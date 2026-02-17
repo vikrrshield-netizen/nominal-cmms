@@ -184,12 +184,16 @@ function AddVehicleModal({ onClose, onSuccess }: { onClose: () => void; onSucces
     if (!name.trim()) return;
     setSaving(true);
     try {
+      const vehicleName = name.trim();
+      const vehicleCode = spz.trim().replace(/\s+/g, '-').toUpperCase() || vehicleName.substring(0, 3).toUpperCase() + '-NEW';
+
+      // Write to entities collection (FleetPage realtime)
       await addDoc(collection(db, 'entities'), {
         parentId: 'entity_fleet',
         type: 'vehicle',
         blueprintId: 'blueprint_vehicle',
-        name: name.trim(),
-        code: spz.trim().replace(/\s+/g, '-').toUpperCase() || name.trim().substring(0, 3).toUpperCase() + '-NEW',
+        name: vehicleName,
+        code: vehicleCode,
         status: 'operational',
         data: {
           registration: spz.trim() || 'bez SPZ',
@@ -210,9 +214,28 @@ function AddVehicleModal({ onClose, onSuccess }: { onClose: () => void; onSucces
         createdBy: user?.id || 'unknown',
         isDeleted: false,
       });
-      onSuccess(name.trim());
-    } catch (err: any) {
-      alert('Chyba: ' + err.message);
+
+      // Also write to fleet collection (Dashboard useFleet compatibility)
+      await addDoc(collection(db, 'fleet'), {
+        name: vehicleName,
+        type: 'car' as const,
+        status: 'available',
+        assignedUserName: user?.displayName || 'Pool (sdílený)',
+        licensePlate: spz.trim() || null,
+        stkExpiry: null,
+        insuranceExpiry: null,
+        keysLocation: '',
+        currentMth: 0,
+        currentKm: 0,
+        fuelLevel: 100,
+        serviceHistory: [],
+        isDeleted: false,
+        updatedAt: serverTimestamp(),
+      });
+
+      onSuccess(vehicleName);
+    } catch (err: unknown) {
+      alert('Chyba: ' + ((err as Error).message || err));
     }
     setSaving(false);
   };
@@ -299,8 +322,8 @@ function VehicleDetailModal({ entity, blueprint, onClose, toast }: {
       });
       toast(`${fieldKey === 'stk_date' ? 'STK' : fieldKey} aktualizováno`);
       setEditingField(null);
-    } catch (err: any) {
-      toast('Chyba: ' + err.message, 'error');
+    } catch (err: unknown) {
+      toast('Chyba: ' + ((err as Error).message || err), 'error');
     }
     setSaving(false);
   };
@@ -315,8 +338,8 @@ function VehicleDetailModal({ entity, blueprint, onClose, toast }: {
       });
       await addLog('maintenance', `Výměna oleje — reset motohodin na 0. Typ: ${entity.data.oil_type || 'neuvedeno'}.`, { oil_reset: true });
       toast('Olej vyměněn — Mth reset na 0');
-    } catch (err: any) {
-      toast('Chyba: ' + err.message, 'error');
+    } catch (err: unknown) {
+      toast('Chyba: ' + ((err as Error).message || err), 'error');
     }
     setSaving(false);
   };
@@ -340,8 +363,8 @@ function VehicleDetailModal({ entity, blueprint, onClose, toast }: {
       }
       toast('Vozidlo předáno');
       setShowHandover(false);
-    } catch (err: any) {
-      toast('Chyba: ' + err.message, 'error');
+    } catch (err: unknown) {
+      toast('Chyba: ' + ((err as Error).message || err), 'error');
     }
     setSaving(false);
   };

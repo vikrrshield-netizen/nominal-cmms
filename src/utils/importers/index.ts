@@ -5,3 +5,4 @@
 export { validateExcelData, type ValidationResult, type ValidationError } from './validateExcelData';
 export { importAssets } from './importAssets';
 export { importInventory } from './importInventory';
+export { parseExcelFile, type ParseResult, type ColumnMapping } from './excelImporter';

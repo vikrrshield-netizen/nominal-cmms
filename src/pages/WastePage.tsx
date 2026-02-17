@@ -238,7 +238,7 @@ function ContainerModal({ container, onClose, onUpdateFill, onMarkEmptied, forma
     try {
       await onMarkEmptied(container.id);
       onClose();
-    } catch (err: any) { alert(err.message); }
+    } catch (err: unknown) { alert((err as Error).message); }
     setSaving(false);
   };
 
@@ -247,7 +247,7 @@ function ContainerModal({ container, onClose, onUpdateFill, onMarkEmptied, forma
     try {
       await onUpdateFill(container.id, level);
       onClose();
-    } catch (err: any) { alert(err.message); }
+    } catch (err: unknown) { alert((err as Error).message); }
     setSaving(false);
   };
 
