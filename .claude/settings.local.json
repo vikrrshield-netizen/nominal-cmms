@@ -8,7 +8,10 @@
       "Bash(unzip:*)",
       "Bash(ls:*)",
       "Bash(curl:*)",
-      "Bash(npx tsx:*)"
+      "Bash(npx tsx:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(npx firebase deploy:*)"
     ]
   }
 }

@@ -347,6 +347,94 @@ function QuickActionsGrid() {
 }
 
 // ═══════════════════════════════════════════════════════
+// SILO STATUS PANEL — vizuální stav sil
+// ═══════════════════════════════════════════════════════
+
+const DEMO_SILOS = [
+  { id: 's1', name: 'Silo 1', material: 'Pšeničná mouka', fillPercent: 78, capacity: '25 t' },
+  { id: 's2', name: 'Silo 2', material: 'Kukuřičná mouka', fillPercent: 42, capacity: '25 t' },
+  { id: 's3', name: 'Silo 3', material: 'Hrášková bílkovina', fillPercent: 15, capacity: '15 t' },
+  { id: 's4', name: 'Silo 4', material: 'Sojový šrot', fillPercent: 91, capacity: '20 t' },
+];
+
+function SiloStatusPanel() {
+  const [silos, setSilos] = useState(DEMO_SILOS);
+  const [editingSilo, setEditingSilo] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
+
+  const getSiloColor = (pct: number) => {
+    if (pct < 20) return { bar: 'bg-red-500', text: 'text-red-400', border: 'border-red-500/30', bg: 'bg-red-500/10' };
+    if (pct < 60) return { bar: 'bg-amber-500', text: 'text-amber-400', border: 'border-amber-500/30', bg: 'bg-amber-500/10' };
+    return { bar: 'bg-emerald-500', text: 'text-emerald-400', border: 'border-emerald-500/30', bg: 'bg-emerald-500/10' };
+  };
+
+  const handleUpdate = (id: string) => {
+    const val = parseInt(editValue);
+    if (isNaN(val) || val < 0 || val > 100) return;
+    setSilos(prev => prev.map(s => s.id === id ? { ...s, fillPercent: val } : s));
+    setEditingSilo(null);
+  };
+
+  return (
+    <div className="bg-slate-800/60 rounded-2xl p-4 border border-slate-700/50 mb-6">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Stav sil</h2>
+        <span className="text-xs text-slate-500">{silos.length} sil</span>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {silos.map((silo) => {
+          const c = getSiloColor(silo.fillPercent);
+          return (
+            <div key={silo.id} className={`rounded-xl p-3 border ${c.border} ${c.bg}`}>
+              <div className="text-xs text-slate-500 mb-1">{silo.name}</div>
+              <div className="text-sm font-bold text-white mb-0.5">{silo.material}</div>
+              <div className="text-xs text-slate-500 mb-2">{silo.capacity}</div>
+              {/* Progress bar */}
+              <div className="h-3 bg-slate-700/50 rounded-full overflow-hidden mb-1.5">
+                <div
+                  className={`h-full ${c.bar} rounded-full transition-all duration-500`}
+                  style={{ width: `${silo.fillPercent}%` }}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <span className={`text-lg font-bold ${c.text}`}>{silo.fillPercent}%</span>
+                {editingSilo === silo.id ? (
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      className="w-14 p-1 bg-slate-600/80 border border-slate-500/50 rounded text-xs text-white text-center outline-none"
+                      min={0}
+                      max={100}
+                      autoFocus
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleUpdate(silo.id); }}
+                    />
+                    <button
+                      onClick={() => handleUpdate(silo.id)}
+                      className="text-[10px] text-emerald-400 font-bold hover:text-emerald-300"
+                    >
+                      OK
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => { setEditingSilo(silo.id); setEditValue(String(silo.fillPercent)); }}
+                    className="text-[10px] text-slate-500 hover:text-white transition px-1.5 py-0.5 rounded hover:bg-white/5"
+                  >
+                    Aktualizovat
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════
 // FULL DASHBOARD — layout "Velín"
 // ═══════════════════════════════════════════════════════
 
@@ -445,6 +533,9 @@ function FullDashboard() {
 
         {/* 2. QUICK ACTIONS GRID */}
         <QuickActionsGrid />
+
+        {/* 2.5 SILA STATUS */}
+        <SiloStatusPanel />
 
         {/* 3. HLAVNÍ GRID — Mapa + Kalendář */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">

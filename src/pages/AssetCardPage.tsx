@@ -20,7 +20,7 @@ import {
   AlertTriangle, ArrowLeft, CheckCircle2,
   Clock, Loader2, Shield, Wrench, X,
   ChevronRight, Settings, Building2, MapPin,
-  Cog, PlusCircle,
+  Cog, PlusCircle, FileText, Filter,
 } from 'lucide-react';
 
 // ═══════════════════════════════════════════
@@ -115,11 +115,37 @@ export default function AssetCardPage() {
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showRevisionModal, setShowRevisionModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'info' | 'tasks' | 'revisions'>('info');
+  const [stanoviste, setStanoviste] = useState('Expedice');
+  const [prefilterSaving, setPrefilterSaving] = useState(false);
 
   const { revisions, loading: loadingRevisions, logRevision } = useRevisions(assetId);
 
   const canCreateTask = hasPermission('tasks.create');
   const canEditAsset = hasPermission('assets.edit');
+
+  // Handler: Výměna předfiltru (extruder)
+  const handlePrefilterChange = async () => {
+    if (!asset) return;
+    setPrefilterSaving(true);
+    try {
+      await createTask({
+        title: `Výměna předfiltru — ${asset.name}`,
+        description: `Preventivní výměna předfiltru na ${asset.name} (${asset.code || ''})`,
+        priority: 'P3',
+        type: 'preventive',
+        source: 'web',
+        assetId: asset.id,
+        assetName: asset.name,
+        buildingId: asset.buildingId,
+        createdById: user?.id || 'unknown',
+        createdByName: user?.displayName || 'Neznámý',
+      });
+      setActiveTab('tasks');
+    } catch (err) {
+      console.error('[Prefilter]', err);
+    }
+    setPrefilterSaving(false);
+  };
 
   // ─── LOAD ASSET ───
   useEffect(() => {
@@ -309,6 +335,16 @@ export default function AssetCardPage() {
               Zapsat revizi
             </button>
           )}
+          {asset.category === 'extruder' && canCreateTask && (
+            <button
+              onClick={handlePrefilterChange}
+              disabled={prefilterSaving}
+              className="flex-1 py-3 bg-purple-500/15 border border-purple-500/30 text-purple-400 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-purple-500/25 transition active:scale-[0.97] min-h-[48px] disabled:opacity-50"
+            >
+              {prefilterSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Filter className="w-5 h-5" />}
+              Výměna předfiltru
+            </button>
+          )}
         </div>
 
         {/* Tabs */}
@@ -360,6 +396,57 @@ export default function AssetCardPage() {
                 )}
               </div>
             </div>
+
+            {/* VZV Stanoviště */}
+            {asset.category === 'forklift' && (
+              <div className="bg-slate-800/40 rounded-2xl p-4 border border-slate-700/30">
+                <h3 className="text-xs text-slate-500 uppercase font-bold mb-3">Stanoviště VZV</h3>
+                <div className="flex gap-2">
+                  {['Expedice', 'Sklad A', 'Sklad B'].map((loc) => (
+                    <button
+                      key={loc}
+                      className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition border min-h-[44px] ${
+                        stanoviste === loc
+                          ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+                          : 'bg-white/5 text-slate-500 border-white/10 hover:text-slate-300'
+                      }`}
+                      onClick={() => setStanoviste(loc)}
+                    >
+                      {loc}
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-2 text-xs text-slate-500">
+                  Aktuální poloha: <span className="text-yellow-400 font-medium">{stanoviste}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Dokumentace VZV */}
+            {asset.category === 'forklift' && (
+              <div className="bg-slate-800/40 rounded-2xl p-4 border border-slate-700/30">
+                <h3 className="text-xs text-slate-500 uppercase font-bold mb-3 flex items-center gap-2">
+                  <FileText className="w-4 h-4" />
+                  Dokumentace
+                </h3>
+                <div className="space-y-2">
+                  {[
+                    { name: 'Revizní zpráva VZV 2025', date: '12.08.2025' },
+                    { name: 'Školení operátora VZV', date: '05.01.2026' },
+                    { name: 'Technický list', date: '01.03.2024' },
+                  ].map((d, i) => (
+                    <div key={i} className="flex items-center gap-3 bg-slate-700/30 rounded-xl p-3 hover:bg-slate-700/40 transition cursor-pointer">
+                      <FileText className="w-5 h-5 text-blue-400 flex-shrink-0" />
+                      <div className="flex-1">
+                        <div className="text-sm font-medium text-white">{d.name}</div>
+                        <div className="text-xs text-slate-500">{d.date}</div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-slate-600" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Control Points */}
             {asset.controlPoints && asset.controlPoints.length > 0 && (
