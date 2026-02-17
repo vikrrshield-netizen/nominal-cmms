@@ -54,6 +54,16 @@ const PRIORITY_CONFIG: Record<string, { bg: string; border: string; color: strin
   P4: { bg: 'bg-slate-500/8', border: 'border-slate-500/20', color: '#94a3b8', label: 'P4 — Nápad', textClass: 'text-slate-400', borderLeft: 'border-l-4 border-l-gray-500' },
 };
 
+const STATUS_BADGES: Record<string, { label: string; bg: string; text: string }> = {
+  backlog:      { label: 'Nový',         bg: 'bg-red-500/20',     text: 'text-red-400' },
+  planned:      { label: 'Plánovaný',    bg: 'bg-blue-500/20',    text: 'text-blue-400' },
+  in_progress:  { label: 'V řešení',     bg: 'bg-amber-500/20',   text: 'text-amber-400' },
+  paused:       { label: 'Čeká na díl',  bg: 'bg-cyan-500/20',    text: 'text-cyan-400' },
+  completed:    { label: 'Hotovo',        bg: 'bg-emerald-500/20', text: 'text-emerald-400' },
+  done:         { label: 'Hotovo',        bg: 'bg-emerald-500/20', text: 'text-emerald-400' },
+  cancelled:    { label: 'Zrušeno',       bg: 'bg-slate-500/20',   text: 'text-slate-400' },
+};
+
 // ═══════════════════════════════════════════════════
 // HELPERS
 // ═══════════════════════════════════════════════════
@@ -94,6 +104,14 @@ function TaskCard({ task, onClick }: { task: Task; onClick: () => void }) {
           <span className="text-sm font-bold px-1.5 py-0.5 rounded-md" style={{ background: `${pc.color}20`, color: pc.color }}>
             {task.priority}
           </span>
+          {(() => {
+            const sb = STATUS_BADGES[task.status];
+            return sb ? (
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${sb.bg} ${sb.text}`}>
+                {sb.label}
+              </span>
+            ) : null;
+          })()}
         </div>
         <span className="text-xs text-slate-500">{timeAgo(task.createdAt)}</span>
       </div>

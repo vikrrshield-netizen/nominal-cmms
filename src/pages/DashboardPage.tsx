@@ -10,8 +10,11 @@ import { useLouparna } from '../hooks/useLouparna';
 import { useRevisions } from '../hooks/useRevisions';
 import { useInspections } from '../hooks/useInspections';
 import {
-  Settings, AlertTriangle, LogOut, Loader2, ClipboardCheck, Map
+  Settings, AlertTriangle, LogOut, Loader2, ClipboardCheck, Map,
+  Lightbulb, Package, Trash2, Bot,
 } from 'lucide-react';
+import { createTask } from '../services/taskService';
+import BottomSheet, { FormField, SubmitButton } from '../components/ui/BottomSheet';
 
 // ═══════════════════════════════════════════════════════
 // FIREBASE HOOKS (LIVE DATA) — zachováno beze změn
@@ -182,6 +185,168 @@ const PRIORITY_BORDER: Record<string, string> = {
 };
 
 // ═══════════════════════════════════════════════════════
+// QUICK ACTIONS GRID — Dashboard rychlé akce
+// ═══════════════════════════════════════════════════════
+
+function QuickActionsGrid() {
+  const navigate = useNavigate();
+  const { user } = useAuthContext();
+  const [activeModal, setActiveModal] = useState<'idea' | 'request' | 'waste' | null>(null);
+  const [formText, setFormText] = useState('');
+  const [isAnonymous, setIsAnonymous] = useState(false);
+  const [requestType, setRequestType] = useState('tool');
+  const [wasteType, setWasteType] = useState('plevy');
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!formText.trim() && activeModal !== 'waste') return;
+    setSaving(true);
+    try {
+      const baseTask = {
+        createdById: isAnonymous ? 'anonymous' : (user?.id || 'unknown'),
+        createdByName: isAnonymous ? 'Anonymní' : (user?.displayName || 'Neznámý'),
+        source: 'web' as const,
+        priority: 'P3' as const,
+      };
+
+      if (activeModal === 'idea') {
+        await createTask({
+          ...baseTask,
+          title: formText.trim(),
+          type: 'improvement',
+        });
+      } else if (activeModal === 'request') {
+        const labels: Record<string, string> = {
+          tool: 'Chybí nářadí',
+          clothing: 'Chybí pracovní oděv',
+          material: 'Chybí materiál',
+        };
+        await createTask({
+          ...baseTask,
+          title: `${labels[requestType]}: ${formText.trim()}`,
+          type: 'preventive',
+          priority: 'P3',
+        });
+      } else if (activeModal === 'waste') {
+        const labels: Record<string, string> = {
+          plevy: 'Vyvézt vůz (plevy)',
+          popelnice: 'Plná popelnice',
+          kontejner: 'Plný kontejner',
+        };
+        await createTask({
+          ...baseTask,
+          title: labels[wasteType] + (formText.trim() ? ` — ${formText.trim()}` : ''),
+          type: 'corrective',
+          priority: 'P2',
+        });
+      }
+
+      setActiveModal(null);
+      setFormText('');
+      setIsAnonymous(false);
+    } catch (err) {
+      console.error('[QuickAction]', err);
+    }
+    setSaving(false);
+  };
+
+  return (
+    <>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        {/* Nápad / Schránka důvěry */}
+        <button
+          onClick={() => setActiveModal('idea')}
+          className="p-4 bg-purple-500/10 border border-purple-500/25 rounded-2xl text-left hover:bg-purple-500/20 transition active:scale-[0.97] min-h-[90px]"
+        >
+          <Lightbulb className="w-7 h-7 text-purple-400 mb-2" />
+          <div className="text-sm font-bold text-white">Nápad</div>
+          <div className="text-[10px] text-purple-400/70 mt-0.5">Schránka důvěry</div>
+        </button>
+
+        {/* Požadavky */}
+        <button
+          onClick={() => setActiveModal('request')}
+          className="p-4 bg-blue-500/10 border border-blue-500/25 rounded-2xl text-left hover:bg-blue-500/20 transition active:scale-[0.97] min-h-[90px]"
+        >
+          <Package className="w-7 h-7 text-blue-400 mb-2" />
+          <div className="text-sm font-bold text-white">Požadavky</div>
+          <div className="text-[10px] text-blue-400/70 mt-0.5">Nářadí, materiál</div>
+        </button>
+
+        {/* Odpad / Plevy */}
+        <button
+          onClick={() => setActiveModal('waste')}
+          className="p-4 bg-amber-500/10 border border-amber-500/25 rounded-2xl text-left hover:bg-amber-500/20 transition active:scale-[0.97] min-h-[90px]"
+        >
+          <Trash2 className="w-7 h-7 text-amber-400 mb-2" />
+          <div className="text-sm font-bold text-white">Odpad</div>
+          <div className="text-[10px] text-amber-400/70 mt-0.5">Plevy, popelnice</div>
+        </button>
+
+        {/* AI Asistent */}
+        <button
+          onClick={() => navigate('/ai')}
+          className="p-4 bg-emerald-500/10 border border-emerald-500/25 rounded-2xl text-left hover:bg-emerald-500/20 transition active:scale-[0.97] min-h-[90px]"
+        >
+          <Bot className="w-7 h-7 text-emerald-400 mb-2" />
+          <div className="text-sm font-bold text-white">Nominal AI</div>
+          <div className="text-[10px] text-emerald-400/70 mt-0.5">Asistent údržby</div>
+        </button>
+      </div>
+
+      {/* ── MODAL: Nápad ── */}
+      <BottomSheet title="💡 Nápad / Schránka důvěry" isOpen={activeModal === 'idea'} onClose={() => setActiveModal(null)}>
+        <div className="mb-3 flex items-center gap-3 p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl">
+          <input
+            type="checkbox"
+            checked={isAnonymous}
+            onChange={(e) => setIsAnonymous(e.target.checked)}
+            className="w-5 h-5 accent-purple-500"
+          />
+          <span className="text-sm text-purple-300">Poslat anonymně</span>
+        </div>
+        <FormField label="Váš nápad nebo zpráva" value={formText} onChange={setFormText} type="textarea" placeholder="Co byste chtěli zlepšit?" required />
+        <SubmitButton label="Odeslat" onClick={handleSubmit} loading={saving} color="orange" />
+      </BottomSheet>
+
+      {/* ── MODAL: Požadavky ── */}
+      <BottomSheet title="📦 Nový požadavek" isOpen={activeModal === 'request'} onClose={() => setActiveModal(null)}>
+        <FormField
+          label="Typ požadavku"
+          value={requestType}
+          onChange={setRequestType}
+          type="select"
+          options={[
+            { value: 'tool', label: '🔧 Chybí nářadí' },
+            { value: 'clothing', label: '👕 Chybí pracovní oděv' },
+            { value: 'material', label: '📦 Chybí materiál' },
+          ]}
+        />
+        <FormField label="Upřesnění" value={formText} onChange={setFormText} placeholder="Co přesně potřebujete?" required />
+        <SubmitButton label="Odeslat požadavek" onClick={handleSubmit} loading={saving} color="orange" />
+      </BottomSheet>
+
+      {/* ── MODAL: Odpad ── */}
+      <BottomSheet title="🚜 Odpad / Plevy" isOpen={activeModal === 'waste'} onClose={() => setActiveModal(null)}>
+        <FormField
+          label="Typ"
+          value={wasteType}
+          onChange={setWasteType}
+          type="select"
+          options={[
+            { value: 'plevy', label: '🌾 Vyvézt vůz (plevy)' },
+            { value: 'popelnice', label: '🗑️ Plná popelnice' },
+            { value: 'kontejner', label: '📦 Plný kontejner' },
+          ]}
+        />
+        <FormField label="Poznámka (volitelné)" value={formText} onChange={setFormText} placeholder="Lokace, poznámka..." />
+        <SubmitButton label="Nahlásit" onClick={handleSubmit} loading={saving} color="orange" />
+      </BottomSheet>
+    </>
+  );
+}
+
+// ═══════════════════════════════════════════════════════
 // FULL DASHBOARD — layout "Velín"
 // ═══════════════════════════════════════════════════════
 
@@ -278,7 +443,10 @@ function FullDashboard() {
           <span className="text-2xl font-bold">NAHLÁSIT PORUCHU</span>
         </button>
 
-        {/* 2. HLAVNÍ GRID — Mapa + Kalendář */}
+        {/* 2. QUICK ACTIONS GRID */}
+        <QuickActionsGrid />
+
+        {/* 3. HLAVNÍ GRID — Mapa + Kalendář */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
 
           {/* A) MAPA AREÁLU */}
