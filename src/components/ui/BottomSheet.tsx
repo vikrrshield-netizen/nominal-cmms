@@ -18,27 +18,22 @@ export default function BottomSheet({ title, isOpen, onClose, children }: Bottom
   return (
     <>
       <style>{`
-        @keyframes nominalSlideUp {
-          from { transform: translateY(100%); opacity: 0.5; }
-          to { transform: translateY(0); opacity: 1; }
+        @keyframes nominalScaleIn {
+          from { transform: scale(0.95); opacity: 0; }
+          to { transform: scale(1); opacity: 1; }
         }
       `}</style>
       <div
-        className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end justify-center"
+        className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-md flex items-center justify-center p-4"
         onClick={onClose}
       >
         <div
           onClick={(e) => e.stopPropagation()}
-          className="w-full max-w-lg max-h-[85vh] bg-slate-800 rounded-t-3xl overflow-y-auto"
-          style={{ animation: 'nominalSlideUp 0.25s ease-out' }}
+          className="w-full max-w-lg max-h-[85vh] bg-slate-800 rounded-3xl overflow-y-auto shadow-2xl border border-white/10"
+          style={{ animation: 'nominalScaleIn 0.2s ease-out' }}
         >
-        {/* Handle bar */}
-        <div className="flex justify-center pt-3 pb-1">
-          <div className="w-10 h-1 rounded-full bg-slate-600" />
-        </div>
-
         {/* Header */}
-        <div className="flex items-center justify-between px-6 pb-4 pt-2">
+        <div className="flex items-center justify-between px-6 pb-4 pt-5">
           <h2 className="text-xl font-bold text-white">{title}</h2>
           <button
             onClick={onClose}

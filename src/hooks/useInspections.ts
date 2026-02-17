@@ -5,6 +5,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
+import { createTask } from '../services/taskService';
 
 export interface InspectionLog {
   id: string;
@@ -93,8 +94,11 @@ export function useInspections(month?: string) {
     });
   }
 
-  // Označit se závadou
+  // Označit se závadou + automaticky vytvořit P1 úkol
   async function markDefect(logId: string, defectNote: string) {
+    // Najdi log pro context
+    const log = logs.find((l) => l.id === logId);
+
     await updateDoc(doc(db, 'inspection_logs', logId), {
       status: 'defect',
       defectNote,
@@ -102,6 +106,22 @@ export function useInspections(month?: string) {
       completedAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
+
+    // Auto-create P1 task
+    try {
+      await createTask({
+        title: `Závada: ${log?.roomName || 'Neznámá místnost'} — ${defectNote.slice(0, 80)}`,
+        description: `Automaticky vytvořeno z kontroly budov.\nBudova: ${log?.building || '?'}\nPatro: ${log?.floor || '?'}\nMístnost: ${log?.roomName || '?'}\nPopis: ${defectNote}`,
+        type: 'corrective',
+        priority: 'P1',
+        source: 'inspection',
+        buildingId: log?.building || undefined,
+        createdById: user?.id || 'system',
+        createdByName: user?.displayName || 'Kontrola budov',
+      });
+    } catch (err) {
+      console.error('[useInspections] Auto-task creation failed:', err);
+    }
   }
 
   // Vrátit na pending (oprava)

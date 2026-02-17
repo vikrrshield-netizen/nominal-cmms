@@ -11,13 +11,14 @@ import { useRevisions } from '../hooks/useRevisions';
 import { useInspections } from '../hooks/useInspections';
 import {
   Settings, AlertTriangle, LogOut, Loader2, ClipboardCheck, Map,
-  Lightbulb, Package, Trash2, Bot,
+  X, Edit3, LayoutGrid, Play, CheckCircle2,
 } from 'lucide-react';
-import { createTask } from '../services/taskService';
+import { createTask, startTask, completeTask, subscribeToActiveTasks } from '../services/taskService';
+import type { TaskDoc } from '../types/firestore';
 import BottomSheet, { FormField, SubmitButton } from '../components/ui/BottomSheet';
 
 // ═══════════════════════════════════════════════════════
-// FIREBASE HOOKS (LIVE DATA) — zachováno beze změn
+// FIREBASE HOOKS (LIVE DATA)
 // ═══════════════════════════════════════════════════════
 
 function useDashboardStats() {
@@ -69,7 +70,7 @@ function useDashboardStats() {
 }
 
 // ═══════════════════════════════════════════════════════
-// KIOSK DASHBOARD (OPERATOR role) — zachováno beze změn
+// KIOSK DASHBOARD (OPERATOR role)
 // ═══════════════════════════════════════════════════════
 
 function KioskDashboard() {
@@ -90,10 +91,10 @@ function KioskDashboard() {
               <Settings className="w-7 h-7 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-white">Nominální<span className="text-blue-400">CMMS</span></h1>
+              <h1 className="text-2xl font-bold text-white">Nominal<span className="text-blue-400">CMMS</span></h1>
               <p className="text-slate-400 text-sm flex items-center gap-2">
                 <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
-                Kiosek – Velín extruze
+                Kiosek
               </p>
             </div>
           </div>
@@ -104,7 +105,7 @@ function KioskDashboard() {
 
         {stats.loading && (
           <div className="px-6 mb-6 flex items-center gap-3 text-slate-400">
-            <Loader2 className="w-5 h-5 animate-spin" /><span className="text-sm">Načítám data...</span>
+            <Loader2 className="w-5 h-5 animate-spin" /><span className="text-sm">Nacitam data...</span>
           </div>
         )}
 
@@ -115,8 +116,8 @@ function KioskDashboard() {
               <AlertTriangle className="w-10 h-10 text-white" />
             </div>
             <div className="text-left">
-              <h2 className="text-2xl font-bold text-white mb-1">Nahlásit chybu</h2>
-              <p className="text-red-300/70 text-lg">Stroj nefunguje? Hlásí chyba?</p>
+              <h2 className="text-2xl font-bold text-white mb-1">Nahlasit chybu</h2>
+              <p className="text-red-300/70 text-lg">Stroj nefunguje?</p>
             </div>
           </button>
 
@@ -127,7 +128,7 @@ function KioskDashboard() {
             </div>
             <div className="text-left">
               <h2 className="text-2xl font-bold text-white mb-1">Kontrola budov</h2>
-              <p className="text-emerald-300/70 text-lg">Denní obchůzka a kontroly</p>
+              <p className="text-emerald-300/70 text-lg">Denni obchuzka</p>
             </div>
           </button>
 
@@ -137,8 +138,8 @@ function KioskDashboard() {
               <Map className="w-10 h-10 text-white" />
             </div>
             <div className="text-left">
-              <h2 className="text-2xl font-bold text-white mb-1">Mapa strojů</h2>
-              <p className="text-blue-300/70 text-lg">{stats.totalAssets} zařízení • {stats.operationalAssets} v provozu</p>
+              <h2 className="text-2xl font-bold text-white mb-1">Mapa stroju</h2>
+              <p className="text-blue-300/70 text-lg">{stats.totalAssets} zarizeni</p>
             </div>
           </button>
         </section>
@@ -147,7 +148,7 @@ function KioskDashboard() {
           <div className="grid grid-cols-3 gap-3">
             <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-4 text-center border border-white/10">
               <div className="text-2xl font-bold text-orange-400">{stats.openTasks}</div>
-              <div className="text-xs text-slate-400 mt-1">Otevřené úkoly</div>
+              <div className="text-xs text-slate-400 mt-1">Otevrene ukoly</div>
             </div>
             <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-4 text-center border border-white/10">
               <div className="text-2xl font-bold text-emerald-400">{stats.operationalAssets}</div>
@@ -155,7 +156,7 @@ function KioskDashboard() {
             </div>
             <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-4 text-center border border-white/10">
               <div className="text-2xl font-bold text-red-400">{stats.criticalTasks}</div>
-              <div className="text-xs text-slate-400 mt-1">Havárie</div>
+              <div className="text-xs text-slate-400 mt-1">Havarie</div>
             </div>
           </div>
         </footer>
@@ -165,32 +166,276 @@ function KioskDashboard() {
 }
 
 // ═══════════════════════════════════════════════════════
-// CONSTANTS
+// TILE DEFINITIONS
 // ═══════════════════════════════════════════════════════
 
-const BUILDINGS = [
-  { id: 'A', name: 'Administrativa', icon: '🏢' },
-  { id: 'B', name: 'Výroba', icon: '🏭' },
-  { id: 'C', name: 'Sklad', icon: '📦' },
-  { id: 'D', name: 'Dílna', icon: '🔧' },
-  { id: 'E', name: 'Expedice', icon: '🚛' },
-  { id: 'L', name: 'Loupárna', icon: '🌾' },
+interface TileDef {
+  id: string;
+  icon: string;
+  label: string;
+  gradient: string;
+}
+
+const TILE_DEFS: TileDef[] = [
+  { id: 'fault',       icon: '🚨', label: 'Nahlásit poruchu', gradient: 'from-red-500 to-rose-600' },
+  { id: 'tasks',       icon: '📋', label: 'Úkoly',            gradient: 'from-orange-500 to-amber-600' },
+  { id: 'map',         icon: '🗺️', label: 'Mapa areálu',      gradient: 'from-blue-500 to-indigo-600' },
+  { id: 'revisions',   icon: '🔍', label: 'Revize',           gradient: 'from-purple-500 to-violet-600' },
+  { id: 'inventory',   icon: '📦', label: 'Sklad ND',         gradient: 'from-emerald-500 to-teal-600' },
+  { id: 'waste',       icon: '♻️', label: 'Odpady',            gradient: 'from-yellow-500 to-amber-600' },
+  { id: 'fleet',       icon: '🚗', label: 'Vozidla',          gradient: 'from-cyan-500 to-blue-600' },
+  { id: 'louparna',    icon: '🌾', label: 'Loupárna',         gradient: 'from-lime-500 to-green-600' },
+  { id: 'inspections', icon: '✅', label: 'Kontroly',         gradient: 'from-teal-500 to-emerald-600' },
+  { id: 'calendar',    icon: '📅', label: 'Kalendář',         gradient: 'from-indigo-500 to-purple-600' },
+  { id: 'ai',          icon: '🤖', label: 'Nominal AI',       gradient: 'from-pink-500 to-rose-600' },
+  { id: 'reports',     icon: '📊', label: 'Reporty',          gradient: 'from-slate-500 to-gray-600' },
+  { id: 'idea',        icon: '💡', label: 'Nápad',            gradient: 'from-violet-500 to-purple-600' },
+  { id: 'request',     icon: '🔧', label: 'Požadavky',        gradient: 'from-sky-500 to-blue-600' },
+  { id: 'admin',       icon: '⚙️', label: 'Administrace',     gradient: 'from-gray-500 to-slate-600' },
 ];
 
-const PRIORITY_BORDER: Record<string, string> = {
-  P1: 'border-l-red-500',
-  P2: 'border-l-orange-400',
-  P3: 'border-l-blue-400',
-  P4: 'border-l-gray-500',
-};
+const DEFAULT_ORDER = TILE_DEFS.map(t => t.id);
 
 // ═══════════════════════════════════════════════════════
-// QUICK ACTIONS GRID — Dashboard rychlé akce
+// DASHBOARD CONFIG (localStorage)
 // ═══════════════════════════════════════════════════════
 
-function QuickActionsGrid() {
+interface DashConfig {
+  tileOrder: string[];
+  hiddenTiles: string[];
+}
+
+function loadDashConfig(): DashConfig {
+  try {
+    const raw = localStorage.getItem('nominal-dash-v2');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const tileOrder = Array.isArray(parsed?.tileOrder) ? parsed.tileOrder : [];
+      const hiddenTiles = Array.isArray(parsed?.hiddenTiles) ? parsed.hiddenTiles : [];
+      const allIds = new Set(DEFAULT_ORDER);
+      const existing = new Set([...tileOrder, ...hiddenTiles]);
+      const missing = DEFAULT_ORDER.filter(id => !existing.has(id));
+      return {
+        tileOrder: [...tileOrder.filter((id: string) => allIds.has(id)), ...missing],
+        hiddenTiles: hiddenTiles.filter((id: string) => allIds.has(id)),
+      };
+    }
+  } catch { /* ignore */ }
+  return { tileOrder: [...DEFAULT_ORDER], hiddenTiles: [] };
+}
+
+function saveDashConfig(c: DashConfig) {
+  localStorage.setItem('nominal-dash-v2', JSON.stringify(c));
+}
+
+// ═══════════════════════════════════════════════════════
+// JIGGLE CSS
+// ═══════════════════════════════════════════════════════
+
+const JIGGLE_CSS = `
+@keyframes nominalJiggle {
+  0%, 100% { transform: rotate(-0.7deg) scale(1); }
+  25% { transform: rotate(0.7deg) scale(1.01); }
+  50% { transform: rotate(-0.5deg) scale(1); }
+  75% { transform: rotate(0.5deg) scale(0.99); }
+}
+.tile-jiggle { animation: nominalJiggle 0.3s ease-in-out infinite; }
+.tile-jiggle:nth-child(2n) { animation-delay: 0.05s; }
+.tile-jiggle:nth-child(3n) { animation-delay: 0.1s; }
+`;
+
+// ═══════════════════════════════════════════════════════
+// SEMAPHORE WIDGET — Critical machines, Active incidents, Waste
+// ═══════════════════════════════════════════════════════
+
+function SemaphoreWidget({ stats, wasteRed }: {
+  stats: { breakdownAssets: number; criticalTasks: number; maintenanceAssets: number };
+  wasteRed: number;
+}) {
+  const items = [
+    {
+      label: 'Stroje v poruše',
+      value: stats.breakdownAssets,
+      color: stats.breakdownAssets > 0 ? 'bg-red-500' : 'bg-emerald-500',
+      textColor: stats.breakdownAssets > 0 ? 'text-red-400' : 'text-emerald-400',
+      bgColor: stats.breakdownAssets > 0 ? 'bg-red-500/10 border-red-500/30' : 'bg-emerald-500/10 border-emerald-500/30',
+    },
+    {
+      label: 'Aktivní havárie',
+      value: stats.criticalTasks,
+      color: stats.criticalTasks > 0 ? 'bg-red-500' : 'bg-emerald-500',
+      textColor: stats.criticalTasks > 0 ? 'text-red-400' : 'text-emerald-400',
+      bgColor: stats.criticalTasks > 0 ? 'bg-red-500/10 border-red-500/30' : 'bg-emerald-500/10 border-emerald-500/30',
+    },
+    {
+      label: 'V údržbě',
+      value: stats.maintenanceAssets,
+      color: stats.maintenanceAssets > 0 ? 'bg-amber-500' : 'bg-emerald-500',
+      textColor: stats.maintenanceAssets > 0 ? 'text-amber-400' : 'text-emerald-400',
+      bgColor: stats.maintenanceAssets > 0 ? 'bg-amber-500/10 border-amber-500/30' : 'bg-emerald-500/10 border-emerald-500/30',
+    },
+    {
+      label: 'Odpady (červený)',
+      value: wasteRed,
+      color: wasteRed > 0 ? 'bg-orange-500' : 'bg-emerald-500',
+      textColor: wasteRed > 0 ? 'text-orange-400' : 'text-emerald-400',
+      bgColor: wasteRed > 0 ? 'bg-orange-500/10 border-orange-500/30' : 'bg-emerald-500/10 border-emerald-500/30',
+    },
+  ];
+
+  return (
+    <div className="bg-slate-800/60 rounded-2xl p-4 border border-slate-700/50 mb-4">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Semafor závodu</h2>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {items.map((item) => (
+          <div key={item.label} className={`rounded-xl p-3 border ${item.bgColor} text-center`}>
+            <div className={`w-4 h-4 rounded-full mx-auto mb-2 ${item.color} ${item.value > 0 ? 'animate-pulse' : ''}`} />
+            <div className={`text-2xl font-bold ${item.textColor}`}>{item.value}</div>
+            <div className="text-[10px] text-slate-500 mt-1">{item.label}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════
+// TOP 5 TASKS WIDGET — Interactive daily tasks
+// ═══════════════════════════════════════════════════════
+
+function Top5TasksWidget() {
+  const [tasks, setTasks] = useState<TaskDoc[]>([]);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
   const navigate = useNavigate();
-  const { user } = useAuthContext();
+
+  useEffect(() => {
+    const unsub = subscribeToActiveTasks((allTasks) => {
+      // Top 5 sorted by priority then date
+      const sorted = allTasks
+        .sort((a, b) => {
+          const pOrder: Record<string, number> = { P1: 0, P2: 1, P3: 2, P4: 3 };
+          return (pOrder[a.priority] ?? 9) - (pOrder[b.priority] ?? 9);
+        })
+        .slice(0, 5);
+      setTasks(sorted);
+    });
+    return () => unsub();
+  }, []);
+
+  const handleStart = async (taskId: string) => {
+    setActionLoading(taskId);
+    try { await startTask(taskId); } catch (e) { console.error(e); }
+    setActionLoading(null);
+  };
+
+  const handleComplete = async (taskId: string) => {
+    setActionLoading(taskId);
+    try { await completeTask(taskId); } catch (e) { console.error(e); }
+    setActionLoading(null);
+  };
+
+  const PRIORITY_COLORS: Record<string, string> = {
+    P1: 'bg-red-500',
+    P2: 'bg-orange-500',
+    P3: 'bg-blue-500',
+    P4: 'bg-slate-500',
+  };
+
+  const STATUS_LABELS: Record<string, string> = {
+    backlog: 'Backlog',
+    planned: 'Plánováno',
+    in_progress: 'Probíhá',
+    paused: 'Pozastaveno',
+  };
+
+  if (tasks.length === 0) {
+    return (
+      <div className="bg-slate-800/60 rounded-2xl p-4 border border-slate-700/50 mb-4">
+        <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Top úkoly</h2>
+        <div className="text-center py-4 text-slate-600 text-sm">Žádné aktivní úkoly</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-slate-800/60 rounded-2xl p-4 border border-slate-700/50 mb-4">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Top 5 úkolů</h2>
+        <button onClick={() => navigate('/tasks')} className="text-[11px] text-orange-400 hover:text-orange-300 font-semibold">
+          Vše →
+        </button>
+      </div>
+      <div className="space-y-2">
+        {tasks.map((task) => (
+          <div key={task.id} className="flex items-center gap-3 p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.06] transition">
+            <div className={`w-2 h-8 rounded-full flex-shrink-0 ${PRIORITY_COLORS[task.priority] || 'bg-slate-500'}`} />
+            <div className="flex-1 min-w-0">
+              <div className="text-[13px] font-medium text-white truncate">{task.title}</div>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-[10px] text-slate-500 font-mono">{task.code}</span>
+                <span className="text-[10px] text-slate-600">•</span>
+                <span className="text-[10px] text-slate-500">{STATUS_LABELS[task.status] || task.status}</span>
+              </div>
+            </div>
+            <div className="flex gap-1.5 flex-shrink-0">
+              {(task.status === 'backlog' || task.status === 'planned') && (
+                <button
+                  onClick={() => handleStart(task.id)}
+                  disabled={actionLoading === task.id}
+                  className="px-2.5 py-1.5 rounded-lg bg-blue-500/15 border border-blue-500/30 text-blue-400 text-[11px] font-semibold hover:bg-blue-500/25 transition flex items-center gap-1"
+                >
+                  {actionLoading === task.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
+                  Přebrat
+                </button>
+              )}
+              {task.status === 'in_progress' && (
+                <button
+                  onClick={() => handleComplete(task.id)}
+                  disabled={actionLoading === task.id}
+                  className="px-2.5 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[11px] font-semibold hover:bg-emerald-500/25 transition flex items-center gap-1"
+                >
+                  {actionLoading === task.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
+                  Dokončit
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════
+// FULL DASHBOARD — 3-column Icon Tile Grid
+// ═══════════════════════════════════════════════════════
+
+function FullDashboard() {
+  const navigate = useNavigate();
+  const { user, logout } = useAuthContext();
+  const stats = useDashboardStats();
+
+  // Live data hooks
+  const fleet = useFleet();
+  const waste = useWaste();
+  const inventory = useInventory();
+  const louparna = useLouparna();
+  const revisions = useRevisions();
+  const inspections = useInspections();
+
+  // Clock
+  const [time, setTime] = useState(new Date());
+  useEffect(() => { const t = setInterval(() => setTime(new Date()), 60000); return () => clearInterval(t); }, []);
+
+  // Edit mode
+  const [isEditing, setIsEditing] = useState(false);
+
+  // Tile order + hidden (persisted)
+  const [config, setConfig] = useState<DashConfig>(() => loadDashConfig());
+
+  // Quick action modals
   const [activeModal, setActiveModal] = useState<'idea' | 'request' | 'waste' | null>(null);
   const [formText, setFormText] = useState('');
   const [isAnonymous, setIsAnonymous] = useState(false);
@@ -198,6 +443,106 @@ function QuickActionsGrid() {
   const [wasteType, setWasteType] = useState('plevy');
   const [saving, setSaving] = useState(false);
 
+  // Move tile (stable reorder — no drag & drop)
+  const moveTile = (fromIdx: number, toIdx: number) => {
+    const visibleIds = config.tileOrder.filter(id => !config.hiddenTiles.includes(id));
+    if (toIdx < 0 || toIdx >= visibleIds.length) return;
+    const updated = [...visibleIds];
+    const [moved] = updated.splice(fromIdx, 1);
+    updated.splice(toIdx, 0, moved);
+    const newConfig: DashConfig = {
+      tileOrder: [...updated, ...config.hiddenTiles],
+      hiddenTiles: config.hiddenTiles,
+    };
+    setConfig(newConfig);
+    saveDashConfig(newConfig);
+  };
+
+  // Remove / Restore tiles
+  const removeTile = (id: string) => {
+    const newConfig: DashConfig = {
+      tileOrder: config.tileOrder.filter(t => t !== id),
+      hiddenTiles: [...config.hiddenTiles, id],
+    };
+    setConfig(newConfig);
+    saveDashConfig(newConfig);
+  };
+
+  const restoreTile = (id: string) => {
+    const newConfig: DashConfig = {
+      tileOrder: [...config.tileOrder, id],
+      hiddenTiles: config.hiddenTiles.filter(t => t !== id),
+    };
+    setConfig(newConfig);
+    saveDashConfig(newConfig);
+  };
+
+  // Visible & hidden tile defs
+  const visibleTiles = config.tileOrder
+    .filter(id => !config.hiddenTiles.includes(id))
+    .map(id => TILE_DEFS.find(t => t.id === id))
+    .filter((t): t is TileDef => !!t);
+
+  const hiddenTileDefs = config.hiddenTiles
+    .map(id => TILE_DEFS.find(t => t.id === id))
+    .filter((t): t is TileDef => !!t);
+
+  // Tile data (defensive — all hook data accessed safely)
+  const invStats = inventory?.stats ?? { low: 0, critical: 0, out: 0 };
+  const lowStockCount = (invStats.low ?? 0) + (invStats.critical ?? 0) + (invStats.out ?? 0);
+  const revStats = revisions?.stats ?? { expiring: 0, expired: 0, valid: 0 };
+  const fleetStats = fleet?.stats ?? { available: 0, total: 0 };
+  const wasteStats = waste?.stats ?? { red: 0, green: 0 };
+  const loupStats = louparna?.productionStats ?? { avgYield: 0 };
+  const inspStats = inspections?.stats ?? { percentDone: 0, ok: 0, defect: 0, total: 0 };
+
+  const getTileData = (id: string): { value?: string; subtext?: string; badge?: number } => {
+    switch (id) {
+      case 'fault': return { subtext: 'Rychlé hlášení' };
+      case 'tasks': return { value: String(stats.openTasks || 0), subtext: 'otevřených', badge: stats.criticalTasks > 0 ? stats.criticalTasks : undefined };
+      case 'map': return { value: String(stats.totalAssets || 0), subtext: 'zařízení' };
+      case 'revisions': return {
+        value: String((revStats.expiring ?? 0) + (revStats.expired ?? 0)),
+        subtext: `${revStats.valid ?? 0} platných`,
+        badge: (revStats.expired ?? 0) > 0 ? revStats.expired : undefined,
+      };
+      case 'inventory': return {
+        value: String(lowStockCount),
+        subtext: lowStockCount > 0 ? 'pod limitem' : 'vše OK',
+        badge: (invStats.out ?? 0) > 0 ? invStats.out : undefined,
+      };
+      case 'waste': return { value: String(wasteStats.red ?? 0), subtext: `${wasteStats.green ?? 0} OK` };
+      case 'fleet': return { value: String(fleetStats.available ?? 0), subtext: `z ${fleetStats.total ?? 0} vozidel` };
+      case 'louparna': return { value: `${loupStats.avgYield ?? 0}%`, subtext: louparna?.currentBatch ? 'AKTIVNI' : 'výtěžnost' };
+      case 'inspections': return {
+        value: `${inspStats.percentDone ?? 0}%`,
+        subtext: `${(inspStats.ok ?? 0) + (inspStats.defect ?? 0)}/${inspStats.total ?? 0}`,
+        badge: (inspStats.defect ?? 0) > 0 ? inspStats.defect : undefined,
+      };
+      case 'calendar': return { subtext: time.toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' }) };
+      case 'ai': return { subtext: 'Asistent údržby' };
+      case 'reports': return { subtext: 'Statistiky' };
+      case 'idea': return { subtext: 'Schránka důvěry' };
+      case 'request': return { subtext: 'Nářadí, materiál' };
+      case 'admin': return { subtext: 'Uživatelé, role' };
+      default: return {};
+    }
+  };
+
+  // Tile click
+  const handleTileClick = (tile: TileDef) => {
+    if (isEditing) return;
+    const routes: Record<string, string> = {
+      fault: '/kiosk', tasks: '/tasks', map: '/map', revisions: '/revisions',
+      inventory: '/inventory', waste: '/waste', fleet: '/fleet', louparna: '/louparna',
+      inspections: '/inspections', calendar: '/calendar', ai: '/ai', reports: '/reports', admin: '/admin',
+    };
+    if (routes[tile.id]) { navigate(routes[tile.id]); return; }
+    if (tile.id === 'idea') setActiveModal('idea');
+    else if (tile.id === 'request') setActiveModal('request');
+  };
+
+  // Modal submit
   const handleSubmit = async () => {
     if (!formText.trim() && activeModal !== 'waste') return;
     setSaving(true);
@@ -208,39 +553,15 @@ function QuickActionsGrid() {
         source: 'web' as const,
         priority: 'P3' as const,
       };
-
       if (activeModal === 'idea') {
-        await createTask({
-          ...baseTask,
-          title: formText.trim(),
-          type: 'improvement',
-        });
+        await createTask({ ...baseTask, title: formText.trim(), type: 'improvement' });
       } else if (activeModal === 'request') {
-        const labels: Record<string, string> = {
-          tool: 'Chybí nářadí',
-          clothing: 'Chybí pracovní oděv',
-          material: 'Chybí materiál',
-        };
-        await createTask({
-          ...baseTask,
-          title: `${labels[requestType]}: ${formText.trim()}`,
-          type: 'preventive',
-          priority: 'P3',
-        });
+        const labels: Record<string, string> = { tool: 'Chybí nářadí', clothing: 'Chybí pracovní oděv', material: 'Chybí materiál' };
+        await createTask({ ...baseTask, title: `${labels[requestType]}: ${formText.trim()}`, type: 'preventive', priority: 'P3' });
       } else if (activeModal === 'waste') {
-        const labels: Record<string, string> = {
-          plevy: 'Vyvézt vůz (plevy)',
-          popelnice: 'Plná popelnice',
-          kontejner: 'Plný kontejner',
-        };
-        await createTask({
-          ...baseTask,
-          title: labels[wasteType] + (formText.trim() ? ` — ${formText.trim()}` : ''),
-          type: 'corrective',
-          priority: 'P2',
-        });
+        const labels: Record<string, string> = { plevy: 'Vyvézt vůz (plevy)', popelnice: 'Plná popelnice', kontejner: 'Plný kontejner' };
+        await createTask({ ...baseTask, title: labels[wasteType] + (formText.trim() ? ` — ${formText.trim()}` : ''), type: 'corrective', priority: 'P2' });
       }
-
       setActiveModal(null);
       setFormText('');
       setIsAnonymous(false);
@@ -250,72 +571,182 @@ function QuickActionsGrid() {
     setSaving(false);
   };
 
+  const greeting = () => {
+    const h = time.getHours();
+    if (h < 12) return 'Dobré ráno';
+    if (h < 18) return 'Dobré odpoledne';
+    return 'Dobrý večer';
+  };
+
+  const userName = user?.displayName?.split(' ')[0] || 'uživateli';
+  const isAdmin = (['MAJITEL', 'VEDENI', 'SUPERADMIN', 'UDRZBA'] as string[]).includes(user?.role || '');
+
   return (
-    <>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        {/* Nápad / Schránka důvěry */}
-        <button
-          onClick={() => setActiveModal('idea')}
-          className="p-4 bg-purple-500/10 border border-purple-500/25 rounded-2xl text-left hover:bg-purple-500/20 transition active:scale-[0.97] min-h-[90px]"
-        >
-          <Lightbulb className="w-7 h-7 text-purple-400 mb-2" />
-          <div className="text-sm font-bold text-white">Nápad</div>
-          <div className="text-[10px] text-purple-400/70 mt-0.5">Schránka důvěry</div>
-        </button>
+    <div className="min-h-screen bg-slate-900">
+      <style>{JIGGLE_CSS}</style>
+      <div className="max-w-4xl mx-auto px-3 pt-4 pb-24">
 
-        {/* Požadavky */}
-        <button
-          onClick={() => setActiveModal('request')}
-          className="p-4 bg-blue-500/10 border border-blue-500/25 rounded-2xl text-left hover:bg-blue-500/20 transition active:scale-[0.97] min-h-[90px]"
-        >
-          <Package className="w-7 h-7 text-blue-400 mb-2" />
-          <div className="text-sm font-bold text-white">Požadavky</div>
-          <div className="text-[10px] text-blue-400/70 mt-0.5">Nářadí, materiál</div>
-        </button>
+        {/* HEADER */}
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <div className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">NOMINAL CMMS</div>
+            <h1 className="text-xl font-bold text-white mt-0.5">{greeting()}, {userName}</h1>
+            <div className="text-xs text-slate-500 mt-0.5">
+              {time.toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsEditing(!isEditing)}
+              title="Upravit rozvržení dlaždic (drag & drop)"
+              className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold transition ${
+                isEditing
+                  ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/25'
+                  : 'bg-white/10 border border-white/15 text-white hover:bg-white/15'
+              }`}
+            >
+              {isEditing ? <LayoutGrid className="w-4 h-4" /> : <Edit3 className="w-4 h-4" />}
+              {isEditing ? 'Hotovo' : 'Upravit'}
+            </button>
+            <button
+              onClick={() => logout()}
+              className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white transition"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
 
-        {/* Odpad / Plevy */}
-        <button
-          onClick={() => setActiveModal('waste')}
-          className="p-4 bg-amber-500/10 border border-amber-500/25 rounded-2xl text-left hover:bg-amber-500/20 transition active:scale-[0.97] min-h-[90px]"
-        >
-          <Trash2 className="w-7 h-7 text-amber-400 mb-2" />
-          <div className="text-sm font-bold text-white">Odpad</div>
-          <div className="text-[10px] text-amber-400/70 mt-0.5">Plevy, popelnice</div>
-        </button>
+        {/* LOADING */}
+        {stats.loading && (
+          <div className="flex items-center gap-2 mb-4 text-slate-500 text-sm">
+            <Loader2 className="w-4 h-4 animate-spin" /> Načítám data...
+          </div>
+        )}
 
-        {/* AI Asistent */}
-        <button
-          onClick={() => navigate('/ai')}
-          className="p-4 bg-emerald-500/10 border border-emerald-500/25 rounded-2xl text-left hover:bg-emerald-500/20 transition active:scale-[0.97] min-h-[90px]"
-        >
-          <Bot className="w-7 h-7 text-emerald-400 mb-2" />
-          <div className="text-sm font-bold text-white">Nominal AI</div>
-          <div className="text-[10px] text-emerald-400/70 mt-0.5">Asistent údržby</div>
-        </button>
+        {/* SEMAPHORE + TOP 5 TASKS — admin only */}
+        {isAdmin && !isEditing && (
+          <>
+            <SemaphoreWidget
+              stats={{
+                breakdownAssets: stats.breakdownAssets,
+                criticalTasks: stats.criticalTasks,
+                maintenanceAssets: stats.maintenanceAssets,
+              }}
+              wasteRed={wasteStats.red ?? 0}
+            />
+            <Top5TasksWidget />
+          </>
+        )}
+
+        {/* ═══ TILE GRID — 3 columns ═══ */}
+        <div className="grid grid-cols-3 gap-2.5">
+          {visibleTiles.map((tile, idx) => {
+            const data = getTileData(tile.id);
+            return (
+              <div
+                key={tile.id}
+                onClick={() => handleTileClick(tile)}
+                className={`
+                  relative p-3.5 rounded-2xl bg-gradient-to-br ${tile.gradient}
+                  cursor-pointer transition-all min-h-[110px] flex flex-col justify-between
+                  shadow-lg shadow-black/20 border border-white/10
+                  ${isEditing ? 'tile-jiggle' : 'hover:scale-[1.03] active:scale-[0.95]'}
+                `}
+              >
+                {/* Edit mode: Remove + Move buttons */}
+                {isEditing && (
+                  <div className="absolute -top-1.5 left-0 right-0 flex items-center justify-between z-10 px-0.5">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); removeTile(tile.id); }}
+                      className="w-6 h-6 bg-slate-800 border-2 border-slate-600 rounded-full flex items-center justify-center hover:bg-red-600 hover:border-red-500 transition"
+                    >
+                      <X className="w-3.5 h-3.5 text-white" />
+                    </button>
+                    <div className="flex gap-1">
+                      {idx > 0 && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); moveTile(idx, idx - 1); }}
+                          className="w-6 h-6 bg-slate-800/90 border border-slate-600 rounded-full flex items-center justify-center text-white text-[10px] font-bold hover:bg-blue-600 hover:border-blue-500 transition"
+                        >◀</button>
+                      )}
+                      {idx < visibleTiles.length - 1 && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); moveTile(idx, idx + 1); }}
+                          className="w-6 h-6 bg-slate-800/90 border border-slate-600 rounded-full flex items-center justify-center text-white text-[10px] font-bold hover:bg-blue-600 hover:border-blue-500 transition"
+                        >▶</button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Badge */}
+                {!isEditing && data.badge != null && data.badge > 0 && (
+                  <div className="absolute top-2 right-2 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center shadow-md">
+                    {data.badge}
+                  </div>
+                )}
+
+                {/* Icon */}
+                <span className="text-3xl drop-shadow-md">{tile.icon}</span>
+
+                {/* Content */}
+                <div>
+                  <div className="text-[12px] font-bold text-white/90 leading-tight">{tile.label}</div>
+                  {data.value != null && (
+                    <div className="text-2xl font-extrabold text-white mt-0.5 leading-none">{data.value}</div>
+                  )}
+                  {data.subtext != null && (
+                    <div className="text-[10px] text-white/60 mt-0.5">{data.subtext}</div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ═══ LIBRARY — Hidden tiles ═══ */}
+        {isEditing && (
+          <div className="mt-5">
+            <div className="text-[11px] text-slate-500 uppercase tracking-wider font-bold mb-2 flex items-center gap-2">
+              <LayoutGrid className="w-3.5 h-3.5" />
+              Knihovna ({hiddenTileDefs.length})
+            </div>
+            {hiddenTileDefs.length === 0 ? (
+              <div className="text-sm text-slate-600 text-center py-4 bg-white/[0.02] rounded-xl border border-dashed border-slate-700/50">
+                Všechny dlaždice jsou zobrazeny
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-2.5">
+                {hiddenTileDefs.map(tile => (
+                  <button
+                    key={tile.id}
+                    onClick={() => restoreTile(tile.id)}
+                    className="p-3.5 rounded-2xl border-2 border-dashed border-slate-700/50 text-center opacity-50 hover:opacity-100 hover:border-orange-500/40 transition min-h-[90px] flex flex-col items-center justify-center gap-1"
+                  >
+                    <span className="text-2xl">{tile.icon}</span>
+                    <div className="text-[11px] text-slate-400 font-medium">{tile.label}</div>
+                    <div className="text-[10px] text-emerald-400 font-bold">+ Přidat</div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* ── MODAL: Nápad ── */}
+      {/* ═══ MODALS (centered) ═══ */}
       <BottomSheet title="💡 Nápad / Schránka důvěry" isOpen={activeModal === 'idea'} onClose={() => setActiveModal(null)}>
         <div className="mb-3 flex items-center gap-3 p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl">
-          <input
-            type="checkbox"
-            checked={isAnonymous}
-            onChange={(e) => setIsAnonymous(e.target.checked)}
-            className="w-5 h-5 accent-purple-500"
-          />
+          <input type="checkbox" checked={isAnonymous} onChange={(e) => setIsAnonymous(e.target.checked)} className="w-5 h-5 accent-purple-500" />
           <span className="text-sm text-purple-300">Poslat anonymně</span>
         </div>
         <FormField label="Váš nápad nebo zpráva" value={formText} onChange={setFormText} type="textarea" placeholder="Co byste chtěli zlepšit?" required />
         <SubmitButton label="Odeslat" onClick={handleSubmit} loading={saving} color="orange" />
       </BottomSheet>
 
-      {/* ── MODAL: Požadavky ── */}
       <BottomSheet title="📦 Nový požadavek" isOpen={activeModal === 'request'} onClose={() => setActiveModal(null)}>
-        <FormField
-          label="Typ požadavku"
-          value={requestType}
-          onChange={setRequestType}
-          type="select"
+        <FormField label="Typ požadavku" value={requestType} onChange={setRequestType} type="select"
           options={[
             { value: 'tool', label: '🔧 Chybí nářadí' },
             { value: 'clothing', label: '👕 Chybí pracovní oděv' },
@@ -326,13 +757,8 @@ function QuickActionsGrid() {
         <SubmitButton label="Odeslat požadavek" onClick={handleSubmit} loading={saving} color="orange" />
       </BottomSheet>
 
-      {/* ── MODAL: Odpad ── */}
       <BottomSheet title="🚜 Odpad / Plevy" isOpen={activeModal === 'waste'} onClose={() => setActiveModal(null)}>
-        <FormField
-          label="Typ"
-          value={wasteType}
-          onChange={setWasteType}
-          type="select"
+        <FormField label="Typ" value={wasteType} onChange={setWasteType} type="select"
           options={[
             { value: 'plevy', label: '🌾 Vyvézt vůz (plevy)' },
             { value: 'popelnice', label: '🗑️ Plná popelnice' },
@@ -342,378 +768,6 @@ function QuickActionsGrid() {
         <FormField label="Poznámka (volitelné)" value={formText} onChange={setFormText} placeholder="Lokace, poznámka..." />
         <SubmitButton label="Nahlásit" onClick={handleSubmit} loading={saving} color="orange" />
       </BottomSheet>
-    </>
-  );
-}
-
-// ═══════════════════════════════════════════════════════
-// SILO STATUS PANEL — vizuální stav sil
-// ═══════════════════════════════════════════════════════
-
-const DEMO_SILOS = [
-  { id: 's1', name: 'Silo 1', material: 'Pšeničná mouka', fillPercent: 78, capacity: '25 t' },
-  { id: 's2', name: 'Silo 2', material: 'Kukuřičná mouka', fillPercent: 42, capacity: '25 t' },
-  { id: 's3', name: 'Silo 3', material: 'Hrášková bílkovina', fillPercent: 15, capacity: '15 t' },
-  { id: 's4', name: 'Silo 4', material: 'Sojový šrot', fillPercent: 91, capacity: '20 t' },
-];
-
-function SiloStatusPanel() {
-  const [silos, setSilos] = useState(DEMO_SILOS);
-  const [editingSilo, setEditingSilo] = useState<string | null>(null);
-
-  const getSiloColor = (pct: number) => {
-    if (pct < 20) return { bar: 'bg-red-500', text: 'text-red-400', border: 'border-red-500/30', bg: 'bg-red-500/10' };
-    if (pct < 60) return { bar: 'bg-amber-500', text: 'text-amber-400', border: 'border-amber-500/30', bg: 'bg-amber-500/10' };
-    return { bar: 'bg-emerald-500', text: 'text-emerald-400', border: 'border-emerald-500/30', bg: 'bg-emerald-500/10' };
-  };
-
-  const handleSliderChange = (id: string, val: number) => {
-    setSilos(prev => prev.map(s => s.id === id ? { ...s, fillPercent: val } : s));
-  };
-
-  return (
-    <div className="bg-slate-800/60 rounded-2xl p-4 border border-slate-700/50 mb-6">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Stav sil</h2>
-        <span className="text-xs text-slate-500">{silos.length} sil</span>
-      </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {silos.map((silo) => {
-          const c = getSiloColor(silo.fillPercent);
-          return (
-            <div key={silo.id} className={`rounded-xl p-3 border ${c.border} ${c.bg}`}>
-              <div className="text-xs text-slate-500 mb-1">{silo.name}</div>
-              <div className="text-sm font-bold text-white mb-0.5">{silo.material}</div>
-              <div className="text-xs text-slate-500 mb-2">{silo.capacity}</div>
-              {/* Progress bar */}
-              <div className="h-3 bg-slate-700/50 rounded-full overflow-hidden mb-1.5">
-                <div
-                  className={`h-full ${c.bar} rounded-full transition-all duration-500`}
-                  style={{ width: `${silo.fillPercent}%` }}
-                />
-              </div>
-              <div className="flex items-center justify-between mb-1">
-                <span className={`text-lg font-bold ${c.text}`}>{silo.fillPercent}%</span>
-                <button
-                  onClick={() => setEditingSilo(editingSilo === silo.id ? null : silo.id)}
-                  className="text-[10px] text-slate-500 hover:text-white transition px-1.5 py-0.5 rounded hover:bg-white/5"
-                >
-                  {editingSilo === silo.id ? 'Hotovo' : 'Upravit'}
-                </button>
-              </div>
-              {editingSilo === silo.id && (
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={silo.fillPercent}
-                  onChange={(e) => handleSliderChange(silo.id, Number(e.target.value))}
-                  className="w-full h-2 bg-slate-700 rounded-full appearance-none cursor-pointer accent-orange-500"
-                />
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════
-// FULL DASHBOARD — layout "Velín"
-// ═══════════════════════════════════════════════════════
-
-function FullDashboard() {
-  const navigate = useNavigate();
-  const { user, logout } = useAuthContext();
-  const stats = useDashboardStats();
-
-  // Hooks pro stat karty (LIVE Firestore)
-  const fleet = useFleet();
-  const waste = useWaste();
-  const inventory = useInventory();
-  const louparna = useLouparna();
-  const revisions = useRevisions();
-  const inspections = useInspections();
-
-  // Hodiny
-  const [time, setTime] = useState(new Date());
-  useEffect(() => {
-    const t = setInterval(() => setTime(new Date()), 60000);
-    return () => clearInterval(t);
-  }, []);
-
-  // Dnešní úkoly pro kalendář
-  const [todayTasks, setTodayTasks] = useState<any[]>([]);
-  useEffect(() => {
-    const unsub = onSnapshot(
-      collection(db, 'tasks'),
-      (snap) => {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-
-        const filtered = snap.docs
-          .map((d) => ({ id: d.id, ...d.data() } as any))
-          .filter((t) => {
-            if (t.isDone || t.status === 'done' || t.status === 'completed') return false;
-            if (!t.scheduledDate) return false;
-            const sd = t.scheduledDate.toDate ? t.scheduledDate.toDate() : new Date(t.scheduledDate);
-            return sd >= today && sd < tomorrow;
-          });
-        setTodayTasks(filtered);
-      },
-      () => setTodayTasks([])
-    );
-    return () => unsub();
-  }, []);
-
-  const greeting = () => {
-    const h = time.getHours();
-    if (h < 12) return 'Dobré ráno';
-    if (h < 18) return 'Dobré odpoledne';
-    return 'Dobrý večer';
-  };
-
-  const userName = user?.displayName?.split(' ')[0] || 'uživateli';
-  const lowStockCount = inventory.stats.low + inventory.stats.critical + inventory.stats.out;
-
-  return (
-    <div className="min-h-screen bg-slate-900">
-      <div className="max-w-7xl mx-auto px-4 pt-4 pb-12">
-
-        {/* HEADER */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <div className="text-xs text-slate-500 uppercase tracking-widest">NOMINAL CMMS</div>
-            <h1 className="text-xl font-bold text-white mt-1">{greeting()}, {userName}</h1>
-            <div className="text-xs text-slate-500 mt-1">
-              {time.toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-            </div>
-          </div>
-          <button
-            onClick={() => logout()}
-            className="w-11 h-11 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white transition"
-          >
-            <LogOut className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* LOADING */}
-        {stats.loading && (
-          <div className="flex items-center gap-2 mb-4 text-slate-500 text-sm">
-            <Loader2 className="w-4 h-4 animate-spin" /> Načítám data...
-          </div>
-        )}
-
-        {/* 1. QUICK ACTION — NAHLÁSIT PORUCHU */}
-        <button
-          onClick={() => navigate('/kiosk')}
-          className="w-full bg-red-600 hover:bg-red-500 text-white rounded-2xl p-5 cursor-pointer flex items-center gap-4 transition-all active:scale-[0.98] mb-6"
-        >
-          <AlertTriangle className="w-8 h-8 flex-shrink-0" />
-          <span className="text-2xl font-bold">NAHLÁSIT PORUCHU</span>
-        </button>
-
-        {/* 2. QUICK ACTIONS GRID */}
-        <QuickActionsGrid />
-
-        {/* 2.5 SILA STATUS — admin only */}
-        {(['MAJITEL', 'VEDENI', 'SUPERADMIN', 'UDRZBA'] as string[]).includes(user?.role || '') && (
-          <SiloStatusPanel />
-        )}
-
-        {/* 3. HLAVNÍ GRID — Mapa + Kalendář */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-
-          {/* A) MAPA AREÁLU */}
-          <div
-            onClick={() => navigate('/map')}
-            className="lg:col-span-2 min-h-[300px] bg-slate-800/60 rounded-2xl p-4 border border-slate-700/50 cursor-pointer hover:bg-slate-700/60 transition-all"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-white">Mapa areálu</h2>
-              <span className="text-sm text-slate-400">{stats.totalAssets} zařízení</span>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              {BUILDINGS.map((b) => (
-                <div key={b.id} className="bg-slate-700/50 rounded-xl p-3 text-center hover:bg-slate-600/50 transition">
-                  <div className="text-2xl mb-1">{b.icon}</div>
-                  <div className="text-lg font-bold text-white">{b.id}</div>
-                  <div className="text-xs text-slate-400">{b.name}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* B) KALENDÁŘ — Dnes */}
-          <div className="lg:col-span-1 min-h-[300px] bg-slate-800/60 rounded-2xl p-4 border border-slate-700/50 flex flex-col">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-white">Dnes</h2>
-              <span className="text-sm text-slate-400">
-                {time.toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })}
-              </span>
-            </div>
-            <div className="flex-1 space-y-2 overflow-y-auto">
-              {todayTasks.length === 0 ? (
-                <div className="text-sm text-slate-500 text-center py-8">
-                  Žádné naplánované úkoly na dnes
-                </div>
-              ) : (
-                todayTasks.map((task) => (
-                  <div
-                    key={task.id}
-                    className={`border-l-4 ${PRIORITY_BORDER[task.priority] || 'border-l-gray-500'} bg-slate-700/30 rounded-lg p-3`}
-                  >
-                    <div className="text-sm font-medium text-white">{task.title}</div>
-                    {task.assetName && (
-                      <div className="text-xs text-slate-400 mt-1">{task.assetName}</div>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
-            <button
-              onClick={(e) => { e.stopPropagation(); navigate('/calendar'); }}
-              className="mt-3 w-full py-2.5 rounded-xl bg-slate-700/50 text-sm text-slate-300 hover:bg-slate-600/50 transition cursor-pointer"
-            >
-              Celý týden
-            </button>
-          </div>
-        </div>
-
-        {/* 3. STAT KARTY */}
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
-
-          {/* a) Úkoly */}
-          <div
-            onClick={() => navigate('/tasks')}
-            className="min-h-[100px] bg-slate-800/60 rounded-2xl p-4 border border-slate-700/50 cursor-pointer hover:bg-slate-700/60 transition"
-          >
-            <div className="text-xs text-slate-500 mb-1">Úkoly</div>
-            <div className="text-3xl font-bold text-white">{stats.openTasks}</div>
-            <div className="text-xs text-slate-500 mt-1">otevřených</div>
-            <div className="flex gap-1 mt-2 flex-wrap">
-              {stats.criticalTasks > 0 && (
-                <span className="text-[10px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-full font-bold">
-                  P1: {stats.criticalTasks}
-                </span>
-              )}
-              {stats.urgentTasks > 0 && (
-                <span className="text-[10px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-full font-bold">
-                  P2: {stats.urgentTasks}
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* b) Revize */}
-          <div
-            onClick={() => navigate('/revisions')}
-            className="min-h-[100px] bg-slate-800/60 rounded-2xl p-4 border border-slate-700/50 cursor-pointer hover:bg-slate-700/60 transition"
-          >
-            <div className="text-xs text-slate-500 mb-2">Revize</div>
-            <div className="space-y-1">
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-emerald-400 font-bold">{revisions.stats.valid}</span>
-                <span className="text-slate-500 text-xs">platné</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-amber-400 font-bold">{revisions.stats.expiring}</span>
-                <span className="text-slate-500 text-xs">končí</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-red-400 font-bold">{revisions.stats.expired}</span>
-                <span className="text-slate-500 text-xs">prošlé</span>
-              </div>
-            </div>
-          </div>
-
-          {/* c) Sklad */}
-          <div
-            onClick={() => navigate('/inventory')}
-            className="min-h-[100px] bg-slate-800/60 rounded-2xl p-4 border border-slate-700/50 cursor-pointer hover:bg-slate-700/60 transition"
-          >
-            <div className="text-xs text-slate-500 mb-1">Sklad ND</div>
-            <div className={`text-3xl font-bold ${lowStockCount > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
-              {lowStockCount}
-            </div>
-            <div className={`text-xs mt-1 ${lowStockCount > 0 ? 'text-red-400' : 'text-slate-500'}`}>
-              {lowStockCount > 0 ? 'pod limitem' : 'vše OK'}
-            </div>
-          </div>
-
-          {/* d) Odpady */}
-          <div
-            onClick={() => navigate('/waste')}
-            className="min-h-[100px] bg-slate-800/60 rounded-2xl p-4 border border-slate-700/50 cursor-pointer hover:bg-slate-700/60 transition"
-          >
-            <div className="text-xs text-slate-500 mb-2">Odpady</div>
-            <div className="flex items-center gap-3 mt-2">
-              <div className="flex flex-col items-center">
-                <div className="w-4 h-4 rounded-full bg-emerald-500" />
-                <span className="text-xs text-white font-bold mt-1">{waste.stats.green}</span>
-              </div>
-              <div className="flex flex-col items-center">
-                <div className="w-4 h-4 rounded-full bg-amber-500" />
-                <span className="text-xs text-white font-bold mt-1">{waste.stats.yellow}</span>
-              </div>
-              <div className="flex flex-col items-center">
-                <div className="w-4 h-4 rounded-full bg-red-500" />
-                <span className="text-xs text-white font-bold mt-1">{waste.stats.red}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* e) Vozidla */}
-          <div
-            onClick={() => navigate('/fleet')}
-            className="min-h-[100px] bg-slate-800/60 rounded-2xl p-4 border border-slate-700/50 cursor-pointer hover:bg-slate-700/60 transition"
-          >
-            <div className="text-xs text-slate-500 mb-1">Vozidla</div>
-            <div className="text-3xl font-bold text-white">{fleet.stats.available}</div>
-            <div className="text-xs text-slate-500 mt-1">
-              volných / {fleet.stats.total} celkem
-            </div>
-          </div>
-
-          {/* f) Loupárna */}
-          <div
-            onClick={() => navigate('/louparna')}
-            className="min-h-[100px] bg-slate-800/60 rounded-2xl p-4 border border-slate-700/50 cursor-pointer hover:bg-slate-700/60 transition"
-          >
-            <div className="text-xs text-slate-500 mb-1">Loupárna</div>
-            <div className="text-3xl font-bold text-white">{louparna.productionStats.avgYield}%</div>
-            <div className="text-xs text-slate-500 mt-1">výtěžnost</div>
-            {louparna.currentBatch && (
-              <span className="inline-block mt-1 text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-bold animate-pulse">
-                BĚŽÍ
-              </span>
-            )}
-          </div>
-
-          {/* g) Kontrola budovy */}
-          <div
-            onClick={() => navigate('/inspections')}
-            className="min-h-[100px] bg-slate-800/60 rounded-2xl p-4 border border-slate-700/50 cursor-pointer hover:bg-slate-700/60 transition"
-          >
-            <div className="text-xs text-slate-500 mb-1">Kontrola budovy</div>
-            <div className="text-3xl font-bold text-white">
-              {inspections.stats.percentDone}%
-            </div>
-            <div className="text-xs text-slate-500 mt-1">
-              {inspections.stats.ok + inspections.stats.defect}/{inspections.stats.total} bodů
-            </div>
-            {inspections.stats.defect > 0 && (
-              <span className="inline-block mt-1 text-[10px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full font-bold">
-                {inspections.stats.defect} závad
-              </span>
-            )}
-          </div>
-        </div>
-
-      </div>
     </div>
   );
 }
