@@ -7,8 +7,8 @@ import { useAuthContext } from '../context/AuthContext';
 import { useInventory } from '../hooks/useInventory';
 import { Breadcrumb } from '../components/ui';
 import {
-  Search, Plus, ChevronRight, QrCode, Truck, X,
-  CheckCircle2, TrendingDown, TrendingUp, Loader2,
+  Search, Plus, QrCode, Truck, X,
+  CheckCircle2, TrendingDown, TrendingUp, Loader2, Edit2,
 } from 'lucide-react';
 
 // ═══════════════════════════════════════════
@@ -231,7 +231,7 @@ export default function InventoryPage() {
                       <div className="text-xl font-bold">{item.quantity}</div>
                       <div className="text-xs">{item.unit}</div>
                     </div>
-                    <ChevronRight className="w-5 h-5 text-slate-300" />
+                    <Edit2 className="w-4 h-4 text-slate-400 flex-shrink-0" />
                   </button>
                 );
               })}

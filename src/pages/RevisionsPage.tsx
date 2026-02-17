@@ -10,9 +10,10 @@ import {
 } from '../hooks/useRevisions';
 import type { Revision, RevisionType, RevisionStatus } from '../hooks/useRevisions';
 import { Breadcrumb } from '../components/ui';
+import { useReports } from '../hooks/useReports';
 import {
-  Shield, AlertTriangle, CheckCircle2, ChevronRight,
-  Loader2, Calendar, Search, X, Download,
+  Shield, AlertTriangle, CheckCircle2,
+  Loader2, Calendar, Search, X, Download, Edit2,
 } from 'lucide-react';
 
 // ═══════════════════════════════════════════
@@ -23,13 +24,14 @@ export default function RevisionsPage() {
   const navigate = useNavigate();
   const { hasPermission } = useAuthContext();
   const { revisions, loading, stats, logRevision } = useRevisions();
+  const { exportXLSX } = useReports();
 
   // State
   const [filterType, setFilterType] = useState<RevisionType | 'all'>('all');
   const [filterStatus, setFilterStatus] = useState<RevisionStatus | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRevision, setSelectedRevision] = useState<Revision | null>(null);
-  const [_showLogModal, _setShowLogModal] = useState(false);
+  // showLogModal — reserved for future use
 
   const canEdit = hasPermission('revisions.edit');
   const canExport = hasPermission('reports.export');
@@ -100,7 +102,22 @@ export default function RevisionsPage() {
           </div>
           {canExport && (
             <button
-              onClick={() => alert('Export PDF — bude implementován s useReports hookem')}
+              onClick={() => {
+                const data = filteredRevisions.map(rev => ({
+                  title: rev.title,
+                  type: rev.type,
+                  status: rev.status,
+                  assetName: rev.assetName,
+                  buildingId: rev.buildingId,
+                  areaName: rev.areaName,
+                  lastRevisionDate: rev.lastRevisionDate,
+                  nextRevisionDate: rev.nextRevisionDate,
+                  revisionCompany: rev.revisionCompany,
+                  certificateNumber: rev.certificateNumber,
+                  intervalMonths: rev.intervalMonths,
+                }));
+                exportXLSX('revisions', data, { filename: `NOMINAL_revize_${new Date().toISOString().slice(0, 10)}.xlsx` });
+              }}
               className="bg-slate-800 text-white px-3 py-2 rounded-lg font-medium flex items-center gap-2 hover:bg-slate-700"
             >
               <Download className="w-4 h-4" />
@@ -270,7 +287,7 @@ function RevisionCard({ revision, onClick }: { revision: Revision; onClick: () =
           </div>
         </div>
 
-        <ChevronRight className="w-5 h-5 text-slate-300 flex-shrink-0" />
+        <Edit2 className="w-4 h-4 text-slate-400 flex-shrink-0" />
       </div>
     </button>
   );
@@ -285,10 +302,24 @@ function RevisionDetailModal({ revision, onClose, canEdit, onLog }: {
   const statusCfg = STATUS_CONFIG[revision.status];
   const typeCfg = TYPE_CONFIG[revision.type] || TYPE_CONFIG.other;
   const days = daysUntilRevision(revision.nextRevisionDate);
+  const { exportPDF } = useReports();
 
   const [showLogForm, setShowLogForm] = useState(false);
   const [logDate, setLogDate] = useState(new Date().toISOString().split('T')[0]);
   const [logCert, setLogCert] = useState('');
+
+  const handleExportPDF = () => {
+    exportPDF('revision-report', {
+      revision: {
+        name: revision.title,
+        category: typeCfg.label,
+        lastPerformedAt: revision.lastRevisionDate,
+        nextDueAt: revision.nextRevisionDate,
+        performedBy: revision.technicianName,
+      },
+      assets: [{ name: revision.assetName, areaName: revision.areaName }],
+    });
+  };
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={onClose}>
@@ -371,6 +402,15 @@ function RevisionDetailModal({ revision, onClose, canEdit, onLog }: {
               <div className="text-sm text-amber-800">{revision.notes}</div>
             </div>
           )}
+
+          {/* Export PDF */}
+          <button
+            onClick={handleExportPDF}
+            className="w-full py-3 bg-slate-700 text-white rounded-xl font-bold hover:bg-slate-600 flex items-center justify-center gap-2"
+          >
+            <Download className="w-5 h-5" />
+            Export PDF
+          </button>
 
           {/* Log new revision */}
           {canEdit && !showLogForm && (

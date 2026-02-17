@@ -9,7 +9,7 @@ import type { WasteContainer, FillLevel } from '../hooks/useWaste';
 import { Breadcrumb } from '../components/ui';
 import {
   Recycle, Calendar, Bell, CheckCircle2, AlertTriangle,
-  Truck, X, Loader2,
+  Truck, X, Loader2, Edit2,
 } from 'lucide-react';
 
 // ═══════════════════════════════════════════
@@ -166,6 +166,8 @@ export default function WastePage() {
                       />
                     </div>
                   </div>
+
+                  <Edit2 className="w-4 h-4 text-slate-400 flex-shrink-0" />
                 </div>
               </button>
             );

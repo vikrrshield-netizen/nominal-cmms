@@ -14,6 +14,7 @@ import {
   ArrowLeft,
   Loader2,
   Inbox,
+  Edit2,
 } from 'lucide-react';
 
 import FAB from '../components/ui/FAB';
@@ -149,7 +150,7 @@ const TAB_OPTIONS: { key: FilterTab; label: string; color: string }[] = [
 // ═══════════════════════════════════════════════════
 // TABLE ROW
 // ═══════════════════════════════════════════════════
-function TaskRow({ task, onClick }: { task: Task; onClick: () => void }) {
+function TaskRow({ task, onClick, onEdit }: { task: Task; onClick: () => void; onEdit: () => void }) {
   const pc = PRIORITY_CONFIG[task.priority] || PRIORITY_CONFIG.P3;
   const sb = STATUS_BADGES[task.status] || STATUS_BADGES.backlog;
   const assignee = task.assignedToName || task.assignedTo || '—';
@@ -200,6 +201,17 @@ function TaskRow({ task, onClick }: { task: Task; onClick: () => void }) {
           {sb.label}
         </span>
       </td>
+
+      {/* Akce */}
+      <td className="px-1 py-2 sm:px-2 w-[36px]">
+        <button
+          onClick={(e) => { e.stopPropagation(); onEdit(); }}
+          className="p-1.5 rounded-lg hover:bg-white/10 text-slate-500 hover:text-amber-400 transition"
+          title="Upravit"
+        >
+          <Edit2 className="w-3.5 h-3.5" />
+        </button>
+      </td>
     </tr>
   );
 }
@@ -214,6 +226,7 @@ export default function TasksPage() {
 
   const [showNewTask, setShowNewTask] = useState(false);
   const [completingTask, setCompletingTask] = useState<Task | null>(null);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [filterTab, setFilterTab] = useState<FilterTab>('active');
   const [filterPriority, setFilterPriority] = useState<string | null>(null);
 
@@ -362,11 +375,12 @@ export default function TasksPage() {
                   <th className="text-left px-3 py-2.5 text-[11px] text-slate-500 uppercase tracking-wider font-semibold">Co</th>
                   <th className="text-left px-3 py-2.5 text-[11px] text-slate-500 uppercase tracking-wider font-semibold">Termín</th>
                   <th className="text-left px-3 py-2.5 text-[11px] text-slate-500 uppercase tracking-wider font-semibold">Status</th>
+                  <th className="w-[36px]"></th>
                 </tr>
               </thead>
               <tbody>
                 {filteredTasks.map((task) => (
-                  <TaskRow key={task.id} task={task} onClick={() => setCompletingTask(task)} />
+                  <TaskRow key={task.id} task={task} onClick={() => setCompletingTask(task)} onEdit={() => setEditingTask(task)} />
                 ))}
               </tbody>
             </table>
@@ -428,6 +442,21 @@ export default function TasksPage() {
           onClose={() => setCompletingTask(null)}
         />
       )}
+
+      {/* Edit Task Sheet */}
+      {editingTask && (
+        <EditTaskSheet
+          task={editingTask}
+          onClose={() => setEditingTask(null)}
+          onSave={async (updates) => {
+            await updateDoc(doc(db, 'tasks', editingTask.id), {
+              ...updates,
+              updatedAt: serverTimestamp(),
+            });
+            setEditingTask(null);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -448,5 +477,83 @@ function FilterChip({ label, active, onClick, color }: { label: string; active: 
     >
       {label}
     </button>
+  );
+}
+
+// ═══════════════════════════════════════════════════
+// EDIT TASK SHEET
+// ═══════════════════════════════════════════════════
+function EditTaskSheet({ task, onClose, onSave }: {
+  task: Task;
+  onClose: () => void;
+  onSave: (updates: Record<string, unknown>) => Promise<void>;
+}) {
+  const [title, setTitle] = useState(task.title);
+  const [description, setDescription] = useState(task.description || '');
+  const [priority, setPriority] = useState(task.priority);
+  const [status, setStatus] = useState(task.status);
+  const [assignee, setAssignee] = useState(task.assignedToName || task.assignedTo || '');
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (!title.trim()) return;
+    setSaving(true);
+    try {
+      await onSave({
+        title: title.trim(),
+        description: description.trim(),
+        priority,
+        status,
+        assignedToName: assignee || undefined,
+      });
+    } catch (err) {
+      console.error('[TasksPage] Edit save failed:', err);
+    }
+    setSaving(false);
+  };
+
+  return (
+    <BottomSheet title="Upravit úkol" isOpen onClose={onClose}>
+      <FormField label="Název" value={title} onChange={setTitle} required />
+      <FormField label="Popis" value={description} onChange={setDescription} type="textarea" />
+      <FormField
+        label="Priorita"
+        value={priority}
+        onChange={setPriority}
+        type="select"
+        options={[
+          { value: 'P1', label: 'P1 — Havárie' },
+          { value: 'P2', label: 'P2 — Tento týden' },
+          { value: 'P3', label: 'P3 — Běžná' },
+          { value: 'P4', label: 'P4 — Nápad' },
+        ]}
+      />
+      <FormField
+        label="Status"
+        value={status}
+        onChange={setStatus}
+        type="select"
+        options={[
+          { value: 'backlog', label: 'Nový' },
+          { value: 'planned', label: 'Plánovaný' },
+          { value: 'in_progress', label: 'V řešení' },
+          { value: 'paused', label: 'Čeká na díl' },
+          { value: 'completed', label: 'Hotovo' },
+        ]}
+      />
+      <FormField
+        label="Přiřadit"
+        value={assignee}
+        onChange={setAssignee}
+        type="select"
+        options={[
+          { value: 'Zdeněk Mička', label: 'Zdeněk Mička' },
+          { value: 'Petr Volf', label: 'Petr Volf' },
+          { value: 'Filip Novák', label: 'Filip Novák' },
+          { value: 'Vilém', label: 'Vilém' },
+        ]}
+      />
+      <SubmitButton label={saving ? 'Ukládám...' : 'Uložit změny'} onClick={handleSave} loading={saving} />
+    </BottomSheet>
   );
 }
