@@ -160,43 +160,43 @@ function TaskRow({ task, onClick }: { task: Task; onClick: () => void }) {
       className="border-t border-white/5 hover:bg-white/[0.04] cursor-pointer transition-colors active:bg-white/[0.08]"
     >
       {/* Kdo */}
-      <td className="px-3 py-3 w-[100px]">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-full bg-slate-700 flex items-center justify-center flex-shrink-0">
-            <span className="text-[10px] font-bold text-slate-300">
+      <td className="px-2 py-2 sm:px-3 sm:py-3 w-[44px] sm:w-[100px]">
+        <div className="flex items-center gap-1.5">
+          <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-slate-700 flex items-center justify-center flex-shrink-0">
+            <span className="text-[9px] sm:text-[10px] font-bold text-slate-300">
               {assignee !== '—' ? assignee.split(' ').map(w => w[0]).join('').slice(0, 2) : '?'}
             </span>
           </div>
-          <span className="text-[13px] text-slate-300 truncate hidden sm:block">{assignee}</span>
+          <span className="text-[12px] text-slate-300 truncate hidden sm:block max-w-[80px]">{assignee}</span>
         </div>
       </td>
 
       {/* Co */}
-      <td className="px-3 py-3">
-        <div className="flex items-center gap-2">
+      <td className="px-2 py-2 sm:px-3 sm:py-3">
+        <div className="flex items-center gap-1.5">
           <span
-            className="text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0"
+            className="text-[9px] font-bold px-1 py-0.5 rounded flex-shrink-0"
             style={{ background: `${pc.color}20`, color: pc.color }}
           >
             {task.priority}
           </span>
-          <span className="text-sm font-medium text-white truncate">{task.title}</span>
+          <span className="text-[13px] font-medium text-white truncate">{task.title}</span>
         </div>
         {task.assetName && (
-          <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1">
+          <div className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-1">
             <Wrench className="w-3 h-3" /> {task.assetName}
           </div>
         )}
       </td>
 
       {/* Termín */}
-      <td className="px-3 py-3 text-xs text-slate-500 whitespace-nowrap w-[70px]">
+      <td className="px-2 py-2 sm:px-3 sm:py-3 text-[11px] text-slate-500 whitespace-nowrap w-[50px] sm:w-[70px]">
         {timeAgo(task.createdAt)}
       </td>
 
       {/* Status */}
-      <td className="px-3 py-3 w-[100px]">
-        <span className={`text-[10px] font-bold px-2 py-1 rounded-lg whitespace-nowrap ${sb.bg} ${sb.text}`}>
+      <td className="px-2 py-2 sm:px-3 sm:py-3 w-[70px] sm:w-[100px]">
+        <span className={`text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-lg whitespace-nowrap ${sb.bg} ${sb.text}`}>
           {sb.label}
         </span>
       </td>
@@ -420,7 +420,7 @@ export default function TasksPage() {
               resolution: data.resolution,
               durationMinutes: data.durationMinutes,
               completedAt: serverTimestamp(),
-              completedBy: user?.displayName || 'Neznámý',
+              completedBy: data.completedByName || user?.displayName || 'Neznámý',
               updatedAt: serverTimestamp(),
             });
             setCompletingTask(null);

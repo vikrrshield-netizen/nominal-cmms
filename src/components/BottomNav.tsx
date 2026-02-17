@@ -7,7 +7,7 @@ import {
   ClipboardList,
   Map,
   Truck,
-  Bot,
+  Search,
 } from 'lucide-react';
 
 const navItems = [
@@ -15,7 +15,7 @@ const navItems = [
   { path: '/tasks', icon: ClipboardList, label: 'Úkoly' },
   { path: '/map', icon: Map, label: 'Mapa' },
   { path: '/fleet', icon: Truck, label: 'Vozidla' },
-  { path: '/ai', icon: Bot, label: 'AI' },
+  { path: '/ai', icon: Search, label: 'Hledat' },
 ];
 
 export default function BottomNav() {

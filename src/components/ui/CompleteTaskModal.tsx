@@ -5,23 +5,42 @@
 import { useState } from 'react';
 import { CheckCircle2, X, Loader2, Clock, FileText } from 'lucide-react';
 
+const ASSIGNEE_OPTIONS = [
+  { value: '', label: '— Vybrat —' },
+  { value: 'Filip Novák', label: 'Filip Novák (interní)' },
+  { value: 'Zdeněk Mička', label: 'Zdeněk Mička (interní)' },
+  { value: 'Petr Volf', label: 'Petr Volf (interní)' },
+  { value: 'Údržba (tým)', label: 'Údržba — tým (interní)' },
+  { value: 'Externí firma', label: 'Externí firma' },
+];
+
 interface CompleteTaskModalProps {
   taskTitle: string;
-  onConfirm: (data: { resolution: string; durationMinutes: number | null }) => Promise<void>;
+  onConfirm: (data: { resolution: string; durationMinutes: number | null; completedByName: string }) => Promise<void>;
   onClose: () => void;
 }
 
 export default function CompleteTaskModal({ taskTitle, onConfirm, onClose }: CompleteTaskModalProps) {
   const [resolution, setResolution] = useState('');
   const [duration, setDuration] = useState('');
+  const [assignee, setAssignee] = useState('');
+  const [pin, setPin] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const isValid = resolution.trim().length >= 5;
+  const isValid = resolution.trim().length >= 5 && pin.length === 4 && assignee !== '';
 
   const handleSubmit = async () => {
-    if (!isValid) {
+    if (resolution.trim().length < 5) {
       setError('Popis řešení musí mít alespoň 5 znaků');
+      return;
+    }
+    if (!assignee) {
+      setError('Vyber kdo úkol provedl');
+      return;
+    }
+    if (pin.length !== 4) {
+      setError('Zadej 4místný PIN pro potvrzení');
       return;
     }
 
@@ -31,6 +50,7 @@ export default function CompleteTaskModal({ taskTitle, onConfirm, onClose }: Com
       await onConfirm({
         resolution: resolution.trim(),
         durationMinutes: duration ? Number(duration) : null,
+        completedByName: assignee,
       });
       onClose();
     } catch (err: any) {
@@ -103,6 +123,22 @@ export default function CompleteTaskModal({ taskTitle, onConfirm, onClose }: Com
             </div>
           </div>
 
+          {/* Assignee — KDO PROVEDL */}
+          <div>
+            <label className="text-sm text-slate-400 mb-1.5 flex items-center gap-2">
+              Provedl <span className="text-red-400">*</span>
+            </label>
+            <select
+              value={assignee}
+              onChange={(e) => setAssignee(e.target.value)}
+              className="w-full bg-slate-700 text-white p-3 rounded-xl border border-slate-600 focus:border-blue-500 outline-none appearance-none"
+            >
+              {ASSIGNEE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+
           {/* Duration — VOLITELNÉ */}
           <div>
             <label className="text-sm text-slate-400 mb-1.5 flex items-center gap-2">
@@ -124,6 +160,23 @@ export default function CompleteTaskModal({ taskTitle, onConfirm, onClose }: Com
                 = {Math.floor(Number(duration) / 60)}h {Number(duration) % 60}min
               </span>
             )}
+          </div>
+
+          {/* PIN Verification */}
+          <div>
+            <label className="text-sm text-slate-400 mb-1.5 flex items-center gap-2">
+              🔒 PIN pro potvrzení <span className="text-red-400">*</span>
+            </label>
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={4}
+              value={pin}
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+              placeholder="4 číslice"
+              className="w-full bg-slate-700 text-white p-3 rounded-xl border border-slate-600 focus:border-blue-500 outline-none text-center text-2xl tracking-[0.5em] font-mono"
+            />
+            <span className="text-[11px] text-slate-600 mt-1 block">Potvrzuji dokončení zadáním PINu</span>
           </div>
 
           {/* Error */}

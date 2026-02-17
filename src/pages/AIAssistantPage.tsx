@@ -1,5 +1,5 @@
 // src/pages/AIAssistantPage.tsx
-// NOMINAL CMMS — AI Asistent s hlasovými příkazy
+// NOMINAL CMMS — Search & Nominal AI
 
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -237,7 +237,7 @@ const _speakText = (text: string) => {
               <Sparkles className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-white">AI Asistent</h1>
+              <h1 className="text-lg font-bold text-white">Search &amp; Nominal AI</h1>
               <p className="text-xs text-slate-400">
                 {isListening ? '🎤 Poslouchám...' : isProcessing ? '🤔 Přemýšlím...' : '✨ Připraven'}
               </p>

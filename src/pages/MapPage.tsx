@@ -14,9 +14,7 @@ import {
   AlertTriangle,
   Search,
   Inbox,
-  Building2,
   Layers,
-  X,
   Plus,
   Truck,
 } from 'lucide-react';
@@ -24,7 +22,6 @@ import { useAuthContext } from '../context/AuthContext';
 import { createTask } from '../services/taskService';
 import BottomSheet from '../components/ui/BottomSheet';
 import EmptyState from '../components/ui/EmptyState';
-import FloorPlan2NP from '../components/maps/FloorPlan2NP';
 import {
   EntityCardFull,
   type Entity,
@@ -203,7 +200,7 @@ function MachineCard({ asset, onClick }: { asset: Asset; onClick: () => void }) 
 // ═══════════════════════════════════════════════
 // ROOM CARD — drill-down level 2
 // ═══════════════════════════════════════════════
-function RoomCard({ room, color, onClick }: { room: RoomGroup; color: string; onClick: () => void }) {
+function RoomCard({ room, color, onClick, code }: { room: RoomGroup; color: string; onClick: () => void; code: string }) {
   return (
     <button
       onClick={onClick}
@@ -216,7 +213,10 @@ function RoomCard({ room, color, onClick }: { room: RoomGroup; color: string; on
         <Layers className="w-6 h-6" style={{ color }} />
       </div>
       <div className="flex-1 min-w-0">
-        <div className="text-[15px] font-semibold text-white">{room.name}</div>
+        <div className="flex items-center gap-2">
+          <span className="text-[15px] font-semibold text-white">{room.name}</span>
+          <span className="text-[11px] font-mono text-slate-500 bg-slate-700/40 px-1.5 py-0.5 rounded">{code}</span>
+        </div>
         <div className="text-[12px] text-slate-500 mt-0.5">
           {room.assets.length} strojů · {room.floor}
         </div>
@@ -241,9 +241,8 @@ const WASTE_ITEMS = [
   { id: 'container', label: 'Kontejner', icon: '📦' },
 ];
 
-function WastePanel() {
+function WastePanel({ wasteStatus, setWasteStatus }: { wasteStatus: Record<string, boolean>; setWasteStatus: React.Dispatch<React.SetStateAction<Record<string, boolean>>> }) {
   const { user } = useAuthContext();
-  const [wasteStatus, setWasteStatus] = useState<Record<string, boolean>>({});
   const [plevyStatus, setPlevyStatus] = useState<'ok' | 'pending'>('ok');
   const [saving, setSaving] = useState(false);
 
@@ -458,191 +457,6 @@ function AssetDetailSheet({ asset, onClose }: { asset: Asset; onClose: () => voi
 }
 
 // ═══════════════════════════════════════════════
-// ROOM BOTTOM SHEET — for SVG floor plan clicks
-// ═══════════════════════════════════════════════
-function RoomBottomSheet({
-  roomId,
-  roomName,
-  roomAssets,
-  onClose,
-  onAssetClick,
-}: {
-  roomId: string;
-  roomName: string;
-  roomAssets: Asset[];
-  onClose: () => void;
-  onAssetClick: (asset: Asset) => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-50">
-      {/* Overlay */}
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-
-      {/* Sheet */}
-      <div className="absolute bottom-0 left-0 right-0 bg-slate-800 border-t border-white/10 rounded-t-2xl max-h-[50vh] overflow-y-auto animate-slide-up">
-        <div className="p-4">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-1">
-            <h2 className="text-base font-bold text-white">{roomName}</h2>
-            <button
-              onClick={onClose}
-              className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center text-slate-400"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          <p className="text-xs text-slate-500 mb-3">{roomId}</p>
-
-          {/* Machine list */}
-          {roomAssets.length === 0 ? (
-            <p className="text-sm text-slate-500 text-center py-6">
-              Žádné stroje v této místnosti
-            </p>
-          ) : (
-            <div className="space-y-1.5">
-              {roomAssets.map((asset) => {
-                const st = STATUS_CONFIG[asset.status] || STATUS_CONFIG.idle;
-                return (
-                  <button
-                    key={asset.id}
-                    onClick={() => onAssetClick(asset)}
-                    className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.07] transition text-left"
-                  >
-                    <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${st.dot}`} />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[13px] font-semibold text-white truncate">
-                        {asset.name}
-                      </div>
-                      {asset.code && (
-                        <div className="text-[10px] text-slate-500">{asset.code}</div>
-                      )}
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-slate-600 flex-shrink-0" />
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════
-// FLOOR PLAN VIEW — for building D
-// ═══════════════════════════════════════════════
-function FloorPlanView({
-  assets,
-  onBack,
-  onAssetClick,
-}: {
-  assets: Asset[];
-  onBack: () => void;
-  onAssetClick: (asset: Asset) => void;
-}) {
-  const [selectedFloor, setSelectedFloor] = useState<'2np' | '1np'>('2np');
-  const [roomSheet, setRoomSheet] = useState<{
-    roomId: string;
-    roomName: string;
-    assets: Asset[];
-  } | null>(null);
-  const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
-
-  const buildingDAssets = useMemo(
-    () => assets.filter((a) => a.buildingId === 'D'),
-    [assets]
-  );
-
-  const handleRoomClick = (roomId: string, roomName: string, roomAssets: Asset[]) => {
-    setSelectedRoom(roomId);
-    setRoomSheet({ roomId, roomName, assets: roomAssets });
-  };
-
-  const handleCloseSheet = () => {
-    setRoomSheet(null);
-    setSelectedRoom(null);
-  };
-
-  return (
-    <div>
-      {/* Back + Header */}
-      <button
-        onClick={onBack}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-400 text-xs font-semibold mb-3 hover:text-white transition"
-      >
-        <ArrowLeft className="w-3.5 h-3.5" />
-        Zpět na budovy
-      </button>
-
-      <div className="flex items-center justify-between mb-2">
-        <div>
-          <h2 className="text-lg font-bold text-white">Budova D — Výrobní hala</h2>
-          <p className="text-xs text-slate-500">
-            {buildingDAssets.length} zařízení · 2 patra
-          </p>
-        </div>
-      </div>
-
-      {/* Floor switcher */}
-      <div className="flex gap-1.5 mb-4">
-        <button
-          onClick={() => setSelectedFloor('1np')}
-          className={`px-4 py-1.5 rounded-lg text-xs font-semibold border transition ${
-            selectedFloor === '1np'
-              ? 'bg-orange-500/15 border-orange-500/40 text-orange-400'
-              : 'bg-white/5 border-white/10 text-slate-400'
-          }`}
-        >
-          1. NP
-        </button>
-        <button
-          onClick={() => setSelectedFloor('2np')}
-          className={`px-4 py-1.5 rounded-lg text-xs font-semibold border transition ${
-            selectedFloor === '2np'
-              ? 'bg-orange-500/15 border-orange-500/40 text-orange-400'
-              : 'bg-white/5 border-white/10 text-slate-400'
-          }`}
-        >
-          2. NP
-        </button>
-      </div>
-
-      {/* Floor plan */}
-      {selectedFloor === '2np' ? (
-        <FloorPlan2NP
-          assets={buildingDAssets}
-          onRoomClick={handleRoomClick}
-          selectedRoom={selectedRoom}
-        />
-      ) : (
-        <div className="flex items-center justify-center py-16 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-          <div className="text-center">
-            <Building2 className="w-10 h-10 text-slate-600 mx-auto mb-2" />
-            <p className="text-sm text-slate-500">1. NP — připravujeme</p>
-          </div>
-        </div>
-      )}
-
-      <p className="text-center text-[11px] text-slate-600 mt-2">
-        Klikni na místnost pro zobrazení strojů
-      </p>
-
-      {/* Room bottom sheet */}
-      {roomSheet && (
-        <RoomBottomSheet
-          roomId={roomSheet.roomId}
-          roomName={roomSheet.roomName}
-          roomAssets={roomSheet.assets}
-          onClose={handleCloseSheet}
-          onAssetClick={onAssetClick}
-        />
-      )}
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════
 // SUMMARY BAR
 // ═══════════════════════════════════════════════
 function SummaryBar({ assets }: { assets: Asset[] }) {
@@ -684,7 +498,7 @@ export default function MapPage() {
   const [selectedRoomName, setSelectedRoomName] = useState<string | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [search, setSearch] = useState('');
-  const [showFloorPlan, setShowFloorPlan] = useState(false);
+  const [wasteStatus, setWasteStatus] = useState<Record<string, boolean>>({});
 
   const { buildings } = useGroupedData(assets, selectedBuildingId);
 
@@ -724,12 +538,14 @@ export default function MapPage() {
     );
   }, [currentRoom, search]);
 
+  // Generate room code: e.g. D1.01, D2.03
+  const getRoomCode = (buildingId: string, room: RoomGroup, index: number) => {
+    const floorNum = room.floor?.match(/(\d)/)?.[1] || '1';
+    return `${buildingId}${floorNum}.${String(index + 1).padStart(2, '0')}`;
+  };
+
   // ── Navigation handlers ──
   const handleBuildingClick = (buildingId: string) => {
-    if (buildingId === 'D') {
-      setShowFloorPlan(true);
-      return;
-    }
     setSelectedBuildingId(buildingId);
     setDrillLevel('rooms');
     setSearch('');
@@ -753,38 +569,6 @@ export default function MapPage() {
     setSelectedRoomName(null);
     setSearch('');
   };
-
-  // ── Floor plan for building D ──
-  if (showFloorPlan) {
-    return (
-      <div className="min-h-screen bg-slate-900">
-        <div className="max-w-6xl mx-auto px-3 pt-4 pb-24">
-          <div className="flex items-center gap-3 mb-3">
-            <button
-              onClick={() => window.location.href = '/'}
-              className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 hover:text-white transition"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <div className="flex-1">
-              <h1 className="text-xl font-bold text-white">Mapa areálu</h1>
-              <p className="text-xs text-slate-500">
-                {assets.length} zařízení · {buildings.length} budov
-              </p>
-            </div>
-          </div>
-          <FloorPlanView
-            assets={assets}
-            onBack={() => setShowFloorPlan(false)}
-            onAssetClick={setSelectedAsset}
-          />
-        </div>
-        {selectedAsset && (
-          <AssetDetailSheet asset={selectedAsset} onClose={() => setSelectedAsset(null)} />
-        )}
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-slate-900">
@@ -845,7 +629,7 @@ export default function MapPage() {
           </div>
         )}
 
-        {/* ═══ LEVEL 1: Buildings ═══ */}
+        {/* ═══ LEVEL 1: Buildings (Tiles) ═══ */}
         {drillLevel === 'buildings' && (
           <>
             <SummaryBar assets={assets} />
@@ -856,49 +640,62 @@ export default function MapPage() {
                 Načítám zařízení...
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {buildings.map((b) => (
-                  <button
-                    key={b.id}
-                    onClick={() => handleBuildingClick(b.id)}
-                    className="flex items-center gap-4 p-4 rounded-2xl border transition-all active:scale-[0.97] text-left"
-                    style={{
-                      background: `linear-gradient(145deg, ${b.color}12, ${b.color}04)`,
-                      borderColor: `${b.color}25`,
-                    }}
-                  >
-                    <div
-                      className="w-14 h-14 rounded-xl flex items-center justify-center text-2xl font-bold flex-shrink-0"
-                      style={{ background: `${b.color}20`, color: b.color }}
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {buildings.map((b) => (
+                    <button
+                      key={b.id}
+                      onClick={() => handleBuildingClick(b.id)}
+                      className="flex items-center gap-4 p-4 rounded-2xl border transition-all active:scale-[0.97] text-left"
+                      style={{
+                        background: `linear-gradient(145deg, ${b.color}12, ${b.color}04)`,
+                        borderColor: `${b.color}25`,
+                      }}
                     >
-                      {b.id}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[15px] font-semibold text-white">{b.name}</div>
-                      <div className="text-[12px] text-slate-500 mt-0.5">
-                        {b.totalAssets} zařízení · {b.rooms.length} místností
+                      <div
+                        className="w-14 h-14 rounded-xl flex items-center justify-center text-2xl font-bold flex-shrink-0"
+                        style={{ background: `${b.color}20`, color: b.color }}
+                      >
+                        {b.id}
                       </div>
-                      {b.issueCount > 0 && (
-                        <div className="text-[12px] text-red-400 mt-0.5">
-                          {b.issueCount} problémů
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[15px] font-semibold text-white">{b.name}</div>
+                        <div className="text-[12px] text-slate-500 mt-0.5">
+                          {b.totalAssets} zařízení · {b.rooms.length} místností
                         </div>
-                      )}
-                      {b.id === 'D' && (
-                        <div className="text-[11px] text-orange-400 mt-0.5 flex items-center gap-1">
-                          <Layers className="w-3 h-3" />
-                          Půdorys k dispozici
-                        </div>
-                      )}
-                    </div>
-                    <ChevronRight className="w-5 h-5 text-slate-500 flex-shrink-0" />
-                  </button>
-                ))}
-              </div>
+                        {b.issueCount > 0 && (
+                          <div className="text-[12px] text-red-400 mt-0.5">
+                            {b.issueCount} problémů
+                          </div>
+                        )}
+                        {/* Waste semaphores for Loupárna */}
+                        {b.id === 'L' && (
+                          <div className="flex items-center gap-1.5 mt-1">
+                            {WASTE_ITEMS.map((w) => (
+                              <div key={w.id} className="flex items-center gap-0.5" title={w.label}>
+                                <div className={`w-2.5 h-2.5 rounded-full ${wasteStatus[w.id] ? 'bg-red-500' : 'bg-emerald-500'}`} />
+                                <span className="text-[9px] text-slate-500">{w.icon}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <ChevronRight className="w-5 h-5 text-slate-500 flex-shrink-0" />
+                    </button>
+                  ))}
+                </div>
+
+                {/* [+] Add building button */}
+                <button className="w-full mt-3 py-3 rounded-2xl border-2 border-dashed border-slate-700/50 text-slate-500 hover:text-orange-400 hover:border-orange-500/30 transition flex items-center justify-center gap-2 text-sm font-medium">
+                  <Plus className="w-4 h-4" />
+                  Přidat budovu
+                </button>
+              </>
             )}
           </>
         )}
 
-        {/* ═══ LEVEL 2: Rooms in building ═══ */}
+        {/* ═══ LEVEL 2: Rooms in building (Tiles) ═══ */}
         {drillLevel === 'rooms' && currentBuilding && (
           <>
             <button
@@ -929,7 +726,7 @@ export default function MapPage() {
 
             <SummaryBar assets={assets.filter((a) => a.buildingId === selectedBuildingId)} />
 
-            {selectedBuildingId === 'L' && <WastePanel />}
+            {selectedBuildingId === 'L' && <WastePanel wasteStatus={wasteStatus} setWasteStatus={setWasteStatus} />}
 
             {filteredRooms.length === 0 ? (
               <EmptyState
@@ -939,11 +736,12 @@ export default function MapPage() {
               />
             ) : (
               <div className="space-y-2">
-                {filteredRooms.map((room) => (
+                {filteredRooms.map((room, idx) => (
                   <RoomCard
                     key={room.name}
                     room={room}
                     color={currentColor}
+                    code={getRoomCode(selectedBuildingId!, room, idx)}
                     onClick={() => handleRoomClick(room.name)}
                   />
                 ))}
