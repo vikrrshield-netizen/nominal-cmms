@@ -1,13 +1,13 @@
 // src/pages/AIAssistantPage.tsx
 // NOMINAL CMMS — Search & Nominal AI
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../context/AuthContext';
-import { 
+import {
   Sparkles, Mic, MicOff, Send, ArrowLeft, Bot, User,
- AlertTriangle, Package, Calendar, FileText,
- Volume2, VolumeX, Loader2, CheckCircle2
+  AlertTriangle, Package, Calendar, FileText,
+  Volume2, VolumeX, Loader2,
 } from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════════════════
@@ -19,61 +19,96 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
-  action?: AIAction;
-}
-
-interface AIAction {
-  type: 'create_task' | 'check_inventory' | 'schedule' | 'report' | 'info';
-  data?: any;
-  executed?: boolean;
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// MOCK AI RESPONSES
+// GEMINI AI INTEGRATION
 // ═══════════════════════════════════════════════════════════════════
 
-const AI_RESPONSES: Record<string, { response: string; action?: AIAction }> = {
-  'porucha': {
-    response: 'Rozumím, chcete nahlásit poruchu. Na kterém stroji je problém? Můžete říct název nebo kód stroje.',
-    action: { type: 'create_task' }
-  },
-  'extruder': {
-    response: 'Vytvořím hlášení poruchy pro Extruder. Jaký je popis problému?',
-    action: { type: 'create_task', data: { asset: 'Extruder 1' } }
-  },
-  'balička': {
-    response: 'Balička Karel, Lojza nebo U Agáty? Upřesněte prosím.',
-    action: { type: 'create_task' }
-  },
-  'karel': {
-    response: '✅ Vytvořil jsem hlášení poruchy pro Baličku Karel s prioritou P2. Úkol byl přiřazen do backlogu.',
-    action: { type: 'create_task', data: { asset: 'Balička Karel', priority: 'P2' }, executed: true }
-  },
-  'sklad': {
-    response: 'Stav skladu: 3 položky v kritickém stavu (červená), 5 položek s nízkým stavem (žlutá). Chcete zobrazit detail nebo vytvořit objednávku?',
-    action: { type: 'check_inventory' }
-  },
-  'objednat': {
-    response: 'Jaký díl chcete objednat? Můžete říct název nebo katalogové číslo.',
-    action: { type: 'check_inventory' }
-  },
-  'ložisko': {
-    response: '✅ Přidal jsem ložisko SKF 6205 do objednávky. Aktuální stav: 2 ks, minimum: 5 ks. Chcete objednat doporučené množství 10 ks?',
-    action: { type: 'check_inventory', data: { part: 'SKF 6205', qty: 10 }, executed: true }
-  },
-  'revize': {
-    response: 'Máte 2 kritické revize: Hasicí přístroje (do 1.3.) a Kalibrace vah (do 28.2.). Chcete zobrazit detail nebo naplánovat?',
-    action: { type: 'schedule' }
-  },
-  'report': {
-    response: 'Tento měsíc: 47 dokončených úkolů, průměrná doba opravy 2.4h, 87% úkolů dokončeno včas. Chcete exportovat report?',
-    action: { type: 'report' }
-  },
-  'help': {
-    response: 'Můžu vám pomoct s:\n• Nahlášení poruchy\n• Kontrola skladu\n• Přehled revizí\n• Statistiky a reporty\n• Plánování úkolů\n\nŘekněte co potřebujete!',
-    action: { type: 'info' }
-  },
-};
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
+
+const SYSTEM_PROMPT = `Jsi AI asistent NOMINAL CMMS — systému pro správu údržby potravinářského závodu v Kozlově.
+Odpovídej VŽDY česky. Buď stručný a profesionální.
+
+MODULY SYSTÉMU:
+- Úkoly (Work Orders): P1 Havárie, P2 Urgentní, P3 Běžná, P4 Nápad. Stavy: backlog → planned → in_progress → paused → completed.
+- Mapa strojů: Interaktivní mapa budov → místností → strojů. Přidání strojů přes [+] tlačítko.
+- Sklad ND: Skladové položky s minimem, automatické notifikace. Kategorie: ložiska, řemeny, těsnění, oleje, filtry, elektro.
+- Revize: Hasicí přístroje, elektro, tlakové nádoby, výtahy, plyn, kalibrace. Termíny a zodpovědné osoby.
+- Vozidla: VZV, traktory, nakladače, osobní. STK, pojistka, servisní intervaly.
+- Odpady: Kontejnery s plněním (zelená/žlutá/červená), harmonogram svozů.
+- Loupárna: Specializovaná sekce pro loupání koření.
+- Kontroly budov: Inspekce místností s foto-dokumentací, automatické P1 úkoly při závadě.
+
+BUDOVY: A (Administrativa), B (Spojovací krček), C (Zázemí & Vedení), D (Výrobní hala), E (Dílna & Sklad ND), L (Loupárna).
+
+STROJE: Extrudery (EXT-xxx), Míchačky, Balicí linky, Pece, Dopravníky, VZV, Kompresory, Chladicí jednotky, Loupačky.
+
+ROLE UŽIVATELŮ: Majitel (read-only), Vedení (schvalování, finance), Superadmin (technika), Údržba (stroje, sklad), Výroba (zóny, plánování), Operátor (kiosk).
+
+Pomáhej s: hlášením poruch, kontrolou skladu, přehledem revizí, statistikami, plánováním údržby, exportem dat.
+Pokud uživatel chce nahlásit poruchu, pomoz mu identifikovat stroj (kód + budova) a popis problému.
+Pokud se ptá na stav, uveď konkrétní čísla pokud je máš (jinak řekni že je potřeba zkontrolovat v systému).`;
+
+async function callGeminiAPI(userMessage: string, history: Message[]): Promise<string> {
+  if (!GEMINI_API_KEY) {
+    return getFallbackResponse(userMessage);
+  }
+
+  try {
+    const contents = [
+      { role: 'user', parts: [{ text: SYSTEM_PROMPT }] },
+      { role: 'model', parts: [{ text: 'Rozumím, jsem AI asistent NOMINAL CMMS. Jak vám mohu pomoci?' }] },
+      ...history.slice(-10).map(m => ({
+        role: m.role === 'user' ? 'user' : 'model',
+        parts: [{ text: m.content }],
+      })),
+      { role: 'user', parts: [{ text: userMessage }] },
+    ];
+
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents,
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 500,
+          },
+        }),
+      }
+    );
+
+    if (!res.ok) {
+      console.error('[AI] Gemini API error:', res.status);
+      return getFallbackResponse(userMessage);
+    }
+
+    const data = await res.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    return text || getFallbackResponse(userMessage);
+  } catch (err) {
+    console.error('[AI] Gemini fetch error:', err);
+    return getFallbackResponse(userMessage);
+  }
+}
+
+function getFallbackResponse(userMessage: string): string {
+  const lm = userMessage.toLowerCase();
+  if (lm.includes('porucha') || lm.includes('nefunguje') || lm.includes('rozbil'))
+    return 'Rozumím, chcete nahlásit poruchu. Na kterém stroji je problém? Můžete říct název nebo kód stroje.';
+  if (lm.includes('sklad') || lm.includes('díl') || lm.includes('objednat'))
+    return 'Stav skladu: 3 položky v kritickém stavu, 5 s nízkým stavem. Chcete zobrazit detail nebo vytvořit objednávku?';
+  if (lm.includes('revize') || lm.includes('kalibrace'))
+    return 'Máte 2 kritické revize: Hasicí přístroje a Kalibrace vah. Chcete zobrazit detail?';
+  if (lm.includes('report') || lm.includes('statistik'))
+    return 'Tento měsíc: 47 dokončených úkolů, průměrná doba opravy 2.4h, 87% dokončeno včas. Chcete exportovat?';
+  if (lm.includes('help') || lm.includes('pomoc'))
+    return 'Můžu pomoct s:\n• Nahlášení poruchy\n• Kontrola skladu\n• Přehled revizí\n• Statistiky a reporty\n• Plánování úkolů\n\nŘekněte co potřebujete!';
+  return 'Nerozuměl jsem. Zkuste to prosím jinak nebo řekněte "help" pro seznam příkazů.';
+}
 
 const QUICK_COMMANDS = [
   { label: 'Nahlásit poruchu', icon: AlertTriangle, color: 'bg-red-500', keyword: 'porucha' },
@@ -101,10 +136,38 @@ export default function AIAssistantPage() {
   const [input, setInput] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  
+  const [isSpeaking] = useState(false);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null);
+
+  // handleSend — must be declared before useEffect that uses it
+  const handleSend = useCallback(async (messageText?: string) => {
+    const text = messageText || input;
+    if (!text.trim()) return;
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: text,
+      timestamp: new Date(),
+    };
+    setMessages(prev => [...prev, userMessage]);
+    setInput('');
+    setIsProcessing(true);
+
+    const response = await callGeminiAPI(text, messages);
+
+    const assistantMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      role: 'assistant',
+      content: response,
+      timestamp: new Date(),
+    };
+    setMessages(prev => [...prev, assistantMessage]);
+    setIsProcessing(false);
+  }, [input, messages]);
 
   // Scroll to bottom
   useEffect(() => {
@@ -113,28 +176,33 @@ export default function AIAssistantPage() {
 
   // Initialize speech recognition
   useEffect(() => {
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = false;
-      recognitionRef.current.interimResults = false;
-      recognitionRef.current.lang = 'cs-CZ';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const W = window as any;
+    const SpeechRecognitionClass = W.webkitSpeechRecognition || W.SpeechRecognition;
+    if (SpeechRecognitionClass) {
+      const recognition = new SpeechRecognitionClass();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'cs-CZ';
 
-      recognitionRef.current.onresult = (event: any) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      recognition.onresult = (event: any) => {
         const transcript = event.results[0][0].transcript;
         setInput(transcript);
         handleSend(transcript);
       };
 
-      recognitionRef.current.onend = () => {
+      recognition.onend = () => {
         setIsListening(false);
       };
 
-      recognitionRef.current.onerror = () => {
+      recognition.onerror = () => {
         setIsListening(false);
       };
+
+      recognitionRef.current = recognition;
     }
-  }, []);
+  }, [handleSend]);
 
   const toggleListening = () => {
     if (!recognitionRef.current) {
@@ -148,70 +216,6 @@ export default function AIAssistantPage() {
       recognitionRef.current.start();
       setIsListening(true);
     }
-  };
-
-  // @ts-ignore
-// eslint-disable-next-line
-const _speakText = (text: string) => {
-    if ('speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'cs-CZ';
-      utterance.onstart = () => setIsSpeaking(true);
-      utterance.onend = () => setIsSpeaking(false);
-      speechSynthesis.speak(utterance);
-    }
-  };
-
-  const getAIResponse = (userMessage: string): { response: string; action?: AIAction } => {
-    const lowerMessage = userMessage.toLowerCase();
-    
-    // Check keywords
-    for (const [keyword, data] of Object.entries(AI_RESPONSES)) {
-      if (lowerMessage.includes(keyword)) {
-        return data;
-      }
-    }
-    
-    // Default response
-    return {
-      response: 'Nerozuměl jsem. Zkuste to prosím jinak nebo řekněte "help" pro seznam příkazů.',
-      action: { type: 'info' }
-    };
-  };
-
-  const handleSend = async (messageText?: string) => {
-    const text = messageText || input;
-    if (!text.trim()) return;
-
-    // Add user message
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: text,
-      timestamp: new Date(),
-    };
-    setMessages(prev => [...prev, userMessage]);
-    setInput('');
-    setIsProcessing(true);
-
-    // Simulate AI processing delay
-    await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 1000));
-
-    // Get AI response
-    const { response, action } = getAIResponse(text);
-    
-    const assistantMessage: Message = {
-      id: (Date.now() + 1).toString(),
-      role: 'assistant',
-      content: response,
-      timestamp: new Date(),
-      action,
-    };
-    setMessages(prev => [...prev, assistantMessage]);
-    setIsProcessing(false);
-
-    // Optionally speak the response
-    // speakText(response);
   };
 
   return (
@@ -274,14 +278,7 @@ const _speakText = (text: string) => {
                 : 'bg-white/10 text-white'
             }`}>
               <p className="whitespace-pre-wrap">{message.content}</p>
-              
-              {message.action?.executed && (
-                <div className="mt-2 pt-2 border-t border-white/20 flex items-center gap-2 text-emerald-400 text-sm">
-                  <CheckCircle2 className="w-4 h-4" />
-                  Akce provedena
-                </div>
-              )}
-              
+
               <p className="text-xs opacity-60 mt-2">
                 {message.timestamp.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}
               </p>
@@ -356,7 +353,7 @@ const _speakText = (text: string) => {
         </div>
         
         <p className="text-xs text-slate-500 text-center mt-2">
-          💡 Tip: Řekněte "help" pro seznam dostupných příkazů
+          {GEMINI_API_KEY ? '✨ Powered by Gemini 1.5 Flash' : '💡 Tip: Řekněte "help" pro seznam příkazů'}
         </p>
       </div>
     </div>
