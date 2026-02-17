@@ -1,0 +1,47 @@
+﻿ID_Mistnosti,Cislo_Mistnosti,Nazev_Mistnosti,Budova,Patro,Typ_Mistnosti
+MIS_001,D 1.25,"Údržba, mycí centrum",D,1. patro,Provozní zázemí
+MIS_002,D 1.24,kancelář skladník,D,1. patro,Kancelář
+MIS_003,D1.23,expedice,D,1. patro,Expedice
+MIS_004,,Výtah expedice,D,1. patro,Výtah
+MIS_005,D 1.21,WC řidiči,D,1. patro,Sociální zařízení
+MIS_006,D 1.22,WC expedice,D,1. patro,Sociální zařízení
+MIS_007,D 1.18,úklidovka expedice,D,1. patro,Úklidové zázemí
+MIS_008,D 1.17,odpadová místnost,D,1. patro,Odpadové hospodářství
+MIS_009,D1.13a,u Agáty,D,1. patro,Ostatní
+MIS_010,D1.13,U kartonovačky,D,1. patro,Ostatní
+MIS_011,D1.9,Uklidovka u kartonovačky,D,1. patro,Úklidové zázemí
+MIS_012,D1.12,Kancelář Vedoucí výroby,D,1. patro,Kancelář
+MIS_013,D1.02,Chodba u kotelny,D,1. patro,Komunikace
+MIS_014,D1.06,Výtah Extrudovny,D,1. patro,Výtah
+MIS_015,D1.02,Sklad pod schody,D,1. patro,Sklad
+MIS_016,D1.06,Sklad vzorků,D,1. patro,Sklad
+MIS_017,D1.08,Prádelna,D,1. patro,Úklidové zázemí
+MIS_018,C1.18,Denní místnost,C,1. patro,Denní místnost
+MIS_019,C1.03,Chodba šatny směr A,C,1. patro,Komunikace
+MIS_020,C1.05,Uklidová místnost,C,1. patro,Úklidové zázemí
+MIS_021,C1.17/C1.13,Šatna ženy,C,1. patro,Šatna
+MIS_022,D.05,Sklad vedle vzorků,D,1. patro,Sklad
+MIS_023,D.06,Sklad čistého prádla,D,1. patro,Sklad
+MIS_024,C1.07,Šatna Muži,C,1. patro,Šatna
+MIS_025,C.01,Baterkárna Fve,C,1. patro,Technická místnost
+MIS_026,C1.02,Místnost s Bojlerem,C,1. patro,Technická místnost
+MIS_027,C1.03,WC C,C,1. patro,Sociální zařízení
+MIS_028,,Chodba C,C,1. patro,Komunikace
+MIS_029,,Vstup D,D,1. patro,Komunikace
+MIS_030,D1.01,Kotelna,D,1. patro,Technická místnost
+MIS_031,D1.15,Sklad surovin,D,1. patro,Sklad
+MIS_032,D1.14,Sklad hotové výrobky,D,1. patro,Sklad
+MIS_033,,schodiště expedice,D,2. patro,Komunikace
+MIS_034,D2.11,Chodba u výtahu,D,2. patro,Komunikace
+MIS_035,D2.12,Sklad obalů,D,2. patro,Sklad
+MIS_036,D2.1,Sklad Extrudátu,D,2. patro,Sklad
+MIS_037,D2.092,Míchárna II.,D,2. patro,Výrobní prostor
+MIS_038,D2.091,Míchárna I.,D,2. patro,Výrobní prostor
+MIS_039,D2.08,Extrudovna 1,D,2. patro,Výrobní prostor
+MIS_040,D2.07,denní místnost,D,2. patro,Denní místnost
+MIS_041,D2.06,WC,D,2. patro,Sociální zařízení
+MIS_042,D2.02,Chodba Ex.,D,2. patro,Komunikace
+MIS_043,D2.05,Úklidovka,D,2. patro,Úklidové zázemí
+MIS_044,D2.04,El. ozvodna,D,2. patro,Technická místnost
+MIS_045,D2.01,Extrudovna 2.,D,2. patro,Výrobní prostor
+MIS_046,D2.03,vzt,D,3. patro,Technická místnost

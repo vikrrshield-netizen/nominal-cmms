@@ -1,0 +1,291 @@
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { useAuthContext } from '../context/AuthContext';
+import { Wrench, Activity, Car, Package, CalendarCheck, MessageCircle, BarChart3, Settings, AlertTriangle, Shield, Bell, Sparkles, LogOut, Calendar, Trash2, ChevronRight, Clock, Zap, Loader2, ClipboardCheck, Map } from 'lucide-react';
+
+function useDashboardStats() {
+  const [stats, setStats] = useState({ openTasks: 0, criticalTasks: 0, urgentTasks: 0, newReports: 0, totalAssets: 0, operationalAssets: 0, upcomingRevisions: 0, loading: true });
+  useEffect(() => {
+    const unsubs: (() => void)[] = [];
+    const tq = query(collection(db, 'tasks'), where('status', 'in', ['backlog', 'planned', 'in_progress', 'paused']));
+    unsubs.push(onSnapshot(tq, (snap) => {
+      let c = 0, u = 0, b = 0;
+      snap.docs.forEach((d) => { const data = d.data(); if (data.priority === 'P1') c++; if (data.priority === 'P2') u++; if (data.status === 'backlog') b++; });
+      setStats((p) => ({ ...p, openTasks: snap.size, criticalTasks: c, urgentTasks: u, newReports: b, loading: false }));
+    }, () => setStats((p) => ({ ...p, loading: false }))));
+    const aq = query(collection(db, 'assets'));
+    unsubs.push(onSnapshot(aq, (snap) => {
+      let op = 0; snap.docs.forEach((d) => { if (d.data().status === 'operational') op++; });
+      setStats((p) => ({ ...p, totalAssets: snap.size, operationalAssets: op }));
+    }));
+    const now = new Date(); const in30 = new Date(now.getTime() + 30*24*60*60*1000);
+    const rq = query(collection(db, 'revisions'), where('nextRevisionAt', '<=', in30));
+    unsubs.push(onSnapshot(rq, (snap) => { setStats((p) => ({ ...p, upcomingRevisions: snap.size })); }));
+    return () => unsubs.forEach((u) => u());
+  }, []);
+  return stats;
+}
+
+function formatTimeAgo(date: Date): string {
+  const diff = Math.floor((Date.now() - date.getTime()) / 60000);
+  if (diff < 1) return 'právě teď'; if (diff < 60) return `před ${diff} min`;
+  const h = Math.floor(diff / 60); if (h < 24) return `před ${h} hod`;
+  return `před ${Math.floor(h / 24)} dny`;
+}
+
+function useRecentActivity() {
+  const [activities, setActivities] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    const q = query(collection(db, 'tasks'), where('status', 'in', ['completed', 'in_progress']), orderBy('updatedAt', 'desc'), limit(5));
+    const unsub = onSnapshot(q, (snap) => {
+      setActivities(snap.docs.map((d) => { const data = d.data(); return { id: d.id, user: data.assigneeName || data.createdByName || 'Systém', action: data.status === 'completed' ? 'dokončil' : 'pracuje na', target: data.assetName || data.title || 'Úkol', time: data.updatedAt?.toDate ? formatTimeAgo(data.updatedAt.toDate()) : '—', color: data.assigneeColor || '#64748b' }; }));
+      setLoading(false);
+    }, () => { setActivities([]); setLoading(false); });
+    return () => unsub();
+  }, []);
+  return { activities, loading };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// KIOSK DASHBOARD — velké dotykové dlaždice pro operátory
+// ═══════════════════════════════════════════════════════════════
+function KioskDashboard() {
+  const navigate = useNavigate();
+  const { user, logout } = useAuthContext();
+  const stats = useDashboardStats();
+
+  return (
+    <div className="min-h-screen bg-[#0f172a] flex flex-col">
+      {/* Fixed background */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-blue-500/20 rounded-full blur-[120px]" />
+        <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-purple-500/20 rounded-full blur-[120px]" />
+      </div>
+
+      <div className="relative z-10 flex flex-col min-h-screen">
+        {/* Header */}
+        <header className="p-6 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/25">
+              <Settings className="w-7 h-7 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white">Nominal<span className="text-blue-400">CMMS</span></h1>
+              <p className="text-slate-400 text-sm flex items-center gap-2">
+                <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+                Kiosk — Velín extruze
+              </p>
+            </div>
+          </div>
+          <button onClick={() => logout()} className="p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition">
+            <LogOut className="w-5 h-5 text-slate-400" />
+          </button>
+        </header>
+
+        {/* Semafor — pokud jsou havárie */}
+        {(stats.criticalTasks > 0 || stats.urgentTasks > 0) && (
+          <div className="px-6 mb-6">
+            <AlertSemaphore p1Count={stats.criticalTasks} p2Count={stats.urgentTasks} newReports={stats.newReports} onClick={() => navigate('/tasks')} />
+          </div>
+        )}
+
+        {/* Loading */}
+        {stats.loading && (
+          <div className="px-6 mb-6 flex items-center gap-3 text-slate-400">
+            <Loader2 className="w-5 h-5 animate-spin" />
+            <span className="text-sm">Načítám data...</span>
+          </div>
+        )}
+
+        {/* HLAVNÍ AKCE — velké dotykové dlaždice */}
+        <section className="px-6 flex-1 flex flex-col gap-5">
+          {/* Nahlásit poruchu — NEJVĚTŠÍ tlačítko */}
+          <button
+            onClick={() => navigate('/tasks?new=1')}
+            className="flex-1 min-h-[140px] bg-gradient-to-br from-red-500/30 to-rose-600/20 backdrop-blur-xl rounded-3xl border-2 border-red-500/40 p-8 flex items-center gap-6 hover:from-red-500/40 hover:to-rose-600/30 transition-all active:scale-[0.98] shadow-xl shadow-red-500/10"
+          >
+            <div className="w-20 h-20 bg-gradient-to-br from-red-500 to-rose-600 rounded-2xl flex items-center justify-center shadow-lg shadow-red-500/40 flex-shrink-0">
+              <AlertTriangle className="w-10 h-10 text-white" />
+            </div>
+            <div className="text-left">
+              <h2 className="text-2xl font-bold text-white mb-1">Nahlásit poruchu</h2>
+              <p className="text-red-300/70 text-lg">Stroj nefunguje? Hlásí chybu?</p>
+            </div>
+            <ChevronRight className="w-8 h-8 text-red-400 ml-auto flex-shrink-0" />
+          </button>
+
+          {/* Kontrola budov */}
+          <button
+            onClick={() => navigate('/inspection')}
+            className="flex-1 min-h-[120px] bg-gradient-to-br from-emerald-500/20 to-teal-600/10 backdrop-blur-xl rounded-3xl border border-emerald-500/30 p-8 flex items-center gap-6 hover:from-emerald-500/30 hover:to-teal-600/20 transition-all active:scale-[0.98]"
+          >
+            <div className="w-20 h-20 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/30 flex-shrink-0">
+              <ClipboardCheck className="w-10 h-10 text-white" />
+            </div>
+            <div className="text-left">
+              <h2 className="text-2xl font-bold text-white mb-1">Kontrola budov</h2>
+              <p className="text-emerald-300/70 text-lg">Denní obchůzka a kontroly</p>
+            </div>
+            <ChevronRight className="w-8 h-8 text-emerald-400 ml-auto flex-shrink-0" />
+          </button>
+
+          {/* Mapa strojů */}
+          <button
+            onClick={() => navigate('/map')}
+            className="flex-1 min-h-[120px] bg-gradient-to-br from-blue-500/20 to-indigo-600/10 backdrop-blur-xl rounded-3xl border border-blue-500/30 p-8 flex items-center gap-6 hover:from-blue-500/30 hover:to-indigo-600/20 transition-all active:scale-[0.98]"
+          >
+            <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30 flex-shrink-0">
+              <Map className="w-10 h-10 text-white" />
+            </div>
+            <div className="text-left">
+              <h2 className="text-2xl font-bold text-white mb-1">Mapa strojů</h2>
+              <p className="text-blue-300/70 text-lg">{stats.totalAssets} zařízení • {stats.operationalAssets} v provozu</p>
+            </div>
+            <ChevronRight className="w-8 h-8 text-blue-400 ml-auto flex-shrink-0" />
+          </button>
+        </section>
+
+        {/* Footer stats */}
+        <footer className="px-6 py-6 mt-4">
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-4 text-center border border-white/10">
+              <div className="text-2xl font-bold text-orange-400">{stats.openTasks}</div>
+              <div className="text-xs text-slate-400 mt-1">Otevřené úkoly</div>
+            </div>
+            <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-4 text-center border border-white/10">
+              <div className="text-2xl font-bold text-emerald-400">{stats.operationalAssets}</div>
+              <div className="text-xs text-slate-400 mt-1">Stroje OK</div>
+            </div>
+            <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-4 text-center border border-white/10">
+              <div className="text-2xl font-bold text-red-400">{stats.criticalTasks}</div>
+              <div className="text-xs text-slate-400 mt-1">Havárie</div>
+            </div>
+          </div>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MAIN DASHBOARD — plná verze pro ostatní role
+// ═══════════════════════════════════════════════════════════════
+export default function DashboardPage() {
+  const { user } = useAuthContext();
+
+  // OPERATOR = kiosk mode
+  if (user?.role === 'OPERATOR') {
+    return <KioskDashboard />;
+  }
+
+  // Všechny ostatní role = plný dashboard
+  return <FullDashboard />;
+}
+
+function FullDashboard() {
+  const navigate = useNavigate();
+  const { hasPermission, roleMeta, user, logout } = useAuthContext();
+  const stats = useDashboardStats();
+  const { activities, loading: actLoading } = useRecentActivity();
+  const pct = stats.totalAssets > 0 ? Math.round((stats.operationalAssets / stats.totalAssets) * 100) : 0;
+
+  // Role-based module filtering
+  const isReadOnly = user?.role === 'MAJITEL';
+
+  return (
+    <div className="min-h-screen bg-[#0f172a]">
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-blue-500/20 rounded-full blur-[120px]" />
+        <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-purple-500/20 rounded-full blur-[120px]" />
+        <div className="absolute top-1/2 left-1/2 w-[400px] h-[400px] bg-emerald-500/10 rounded-full blur-[100px]" />
+      </div>
+      <div className="relative z-10 pb-24">
+        <header className="p-6 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/25"><Settings className="w-7 h-7 text-white" /></div>
+            <div><h1 className="text-2xl font-bold text-white">Nominal<span className="text-blue-400">CMMS</span></h1><p className="text-slate-400 text-sm flex items-center gap-2"><span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />Systém údržby</p></div>
+          </div>
+          <div className="flex items-center gap-4">
+            <button onClick={() => logout()} className="p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition"><LogOut className="w-5 h-5 text-slate-400" /></button>
+            <div className="flex items-center gap-3 px-4 py-2 rounded-xl bg-white/5 border border-white/10">
+              <div className="text-right hidden sm:block"><div className="text-sm font-medium text-white">{user?.displayName}</div><div className="text-xs text-slate-400">{roleMeta?.icon} {roleMeta?.label}</div></div>
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center text-white font-bold shadow-lg">{user?.displayName?.charAt(0) || 'U'}</div>
+            </div>
+          </div>
+        </header>
+        {stats.loading && <div className="px-6 mb-6 flex items-center gap-3 text-slate-400"><Loader2 className="w-5 h-5 animate-spin" /><span className="text-sm">Načítám data z Firebase...</span></div>}
+        <section className="px-6 mb-6"><AlertSemaphore p1Count={stats.criticalTasks} p2Count={stats.urgentTasks} newReports={stats.newReports} onClick={() => navigate('/tasks')} /></section>
+        <section className="px-6 mb-8"><div className="grid grid-cols-3 gap-4">
+          <HeroStat icon={<Wrench className="w-6 h-6" />} label="Otevřených úkolů" value={String(stats.openTasks)} sublabel={`${stats.criticalTasks} kritické`} trend={stats.openTasks > 0 ? 'aktivní' : '✓'} color="orange" />
+          <HeroStat icon={<Activity className="w-6 h-6" />} label="Strojů v provozu" value={String(stats.operationalAssets)} sublabel={`z ${stats.totalAssets} celkem`} trend={`${pct}%`} color="emerald" />
+          <HeroStat icon={<CalendarCheck className="w-6 h-6" />} label="Revize" value={String(stats.upcomingRevisions)} sublabel="blíží se" trend="Do 30 dní" color="blue" />
+        </div></section>
+
+        {/* Quick actions — ne pro MAJITEL (read-only) */}
+        {!isReadOnly && (
+          <section className="px-6 mb-8"><div className="flex gap-3 overflow-x-auto pb-2 -mx-6 px-6">
+            <QuickAction icon={<AlertTriangle className="w-5 h-5" />} label="Nahlásit poruchu" color="from-red-500 to-rose-600" onClick={() => navigate('/tasks?new=1')} />
+            <QuickAction icon={<Calendar className="w-5 h-5" />} label="Pondělní plán" color="from-blue-500 to-indigo-600" onClick={() => navigate('/calendar')} />
+            <QuickAction icon={<Package className="w-5 h-5" />} label="Objednat díly" color="from-emerald-500 to-teal-600" onClick={() => navigate('/inventory')} />
+          </div></section>
+        )}
+
+        <section className="px-6 mb-8"><h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Zap className="w-5 h-5 text-amber-400" />Hlavní moduly</h2><div className="grid grid-cols-2 gap-4">
+          <ModuleCard icon={<Wrench className="w-7 h-7" />} title="Úkoly" description="Work orders" badge={stats.openTasks > 0 ? stats.openTasks : undefined} color="from-orange-500 to-amber-500" onClick={() => navigate('/tasks')} />
+          <ModuleCard icon={<Calendar className="w-7 h-7" />} title="Plánování" description="Týdenní rozvrh" color="from-blue-500 to-indigo-500" onClick={() => navigate('/calendar')} />
+          <ModuleCard icon={<Activity className="w-7 h-7" />} title="Stroje" description={`${stats.totalAssets} zařízení`} color="from-cyan-500 to-teal-500" onClick={() => navigate('/map')} />
+          <ModuleCard icon={<CalendarCheck className="w-7 h-7" />} title="Revize" description="Termíny" badge={stats.upcomingRevisions > 0 ? stats.upcomingRevisions : undefined} color="from-rose-500 to-pink-500" onClick={() => navigate('/revisions')} />
+          <ModuleCard icon={<ClipboardCheck className="w-7 h-7" />} title="Kontrola budov" description="Denní obchůzka" color="from-emerald-500 to-green-500" onClick={() => navigate('/inspection')} />
+        </div></section>
+
+        <section className="px-6 mb-8"><h2 className="text-lg font-bold text-white mb-4">Další moduly</h2><div className="space-y-3">
+          <ListModule icon={<Car className="w-6 h-6" />} title="Vozový park" description="JCB, traktory, VZV" color="bg-violet-500" onClick={() => navigate('/fleet')} />
+          <ListModule icon={<Package className="w-6 h-6" />} title="Sklad náhradních dílů" description="Inventura a objednávky" color="bg-emerald-500" onClick={() => navigate('/inventory')} />
+          <ListModule icon={<Trash2 className="w-6 h-6" />} title="Odpady" description="Semafor a harmonogram" color="bg-lime-500" onClick={() => navigate('/waste')} />
+          <ListModule icon={<MessageCircle className="w-6 h-6" />} title="Schránka důvěry" description="Anonymní hlášení" color="bg-purple-500" onClick={() => navigate('/trustbox')} />
+          {hasPermission('report.read') && <ListModule icon={<BarChart3 className="w-6 h-6" />} title="Reporty" description="Statistiky a export" color="bg-sky-500" onClick={() => navigate('/reports')} />}
+          {hasPermission('ai.use') && <ListModule icon={<Sparkles className="w-6 h-6" />} title="AI Asistent" description="Hlasové příkazy" color="bg-amber-500" onClick={() => navigate('/ai')} />}
+          <ListModule icon={<Bell className="w-6 h-6" />} title="Notifikace" description="Upomínky a upozornění" color="bg-indigo-500" onClick={() => navigate('/notifications')} />
+          {hasPermission('user.manage') && <ListModule icon={<Shield className="w-6 h-6" />} title="Administrace" description="Uživatelé a oprávnění" color="bg-rose-500" onClick={() => navigate('/admin')} />}
+        </div></section>
+        <section className="px-6"><h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Clock className="w-5 h-5 text-slate-400" />Poslední aktivita</h2>
+          <div className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 overflow-hidden">
+            {actLoading ? <div className="p-6 flex items-center justify-center gap-3 text-slate-500"><Loader2 className="w-5 h-5 animate-spin" /><span className="text-sm">Načítám...</span></div>
+            : activities.length === 0 ? <div className="p-6 text-center text-slate-500 text-sm">Zatím žádná aktivita</div>
+            : activities.map((a: any, i: number) => <ActivityItem key={a.id} user={a.user} action={a.action} target={a.target} time={a.time} color={a.color} isLast={i === activities.length - 1} />)}
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SHARED COMPONENTS
+// ═══════════════════════════════════════════════════════════════
+
+function HeroStat({ icon, label, value, sublabel, trend, color }: { icon: React.ReactNode; label: string; value: string; sublabel: string; trend: string; color: 'orange' | 'emerald' | 'blue' }) {
+  const colors: any = { orange: 'from-orange-500/20 to-amber-500/10 border-orange-500/20', emerald: 'from-emerald-500/20 to-teal-500/10 border-emerald-500/20', blue: 'from-blue-500/20 to-indigo-500/10 border-blue-500/20' };
+  const ic: any = { orange: 'text-orange-400', emerald: 'text-emerald-400', blue: 'text-blue-400' };
+  return (<div className={`bg-gradient-to-br ${colors[color]} backdrop-blur-xl rounded-2xl p-5 border`}><div className={`${ic[color]} mb-3`}>{icon}</div><div className="text-3xl font-bold text-white mb-1">{value}</div><div className="text-slate-400 text-sm mb-2">{label}</div><div className="flex items-center justify-between"><span className="text-xs text-slate-500">{sublabel}</span><span className={`text-xs font-medium ${ic[color]} bg-white/5 px-2 py-1 rounded-full`}>{trend}</span></div></div>);
+}
+function QuickAction({ icon, label, color, onClick }: { icon: React.ReactNode; label: string; color: string; onClick: () => void }) {
+  return (<button onClick={onClick} className={`bg-gradient-to-r ${color} text-white px-5 py-3.5 rounded-xl font-semibold flex items-center gap-2.5 whitespace-nowrap shadow-xl hover:shadow-2xl transition-all hover:-translate-y-0.5 active:scale-95`}>{icon}<span>{label}</span></button>);
+}
+function ModuleCard({ icon, title, description, badge, color, onClick }: { icon: React.ReactNode; title: string; description: string; badge?: number; color: string; onClick: () => void }) {
+  return (<button onClick={onClick} className="group relative bg-white/5 backdrop-blur-xl p-5 rounded-2xl border border-white/10 text-left hover:bg-white/10 transition-all hover:-translate-y-1 overflow-hidden"><div className={`absolute -top-8 -right-8 w-28 h-28 bg-gradient-to-br ${color} rounded-full blur-2xl opacity-40 group-hover:opacity-60 transition-opacity`} /><div className={`relative w-14 h-14 bg-gradient-to-br ${color} rounded-2xl flex items-center justify-center mb-4 shadow-lg`}><div className="text-white">{icon}</div></div><h3 className="relative text-lg font-bold text-white mb-0.5">{title}</h3><p className="relative text-sm text-slate-400">{description}</p>{badge !== undefined && <span className="absolute top-4 right-4 min-w-[1.75rem] h-7 px-2.5 bg-red-500 text-white text-sm font-bold rounded-full flex items-center justify-center shadow-lg shadow-red-500/40 animate-pulse">{badge}</span>}</button>);
+}
+function ListModule({ icon, title, description, badge, color, onClick }: { icon: React.ReactNode; title: string; description: string; badge?: string; color: string; onClick: () => void }) {
+  return (<button onClick={onClick} className="w-full flex items-center gap-4 p-4 bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 hover:bg-white/10 transition-all group"><div className={`w-12 h-12 ${color} rounded-xl flex items-center justify-center shadow-lg flex-shrink-0`}><div className="text-white">{icon}</div></div><div className="flex-1 text-left min-w-0"><h3 className="font-semibold text-white truncate">{title}</h3><p className="text-sm text-slate-400 truncate">{description}</p></div>{badge && <span className="px-2.5 py-1 bg-amber-500/20 text-amber-400 text-xs font-medium rounded-full whitespace-nowrap">{badge}</span>}<ChevronRight className="w-5 h-5 text-slate-500 group-hover:text-white group-hover:translate-x-1 transition-all flex-shrink-0" /></button>);
+}
+function ActivityItem({ user, action, target, time, color, isLast }: { user: string; action: string; target: string; time: string; color: string; isLast?: boolean }) {
+  return (<div className={`p-4 flex items-center gap-4 hover:bg-white/5 transition ${!isLast ? 'border-b border-white/5' : ''}`}><div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg flex-shrink-0" style={{ backgroundColor: color }}>{user.charAt(0)}</div><div className="flex-1 min-w-0"><p className="text-sm text-slate-300"><span className="font-semibold text-white">{user}</span>{' '}{action}{' '}<span className="font-medium text-white">{target}</span></p><p className="text-xs text-slate-500">{time}</p></div></div>);
+}
+function AlertSemaphore({ p1Count, p2Count, newReports, onClick }: { p1Count: number; p2Count: number; newReports: number; onClick: () => void }) {
+  const hasP1 = p1Count > 0, hasP2 = p2Count > 0, hasNew = newReports > 0;
+  if (!hasP1 && !hasP2 && !hasNew) return (<div className="bg-emerald-500/20 border border-emerald-500/30 rounded-2xl p-4 flex items-center gap-4"><div className="w-14 h-14 bg-emerald-500 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/30"><Activity className="w-7 h-7 text-white" /></div><div><h2 className="text-lg font-bold text-emerald-400">✓ Vše v pořádku</h2><p className="text-sm text-emerald-300/70">Žádné aktivní poruchy</p></div></div>);
+  return (<button onClick={onClick} className={`w-full rounded-2xl p-4 md:p-6 transition-all active:scale-[0.98] ${hasP1 ? 'bg-red-500/20 border-2 border-red-500 animate-pulse' : hasP2 ? 'bg-amber-500/20 border-2 border-amber-500/50' : 'bg-blue-500/20 border border-blue-500/30'}`}><div className="flex items-center gap-4 md:gap-6"><div className="flex flex-col gap-2"><div className={`w-8 h-8 md:w-10 md:h-10 rounded-full border-2 flex items-center justify-center font-bold text-sm ${hasP1 ? 'bg-red-500 border-red-400 text-white shadow-lg shadow-red-500/50 animate-pulse' : 'bg-red-900/30 border-red-900/50 text-red-900/50'}`}>{p1Count}</div><div className={`w-8 h-8 md:w-10 md:h-10 rounded-full border-2 flex items-center justify-center font-bold text-sm ${hasP2 ? 'bg-amber-500 border-amber-400 text-white shadow-lg shadow-amber-500/50' : 'bg-amber-900/30 border-amber-900/50 text-amber-900/50'}`}>{p2Count}</div><div className={`w-8 h-8 md:w-10 md:h-10 rounded-full border-2 flex items-center justify-center font-bold text-sm ${hasNew ? 'bg-blue-500 border-blue-400 text-white shadow-lg shadow-blue-500/50' : 'bg-blue-900/30 border-blue-900/50 text-blue-900/50'}`}>{newReports}</div></div><div className="flex-1 text-left">{hasP1 && <div className="mb-1"><span className="text-xl md:text-2xl font-bold text-red-400">⚠️ {p1Count} HAVÁRIE</span><span className="text-red-300 text-sm md:text-base ml-2">— okamžitě řešit!</span></div>}{hasP2 && <div className="mb-1"><span className="text-lg md:text-xl font-bold text-amber-400">🔧 {p2Count} vážné závady</span><span className="text-amber-300/70 text-sm ml-2">— dnes</span></div>}{hasNew && <div><span className="text-base md:text-lg font-medium text-blue-400">📋 {newReports} nových hlášení</span><span className="text-blue-300/70 text-sm ml-2">— ke zpracování</span></div>}</div><ChevronRight className={`w-8 h-8 flex-shrink-0 ${hasP1 ? 'text-red-400' : hasP2 ? 'text-amber-400' : 'text-blue-400'}`} /></div></button>);
+}

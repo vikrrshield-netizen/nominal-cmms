@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run build:*)",
+      "Bash(firebase deploy:*)",
+      "Bash(npx tsc:*)",
+      "Bash(echo:*)",
+      "Bash(unzip:*)",
+      "Bash(ls:*)",
+      "Bash(curl:*)",
+      "Bash(npx tsx:*)"
+    ]
+  }
+}

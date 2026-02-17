@@ -1,0 +1,45 @@
+// storage.rules
+// NOMINAL CMMS — Firebase Storage Rules
+
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return request.auth.token.role in ['SUPERADMIN', 'VEDENI'];
+    }
+    
+    // Revision documents
+    match /revisions/{revisionId}/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    
+    // Asset images
+    match /assets/{assetId}/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.auth.token.role in ['SUPERADMIN', 'VEDENI', 'UDRZBA'];
+    }
+    
+    // User avatars
+    match /users/{userId}/avatar {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.auth.uid == userId;
+    }
+    
+    // Temporary uploads
+    match /temp/{userId}/{allPaths=**} {
+      allow read, write: if isSignedIn() && request.auth.uid == userId;
+    }
+    
+    // Deny everything else
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
