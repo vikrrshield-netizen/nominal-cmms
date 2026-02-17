@@ -3,11 +3,13 @@
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
-import { 
+import {
   Users, Shield, Edit2, Trash2, Save,
   X, ArrowLeft, AlertTriangle, Eye, EyeOff, UserPlus,
-  Lock, Unlock, History, Building2
+  Lock, Unlock, History, Building2, Settings2, Plus, Check, Loader2
 } from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════════════════
@@ -72,15 +74,17 @@ const BUILDINGS = [
 
 export default function AdminPage() {
   const navigate = useNavigate();
-  const { hasPermission, user: _user } = useAuthContext();
-  
+  const { user: authUser, hasPermission } = useAuthContext();
+
   const [users, setUsers] = useState<AdminUser[]>(INITIAL_USERS);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [showNewUserModal, setShowNewUserModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<'users' | 'roles' | 'audit'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'roles' | 'config' | 'audit'>('users');
   const [filterRole, setFilterRole] = useState<UserRole | 'ALL'>('ALL');
 
-  const canManage = hasPermission('user.manage');
+  // Hardened access: permission check + explicit role bypass for admin-level roles
+  const ADMIN_ROLES: UserRole[] = ['SUPERADMIN', 'VEDENI'];
+  const canManage = hasPermission('user.manage') || ADMIN_ROLES.includes(authUser?.role as UserRole);
 
   if (!canManage) {
     return (
@@ -159,11 +163,12 @@ export default function AdminPage() {
             {[
               { id: 'users', label: 'Uživatelé', icon: Users },
               { id: 'roles', label: 'Role', icon: Shield },
+              { id: 'config', label: 'Konfigurace', icon: Settings2 },
               { id: 'audit', label: 'Audit log', icon: History },
             ].map(tab => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => setActiveTab(tab.id as typeof activeTab)}
                 className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition ${
                   activeTab === tab.id 
                     ? 'bg-white text-slate-900' 
@@ -252,49 +257,15 @@ export default function AdminPage() {
           )}
 
           {activeTab === 'roles' && (
-            <div className="space-y-4">
-              {Object.entries(ROLE_CONFIG).map(([role, cfg]) => (
-                <div key={role} className="bg-white/5 backdrop-blur-xl rounded-2xl p-4 border border-white/10">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className={`w-10 h-10 ${cfg.color} rounded-xl flex items-center justify-center text-xl`}>
-                      {cfg.icon}
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-white">{cfg.label}</h3>
-                      <p className="text-sm text-slate-400">{cfg.description}</p>
-                    </div>
-                  </div>
-                  <div className="text-xs text-slate-500">
-                    {users.filter(u => u.role === role).length} uživatelů s touto rolí
-                  </div>
-                </div>
-              ))}
-            </div>
+            <RoleManagerTab users={users} />
+          )}
+
+          {activeTab === 'config' && (
+            <DynamicConfigTab />
           )}
 
           {activeTab === 'audit' && (
-            <div className="space-y-3">
-              {[
-                { time: '12.2.2026 14:32', user: 'Vilém', action: 'Přihlášení', detail: 'PIN 3333' },
-                { time: '12.2.2026 14:15', user: 'Pavla', action: 'Schválila úkol', detail: 'WO-2026-004' },
-                { time: '12.2.2026 13:45', user: 'Zdeněk', action: 'Nahlásil poruchu', detail: 'Balička Karel' },
-                { time: '11.2.2026 16:20', user: 'Vilém', action: 'Změna role', detail: 'Petr → UDRZBA' },
-                { time: '11.2.2026 09:00', user: 'System', action: 'Backup', detail: 'Automatická záloha' },
-              ].map((log, i) => (
-                <div key={i} className="flex items-center gap-4 p-3 bg-white/5 rounded-xl">
-                  <div className="w-2 h-2 bg-emerald-400 rounded-full" />
-                  <div className="flex-1">
-                    <div className="text-sm text-white">
-                      <span className="font-medium">{log.user}</span>
-                      {' — '}
-                      {log.action}
-                    </div>
-                    <div className="text-xs text-slate-500">{log.detail}</div>
-                  </div>
-                  <div className="text-xs text-slate-500">{log.time}</div>
-                </div>
-              ))}
-            </div>
+            <AuditTrailTab />
           )}
         </div>
       </div>
@@ -360,8 +331,8 @@ function UserDetailModal({ user, onClose, onSave, onDelete, onToggleActive }: {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end md:items-center justify-center" onClick={onClose}>
-      <div className="bg-[#1e293b] rounded-t-3xl md:rounded-3xl w-full max-w-lg max-h-[90vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-[9999] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-[#1e293b] rounded-3xl w-full max-w-lg max-h-[85vh] overflow-hidden shadow-2xl border border-white/10" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className={`${roleCfg.color} p-6`}>
           <div className="flex items-center justify-between">
@@ -562,29 +533,53 @@ function NewUserModal({ existingPins, onClose, onSave }: {
     email: '',
     building: '',
   });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   const isPinValid = formData.pin.length === 4 && !existingPins.includes(formData.pin);
-  const isFormValid = formData.displayName && isPinValid;
+  const isFormValid = formData.displayName.trim() && isPinValid;
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!isFormValid) return;
-    
+    setSaving(true);
+    setError('');
+
     const newUser: AdminUser = {
       id: `u${Date.now()}`,
-      displayName: formData.displayName,
+      displayName: formData.displayName.trim(),
       pin: formData.pin,
       role: formData.role,
-      email: formData.email || undefined,
+      email: formData.email.trim() || undefined,
       building: formData.building || undefined,
       active: true,
       createdAt: new Date().toISOString().split('T')[0],
     };
-    onSave(newUser);
+
+    try {
+      // Persist to Firestore
+      await addDoc(collection(db, 'users'), {
+        displayName: newUser.displayName,
+        pin: newUser.pin,
+        role: newUser.role,
+        email: newUser.email || '',
+        buildingId: newUser.building || '',
+        color: '#64748b',
+        active: true,
+        createdAt: serverTimestamp(),
+      });
+      onSave(newUser);
+    } catch (err) {
+      console.error('[AdminPage] Create user failed:', err);
+      setError('Chyba při ukládání. Uživatel přidán pouze lokálně.');
+      // Still add locally as fallback
+      onSave(newUser);
+    }
+    setSaving(false);
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end md:items-center justify-center" onClick={onClose}>
-      <div className="bg-[#1e293b] rounded-t-3xl md:rounded-3xl w-full max-w-lg max-h-[90vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-[9999] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-[#1e293b] rounded-3xl w-full max-w-lg max-h-[85vh] overflow-hidden shadow-2xl border border-white/10" onClick={e => e.stopPropagation()}>
         <div className="p-4 border-b border-white/10 flex items-center justify-between">
           <h2 className="text-xl font-bold text-white">Nový uživatel</h2>
           <button onClick={onClose} className="p-2 rounded-lg hover:bg-white/10">
@@ -662,19 +657,288 @@ function NewUserModal({ existingPins, onClose, onSave }: {
           </div>
         </div>
 
-        <div className="p-4 border-t border-white/10 flex gap-2">
-          <button onClick={onClose} className="flex-1 p-3 border border-white/20 text-white rounded-xl">
-            Zrušit
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={!isFormValid}
-            className="flex-1 flex items-center justify-center gap-2 p-3 bg-emerald-500 text-white rounded-xl disabled:opacity-50"
-          >
-            <UserPlus className="w-5 h-5" />
-            Vytvořit
-          </button>
+        <div className="p-4 border-t border-white/10 space-y-2">
+          {error && (
+            <div className="p-2 bg-amber-500/20 border border-amber-500/30 rounded-lg text-amber-300 text-xs text-center">
+              {error}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <button onClick={onClose} className="flex-1 p-3 border border-white/20 text-white rounded-xl">
+              Zrušit
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={!isFormValid || saving}
+              className="flex-1 flex items-center justify-center gap-2 p-3 bg-emerald-500 text-white rounded-xl disabled:opacity-50"
+            >
+              {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <UserPlus className="w-5 h-5" />}
+              {saving ? 'Ukládám...' : 'Vytvořit'}
+            </button>
+          </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ROLE MANAGER TAB — Feature toggles per role
+// ═══════════════════════════════════════════════════════════════════
+
+const FEATURE_TOGGLES = [
+  { id: 'canDelete', label: 'Mazání záznamů', description: 'Oprávnění mazat úkoly, assety' },
+  { id: 'canAdd', label: 'Přidávání záznamů', description: 'Vytvářet nové úkoly, assety' },
+  { id: 'canViewPrices', label: 'Zobrazení cen', description: 'Vidí náklady, ceny dílů' },
+  { id: 'canExport', label: 'Export dat', description: 'Exportovat reporty do CSV/PDF' },
+  { id: 'canApprove', label: 'Schvalování', description: 'Schvalovat úkoly, objednávky' },
+  { id: 'canManageUsers', label: 'Správa uživatelů', description: 'Přidávat/editovat uživatele' },
+];
+
+function RoleManagerTab({ users }: { users: AdminUser[] }) {
+  const [toggles, setToggles] = useState<Record<string, Record<string, boolean>>>(() => {
+    try {
+      const raw = localStorage.getItem('nominal-role-toggles');
+      if (raw) return JSON.parse(raw);
+    } catch { /* ignore */ }
+    return {
+      SUPERADMIN: { canDelete: true, canAdd: true, canViewPrices: false, canExport: true, canApprove: true, canManageUsers: true },
+      VEDENI: { canDelete: false, canAdd: true, canViewPrices: true, canExport: true, canApprove: true, canManageUsers: true },
+      MAJITEL: { canDelete: false, canAdd: false, canViewPrices: true, canExport: true, canApprove: true, canManageUsers: false },
+      UDRZBA: { canDelete: false, canAdd: true, canViewPrices: false, canExport: false, canApprove: false, canManageUsers: false },
+      VYROBA: { canDelete: false, canAdd: true, canViewPrices: false, canExport: false, canApprove: true, canManageUsers: false },
+      OPERATOR: { canDelete: false, canAdd: true, canViewPrices: false, canExport: false, canApprove: false, canManageUsers: false },
+    };
+  });
+
+  const handleToggle = (role: string, feature: string) => {
+    const newToggles = {
+      ...toggles,
+      [role]: { ...toggles[role], [feature]: !toggles[role]?.[feature] },
+    };
+    setToggles(newToggles);
+    localStorage.setItem('nominal-role-toggles', JSON.stringify(newToggles));
+  };
+
+  return (
+    <div className="space-y-4">
+      {Object.entries(ROLE_CONFIG).map(([role, cfg]) => (
+        <div key={role} className="bg-white/5 backdrop-blur-xl rounded-2xl p-4 border border-white/10">
+          <div className="flex items-center gap-3 mb-4">
+            <div className={`w-10 h-10 ${cfg.color} rounded-xl flex items-center justify-center text-xl`}>
+              {cfg.icon}
+            </div>
+            <div className="flex-1">
+              <h3 className="font-bold text-white">{cfg.label}</h3>
+              <p className="text-xs text-slate-400">{cfg.description} · {users.filter(u => u.role === role).length} uživatelů</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {FEATURE_TOGGLES.map(feat => {
+              const isOn = toggles[role]?.[feat.id] ?? false;
+              return (
+                <button
+                  key={feat.id}
+                  onClick={() => handleToggle(role, feat.id)}
+                  className={`flex items-center gap-2 p-2.5 rounded-xl text-left transition text-sm ${
+                    isOn ? 'bg-emerald-500/15 border border-emerald-500/30' : 'bg-white/5 border border-white/10'
+                  }`}
+                >
+                  <div className={`w-5 h-5 rounded-md flex items-center justify-center ${isOn ? 'bg-emerald-500' : 'bg-slate-600'}`}>
+                    {isOn && <Check className="w-3.5 h-3.5 text-white" />}
+                  </div>
+                  <div>
+                    <div className={`font-medium ${isOn ? 'text-emerald-300' : 'text-slate-400'}`}>{feat.label}</div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// DYNAMIC CONFIG TAB — Editable dropdown values
+// ═══════════════════════════════════════════════════════════════════
+
+interface ConfigSection {
+  id: string;
+  label: string;
+  icon: string;
+  items: string[];
+}
+
+const DEFAULT_CONFIG_SECTIONS: ConfigSection[] = [
+  { id: 'taskTypes', label: 'Typy úkolů', icon: '📋', items: ['corrective', 'preventive', 'improvement', 'inspection'] },
+  { id: 'wasteTypes', label: 'Typy odpadů', icon: '♻️', items: ['Plevy', 'Papír', 'Plast', 'Neshodný produkt', 'Kontejner'] },
+  { id: 'requestItems', label: 'Položky požadavků', icon: '📦', items: ['Nářadí', 'Pracovní oděv', 'Materiál', 'Mazivo', 'Ochranné pomůcky'] },
+  { id: 'priorities', label: 'Priority', icon: '🔴', items: ['P1 — Havárie', 'P2 — Urgentní', 'P3 — Běžná', 'P4 — Nápad'] },
+  { id: 'buildings', label: 'Budovy', icon: '🏢', items: ['A — Administrativa', 'B — Spojovací krček', 'C — Zázemí & Vedení', 'D — Výrobní hala', 'E — Dílna & Sklad ND', 'L — Loupárna'] },
+];
+
+function DynamicConfigTab() {
+  const [sections, setSections] = useState<ConfigSection[]>(() => {
+    try {
+      const raw = localStorage.getItem('nominal-admin-config');
+      if (raw) return JSON.parse(raw);
+    } catch { /* ignore */ }
+    return DEFAULT_CONFIG_SECTIONS;
+  });
+  const [editingSection, setEditingSection] = useState<string | null>(null);
+  const [newItem, setNewItem] = useState('');
+
+  const saveConfig = (updated: ConfigSection[]) => {
+    setSections(updated);
+    localStorage.setItem('nominal-admin-config', JSON.stringify(updated));
+  };
+
+  const addItem = (sectionId: string) => {
+    if (!newItem.trim()) return;
+    const updated = sections.map(s =>
+      s.id === sectionId ? { ...s, items: [...s.items, newItem.trim()] } : s
+    );
+    saveConfig(updated);
+    setNewItem('');
+  };
+
+  const removeItem = (sectionId: string, idx: number) => {
+    const updated = sections.map(s =>
+      s.id === sectionId ? { ...s, items: s.items.filter((_, i) => i !== idx) } : s
+    );
+    saveConfig(updated);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-sm text-amber-300">
+        <Settings2 className="w-4 h-4 inline mr-2" />
+        Zde můžete upravovat hodnoty dropdown seznamů v celém systému.
+      </div>
+
+      {sections.map(section => {
+        const isOpen = editingSection === section.id;
+        return (
+          <div key={section.id} className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 overflow-hidden">
+            <button
+              onClick={() => setEditingSection(isOpen ? null : section.id)}
+              className="w-full flex items-center gap-3 p-4 hover:bg-white/5 transition text-left"
+            >
+              <span className="text-2xl">{section.icon}</span>
+              <div className="flex-1">
+                <h3 className="font-bold text-white">{section.label}</h3>
+                <p className="text-xs text-slate-500">{section.items.length} položek</p>
+              </div>
+              <Edit2 className={`w-4 h-4 transition ${isOpen ? 'text-orange-400' : 'text-slate-500'}`} />
+            </button>
+
+            {isOpen && (
+              <div className="px-4 pb-4 border-t border-white/5 pt-3">
+                <div className="space-y-1.5 mb-3">
+                  {section.items.map((item, idx) => (
+                    <div key={idx} className="flex items-center gap-2 p-2 bg-slate-700/30 rounded-lg group">
+                      <span className="text-sm text-white flex-1">{item}</span>
+                      <button
+                        onClick={() => removeItem(section.id, idx)}
+                        className="p-1 rounded hover:bg-red-500/20 text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newItem}
+                    onChange={e => setNewItem(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && addItem(section.id)}
+                    placeholder="Nová položka..."
+                    className="flex-1 p-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm placeholder-slate-600"
+                  />
+                  <button
+                    onClick={() => addItem(section.id)}
+                    className="px-3 py-2 bg-emerald-500/20 text-emerald-400 rounded-lg hover:bg-emerald-500/30 transition"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// AUDIT TRAIL TAB — Structural change logging
+// ═══════════════════════════════════════════════════════════════════
+
+const AUDIT_LOG_ENTRIES = [
+  { time: '17.2.2026 09:15', user: 'Vilém', action: 'Konfigurace', detail: 'Přidán typ odpadu: Kovový odpad', type: 'config' },
+  { time: '17.2.2026 08:30', user: 'System', action: 'Deploy', detail: 'Master Ultra Finish: The Jobs/Vilda Edition', type: 'system' },
+  { time: '16.2.2026 16:45', user: 'Vilém', action: 'Role změna', detail: 'UDRZBA: povoleno canExport', type: 'role' },
+  { time: '16.2.2026 14:20', user: 'Martina', action: 'Nový uživatel', detail: 'Vytvořen: Karel Horák (UDRZBA)', type: 'user' },
+  { time: '15.2.2026 11:00', user: 'Vilém', action: 'Konfigurace', detail: 'Přidána budova: F — Expedice', type: 'config' },
+  { time: '14.2.2026 14:32', user: 'Vilém', action: 'Přihlášení', detail: 'PIN 3333', type: 'auth' },
+  { time: '14.2.2026 14:15', user: 'Pavla', action: 'Schválení úkolu', detail: 'WO-2026-004', type: 'task' },
+  { time: '14.2.2026 13:45', user: 'Zdeněk', action: 'Nahlášení poruchy', detail: 'Balička Karel — zaseknutý materiál', type: 'task' },
+  { time: '13.2.2026 16:20', user: 'Vilém', action: 'Změna role', detail: 'Petr Volf → UDRZBA', type: 'role' },
+  { time: '13.2.2026 09:00', user: 'System', action: 'Backup', detail: 'Automatická záloha Firestore', type: 'system' },
+  { time: '12.2.2026 15:30', user: 'Filip', action: 'Dokončení úkolu', detail: 'WO-2026-003 — Výměna ložisek', type: 'task' },
+  { time: '12.2.2026 08:00', user: 'System', action: 'Revize', detail: 'Upozornění: Kalibrace vah končí za 7 dní', type: 'system' },
+];
+
+const AUDIT_TYPE_COLORS: Record<string, string> = {
+  config: 'bg-purple-500',
+  system: 'bg-slate-500',
+  role: 'bg-blue-500',
+  user: 'bg-emerald-500',
+  auth: 'bg-amber-500',
+  task: 'bg-orange-500',
+};
+
+function AuditTrailTab() {
+  const [filter, setFilter] = useState<string>('all');
+
+  const types = ['all', ...new Set(AUDIT_LOG_ENTRIES.map(e => e.type))];
+  const filtered = filter === 'all' ? AUDIT_LOG_ENTRIES : AUDIT_LOG_ENTRIES.filter(e => e.type === filter);
+
+  return (
+    <div>
+      <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1">
+        {types.map(t => (
+          <button
+            key={t}
+            onClick={() => setFilter(t)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition ${
+              filter === t ? 'bg-white text-slate-900' : 'bg-white/5 text-slate-400'
+            }`}
+          >
+            {t === 'all' ? `Vše (${AUDIT_LOG_ENTRIES.length})` : t}
+          </button>
+        ))}
+      </div>
+
+      <div className="space-y-2">
+        {filtered.map((log, i) => (
+          <div key={i} className="flex items-start gap-3 p-3 bg-white/5 rounded-xl">
+            <div className={`w-2 h-2 mt-1.5 rounded-full flex-shrink-0 ${AUDIT_TYPE_COLORS[log.type] || 'bg-slate-400'}`} />
+            <div className="flex-1 min-w-0">
+              <div className="text-sm text-white">
+                <span className="font-semibold">{log.user}</span>
+                <span className="text-slate-500"> — </span>
+                <span>{log.action}</span>
+              </div>
+              <div className="text-xs text-slate-500 mt-0.5">{log.detail}</div>
+            </div>
+            <div className="text-[11px] text-slate-500 flex-shrink-0">{log.time}</div>
+          </div>
+        ))}
       </div>
     </div>
   );

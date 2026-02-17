@@ -4,7 +4,7 @@
 // Budova D → interaktivní SVG půdorys 2.NP
 
 import { useState, useEffect, useMemo } from 'react';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import {
   ArrowLeft,
@@ -60,6 +60,8 @@ const STATUS_CONFIG: Record<string, { dot: string; label: string; color: string 
   operational: { dot: 'bg-emerald-400', label: 'V provozu', color: '#34d399' },
   maintenance: { dot: 'bg-amber-400 animate-pulse', label: 'Údržba', color: '#fbbf24' },
   breakdown: { dot: 'bg-red-400 animate-pulse', label: 'Porucha', color: '#f87171' },
+  sanitation: { dot: 'bg-blue-400', label: 'Sanitace', color: '#60a5fa' },
+  planned_downtime: { dot: 'bg-orange-400', label: 'Plán. odstávka', color: '#fb923c' },
   idle: { dot: 'bg-slate-400', label: 'Nečinný', color: '#94a3b8' },
   offline: { dot: 'bg-slate-600', label: 'Offline', color: '#475569' },
 };
@@ -100,6 +102,8 @@ const FOLDER_CONFIG: Record<string, { label: string; icon: string }> = {
 function getWorstStatus(assets: Asset[]): string {
   if (assets.some((a) => a.status === 'breakdown')) return 'breakdown';
   if (assets.some((a) => a.status === 'maintenance')) return 'maintenance';
+  if (assets.some((a) => a.status === 'planned_downtime')) return 'planned_downtime';
+  if (assets.some((a) => a.status === 'sanitation')) return 'sanitation';
   if (assets.some((a) => a.status === 'operational')) return 'operational';
   return 'idle';
 }
@@ -283,35 +287,30 @@ function FolderTile({ folder, onClick }: { folder: FolderGroup; onClick: () => v
 }
 
 // ═══════════════════════════════════════════════
-// ROOM CARD — drill-down level 2
+// ROOM TILE — drill-down level 2 (iPhone tile)
 // ═══════════════════════════════════════════════
-function RoomCard({ room, color, onClick, code }: { room: RoomGroup; color: string; onClick: () => void; code: string }) {
+function RoomTile({ room, color, onClick, code }: { room: RoomGroup; color: string; onClick: () => void; code: string }) {
+  const roomWorst = getWorstStatus(room.assets);
+  const roomSt = STATUS_CONFIG[roomWorst] || STATUS_CONFIG.idle;
+
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-4 p-4 rounded-2xl border transition-all active:scale-[0.97] text-left bg-slate-800/40 border-slate-700/30 hover:bg-slate-700/40"
+      className="flex flex-col items-center justify-center p-3 rounded-2xl border transition-all active:scale-[0.96] cursor-pointer text-center min-h-[110px] relative bg-slate-800/40 border-slate-700/30 hover:bg-slate-700/40"
     >
+      <div className={`absolute top-2 right-2 w-2.5 h-2.5 rounded-full ${roomSt.dot}`} />
       <div
-        className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
+        className="w-12 h-12 rounded-xl flex items-center justify-center mb-1.5"
         style={{ background: `${color}20` }}
       >
         <Layers className="w-6 h-6" style={{ color }} />
       </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-[15px] font-semibold text-white">{room.name}</span>
-          <span className="text-[11px] font-mono text-slate-500 bg-slate-700/40 px-1.5 py-0.5 rounded">{code}</span>
-        </div>
-        <div className="text-[12px] text-slate-500 mt-0.5">
-          {room.assets.length} strojů · {room.floor}
-        </div>
-        {room.issueCount > 0 && (
-          <div className="text-[12px] text-red-400 mt-0.5">
-            {room.issueCount} problémů
-          </div>
-        )}
-      </div>
-      <ChevronRight className="w-5 h-5 text-slate-500 flex-shrink-0" />
+      <span className="text-[13px] font-semibold text-white leading-tight">{room.name}</span>
+      <span className="text-[10px] font-mono text-slate-500 mt-0.5">{code}</span>
+      <span className="text-[11px] text-slate-500 mt-0.5">{room.assets.length} strojů</span>
+      {room.issueCount > 0 && (
+        <span className="text-[11px] text-red-400 mt-0.5">{room.issueCount} problémů</span>
+      )}
     </button>
   );
 }
@@ -585,6 +584,11 @@ export default function MapPage() {
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [search, setSearch] = useState('');
   const [wasteStatus, setWasteStatus] = useState<Record<string, boolean>>({});
+  const [showAddModal, setShowAddModal] = useState<'building' | 'room' | 'asset' | null>(null);
+  const [addName, setAddName] = useState('');
+  const [addCode, setAddCode] = useState('');
+  const [addSaving, setAddSaving] = useState(false);
+  const [addError, setAddError] = useState('');
 
   const { buildings } = useGroupedData(assets, selectedBuildingId);
 
@@ -645,6 +649,15 @@ export default function MapPage() {
       (a) => a.name.toLowerCase().includes(q) || a.code?.toLowerCase().includes(q)
     );
   }, [currentFolder, search]);
+
+  // Effective drill level — falls back safely if selected data vanishes after reload
+  const activeLevel: DrillLevel = useMemo(() => {
+    if (loading) return drillLevel;
+    if (drillLevel === 'folder' && !currentFolder) return currentRoom ? 'machines' : currentBuilding ? 'rooms' : 'buildings';
+    if (drillLevel === 'machines' && !currentRoom) return currentBuilding ? 'rooms' : 'buildings';
+    if (drillLevel === 'rooms' && !currentBuilding) return 'buildings';
+    return drillLevel;
+  }, [drillLevel, loading, currentBuilding, currentRoom, currentFolder]);
 
   // Generate room code: e.g. D1.01, D2.03
   const getRoomCode = (buildingId: string, room: RoomGroup, index: number) => {
@@ -713,18 +726,18 @@ export default function MapPage() {
         </div>
 
         {/* Breadcrumb */}
-        {drillLevel !== 'buildings' && (
+        {activeLevel !== 'buildings' && (
           <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-3 flex-wrap">
             <button onClick={handleBackToBuildings} className="hover:text-orange-400 transition font-medium">
               Budovy
             </button>
-            {drillLevel === 'rooms' && currentBuilding && (
+            {activeLevel === 'rooms' && currentBuilding && (
               <>
                 <ChevronRight className="w-3 h-3" />
                 <span className="text-white font-semibold">{currentBuilding.name}</span>
               </>
             )}
-            {drillLevel === 'machines' && currentBuilding && (
+            {activeLevel === 'machines' && currentBuilding && (
               <>
                 <ChevronRight className="w-3 h-3" />
                 <button onClick={handleBackToRooms} className="hover:text-orange-400 transition font-medium">
@@ -734,7 +747,7 @@ export default function MapPage() {
                 <span className="text-white font-semibold">{selectedRoomName}</span>
               </>
             )}
-            {drillLevel === 'folder' && currentBuilding && currentFolder && (
+            {activeLevel === 'folder' && currentBuilding && currentFolder && (
               <>
                 <ChevronRight className="w-3 h-3" />
                 <button onClick={handleBackToRooms} className="hover:text-orange-400 transition font-medium">
@@ -752,21 +765,21 @@ export default function MapPage() {
         )}
 
         {/* Search — rooms & machines levels */}
-        {drillLevel !== 'buildings' && (
+        {activeLevel !== 'buildings' && (
           <div className="relative mb-3">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder={drillLevel === 'rooms' ? 'Hledat místnost...' : drillLevel === 'folder' ? 'Hledat ve složce...' : 'Hledat stroj...'}
+              placeholder={activeLevel === 'rooms' ? 'Hledat místnost...' : activeLevel === 'folder' ? 'Hledat ve složce...' : 'Hledat stroj...'}
               className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-slate-600 focus:outline-none focus:border-orange-500/50 transition"
             />
           </div>
         )}
 
         {/* ═══ LEVEL 1: Buildings (Tiles) ═══ */}
-        {drillLevel === 'buildings' && (
+        {activeLevel === 'buildings' && (
           <>
             <SummaryBar assets={assets} />
 
@@ -777,62 +790,55 @@ export default function MapPage() {
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {buildings.map((b) => (
-                    <button
-                      key={b.id}
-                      onClick={() => handleBuildingClick(b.id)}
-                      className="flex items-center gap-4 p-4 rounded-2xl border transition-all active:scale-[0.97] text-left"
-                      style={{
-                        background: `linear-gradient(145deg, ${b.color}12, ${b.color}04)`,
-                        borderColor: `${b.color}25`,
-                      }}
-                    >
-                      <div
-                        className="w-14 h-14 rounded-xl flex items-center justify-center text-2xl font-bold flex-shrink-0"
-                        style={{ background: `${b.color}20`, color: b.color }}
+                <div className="grid grid-cols-3 lg:grid-cols-4 gap-2.5">
+                  {buildings.map((b) => {
+                    const bAssets = assets.filter(a => a.buildingId === b.id);
+                    const bWorst = getWorstStatus(bAssets);
+                    const bSt = STATUS_CONFIG[bWorst] || STATUS_CONFIG.idle;
+                    return (
+                      <button
+                        key={b.id}
+                        onClick={() => handleBuildingClick(b.id)}
+                        className="flex flex-col items-center justify-center p-3 rounded-2xl border transition-all active:scale-[0.96] cursor-pointer text-center min-h-[120px] relative"
+                        style={{
+                          background: `linear-gradient(145deg, ${b.color}12, ${b.color}04)`,
+                          borderColor: `${b.color}25`,
+                        }}
                       >
-                        {b.id}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-[15px] font-semibold text-white">{b.name}</div>
-                        <div className="text-[12px] text-slate-500 mt-0.5">
-                          {b.totalAssets} zařízení · {b.rooms.length} místností
+                        <div className={`absolute top-2 right-2 w-3 h-3 rounded-full ${bSt.dot}`} />
+                        <div
+                          className="w-14 h-14 rounded-xl flex items-center justify-center text-2xl font-bold mb-1.5"
+                          style={{ background: `${b.color}20`, color: b.color }}
+                        >
+                          {b.id}
                         </div>
+                        <span className="text-[13px] font-semibold text-white leading-tight">{b.name}</span>
+                        <span className="text-[11px] text-slate-500 mt-0.5">
+                          {b.totalAssets} zařízení · {b.rooms.length} míst.
+                        </span>
                         {b.issueCount > 0 && (
-                          <div className="text-[12px] text-red-400 mt-0.5">
-                            {b.issueCount} problémů
-                          </div>
+                          <span className="text-[11px] text-red-400 mt-0.5">{b.issueCount} problémů</span>
                         )}
-                        {/* Waste semaphores for Loupárna */}
-                        {b.id === 'L' && (
-                          <div className="flex items-center gap-1.5 mt-1">
-                            {WASTE_ITEMS.map((w) => (
-                              <div key={w.id} className="flex items-center gap-0.5" title={w.label}>
-                                <div className={`w-2.5 h-2.5 rounded-full ${wasteStatus[w.id] ? 'bg-red-500' : 'bg-emerald-500'}`} />
-                                <span className="text-[9px] text-slate-500">{w.icon}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      <ChevronRight className="w-5 h-5 text-slate-500 flex-shrink-0" />
-                    </button>
-                  ))}
-                </div>
+                      </button>
+                    );
+                  })}
 
-                {/* [+] Add building button */}
-                <button className="w-full mt-3 py-3 rounded-2xl border-2 border-dashed border-slate-700/50 text-slate-500 hover:text-orange-400 hover:border-orange-500/30 transition flex items-center justify-center gap-2 text-sm font-medium">
-                  <Plus className="w-4 h-4" />
-                  Přidat budovu
-                </button>
+                  {/* [+] Add building tile */}
+                  <button
+                    onClick={() => setShowAddModal('building')}
+                    className="flex flex-col items-center justify-center p-3 rounded-2xl border-2 border-dashed border-slate-700/50 text-slate-500 hover:text-orange-400 hover:border-orange-500/30 transition cursor-pointer text-center min-h-[120px]"
+                  >
+                    <Plus className="w-8 h-8 mb-1" />
+                    <span className="text-[12px] font-medium">Přidat</span>
+                  </button>
+                </div>
               </>
             )}
           </>
         )}
 
         {/* ═══ LEVEL 2: Rooms in building (Tiles) ═══ */}
-        {drillLevel === 'rooms' && currentBuilding && (
+        {activeLevel === 'rooms' && currentBuilding && (
           <>
             <button
               onClick={handleBackToBuildings}
@@ -855,9 +861,6 @@ export default function MapPage() {
                   {currentBuilding.totalAssets} zařízení · {currentBuilding.rooms.length} místností
                 </div>
               </div>
-              <button className="w-10 h-10 rounded-xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center text-orange-400 hover:bg-orange-500/25 transition">
-                <Plus className="w-5 h-5" />
-              </button>
             </div>
 
             <SummaryBar assets={assets.filter((a) => a.buildingId === selectedBuildingId)} />
@@ -871,23 +874,32 @@ export default function MapPage() {
                 subtitle={search ? 'Zkus jiný výraz' : 'Tato budova nemá místnosti'}
               />
             ) : (
-              <div className="space-y-2">
+              <div className="grid grid-cols-3 lg:grid-cols-4 gap-2.5">
                 {filteredRooms.map((room, idx) => (
-                  <RoomCard
+                  <RoomTile
                     key={room.name}
                     room={room}
                     color={currentColor}
-                    code={getRoomCode(selectedBuildingId!, room, idx)}
+                    code={getRoomCode(selectedBuildingId || '', room, idx)}
                     onClick={() => handleRoomClick(room.name)}
                   />
                 ))}
+
+                {/* [+] Add room tile */}
+                <button
+                  onClick={() => setShowAddModal('room')}
+                  className="flex flex-col items-center justify-center p-3 rounded-2xl border-2 border-dashed border-slate-700/50 text-slate-500 hover:text-orange-400 hover:border-orange-500/30 transition cursor-pointer text-center min-h-[110px]"
+                >
+                  <Plus className="w-7 h-7 mb-1" />
+                  <span className="text-[12px] font-medium">Přidat</span>
+                </button>
               </div>
             )}
           </>
         )}
 
         {/* ═══ LEVEL 3: Folders + Machines in room ═══ */}
-        {drillLevel === 'machines' && currentRoom && (
+        {activeLevel === 'machines' && currentRoom && (
           <>
             <button
               onClick={handleBackToRooms}
@@ -910,9 +922,6 @@ export default function MapPage() {
                   {currentRoom.assets.length} strojů · {currentRoom.floor}
                 </div>
               </div>
-              <button className="w-10 h-10 rounded-xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center text-orange-400 hover:bg-orange-500/25 transition">
-                <Plus className="w-5 h-5" />
-              </button>
             </div>
 
             {filteredFolders.length === 0 && filteredUngrouped.length === 0 ? (
@@ -923,35 +932,31 @@ export default function MapPage() {
               />
             ) : (
               <>
-                {/* Folder tiles */}
-                {filteredFolders.length > 0 && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 mb-3">
-                    {filteredFolders.map((folder) => (
-                      <FolderTile key={folder.id} folder={folder} onClick={() => handleFolderClick(folder.id)} />
-                    ))}
-                  </div>
-                )}
+                {/* Folder tiles + ungrouped in single grid */}
+                <div className="grid grid-cols-3 lg:grid-cols-4 gap-2.5">
+                  {filteredFolders.map((folder) => (
+                    <FolderTile key={folder.id} folder={folder} onClick={() => handleFolderClick(folder.id)} />
+                  ))}
+                  {filteredUngrouped.map((asset) => (
+                    <MachineCard key={asset.id} asset={asset} onClick={() => setSelectedAsset(asset)} />
+                  ))}
 
-                {/* Ungrouped machine cards */}
-                {filteredUngrouped.length > 0 && (
-                  <>
-                    {filteredFolders.length > 0 && (
-                      <div className="text-[11px] text-slate-500 uppercase tracking-wider font-bold mb-2">Ostatní</div>
-                    )}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
-                      {filteredUngrouped.map((asset) => (
-                        <MachineCard key={asset.id} asset={asset} onClick={() => setSelectedAsset(asset)} />
-                      ))}
-                    </div>
-                  </>
-                )}
+                  {/* [+] Add asset tile */}
+                  <button
+                    onClick={() => setShowAddModal('asset')}
+                    className="flex flex-col items-center justify-center p-3 rounded-2xl border-2 border-dashed border-slate-700/50 text-slate-500 hover:text-orange-400 hover:border-orange-500/30 transition cursor-pointer text-center min-h-[100px]"
+                  >
+                    <Plus className="w-7 h-7 mb-1" />
+                    <span className="text-[12px] font-medium">Přidat</span>
+                  </button>
+                </div>
               </>
             )}
           </>
         )}
 
         {/* ═══ LEVEL 4: Assets inside folder ═══ */}
-        {drillLevel === 'folder' && currentFolder && (
+        {activeLevel === 'folder' && currentFolder && (
           <>
             <button
               onClick={handleBackToFolders}
@@ -980,7 +985,7 @@ export default function MapPage() {
                 subtitle={search ? 'Zkus jiný výraz' : 'Složka je prázdná'}
               />
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+              <div className="grid grid-cols-3 lg:grid-cols-4 gap-2.5">
                 {filteredFolderAssets.map((asset) => (
                   <MachineCard key={asset.id} asset={asset} onClick={() => setSelectedAsset(asset)} />
                 ))}
@@ -994,6 +999,117 @@ export default function MapPage() {
       {selectedAsset && (
         <AssetDetailSheet asset={selectedAsset} onClose={() => setSelectedAsset(null)} />
       )}
+
+      {/* [+] Add Modal */}
+      <BottomSheet
+        title={
+          showAddModal === 'building' ? '🏢 Přidat budovu' :
+          showAddModal === 'room' ? '🚪 Přidat místnost' :
+          showAddModal === 'asset' ? '⚙️ Přidat zařízení' : ''
+        }
+        isOpen={showAddModal !== null}
+        onClose={() => { setShowAddModal(null); setAddName(''); setAddCode(''); setAddError(''); }}
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm text-slate-400 font-medium mb-1.5">
+              Název <span className="text-red-400">*</span>
+            </label>
+            <input
+              type="text"
+              value={addName}
+              onChange={(e) => setAddName(e.target.value)}
+              placeholder={
+                showAddModal === 'building' ? 'Např. F — Expedice' :
+                showAddModal === 'room' ? 'Např. Míchárna' : 'Např. Extruder XL-400'
+              }
+              className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-[15px] placeholder-slate-600 focus:outline-none focus:border-orange-500/50 transition"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-slate-400 font-medium mb-1.5">Kód</label>
+            <input
+              type="text"
+              value={addCode}
+              onChange={(e) => setAddCode(e.target.value)}
+              placeholder="Např. EXT-005"
+              className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-[15px] placeholder-slate-600 focus:outline-none focus:border-orange-500/50 transition"
+            />
+          </div>
+          {addError && (
+            <div className="p-2.5 bg-red-500/20 border border-red-500/30 rounded-xl text-red-300 text-sm text-center">
+              {addError}
+            </div>
+          )}
+          <button
+            onClick={async () => {
+              const name = addName.trim();
+              if (!name) return;
+
+              // Validate building code for building modal
+              if (showAddModal === 'building') {
+                const code = addCode.trim() || name.charAt(0).toUpperCase();
+                if (code.length > 5) {
+                  setAddError('Kód budovy max 5 znaků.');
+                  return;
+                }
+              }
+
+              setAddSaving(true);
+              setAddError('');
+              try {
+                if (showAddModal === 'asset' && selectedBuildingId) {
+                  await addDoc(collection(db, 'assets'), {
+                    name,
+                    code: addCode.trim() || undefined,
+                    buildingId: selectedBuildingId,
+                    areaName: selectedRoomName || 'Ostatní',
+                    status: 'operational',
+                    category: '',
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp(),
+                  });
+                } else if (showAddModal === 'room' && selectedBuildingId) {
+                  await addDoc(collection(db, 'assets'), {
+                    name: `${name} — placeholder`,
+                    code: addCode.trim() || undefined,
+                    buildingId: selectedBuildingId,
+                    areaName: name,
+                    status: 'idle',
+                    category: '',
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp(),
+                  });
+                } else if (showAddModal === 'building') {
+                  const buildingCode = addCode.trim() || name.charAt(0).toUpperCase();
+                  await addDoc(collection(db, 'assets'), {
+                    name: `${name} — placeholder`,
+                    code: '',
+                    buildingId: buildingCode,
+                    areaName: 'Hlavní',
+                    status: 'idle',
+                    category: '',
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp(),
+                  });
+                }
+                setShowAddModal(null);
+                setAddName('');
+                setAddCode('');
+                setAddError('');
+              } catch (err) {
+                console.error('[MapPage] Add failed:', err);
+                setAddError('Nepodařilo se uložit. Zkuste to znovu.');
+              }
+              setAddSaving(false);
+            }}
+            disabled={!addName.trim() || addSaving}
+            className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold text-base active:scale-[0.98] transition-all disabled:opacity-50"
+          >
+            {addSaving ? 'Ukládám...' : 'Přidat'}
+          </button>
+        </div>
+      </BottomSheet>
     </div>
   );
 }

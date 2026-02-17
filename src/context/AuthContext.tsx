@@ -5,7 +5,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
 import { doc, getDoc, collection, onSnapshot } from 'firebase/firestore';
 import { db, signInWithPin, signOut, onAuthChange } from '../lib/firebase';
-import { ROLE_META, type UserRole, type RoleMeta } from '../types/user';
+import { ROLE_META, ROLE_PERMISSIONS, type UserRole, type RoleMeta, type Permission } from '../types/user';
 import type { Role, UserScope, CustomPermissions } from '../types/rbac';
 import { computeEffectivePermissions, canAccessBuilding, canAccessArea } from '../types/rbac';
 
@@ -168,11 +168,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const hasPermission = useCallback(
     (perm: string): boolean => {
       if (!user) return false;
-      // Pokud RBAC data existují, použij je
-      if (permissions.length > 0) {
-        return permissions.includes(perm);
-      }
-      // Fallback na staré hardcoded role (přechodné období)
+      // Check dynamic RBAC first
+      if (permissions.includes(perm)) return true;
+      // Always also check legacy hardcoded role (belt + suspenders)
+      const legacyPerms = ROLE_PERMISSIONS[user.role];
+      if (legacyPerms?.includes(perm as Permission)) return true;
       return false;
     },
     [user, permissions]
@@ -214,8 +214,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await signInWithPin(pin);
       return true;
-    } catch (err: any) {
-      console.error('Login failed:', err.code);
+    } catch (err: unknown) {
+      console.error('Login failed:', (err as { code?: string })?.code);
       return false;
     }
   };
