@@ -64,7 +64,7 @@ export interface AssetDoc {
 export type TaskStatus = 'backlog' | 'planned' | 'in_progress' | 'paused' | 'completed' | 'cancelled';
 export type TaskPriority = 'P1' | 'P2' | 'P3' | 'P4';
 export type TaskType = 'corrective' | 'preventive' | 'inspection' | 'improvement';
-export type TaskSource = 'kiosk' | 'web' | 'scheduled' | 'ai';
+export type TaskSource = 'kiosk' | 'web' | 'scheduled' | 'ai' | 'inspection';
 
 export interface TaskDoc {
   id: string;
@@ -139,8 +139,9 @@ export interface InventoryDoc {
   currency?: string;
   
   // Vztahy na stroje
-  compatibleAssets?: string[];    // Asset IDs
-  
+  compatibleAssets?: string[];    // Asset IDs — kompatibilní stroje
+  linkedMachineIds?: string[];    // Asset IDs — přímá vazba (nainstalován/přiřazen)
+
   lastRestockAt?: Timestamp;
   lastConsumedAt?: Timestamp;
   createdAt: Timestamp;

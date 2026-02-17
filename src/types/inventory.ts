@@ -45,6 +45,7 @@ export interface InventoryItem {
   currency?: string;
   compatibleAssetIds: string[];
   compatibleAssetNames: string[];
+  linkedMachineIds: string[]; // Přímá vazba na stroje kde je díl nainstalován/přiřazen
   filterSpec?: {
     dimensions: string;       // "592x592x48"
     typeCode: string;         // "F03"

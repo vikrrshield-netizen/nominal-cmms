@@ -42,7 +42,17 @@ export function useInventory() {
       (snap) => {
         setItems(
           snap.docs
-            .map((d) => ({ id: d.id, ...d.data() } as InventoryItem))
+            .map((d) => {
+              const data = d.data();
+              return {
+                id: d.id,
+                ...data,
+                // Ensure array fields always have defaults
+                compatibleAssetIds: data.compatibleAssetIds || [],
+                compatibleAssetNames: data.compatibleAssetNames || [],
+                linkedMachineIds: data.linkedMachineIds || [],
+              } as InventoryItem;
+            })
             .filter((i) => !i.isDeleted)
         );
         setLoading(false);
