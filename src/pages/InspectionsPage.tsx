@@ -207,6 +207,9 @@ export default function InspectionsPage() {
         })}
       </div>
 
+      {/* ═══ AUDIT SECTION ═══ */}
+      <AuditPanel />
+
       {/* Empty state */}
       {Object.keys(filteredGrouped).length === 0 && (
         <div className="text-center py-12 text-slate-500">
@@ -347,6 +350,145 @@ function InspectionItem({
             ↩ Zpět
           </button>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════
+// AUDIT PANEL — Revize a kontrola budovy
+// ═══════════════════════════════════════
+
+const AUDIT_ITEMS = [
+  { id: 'kotly', label: 'Kotly', icon: '🔥', description: 'Plynové kotle, výměníky tepla, komíny' },
+  { id: 'vrata', label: 'Vrata', icon: '🚪', description: 'Sekční vrata, únikové východy, dveře' },
+  { id: 'tlakove', label: 'Tlakové nádoby', icon: '⚡', description: 'Kompresory, expanzní nádoby, ventily' },
+  { id: 'vzduchotechnika', label: 'Vzduchotechnika', icon: '💨', description: 'VZT jednotky, filtrace, klimatizace' },
+];
+
+type AuditStatus = 'pending' | 'ok' | 'defect';
+
+function AuditPanel() {
+  const [auditState, setAuditState] = useState<Record<string, { status: AuditStatus; note: string }>>({});
+  const [editingNote, setEditingNote] = useState<string | null>(null);
+
+  const getState = (id: string) => auditState[id] || { status: 'pending' as AuditStatus, note: '' };
+
+  const setStatus = (id: string, status: AuditStatus) => {
+    setAuditState((prev) => ({
+      ...prev,
+      [id]: { ...getState(id), status },
+    }));
+  };
+
+  const setNote = (id: string, note: string) => {
+    setAuditState((prev) => ({
+      ...prev,
+      [id]: { ...getState(id), note },
+    }));
+  };
+
+  const doneCount = AUDIT_ITEMS.filter((item) => getState(item.id).status !== 'pending').length;
+
+  return (
+    <div className="px-4 mt-6">
+      <div className="bg-slate-800/40 rounded-2xl border border-slate-700/50 overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-slate-700/50">
+          <div className="flex items-center gap-3">
+            <ClipboardCheck className="w-5 h-5 text-purple-400" />
+            <span className="font-bold text-lg text-white">Revize a kontrola budovy</span>
+          </div>
+          <span className="text-sm text-slate-400">
+            {doneCount}/{AUDIT_ITEMS.length}
+          </span>
+        </div>
+
+        {/* Items */}
+        {AUDIT_ITEMS.map((item) => {
+          const state = getState(item.id);
+          const isEditing = editingNote === item.id;
+
+          return (
+            <div
+              key={item.id}
+              className="flex flex-col border-b border-slate-700/30 last:border-b-0"
+            >
+              <div className="flex items-center gap-3 p-4">
+                {/* Status stripe */}
+                <div className={`w-1.5 h-12 rounded-full flex-shrink-0 ${
+                  state.status === 'ok' ? 'bg-emerald-500' : state.status === 'defect' ? 'bg-amber-500' : 'bg-slate-600'
+                }`} />
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">{item.icon}</span>
+                    <span className="font-bold text-white">{item.label}</span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">{item.description}</p>
+                </div>
+
+                {/* Toggle buttons */}
+                <div className="flex gap-1.5 flex-shrink-0">
+                  <button
+                    onClick={() => setStatus(item.id, state.status === 'ok' ? 'pending' : 'ok')}
+                    className={`px-3 py-2 rounded-lg text-sm font-bold transition ${
+                      state.status === 'ok'
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-slate-700 text-slate-400 hover:bg-emerald-600/30 hover:text-emerald-400'
+                    }`}
+                  >
+                    OK
+                  </button>
+                  <button
+                    onClick={() => setStatus(item.id, state.status === 'defect' ? 'pending' : 'defect')}
+                    className={`px-3 py-2 rounded-lg text-sm font-bold transition ${
+                      state.status === 'defect'
+                        ? 'bg-amber-600 text-white'
+                        : 'bg-slate-700 text-slate-400 hover:bg-amber-600/30 hover:text-amber-400'
+                    }`}
+                  >
+                    Závada
+                  </button>
+                  <button
+                    onClick={() => setEditingNote(isEditing ? null : item.id)}
+                    className={`px-2.5 py-2 rounded-lg text-sm transition ${
+                      isEditing || state.note
+                        ? 'bg-blue-500/20 text-blue-400'
+                        : 'bg-slate-700 text-slate-500 hover:text-slate-300'
+                    }`}
+                  >
+                    📝
+                  </button>
+                </div>
+              </div>
+
+              {/* Note field */}
+              {isEditing && (
+                <div className="px-4 pb-3">
+                  <textarea
+                    value={state.note}
+                    onChange={(e) => setNote(item.id, e.target.value)}
+                    placeholder="Poznámky ke kontrole..."
+                    rows={2}
+                    autoFocus
+                    className="w-full bg-slate-700 text-white p-2.5 rounded-xl border border-slate-600 focus:border-blue-500 outline-none resize-none text-sm"
+                  />
+                </div>
+              )}
+
+              {/* Show saved note inline */}
+              {!isEditing && state.note && (
+                <div className="px-4 pb-3">
+                  <div className="text-xs text-slate-400 bg-slate-700/30 rounded-lg p-2">
+                    📝 {state.note}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

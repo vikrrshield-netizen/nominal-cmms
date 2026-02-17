@@ -690,12 +690,20 @@ function InfoBox({ label, value, icon, highlight }: {
 // FAULT MODAL (Nahlásit poruchu — dark theme)
 // ═══════════════════════════════════════════
 
+const ASSIGNEE_OPTIONS = [
+  { id: 'filip', name: 'Filip Novák' },
+  { id: 'zdenek', name: 'Zdeněk Mička' },
+  { id: 'petr', name: 'Petr Volf' },
+  { id: 'udrzba', name: 'Údržba (tým)' },
+];
+
 function FaultModal({ asset, user, onClose, onCreated }: {
   asset: Asset; user: any; onClose: () => void; onCreated: () => void;
 }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState('P2');
+  const [assignee, setAssignee] = useState('');
   const [saving, setSaving] = useState(false);
 
   const handleSubmit = async () => {
@@ -711,6 +719,8 @@ function FaultModal({ asset, user, onClose, onCreated }: {
         assetId: asset.id,
         assetName: asset.name,
         buildingId: asset.buildingId,
+        assigneeId: assignee || undefined,
+        assigneeName: ASSIGNEE_OPTIONS.find(a => a.id === assignee)?.name || undefined,
         createdById: user?.id || 'unknown',
         createdByName: user?.displayName || 'Neznámý',
       });
@@ -741,25 +751,53 @@ function FaultModal({ asset, user, onClose, onCreated }: {
       <textarea
         value={description}
         onChange={(e) => setDescription(e.target.value)}
-        placeholder="Podrobnosti (volitelné)..."
-        rows={3}
+        placeholder="Detailní popis závady — co se stalo, kde přesně, okolnosti..."
+        rows={4}
         className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-red-500/50 transition resize-none mb-3"
       />
 
-      <div className="mb-4">
+      <div className="mb-3">
         <div className="text-sm font-medium text-slate-400 mb-2">Priorita</div>
         <div className="flex gap-2">
-          {Object.entries(PRIORITY_CONFIG).map(([key, cfg]) => (
+          {([
+            { key: 'P3', label: 'Nízká', bg: 'bg-blue-500/20', text: 'text-blue-400' },
+            { key: 'P2', label: 'Střední', bg: 'bg-orange-500/20', text: 'text-orange-400' },
+            { key: 'P1', label: 'Havárie', bg: 'bg-red-500/20', text: 'text-red-400' },
+          ]).map((opt) => (
             <button
-              key={key}
-              onClick={() => setPriority(key)}
+              key={opt.key}
+              onClick={() => setPriority(opt.key)}
               className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition ${
-                priority === key
-                  ? `${cfg.bg} ${cfg.text} border border-current`
+                priority === opt.key
+                  ? `${opt.bg} ${opt.text} border border-current`
                   : 'bg-white/5 text-slate-500 border border-white/10'
               }`}
             >
-              {key}
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="mb-4">
+        <div className="text-sm font-medium text-slate-400 mb-2">Přiřadit řešitele</div>
+        <div className="grid grid-cols-2 gap-2">
+          {ASSIGNEE_OPTIONS.map((a) => (
+            <button
+              key={a.id}
+              onClick={() => setAssignee(assignee === a.id ? '' : a.id)}
+              className={`py-2 px-3 rounded-xl text-sm font-semibold transition flex items-center gap-2 ${
+                assignee === a.id
+                  ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                  : 'bg-white/5 text-slate-500 border border-white/10 hover:text-slate-300'
+              }`}
+            >
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
+                assignee === a.id ? 'bg-blue-500/30 text-blue-300' : 'bg-slate-600 text-slate-400'
+              }`}>
+                {a.name.split(' ').map(w => w[0]).join('')}
+              </div>
+              {a.name}
             </button>
           ))}
         </div>

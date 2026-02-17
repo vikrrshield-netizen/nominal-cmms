@@ -10,13 +10,10 @@ import { useFormDraft } from '../hooks/useFormDraft';
 import CompleteTaskModal from '../components/ui/CompleteTaskModal';
 import {
   Wrench,
-  AlertTriangle,
-  CheckCircle,
   Plus,
   ArrowLeft,
   Loader2,
   Inbox,
-  User,
 } from 'lucide-react';
 
 import FAB from '../components/ui/FAB';
@@ -82,91 +79,6 @@ function timeAgo(date: any): string {
 }
 
 // ═══════════════════════════════════════════════════
-// TASK CARD — responsive
-// ═══════════════════════════════════════════════════
-function TaskCard({ task, onClick }: { task: Task; onClick: () => void }) {
-  const pc = PRIORITY_CONFIG[task.priority] || PRIORITY_CONFIG.P3;
-  const assignee = task.assignedToName || task.assignedTo;
-
-  return (
-    <button
-      onClick={onClick}
-      className={`w-full flex flex-col p-3 rounded-2xl border text-left transition-all duration-200 active:scale-[0.97] hover:scale-[1.01] hover:shadow-lg hover:shadow-black/20 cursor-pointer ${pc.bg} ${pc.border} ${pc.borderLeft}`}
-    >
-      {/* Header: icon + priority */}
-      <div className="flex items-center justify-between mb-2 w-full">
-        <div className="flex items-center gap-2">
-          {task.priority === 'P1' ? (
-            <AlertTriangle className="w-4 h-4" style={{ color: pc.color }} />
-          ) : (
-            <Wrench className="w-4 h-4" style={{ color: pc.color }} />
-          )}
-          <span className="text-sm font-bold px-1.5 py-0.5 rounded-md" style={{ background: `${pc.color}20`, color: pc.color }}>
-            {task.priority}
-          </span>
-          {(() => {
-            const sb = STATUS_BADGES[task.status];
-            return sb ? (
-              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${sb.bg} ${sb.text}`}>
-                {sb.label}
-              </span>
-            ) : null;
-          })()}
-        </div>
-        <span className="text-xs text-slate-500">{timeAgo(task.createdAt)}</span>
-      </div>
-
-      {/* Title */}
-      <div className="text-lg font-bold text-white leading-tight mb-1.5 line-clamp-2">
-        {task.title}
-      </div>
-
-      {/* Meta row */}
-      <div className="flex items-center gap-3 text-sm text-slate-500">
-        {task.assetName && (
-          <span className="flex items-center gap-1 truncate">
-            <Wrench className="w-3 h-3" /> {task.assetName}
-          </span>
-        )}
-        {assignee && (
-          <span className="flex items-center gap-1 truncate">
-            <User className="w-3 h-3" /> {assignee}
-          </span>
-        )}
-      </div>
-
-      {/* Resolution (if done) */}
-      {task.isDone && task.resolution && (
-        <div className="mt-3 p-2 bg-emerald-900/20 border border-emerald-500/30 rounded-lg text-emerald-200 text-sm">
-          <strong>Řešení:</strong> {task.resolution}
-          {task.durationMinutes && <span className="ml-2 opacity-75">({task.durationMinutes} min)</span>}
-        </div>
-      )}
-    </button>
-  );
-}
-
-function DoneCard({ task }: { task: Task }) {
-  return (
-    <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-emerald-500/8 border border-emerald-500/15 opacity-60 pointer-events-none">
-      <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-      <div className="min-w-0 flex-1">
-        <div className="text-sm font-medium text-slate-300 truncate">{task.title}</div>
-        {task.resolution && (
-          <div className="text-xs text-slate-400 truncate">Řešení: {task.resolution}</div>
-        )}
-        <div className="text-xs text-slate-500">
-          {task.completedBy && `${task.completedBy} · `}
-          {task.durationMinutes && `${task.durationMinutes} min · `}
-          {timeAgo(task.completedAt)}
-        </div>
-      </div>
-      <span className="text-emerald-400 text-xs flex-shrink-0">✓ Uzavřeno</span>
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════
 // SUMMARY BAR
 // ═══════════════════════════════════════════════════
 function TaskSummary({ tasks }: { tasks: Task[] }) {
@@ -224,6 +136,75 @@ function useTasks() {
 }
 
 // ═══════════════════════════════════════════════════
+// TAB FILTER TYPE
+// ═══════════════════════════════════════════════════
+type FilterTab = 'mine' | 'active' | 'done';
+
+const TAB_OPTIONS: { key: FilterTab; label: string; color: string }[] = [
+  { key: 'active', label: 'Aktivní', color: '#fbbf24' },
+  { key: 'mine', label: 'Moje úkoly', color: '#f97316' },
+  { key: 'done', label: 'Hotovo', color: '#34d399' },
+];
+
+// ═══════════════════════════════════════════════════
+// TABLE ROW
+// ═══════════════════════════════════════════════════
+function TaskRow({ task, onClick }: { task: Task; onClick: () => void }) {
+  const pc = PRIORITY_CONFIG[task.priority] || PRIORITY_CONFIG.P3;
+  const sb = STATUS_BADGES[task.status] || STATUS_BADGES.backlog;
+  const assignee = task.assignedToName || task.assignedTo || '—';
+
+  return (
+    <tr
+      onClick={onClick}
+      className="border-t border-white/5 hover:bg-white/[0.04] cursor-pointer transition-colors active:bg-white/[0.08]"
+    >
+      {/* Kdo */}
+      <td className="px-3 py-3 w-[100px]">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-full bg-slate-700 flex items-center justify-center flex-shrink-0">
+            <span className="text-[10px] font-bold text-slate-300">
+              {assignee !== '—' ? assignee.split(' ').map(w => w[0]).join('').slice(0, 2) : '?'}
+            </span>
+          </div>
+          <span className="text-[13px] text-slate-300 truncate hidden sm:block">{assignee}</span>
+        </div>
+      </td>
+
+      {/* Co */}
+      <td className="px-3 py-3">
+        <div className="flex items-center gap-2">
+          <span
+            className="text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0"
+            style={{ background: `${pc.color}20`, color: pc.color }}
+          >
+            {task.priority}
+          </span>
+          <span className="text-sm font-medium text-white truncate">{task.title}</span>
+        </div>
+        {task.assetName && (
+          <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1">
+            <Wrench className="w-3 h-3" /> {task.assetName}
+          </div>
+        )}
+      </td>
+
+      {/* Termín */}
+      <td className="px-3 py-3 text-xs text-slate-500 whitespace-nowrap w-[70px]">
+        {timeAgo(task.createdAt)}
+      </td>
+
+      {/* Status */}
+      <td className="px-3 py-3 w-[100px]">
+        <span className={`text-[10px] font-bold px-2 py-1 rounded-lg whitespace-nowrap ${sb.bg} ${sb.text}`}>
+          {sb.label}
+        </span>
+      </td>
+    </tr>
+  );
+}
+
+// ═══════════════════════════════════════════════════
 // MAIN PAGE
 // ═══════════════════════════════════════════════════
 export default function TasksPage() {
@@ -233,6 +214,7 @@ export default function TasksPage() {
 
   const [showNewTask, setShowNewTask] = useState(false);
   const [completingTask, setCompletingTask] = useState<Task | null>(null);
+  const [filterTab, setFilterTab] = useState<FilterTab>('active');
   const [filterPriority, setFilterPriority] = useState<string | null>(null);
 
   // Form state with draft persistence
@@ -244,18 +226,41 @@ export default function TasksPage() {
   });
   const [saving, setSaving] = useState(false);
 
-  // Split & sort
-  const openTasks = tasks
-    .filter((t) => t.status !== 'done' && t.status !== 'completed')
-    .filter((t) => !filterPriority || t.priority === filterPriority)
-    .sort((a, b) => {
-      const order: Record<string, number> = { P1: 0, P2: 1, P3: 2, P4: 3 };
-      return (order[a.priority] ?? 9) - (order[b.priority] ?? 9);
-    });
+  // Counts for tabs
+  const activeCount = tasks.filter((t) => t.status !== 'done' && t.status !== 'completed').length;
+  const mineCount = tasks.filter((t) =>
+    (t.assignedToName === user?.displayName || t.assignedTo === user?.displayName) &&
+    t.status !== 'done' && t.status !== 'completed'
+  ).length;
+  const doneCount = tasks.filter((t) => t.status === 'done' || t.status === 'completed').length;
+  const tabCounts: Record<FilterTab, number> = { active: activeCount, mine: mineCount, done: doneCount };
 
-  const doneTasks = tasks
-    .filter((t) => t.status === 'done' || t.status === 'completed')
-    .slice(0, 20);
+  // Filtered & sorted tasks
+  const filteredTasks = (() => {
+    let result = [...tasks];
+
+    switch (filterTab) {
+      case 'mine':
+        result = result.filter((t) =>
+          (t.assignedToName === user?.displayName || t.assignedTo === user?.displayName) &&
+          t.status !== 'done' && t.status !== 'completed'
+        );
+        break;
+      case 'active':
+        result = result.filter((t) => t.status !== 'done' && t.status !== 'completed');
+        break;
+      case 'done':
+        result = result.filter((t) => t.status === 'done' || t.status === 'completed');
+        break;
+    }
+
+    if (filterPriority) {
+      result = result.filter((t) => t.priority === filterPriority);
+    }
+
+    const order: Record<string, number> = { P1: 0, P2: 1, P3: 2, P4: 3 };
+    return result.sort((a, b) => (order[a.priority] ?? 9) - (order[b.priority] ?? 9));
+  })();
 
   const handleCreateTask = async () => {
     if (!form.title.trim()) return;
@@ -299,7 +304,7 @@ export default function TasksPage() {
           <div className="flex-1">
             <h1 className="text-xl font-bold text-white">Úkoly</h1>
             <p className="text-xs text-slate-500">
-              {openTasks.length} otevřených · {doneTasks.length} hotových
+              {activeCount} otevřených · {doneCount} hotových
             </p>
           </div>
           {loading && <Loader2 className="w-5 h-5 text-slate-500 animate-spin" />}
@@ -308,7 +313,25 @@ export default function TasksPage() {
         {/* Summary */}
         <TaskSummary tasks={tasks} />
 
-        {/* Priority filter */}
+        {/* Tab filters */}
+        <div className="flex gap-1 mb-3 border-b border-white/10 pb-2">
+          {TAB_OPTIONS.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setFilterTab(tab.key)}
+              className={`px-4 py-2 rounded-lg text-[13px] font-semibold transition-all ${
+                filterTab === tab.key
+                  ? 'bg-orange-500/15 text-orange-400'
+                  : 'text-slate-500 hover:text-slate-300'
+              }`}
+            >
+              {tab.label}
+              <span className="ml-1.5 text-[11px] opacity-70">{tabCounts[tab.key]}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Priority chips */}
         <div className="flex gap-1.5 mb-4 overflow-x-auto">
           <FilterChip label="Vše" active={!filterPriority} onClick={() => setFilterPriority(null)} color="#94a3b8" />
           <FilterChip label="P1" active={filterPriority === 'P1'} onClick={() => setFilterPriority(filterPriority === 'P1' ? null : 'P1')} color="#f87171" />
@@ -317,45 +340,37 @@ export default function TasksPage() {
           <FilterChip label="P4" active={filterPriority === 'P4'} onClick={() => setFilterPriority(filterPriority === 'P4' ? null : 'P4')} color="#94a3b8" />
         </div>
 
-        {/* === RESPONSIVE GRID === */}
-        {/* 1 col mobile · 2 col tablet · 3 col desktop */}
-
-        <h3 className="text-[11px] font-semibold text-red-400 uppercase tracking-widest mb-2">
-          K vyřešení ({openTasks.length})
-        </h3>
-
+        {/* ═══ TABLE ═══ */}
         {loading ? (
           <div className="flex items-center justify-center py-12 text-slate-500">
             <Loader2 className="w-6 h-6 animate-spin mr-2" /> Načítám...
           </div>
-        ) : openTasks.length === 0 ? (
+        ) : filteredTasks.length === 0 ? (
           <EmptyState
             icon={<Inbox className="w-12 h-12" />}
-            title={filterPriority ? `Žádné ${filterPriority} úkoly` : 'Žádné otevřené úkoly'}
-            subtitle={filterPriority ? 'Zkus jiný filtr' : 'Vše hotovo!'}
+            title={filterTab === 'mine' ? 'Žádné přiřazené úkoly' : filterTab === 'done' ? 'Žádné hotové úkoly' : 'Žádné aktivní úkoly'}
+            subtitle={filterPriority ? 'Zkus jiný filtr priority' : 'Vše čisté!'}
             actionLabel="Nový úkol"
             onAction={() => setShowNewTask(true)}
           />
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-6">
-            {openTasks.map((task) => (
-              <TaskCard key={task.id} task={task} onClick={() => setCompletingTask(task)} />
-            ))}
+          <div className="overflow-x-auto rounded-2xl border border-white/10">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-slate-800/60">
+                  <th className="text-left px-3 py-2.5 text-[11px] text-slate-500 uppercase tracking-wider font-semibold">Kdo</th>
+                  <th className="text-left px-3 py-2.5 text-[11px] text-slate-500 uppercase tracking-wider font-semibold">Co</th>
+                  <th className="text-left px-3 py-2.5 text-[11px] text-slate-500 uppercase tracking-wider font-semibold">Termín</th>
+                  <th className="text-left px-3 py-2.5 text-[11px] text-slate-500 uppercase tracking-wider font-semibold">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredTasks.map((task) => (
+                  <TaskRow key={task.id} task={task} onClick={() => setCompletingTask(task)} />
+                ))}
+              </tbody>
+            </table>
           </div>
-        )}
-
-        {/* Done section */}
-        {doneTasks.length > 0 && (
-          <>
-            <h3 className="text-[11px] font-semibold text-emerald-400 uppercase tracking-widest mb-2 mt-2">
-              Hotovo ({doneTasks.length})
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5">
-              {doneTasks.map((task) => (
-                <DoneCard key={task.id} task={task} />
-              ))}
-            </div>
-          </>
         )}
       </div>
 
@@ -363,7 +378,7 @@ export default function TasksPage() {
       <FAB icon={<Plus className="w-6 h-6" />} label="Nový úkol" onClick={() => setShowNewTask(true)} />
 
       {/* New Task Modal */}
-      <BottomSheet title="➕ Nový úkol" isOpen={showNewTask} onClose={() => setShowNewTask(false)}>
+      <BottomSheet title="Nový úkol" isOpen={showNewTask} onClose={() => setShowNewTask(false)}>
         <FormField label="Název" value={form.title} onChange={(v) => setForm(prev => ({ ...prev, title: v }))} placeholder="Co je potřeba udělat?" required />
         <FormField label="Popis" value={form.description} onChange={(v) => setForm(prev => ({ ...prev, description: v }))} type="textarea" placeholder="Podrobnosti..." />
         <FormField
@@ -385,16 +400,16 @@ export default function TasksPage() {
           type="select"
           required
           options={[
-            { value: 'P1', label: '🔴 P1 — Havárie' },
-            { value: 'P2', label: '🟡 P2 — Tento týden' },
-            { value: 'P3', label: '🔵 P3 — Běžná' },
-            { value: 'P4', label: '⚪ P4 — Nápad' },
+            { value: 'P1', label: 'P1 — Havárie' },
+            { value: 'P2', label: 'P2 — Tento týden' },
+            { value: 'P3', label: 'P3 — Běžná' },
+            { value: 'P4', label: 'P4 — Nápad' },
           ]}
         />
         <SubmitButton label="Vytvořit úkol" onClick={handleCreateTask} loading={saving} />
       </BottomSheet>
 
-      {/* Complete Task Modal — mandatory fields */}
+      {/* Complete Task Modal */}
       {completingTask && (
         <CompleteTaskModal
           taskTitle={completingTask.title}

@@ -16,9 +16,12 @@ import {
   Inbox,
   Building2,
   Layers,
-  CreditCard,
   X,
+  Plus,
+  Truck,
 } from 'lucide-react';
+import { useAuthContext } from '../context/AuthContext';
+import { createTask } from '../services/taskService';
 import BottomSheet from '../components/ui/BottomSheet';
 import EmptyState from '../components/ui/EmptyState';
 import FloorPlan2NP from '../components/maps/FloorPlan2NP';
@@ -65,9 +68,9 @@ const STATUS_CONFIG: Record<string, { dot: string; label: string; color: string 
 };
 
 // ═══════════════════════════════════════════════
-// TAB SYSTEM
+// DRILL-DOWN LEVEL
 // ═══════════════════════════════════════════════
-type ViewTab = 'stroje' | 'budovy';
+type DrillLevel = 'buildings' | 'rooms' | 'machines';
 
 // ═══════════════════════════════════════════════
 // HOOKS
@@ -198,93 +201,132 @@ function MachineCard({ asset, onClick }: { asset: Asset; onClick: () => void }) 
 }
 
 // ═══════════════════════════════════════════════
-// ROOM SECTION — v24 style header + machine grid
+// ROOM CARD — drill-down level 2
 // ═══════════════════════════════════════════════
-function RoomSection({
-  room,
-  color,
-  onAssetClick,
-}: {
-  room: RoomGroup;
-  color: string;
-  onAssetClick: (asset: Asset) => void;
-}) {
+function RoomCard({ room, color, onClick }: { room: RoomGroup; color: string; onClick: () => void }) {
   return (
-    <div className="mb-4">
+    <button
+      onClick={onClick}
+      className="flex items-center gap-4 p-4 rounded-2xl border transition-all active:scale-[0.97] text-left bg-slate-800/40 border-slate-700/30 hover:bg-slate-700/40"
+    >
       <div
-        className="flex items-center gap-2 px-3 py-2 rounded-t-xl border-b"
-        style={{ background: `${color}08`, borderColor: `${color}20` }}
+        className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
+        style={{ background: `${color}20` }}
       >
-        <Layers className="w-4 h-4" style={{ color }} />
-        <span className="text-[14px] font-bold" style={{ color }}>
-          {room.name}
-        </span>
-        <span className="text-[11px] text-slate-500 ml-auto">{room.assets.length} strojů</span>
+        <Layers className="w-6 h-6" style={{ color }} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-[15px] font-semibold text-white">{room.name}</div>
+        <div className="text-[12px] text-slate-500 mt-0.5">
+          {room.assets.length} strojů · {room.floor}
+        </div>
         {room.issueCount > 0 && (
-          <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-500/20 text-red-400">
-            {room.issueCount} ⚠
-          </span>
+          <div className="text-[12px] text-red-400 mt-0.5">
+            {room.issueCount} problémů
+          </div>
         )}
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-1.5 p-2 rounded-b-xl bg-white/[0.02] border border-t-0 border-white/[0.06]">
-        {room.assets.map((asset) => (
-          <MachineCard key={asset.id} asset={asset} onClick={() => onAssetClick(asset)} />
-        ))}
-      </div>
-    </div>
+      <ChevronRight className="w-5 h-5 text-slate-500 flex-shrink-0" />
+    </button>
   );
 }
 
 // ═══════════════════════════════════════════════
-// BUILDING TABS — horizontal pills
+// WASTE PANEL — Loupárna odpadový semafor
 // ═══════════════════════════════════════════════
-function BuildingTabs({
-  buildings,
-  selected,
-  onSelect,
-}: {
-  buildings: BuildingGroup[];
-  selected: string | null;
-  onSelect: (id: string | null) => void;
-}) {
+const WASTE_ITEMS = [
+  { id: 'paper', label: 'Papír', icon: '📄' },
+  { id: 'plastic', label: 'Plast', icon: '🧴' },
+  { id: 'nonconforming', label: 'Neshodný produkt', icon: '❌' },
+  { id: 'container', label: 'Kontejner', icon: '📦' },
+];
+
+function WastePanel() {
+  const { user } = useAuthContext();
+  const [wasteStatus, setWasteStatus] = useState<Record<string, boolean>>({});
+  const [plevyStatus, setPlevyStatus] = useState<'ok' | 'pending'>('ok');
+  const [saving, setSaving] = useState(false);
+
+  const toggleFull = (id: string) => {
+    setWasteStatus(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleVyvezPlevy = async () => {
+    setSaving(true);
+    try {
+      await createTask({
+        title: 'Vyvézt plevy — Loupárna',
+        description: 'Urgentní odvoz plevů z Loupárny. Vůz je plný.',
+        priority: 'P2',
+        type: 'corrective',
+        source: 'web',
+        buildingId: 'L',
+        createdById: user?.id || 'unknown',
+        createdByName: user?.displayName || 'Neznámý',
+      });
+      setPlevyStatus('pending');
+    } catch (err) {
+      console.error('[WastePanel]', err);
+    }
+    setSaving(false);
+  };
+
   return (
-    <div className="flex gap-1.5 overflow-x-auto pb-1 mb-4 scrollbar-none">
+    <div className="bg-slate-800/40 rounded-2xl p-4 border border-slate-700/30 mb-4">
+      <h3 className="text-xs text-slate-500 uppercase font-bold mb-3 flex items-center gap-2">
+        <Truck className="w-4 h-4" />
+        Správa odpadů — Loupárna
+      </h3>
+
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        {WASTE_ITEMS.map((w) => {
+          const isFull = wasteStatus[w.id] || false;
+          return (
+            <div
+              key={w.id}
+              className={`rounded-xl p-3 border transition ${
+                isFull
+                  ? 'bg-red-500/15 border-red-500/30'
+                  : 'bg-emerald-500/10 border-emerald-500/20'
+              }`}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-lg">{w.icon}</span>
+                <span className="text-sm font-medium text-white">{w.label}</span>
+                <div className={`w-3 h-3 rounded-full ml-auto ${isFull ? 'bg-red-500' : 'bg-emerald-500'}`} />
+              </div>
+              <button
+                onClick={() => toggleFull(w.id)}
+                className={`w-full py-1.5 rounded-lg text-xs font-bold transition ${
+                  isFull
+                    ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'
+                    : 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                }`}
+              >
+                {isFull ? 'Označit prázdný' : 'Plný stav'}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
       <button
-        onClick={() => onSelect(null)}
-        className={`px-3 py-2 rounded-xl text-[12px] font-semibold transition-all active:scale-95 flex-shrink-0 ${
-          !selected
-            ? 'bg-orange-500/20 border-orange-500/40 text-orange-400'
-            : 'bg-white/5 border-white/10 text-slate-400'
+        onClick={handleVyvezPlevy}
+        disabled={saving || plevyStatus === 'pending'}
+        className={`w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition active:scale-[0.97] ${
+          plevyStatus === 'pending'
+            ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+            : 'bg-yellow-600 text-white hover:bg-yellow-500'
         }`}
-        style={{ border: '1px solid' }}
       >
-        Vše
+        {saving ? (
+          <Loader2 className="w-5 h-5 animate-spin" />
+        ) : plevyStatus === 'pending' ? (
+          '⏳ Čeká na odvoz'
+        ) : (
+          <>🌾 Vyvézt plevy</>
+        )}
       </button>
-      {buildings.map((b) => (
-        <button
-          key={b.id}
-          onClick={() => onSelect(b.id)}
-          className="px-3 py-2 rounded-xl text-[12px] font-semibold transition-all active:scale-95 flex-shrink-0 flex items-center gap-1.5"
-          style={{
-            background: selected === b.id ? `${b.color}20` : 'rgba(255,255,255,0.05)',
-            border: `1px solid ${selected === b.id ? b.color + '40' : 'rgba(255,255,255,0.1)'}`,
-            color: selected === b.id ? b.color : '#94a3b8',
-          }}
-        >
-          <span
-            className="w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold"
-            style={{ background: `${b.color}20` }}
-          >
-            {b.id}
-          </span>
-          {b.name}
-          {b.issueCount > 0 && (
-            <span className="w-4 h-4 rounded-full bg-red-500/30 text-red-400 text-[9px] font-bold flex items-center justify-center">
-              {b.issueCount}
-            </span>
-          )}
-        </button>
-      ))}
     </div>
   );
 }
@@ -633,82 +675,90 @@ function SummaryBar({ assets }: { assets: Asset[] }) {
 }
 
 // ═══════════════════════════════════════════════
-// TAB BUTTON
-// ═══════════════════════════════════════════════
-function TabButton({
-  icon,
-  label,
-  active,
-  onClick,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-[13px] font-semibold transition-all ${
-        active ? 'bg-orange-500/15 text-orange-400' : 'text-slate-500 hover:text-slate-300'
-      }`}
-    >
-      {icon}
-      {label}
-    </button>
-  );
-}
-
-// ═══════════════════════════════════════════════
-// MAIN PAGE
+// MAIN PAGE — Drill-down: Buildings → Rooms → Machines
 // ═══════════════════════════════════════════════
 export default function MapPage() {
   const { assets, loading } = useAssets();
-  const [selectedBuilding, setSelectedBuilding] = useState<string | null>(null);
+  const [drillLevel, setDrillLevel] = useState<DrillLevel>('buildings');
+  const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(null);
+  const [selectedRoomName, setSelectedRoomName] = useState<string | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [search, setSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<ViewTab>('stroje');
   const [showFloorPlan, setShowFloorPlan] = useState(false);
 
-  const { buildings, selectedRooms } = useGroupedData(assets, selectedBuilding);
+  const { buildings } = useGroupedData(assets, selectedBuildingId);
 
-  // Filter by search
-  const filteredRooms = useMemo(() => {
-    if (!search.trim()) return selectedRooms;
-    const q = search.toLowerCase();
-    return selectedRooms
-      .map((room) => ({
-        ...room,
-        assets: room.assets.filter(
-          (a) =>
-            a.name.toLowerCase().includes(q) ||
-            a.code?.toLowerCase().includes(q) ||
-            a.areaName?.toLowerCase().includes(q)
-        ),
-      }))
-      .filter((r) => r.assets.length > 0);
-  }, [selectedRooms, search]);
+  const currentBuilding = useMemo(
+    () => buildings.find((b) => b.id === selectedBuildingId) || null,
+    [buildings, selectedBuildingId]
+  );
 
-  const currentColor = selectedBuilding
-    ? BUILDING_META[selectedBuilding]?.color || '#f97316'
+  const currentRoom = useMemo(
+    () => currentBuilding?.rooms.find((r) => r.name === selectedRoomName) || null,
+    [currentBuilding, selectedRoomName]
+  );
+
+  const currentColor = selectedBuildingId
+    ? BUILDING_META[selectedBuildingId]?.color || '#f97316'
     : '#f97316';
 
-  // Handle building click in Budovy tab
+  // Filtered rooms (Level 2)
+  const filteredRooms = useMemo(() => {
+    const rooms = currentBuilding?.rooms || [];
+    if (!search.trim()) return rooms;
+    const q = search.toLowerCase();
+    return rooms.filter(
+      (r) =>
+        r.name.toLowerCase().includes(q) ||
+        r.assets.some((a) => a.name.toLowerCase().includes(q))
+    );
+  }, [currentBuilding, search]);
+
+  // Filtered machines (Level 3)
+  const filteredMachines = useMemo(() => {
+    const machines = currentRoom?.assets || [];
+    if (!search.trim()) return machines;
+    const q = search.toLowerCase();
+    return machines.filter(
+      (a) => a.name.toLowerCase().includes(q) || a.code?.toLowerCase().includes(q)
+    );
+  }, [currentRoom, search]);
+
+  // ── Navigation handlers ──
   const handleBuildingClick = (buildingId: string) => {
     if (buildingId === 'D') {
       setShowFloorPlan(true);
-    } else {
-      setSelectedBuilding(buildingId);
-      setActiveTab('stroje');
+      return;
     }
+    setSelectedBuildingId(buildingId);
+    setDrillLevel('rooms');
+    setSearch('');
   };
 
-  // If showing floor plan for building D
+  const handleRoomClick = (roomName: string) => {
+    setSelectedRoomName(roomName);
+    setDrillLevel('machines');
+    setSearch('');
+  };
+
+  const handleBackToBuildings = () => {
+    setDrillLevel('buildings');
+    setSelectedBuildingId(null);
+    setSelectedRoomName(null);
+    setSearch('');
+  };
+
+  const handleBackToRooms = () => {
+    setDrillLevel('rooms');
+    setSelectedRoomName(null);
+    setSearch('');
+  };
+
+  // ── Floor plan for building D ──
   if (showFloorPlan) {
     return (
       <div className="min-h-screen bg-slate-900">
         <div className="max-w-6xl mx-auto px-3 pt-4 pb-24">
-          {/* Header */}
           <div className="flex items-center gap-3 mb-3">
             <button
               onClick={() => window.location.href = '/'}
@@ -723,15 +773,12 @@ export default function MapPage() {
               </p>
             </div>
           </div>
-
           <FloorPlanView
             assets={assets}
             onBack={() => setShowFloorPlan(false)}
             onAssetClick={setSelectedAsset}
           />
         </div>
-
-        {/* Asset detail */}
         {selectedAsset && (
           <AssetDetailSheet asset={selectedAsset} onClose={() => setSelectedAsset(null)} />
         )}
@@ -759,121 +806,195 @@ export default function MapPage() {
           {loading && <Loader2 className="w-5 h-5 text-slate-500 animate-spin" />}
         </div>
 
-        {/* View tabs */}
-        <div className="flex gap-1 mb-3 border-b border-white/10 pb-2">
-          <TabButton
-            icon={<CreditCard className="w-4 h-4" />}
-            label="Stroje"
-            active={activeTab === 'stroje'}
-            onClick={() => setActiveTab('stroje')}
-          />
-          <TabButton
-            icon={<Building2 className="w-4 h-4" />}
-            label="Budovy"
-            active={activeTab === 'budovy'}
-            onClick={() => setActiveTab('budovy')}
-          />
-        </div>
+        {/* Breadcrumb */}
+        {drillLevel !== 'buildings' && (
+          <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-3 flex-wrap">
+            <button onClick={handleBackToBuildings} className="hover:text-orange-400 transition font-medium">
+              Budovy
+            </button>
+            {drillLevel === 'rooms' && currentBuilding && (
+              <>
+                <ChevronRight className="w-3 h-3" />
+                <span className="text-white font-semibold">{currentBuilding.name}</span>
+              </>
+            )}
+            {drillLevel === 'machines' && currentBuilding && (
+              <>
+                <ChevronRight className="w-3 h-3" />
+                <button onClick={handleBackToRooms} className="hover:text-orange-400 transition font-medium">
+                  {currentBuilding.name}
+                </button>
+                <ChevronRight className="w-3 h-3" />
+                <span className="text-white font-semibold">{selectedRoomName}</span>
+              </>
+            )}
+          </div>
+        )}
 
-        {activeTab === 'stroje' ? (
+        {/* Search — rooms & machines levels */}
+        {drillLevel !== 'buildings' && (
+          <div className="relative mb-3">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={drillLevel === 'rooms' ? 'Hledat místnost...' : 'Hledat stroj...'}
+              className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-slate-600 focus:outline-none focus:border-orange-500/50 transition"
+            />
+          </div>
+        )}
+
+        {/* ═══ LEVEL 1: Buildings ═══ */}
+        {drillLevel === 'buildings' && (
           <>
-            {/* Search */}
-            <div className="relative mb-3">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Hledat stroj, kód, místnost..."
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-slate-600 focus:outline-none focus:border-orange-500/50 transition"
-              />
-            </div>
+            <SummaryBar assets={assets} />
 
-            {/* Summary */}
-            <SummaryBar
-              assets={
-                selectedBuilding ? assets.filter((a) => a.buildingId === selectedBuilding) : assets
-              }
-            />
-
-            {/* Building tabs */}
-            <BuildingTabs
-              buildings={buildings}
-              selected={selectedBuilding}
-              onSelect={setSelectedBuilding}
-            />
-
-            {/* Room sections */}
             {loading ? (
               <div className="flex items-center justify-center py-16 text-slate-500">
                 <Loader2 className="w-6 h-6 animate-spin mr-2" />
                 Načítám zařízení...
               </div>
-            ) : filteredRooms.length === 0 ? (
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {buildings.map((b) => (
+                  <button
+                    key={b.id}
+                    onClick={() => handleBuildingClick(b.id)}
+                    className="flex items-center gap-4 p-4 rounded-2xl border transition-all active:scale-[0.97] text-left"
+                    style={{
+                      background: `linear-gradient(145deg, ${b.color}12, ${b.color}04)`,
+                      borderColor: `${b.color}25`,
+                    }}
+                  >
+                    <div
+                      className="w-14 h-14 rounded-xl flex items-center justify-center text-2xl font-bold flex-shrink-0"
+                      style={{ background: `${b.color}20`, color: b.color }}
+                    >
+                      {b.id}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[15px] font-semibold text-white">{b.name}</div>
+                      <div className="text-[12px] text-slate-500 mt-0.5">
+                        {b.totalAssets} zařízení · {b.rooms.length} místností
+                      </div>
+                      {b.issueCount > 0 && (
+                        <div className="text-[12px] text-red-400 mt-0.5">
+                          {b.issueCount} problémů
+                        </div>
+                      )}
+                      {b.id === 'D' && (
+                        <div className="text-[11px] text-orange-400 mt-0.5 flex items-center gap-1">
+                          <Layers className="w-3 h-3" />
+                          Půdorys k dispozici
+                        </div>
+                      )}
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-slate-500 flex-shrink-0" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ═══ LEVEL 2: Rooms in building ═══ */}
+        {drillLevel === 'rooms' && currentBuilding && (
+          <>
+            <button
+              onClick={handleBackToBuildings}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-400 text-xs font-semibold mb-3 hover:text-white transition"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              Zpět na budovy
+            </button>
+
+            <div className="flex items-center gap-3 mb-4">
+              <div
+                className="w-12 h-12 rounded-xl flex items-center justify-center text-xl font-bold"
+                style={{ background: `${currentColor}20`, color: currentColor }}
+              >
+                {selectedBuildingId}
+              </div>
+              <div className="flex-1">
+                <div className="text-lg font-bold text-white">{currentBuilding.name}</div>
+                <div className="text-xs text-slate-500">
+                  {currentBuilding.totalAssets} zařízení · {currentBuilding.rooms.length} místností
+                </div>
+              </div>
+              <button className="w-10 h-10 rounded-xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center text-orange-400 hover:bg-orange-500/25 transition">
+                <Plus className="w-5 h-5" />
+              </button>
+            </div>
+
+            <SummaryBar assets={assets.filter((a) => a.buildingId === selectedBuildingId)} />
+
+            {selectedBuildingId === 'L' && <WastePanel />}
+
+            {filteredRooms.length === 0 ? (
               <EmptyState
                 icon={<Inbox className="w-12 h-12" />}
-                title="Žádné stroje"
-                subtitle={search ? 'Zkus jiný výraz' : 'Tato budova nemá stroje'}
-                actionLabel="Vymazat filtr"
-                onAction={() => {
-                  setSearch('');
-                  setSelectedBuilding(null);
-                }}
+                title="Žádné místnosti"
+                subtitle={search ? 'Zkus jiný výraz' : 'Tato budova nemá místnosti'}
               />
             ) : (
-              <div>
-                {filteredRooms.map((room, i) => (
-                  <RoomSection
-                    key={`${room.name}-${i}`}
+              <div className="space-y-2">
+                {filteredRooms.map((room) => (
+                  <RoomCard
+                    key={room.name}
                     room={room}
-                    color={(room as any).buildingColor || currentColor}
-                    onAssetClick={setSelectedAsset}
+                    color={currentColor}
+                    onClick={() => handleRoomClick(room.name)}
                   />
                 ))}
               </div>
             )}
           </>
-        ) : (
-          /* BUDOVY TAB — building overview cards */
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {buildings.map((b) => (
-              <button
-                key={b.id}
-                onClick={() => handleBuildingClick(b.id)}
-                className="flex items-center gap-4 p-4 rounded-2xl border transition-all active:scale-[0.97] text-left"
-                style={{
-                  background: `linear-gradient(145deg, ${b.color}12, ${b.color}04)`,
-                  borderColor: `${b.color}25`,
-                }}
+        )}
+
+        {/* ═══ LEVEL 3: Machines in room ═══ */}
+        {drillLevel === 'machines' && currentRoom && (
+          <>
+            <button
+              onClick={handleBackToRooms}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-400 text-xs font-semibold mb-3 hover:text-white transition"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              Zpět na místnosti
+            </button>
+
+            <div className="flex items-center gap-3 mb-4">
+              <div
+                className="w-12 h-12 rounded-xl flex items-center justify-center"
+                style={{ background: `${currentColor}20` }}
               >
-                <div
-                  className="w-14 h-14 rounded-xl flex items-center justify-center text-2xl font-bold flex-shrink-0"
-                  style={{ background: `${b.color}20`, color: b.color }}
-                >
-                  {b.id}
+                <Layers className="w-6 h-6" style={{ color: currentColor }} />
+              </div>
+              <div className="flex-1">
+                <div className="text-lg font-bold text-white">{currentRoom.name}</div>
+                <div className="text-xs text-slate-500">
+                  {currentRoom.assets.length} strojů · {currentRoom.floor}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-[15px] font-semibold text-white">{b.name}</div>
-                  <div className="text-[12px] text-slate-500 mt-0.5">
-                    {b.totalAssets} zařízení · {b.rooms.length} místností
-                  </div>
-                  {b.issueCount > 0 && (
-                    <div className="text-[12px] text-red-400 mt-0.5">
-                      ⚠ {b.issueCount} problémů
-                    </div>
-                  )}
-                  {/* Floor plan badge for building D */}
-                  {b.id === 'D' && (
-                    <div className="text-[11px] text-orange-400 mt-0.5 flex items-center gap-1">
-                      <Layers className="w-3 h-3" />
-                      Půdorys k dispozici
-                    </div>
-                  )}
-                </div>
-                <ChevronRight className="w-5 h-5 text-slate-500 flex-shrink-0" />
+              </div>
+              <button className="w-10 h-10 rounded-xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center text-orange-400 hover:bg-orange-500/25 transition">
+                <Plus className="w-5 h-5" />
               </button>
-            ))}
-          </div>
+            </div>
+
+            {filteredMachines.length === 0 ? (
+              <EmptyState
+                icon={<Inbox className="w-12 h-12" />}
+                title="Žádné stroje"
+                subtitle={search ? 'Zkus jiný výraz' : 'Tato místnost nemá stroje'}
+              />
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                {filteredMachines.map((asset) => (
+                  <MachineCard key={asset.id} asset={asset} onClick={() => setSelectedAsset(asset)} />
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
 

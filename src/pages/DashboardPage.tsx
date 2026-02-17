@@ -360,7 +360,6 @@ const DEMO_SILOS = [
 function SiloStatusPanel() {
   const [silos, setSilos] = useState(DEMO_SILOS);
   const [editingSilo, setEditingSilo] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState('');
 
   const getSiloColor = (pct: number) => {
     if (pct < 20) return { bar: 'bg-red-500', text: 'text-red-400', border: 'border-red-500/30', bg: 'bg-red-500/10' };
@@ -368,11 +367,8 @@ function SiloStatusPanel() {
     return { bar: 'bg-emerald-500', text: 'text-emerald-400', border: 'border-emerald-500/30', bg: 'bg-emerald-500/10' };
   };
 
-  const handleUpdate = (id: string) => {
-    const val = parseInt(editValue);
-    if (isNaN(val) || val < 0 || val > 100) return;
+  const handleSliderChange = (id: string, val: number) => {
     setSilos(prev => prev.map(s => s.id === id ? { ...s, fillPercent: val } : s));
-    setEditingSilo(null);
   };
 
   return (
@@ -396,36 +392,25 @@ function SiloStatusPanel() {
                   style={{ width: `${silo.fillPercent}%` }}
                 />
               </div>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between mb-1">
                 <span className={`text-lg font-bold ${c.text}`}>{silo.fillPercent}%</span>
-                {editingSilo === silo.id ? (
-                  <div className="flex items-center gap-1">
-                    <input
-                      type="number"
-                      value={editValue}
-                      onChange={(e) => setEditValue(e.target.value)}
-                      className="w-14 p-1 bg-slate-600/80 border border-slate-500/50 rounded text-xs text-white text-center outline-none"
-                      min={0}
-                      max={100}
-                      autoFocus
-                      onKeyDown={(e) => { if (e.key === 'Enter') handleUpdate(silo.id); }}
-                    />
-                    <button
-                      onClick={() => handleUpdate(silo.id)}
-                      className="text-[10px] text-emerald-400 font-bold hover:text-emerald-300"
-                    >
-                      OK
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => { setEditingSilo(silo.id); setEditValue(String(silo.fillPercent)); }}
-                    className="text-[10px] text-slate-500 hover:text-white transition px-1.5 py-0.5 rounded hover:bg-white/5"
-                  >
-                    Aktualizovat
-                  </button>
-                )}
+                <button
+                  onClick={() => setEditingSilo(editingSilo === silo.id ? null : silo.id)}
+                  className="text-[10px] text-slate-500 hover:text-white transition px-1.5 py-0.5 rounded hover:bg-white/5"
+                >
+                  {editingSilo === silo.id ? 'Hotovo' : 'Upravit'}
+                </button>
               </div>
+              {editingSilo === silo.id && (
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={silo.fillPercent}
+                  onChange={(e) => handleSliderChange(silo.id, Number(e.target.value))}
+                  className="w-full h-2 bg-slate-700 rounded-full appearance-none cursor-pointer accent-orange-500"
+                />
+              )}
             </div>
           );
         })}
@@ -534,8 +519,10 @@ function FullDashboard() {
         {/* 2. QUICK ACTIONS GRID */}
         <QuickActionsGrid />
 
-        {/* 2.5 SILA STATUS */}
-        <SiloStatusPanel />
+        {/* 2.5 SILA STATUS — admin only */}
+        {(['MAJITEL', 'VEDENI', 'SUPERADMIN', 'UDRZBA'] as string[]).includes(user?.role || '') && (
+          <SiloStatusPanel />
+        )}
 
         {/* 3. HLAVNÍ GRID — Mapa + Kalendář */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
