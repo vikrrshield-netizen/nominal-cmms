@@ -65,9 +65,75 @@ const STATUS_CONFIG: Record<string, { dot: string; label: string; color: string 
 };
 
 // ═══════════════════════════════════════════════
-// DRILL-DOWN LEVEL
+// DRILL-DOWN LEVEL (Building > Room > Folder > Asset)
 // ═══════════════════════════════════════════════
-type DrillLevel = 'buildings' | 'rooms' | 'machines';
+type DrillLevel = 'buildings' | 'rooms' | 'machines' | 'folder';
+
+// ═══════════════════════════════════════════════
+// ASSET FOLDERS (iPhone-style grouping)
+// ═══════════════════════════════════════════════
+interface FolderGroup {
+  id: string;
+  name: string;
+  icon: string;
+  assets: Asset[];
+  worstStatus: string;
+}
+
+const FOLDER_CONFIG: Record<string, { label: string; icon: string }> = {
+  'extruder':    { label: 'Extrudery',       icon: '🏭' },
+  'mixer':       { label: 'Míchačky',        icon: '🔄' },
+  'packaging':   { label: 'Balicí linky',    icon: '📦' },
+  'oven':        { label: 'Pece & Sušárny',  icon: '🔥' },
+  'conveyor':    { label: 'Dopravníky',      icon: '➡️' },
+  'forklift':    { label: 'VZV',             icon: '🚜' },
+  'compressor':  { label: 'Kompresory',      icon: '💨' },
+  'hvac':        { label: 'Vzduchotechnika', icon: '🌬️' },
+  'pump':        { label: 'Čerpadla',        icon: '💧' },
+  'electrical':  { label: 'Elektro',         icon: '⚡' },
+  'peeling':     { label: 'Loupací linka',   icon: '🌾' },
+  'silo':        { label: 'Sila',            icon: '🗼' },
+  'cleaning':    { label: 'Čistění',         icon: '🧹' },
+  'cooling':     { label: 'Chlazení',        icon: '❄️' },
+};
+
+function getWorstStatus(assets: Asset[]): string {
+  if (assets.some((a) => a.status === 'breakdown')) return 'breakdown';
+  if (assets.some((a) => a.status === 'maintenance')) return 'maintenance';
+  if (assets.some((a) => a.status === 'operational')) return 'operational';
+  return 'idle';
+}
+
+function buildFolders(roomAssets: Asset[]): { folders: FolderGroup[]; ungrouped: Asset[] } {
+  const catMap = new Map<string, Asset[]>();
+  const ungrouped: Asset[] = [];
+
+  roomAssets.forEach((asset) => {
+    const cat = asset.category;
+    if (!cat) { ungrouped.push(asset); return; }
+    if (!catMap.has(cat)) catMap.set(cat, []);
+    catMap.get(cat)!.push(asset);
+  });
+
+  const folders: FolderGroup[] = [];
+  catMap.forEach((assets, catId) => {
+    if (assets.length >= 2) {
+      const cfg = FOLDER_CONFIG[catId] || { label: catId, icon: '📁' };
+      folders.push({
+        id: catId,
+        name: cfg.label,
+        icon: cfg.icon,
+        assets: assets.sort((a, b) => a.name.localeCompare(b.name, 'cs')),
+        worstStatus: getWorstStatus(assets),
+      });
+    } else {
+      ungrouped.push(...assets);
+    }
+  });
+
+  folders.sort((a, b) => a.name.localeCompare(b.name, 'cs'));
+  return { folders, ungrouped };
+}
 
 // ═══════════════════════════════════════════════
 // HOOKS
@@ -193,6 +259,25 @@ function MachineCard({ asset, onClick }: { asset: Asset; onClick: () => void }) 
       <span className="text-[11px] mt-1.5 font-medium" style={{ color: st.color }}>
         Karta
       </span>
+    </button>
+  );
+}
+
+// ═══════════════════════════════════════════════
+// FOLDER TILE — iPhone-style category grouping
+// ═══════════════════════════════════════════════
+function FolderTile({ folder, onClick }: { folder: FolderGroup; onClick: () => void }) {
+  const st = STATUS_CONFIG[folder.worstStatus] || STATUS_CONFIG.idle;
+
+  return (
+    <button
+      onClick={onClick}
+      className="flex flex-col items-center justify-center p-4 rounded-2xl border bg-white/[0.03] border-white/[0.08] hover:bg-white/[0.06] transition-all active:scale-[0.96] cursor-pointer text-center min-h-[100px] relative"
+    >
+      <div className={`absolute top-2.5 right-2.5 w-2.5 h-2.5 rounded-full ${st.dot}`} />
+      <span className="text-3xl mb-1.5">{folder.icon}</span>
+      <span className="text-[13px] font-semibold text-white leading-tight">{folder.name}</span>
+      <span className="text-[11px] text-slate-500 mt-1">{folder.assets.length} strojů</span>
     </button>
   );
 }
@@ -496,6 +581,7 @@ export default function MapPage() {
   const [drillLevel, setDrillLevel] = useState<DrillLevel>('buildings');
   const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(null);
   const [selectedRoomName, setSelectedRoomName] = useState<string | null>(null);
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [search, setSearch] = useState('');
   const [wasteStatus, setWasteStatus] = useState<Record<string, boolean>>({});
@@ -528,15 +614,37 @@ export default function MapPage() {
     );
   }, [currentBuilding, search]);
 
-  // Filtered machines (Level 3)
-  const filteredMachines = useMemo(() => {
-    const machines = currentRoom?.assets || [];
-    if (!search.trim()) return machines;
+  // Level 3: Folders + ungrouped assets
+  const { filteredFolders, filteredUngrouped } = useMemo(() => {
+    if (!currentRoom) return { filteredFolders: [] as FolderGroup[], filteredUngrouped: [] as Asset[] };
+    const { folders, ungrouped } = buildFolders(currentRoom.assets);
+    if (!search.trim()) return { filteredFolders: folders, filteredUngrouped: ungrouped };
     const q = search.toLowerCase();
-    return machines.filter(
+    return {
+      filteredFolders: folders.filter(
+        (f) => f.name.toLowerCase().includes(q) || f.assets.some((a) => a.name.toLowerCase().includes(q))
+      ),
+      filteredUngrouped: ungrouped.filter(
+        (a) => a.name.toLowerCase().includes(q) || a.code?.toLowerCase().includes(q)
+      ),
+    };
+  }, [currentRoom, search]);
+
+  // Level 4: Current folder + filtered assets
+  const currentFolder = useMemo(() => {
+    if (!currentRoom || !selectedFolderId) return null;
+    const { folders } = buildFolders(currentRoom.assets);
+    return folders.find((f) => f.id === selectedFolderId) || null;
+  }, [currentRoom, selectedFolderId]);
+
+  const filteredFolderAssets = useMemo(() => {
+    if (!currentFolder) return [];
+    if (!search.trim()) return currentFolder.assets;
+    const q = search.toLowerCase();
+    return currentFolder.assets.filter(
       (a) => a.name.toLowerCase().includes(q) || a.code?.toLowerCase().includes(q)
     );
-  }, [currentRoom, search]);
+  }, [currentFolder, search]);
 
   // Generate room code: e.g. D1.01, D2.03
   const getRoomCode = (buildingId: string, room: RoomGroup, index: number) => {
@@ -561,12 +669,26 @@ export default function MapPage() {
     setDrillLevel('buildings');
     setSelectedBuildingId(null);
     setSelectedRoomName(null);
+    setSelectedFolderId(null);
     setSearch('');
   };
 
   const handleBackToRooms = () => {
     setDrillLevel('rooms');
     setSelectedRoomName(null);
+    setSelectedFolderId(null);
+    setSearch('');
+  };
+
+  const handleFolderClick = (folderId: string) => {
+    setSelectedFolderId(folderId);
+    setDrillLevel('folder');
+    setSearch('');
+  };
+
+  const handleBackToFolders = () => {
+    setDrillLevel('machines');
+    setSelectedFolderId(null);
     setSearch('');
   };
 
@@ -612,6 +734,20 @@ export default function MapPage() {
                 <span className="text-white font-semibold">{selectedRoomName}</span>
               </>
             )}
+            {drillLevel === 'folder' && currentBuilding && currentFolder && (
+              <>
+                <ChevronRight className="w-3 h-3" />
+                <button onClick={handleBackToRooms} className="hover:text-orange-400 transition font-medium">
+                  {currentBuilding.name}
+                </button>
+                <ChevronRight className="w-3 h-3" />
+                <button onClick={handleBackToFolders} className="hover:text-orange-400 transition font-medium">
+                  {selectedRoomName}
+                </button>
+                <ChevronRight className="w-3 h-3" />
+                <span className="text-white font-semibold">{currentFolder.icon} {currentFolder.name}</span>
+              </>
+            )}
           </div>
         )}
 
@@ -623,7 +759,7 @@ export default function MapPage() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder={drillLevel === 'rooms' ? 'Hledat místnost...' : 'Hledat stroj...'}
+              placeholder={drillLevel === 'rooms' ? 'Hledat místnost...' : drillLevel === 'folder' ? 'Hledat ve složce...' : 'Hledat stroj...'}
               className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-slate-600 focus:outline-none focus:border-orange-500/50 transition"
             />
           </div>
@@ -750,7 +886,7 @@ export default function MapPage() {
           </>
         )}
 
-        {/* ═══ LEVEL 3: Machines in room ═══ */}
+        {/* ═══ LEVEL 3: Folders + Machines in room ═══ */}
         {drillLevel === 'machines' && currentRoom && (
           <>
             <button
@@ -779,15 +915,73 @@ export default function MapPage() {
               </button>
             </div>
 
-            {filteredMachines.length === 0 ? (
+            {filteredFolders.length === 0 && filteredUngrouped.length === 0 ? (
               <EmptyState
                 icon={<Inbox className="w-12 h-12" />}
                 title="Žádné stroje"
                 subtitle={search ? 'Zkus jiný výraz' : 'Tato místnost nemá stroje'}
               />
             ) : (
+              <>
+                {/* Folder tiles */}
+                {filteredFolders.length > 0 && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 mb-3">
+                    {filteredFolders.map((folder) => (
+                      <FolderTile key={folder.id} folder={folder} onClick={() => handleFolderClick(folder.id)} />
+                    ))}
+                  </div>
+                )}
+
+                {/* Ungrouped machine cards */}
+                {filteredUngrouped.length > 0 && (
+                  <>
+                    {filteredFolders.length > 0 && (
+                      <div className="text-[11px] text-slate-500 uppercase tracking-wider font-bold mb-2">Ostatní</div>
+                    )}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                      {filteredUngrouped.map((asset) => (
+                        <MachineCard key={asset.id} asset={asset} onClick={() => setSelectedAsset(asset)} />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+          </>
+        )}
+
+        {/* ═══ LEVEL 4: Assets inside folder ═══ */}
+        {drillLevel === 'folder' && currentFolder && (
+          <>
+            <button
+              onClick={handleBackToFolders}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-400 text-xs font-semibold mb-3 hover:text-white transition"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              Zpět na místnost
+            </button>
+
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 rounded-xl bg-white/[0.05] flex items-center justify-center text-2xl">
+                {currentFolder.icon}
+              </div>
+              <div className="flex-1">
+                <div className="text-lg font-bold text-white">{currentFolder.name}</div>
+                <div className="text-xs text-slate-500">
+                  {currentFolder.assets.length} strojů
+                </div>
+              </div>
+            </div>
+
+            {filteredFolderAssets.length === 0 ? (
+              <EmptyState
+                icon={<Inbox className="w-12 h-12" />}
+                title="Žádné stroje"
+                subtitle={search ? 'Zkus jiný výraz' : 'Složka je prázdná'}
+              />
+            ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
-                {filteredMachines.map((asset) => (
+                {filteredFolderAssets.map((asset) => (
                   <MachineCard key={asset.id} asset={asset} onClick={() => setSelectedAsset(asset)} />
                 ))}
               </div>
