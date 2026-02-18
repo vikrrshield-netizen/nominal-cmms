@@ -14,6 +14,7 @@ import {
 import { useReports } from '../hooks/useReports';
 import { doc, deleteDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { showToast } from '../components/ui/Toast';
 
 // ═══════════════════════════════════════════
 // COMPONENT
@@ -257,8 +258,9 @@ function ContainerModal({ container, onClose, onUpdateFill, onMarkEmptied, forma
     setSaving(true);
     try {
       await onMarkEmptied(container.id);
+      showToast(`${container.name} — vyvezeno`, 'success');
       onClose();
-    } catch (err: unknown) { alert((err as Error).message); }
+    } catch (err: unknown) { showToast((err as Error).message, 'error'); }
     setSaving(false);
   };
 
@@ -266,8 +268,9 @@ function ContainerModal({ container, onClose, onUpdateFill, onMarkEmptied, forma
     setSaving(true);
     try {
       await onUpdateFill(container.id, level);
+      showToast(`${container.name} — stav aktualizován`, 'success');
       onClose();
-    } catch (err: unknown) { alert((err as Error).message); }
+    } catch (err: unknown) { showToast((err as Error).message, 'error'); }
     setSaving(false);
   };
 

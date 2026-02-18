@@ -2,7 +2,7 @@
 // NOMINAL CMMS — Kontrolní body budovy (měsíční checklist)
 
 import { useState, useEffect, useMemo } from 'react';
-import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
 import { createTask } from '../services/taskService';
@@ -21,6 +21,8 @@ export interface InspectionLog {
   completedBy: string;
   completedAt: Timestamp | null;
   isDeleted: boolean;
+  resolution?: 'fixed' | 'carried_over';
+  previousDefectId?: string;
 }
 
 export interface InspectionStats {
@@ -38,6 +40,15 @@ export function useInspections(month?: string) {
 
   // Default = aktuální měsíc
   const currentMonth = month || new Date().toISOString().slice(0, 7);
+
+  // Previous month for defect memory
+  const prevMonth = useMemo(() => {
+    const d = new Date(currentMonth + '-01');
+    d.setMonth(d.getMonth() - 1);
+    return d.toISOString().slice(0, 7);
+  }, [currentMonth]);
+
+  const [previousDefects, setPreviousDefects] = useState<InspectionLog[]>([]);
 
   useEffect(() => {
     const q = query(
@@ -61,6 +72,25 @@ export function useInspections(month?: string) {
 
     return () => unsub();
   }, [currentMonth]);
+
+  // Fetch previous month's unresolved defects
+  useEffect(() => {
+    const q2 = query(
+      collection(db, 'inspection_logs'),
+      where('month', '==', prevMonth),
+      where('status', '==', 'defect'),
+      where('isDeleted', '==', false)
+    );
+
+    const unsub2 = onSnapshot(q2, (snap) => {
+      const data = snap.docs
+        .map((d) => ({ id: d.id, ...d.data() } as InspectionLog))
+        .filter((d) => !d.resolution); // Only unresolved
+      setPreviousDefects(data);
+    });
+
+    return () => unsub2();
+  }, [prevMonth]);
 
   // Stats
   const stats: InspectionStats = useMemo(() => {
@@ -124,6 +154,64 @@ export function useInspections(month?: string) {
     }
   }
 
+  // Potvrdit předchozí závadu — buď opravena, nebo přenést do aktuálního měsíce
+  async function confirmPreviousDefect(logId: string, action: 'fixed' | 'still_defect') {
+    const log = previousDefects.find((l) => l.id === logId);
+
+    if (action === 'fixed') {
+      await updateDoc(doc(db, 'inspection_logs', logId), {
+        resolution: 'fixed',
+        resolvedBy: user?.displayName || 'Neznámý',
+        resolvedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    } else {
+      // Carry over — create new defect entry for current month
+      if (log) {
+        await addDoc(collection(db, 'inspection_logs'), {
+          templateId: log.templateId,
+          month: currentMonth,
+          building: log.building,
+          floor: log.floor,
+          roomName: log.roomName,
+          roomCode: log.roomCode,
+          checkPoints: log.checkPoints,
+          status: 'defect',
+          defectNote: `[Nedodělek] ${log.defectNote}`,
+          completedBy: user?.displayName || 'Neznámý',
+          completedAt: serverTimestamp(),
+          isDeleted: false,
+          previousDefectId: logId,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+
+        // Auto-create P1 task for carried defect
+        try {
+          await createTask({
+            title: `Nedodělek: ${log.roomName} — ${log.defectNote.slice(0, 60)}`,
+            description: `Přenesená závada z ${prevMonth}.\nBudova: ${log.building}\nPatro: ${log.floor}\nMístnost: ${log.roomName}\nPopis: ${log.defectNote}`,
+            type: 'corrective',
+            priority: 'P1',
+            source: 'inspection',
+            buildingId: log.building || undefined,
+            createdById: user?.id || 'system',
+            createdByName: user?.displayName || 'Kontrola budov',
+          });
+        } catch (err) {
+          console.error('[useInspections] Carry-over task creation failed:', err);
+        }
+      }
+
+      // Mark original as carried over
+      await updateDoc(doc(db, 'inspection_logs', logId), {
+        resolution: 'carried_over',
+        carriedToMonth: currentMonth,
+        updatedAt: serverTimestamp(),
+      });
+    }
+  }
+
   // Vrátit na pending (oprava)
   async function markPending(logId: string) {
     await updateDoc(doc(db, 'inspection_logs', logId), {
@@ -144,5 +232,8 @@ export function useInspections(month?: string) {
     markDefect,
     markPending,
     currentMonth,
+    previousDefects,
+    confirmPreviousDefect,
+    prevMonth,
   };
 }

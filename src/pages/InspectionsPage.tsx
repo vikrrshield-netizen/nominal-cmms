@@ -6,10 +6,11 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, AlertTriangle, Building2,
-  ChevronDown, ChevronRight, X, Loader2, ClipboardCheck
+  ChevronDown, ChevronRight, X, Loader2, ClipboardCheck, CheckCircle2, RotateCcw
 } from 'lucide-react';
 import { useInspections } from '../hooks/useInspections';
 import type { InspectionLog } from '../hooks/useInspections';
+import { showToast } from '../components/ui/Toast';
 
 // ═══════════════════════════════════════
 // STATUS CONFIG
@@ -27,7 +28,8 @@ const STATUS = {
 
 export default function InspectionsPage() {
   const navigate = useNavigate();
-  const { loading, stats, grouped, markOk, markDefect, markPending, currentMonth } = useInspections();
+  const { loading, stats, grouped, markOk, markDefect, markPending, currentMonth, previousDefects, confirmPreviousDefect, prevMonth } = useInspections();
+  const [confirmingDefect, setConfirmingDefect] = useState<string | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [activeLog, setActiveLog] = useState<InspectionLog | null>(null);
   const [defectNote, setDefectNote] = useState('');
@@ -54,8 +56,9 @@ export default function InspectionsPage() {
     setSaving(true);
     try {
       await markOk(log.id);
+      showToast(`${log.roomName} — OK`, 'success');
     } catch (err) {
-      alert('Chyba při ukládání');
+      showToast('Chyba při ukládání', 'error');
     }
     setSaving(false);
   };
@@ -66,10 +69,11 @@ export default function InspectionsPage() {
     setSaving(true);
     try {
       await markDefect(activeLog.id, defectNote.trim());
+      showToast(`Závada zapsána + P1 úkol vytvořen`, 'success');
       setActiveLog(null);
       setDefectNote('');
     } catch (err) {
-      alert('Chyba při ukládání');
+      showToast('Chyba při ukládání', 'error');
     }
     setSaving(false);
   };
@@ -77,7 +81,23 @@ export default function InspectionsPage() {
   // Handle Reset
   const handleReset = async (log: InspectionLog) => {
     await markPending(log.id);
+    showToast('Vráceno na Čeká', 'success');
   };
+
+  // Handle confirm previous defect
+  const handleConfirmDefect = async (logId: string, action: 'fixed' | 'still_defect') => {
+    setConfirmingDefect(logId);
+    try {
+      await confirmPreviousDefect(logId, action);
+      showToast(action === 'fixed' ? 'Závada opravena' : 'Nedodělek přenesen do aktuálního měsíce', 'success');
+    } catch (err) {
+      showToast('Chyba při potvrzení', 'error');
+    }
+    setConfirmingDefect(null);
+  };
+
+  // Previous month label
+  const prevMonthLabel = new Date(prevMonth + '-01').toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' });
 
   if (loading) {
     return (
@@ -156,6 +176,74 @@ export default function InspectionsPage() {
           <div className="text-xs text-slate-300">Čeká</div>
         </button>
       </div>
+
+      {/* ═══ NEDODĚLKY Z MINULA ═══ */}
+      {previousDefects.length > 0 && (
+        <div className="px-4 mb-4">
+          <div className="bg-red-500/10 rounded-2xl border border-red-500/30 overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b border-red-500/20">
+              <div className="flex items-center gap-3">
+                <RotateCcw className="w-5 h-5 text-red-400" />
+                <div>
+                  <span className="font-bold text-lg text-red-300">Nedodělky z minula</span>
+                  <span className="text-sm text-red-400/70 ml-2 capitalize">{prevMonthLabel}</span>
+                </div>
+              </div>
+              <span className="text-sm text-red-400 font-bold">{previousDefects.length}</span>
+            </div>
+
+            {previousDefects.map((defect) => (
+              <div key={defect.id} className="border-b border-red-500/10 last:border-b-0 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-1.5 h-12 rounded-full bg-red-500 flex-shrink-0 mt-1" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-bold text-white">{defect.roomName}</span>
+                      {defect.roomCode && (
+                        <span className="text-xs text-slate-500 font-mono">{defect.roomCode}</span>
+                      )}
+                    </div>
+                    <div className="text-sm text-red-300 mt-1 bg-red-500/10 rounded-lg p-2">
+                      {defect.defectNote}
+                    </div>
+                    {defect.completedBy && (
+                      <p className="text-xs text-slate-500 mt-1">
+                        {defect.completedBy} • {defect.completedAt?.toDate?.()?.toLocaleDateString('cs-CZ') || ''}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex gap-2 mt-3 ml-5">
+                  <button
+                    onClick={() => handleConfirmDefect(defect.id, 'fixed')}
+                    disabled={confirmingDefect === defect.id}
+                    className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm rounded-xl font-bold transition flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {confirmingDefect === defect.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="w-4 h-4" />
+                    )}
+                    Opraveno
+                  </button>
+                  <button
+                    onClick={() => handleConfirmDefect(defect.id, 'still_defect')}
+                    disabled={confirmingDefect === defect.id}
+                    className="flex-1 py-2.5 bg-red-600 hover:bg-red-500 text-white text-sm rounded-xl font-bold transition flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {confirmingDefect === defect.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <AlertTriangle className="w-4 h-4" />
+                    )}
+                    Stále závada
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Grouped checklist */}
       <div className="px-4 space-y-3">

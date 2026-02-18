@@ -20,12 +20,17 @@ import {
   Edit2,
   FileText,
   Building2,
+  Camera,
+  Bug,
+  Trash2,
+  CheckCircle2,
 } from 'lucide-react';
 import { useAuthContext } from '../context/AuthContext';
 import { createTask } from '../services/taskService';
 import BottomSheet, { FormField, FormFooter } from '../components/ui/BottomSheet';
 import { showToast } from '../components/ui/Toast';
 import EmptyState from '../components/ui/EmptyState';
+import { usePestControl } from '../hooks/usePestControl';
 import {
   EntityCardFull,
   type Entity,
@@ -102,6 +107,8 @@ const FOLDER_CONFIG: Record<string, { label: string; icon: string }> = {
   'silo':        { label: 'Sila',            icon: '🗼' },
   'cleaning':    { label: 'Čistění',         icon: '🧹' },
   'cooling':     { label: 'Chlazení',        icon: '❄️' },
+  'pest_trap':   { label: 'Hmyzolapače',     icon: '🪲' },
+  'waste_bin':   { label: 'Popelnice',       icon: '🗑️' },
 };
 
 function getWorstStatus(assets: Asset[]): string {
@@ -336,7 +343,10 @@ function WastePanel({ wasteStatus, setWasteStatus }: { wasteStatus: Record<strin
   const [saving, setSaving] = useState(false);
 
   const toggleFull = (id: string) => {
-    setWasteStatus(prev => ({ ...prev, [id]: !prev[id] }));
+    const next = !wasteStatus[id];
+    setWasteStatus(prev => ({ ...prev, [id]: next }));
+    const item = WASTE_ITEMS.find(w => w.id === id);
+    showToast(next ? `${item?.label || id} — plný stav` : `${item?.label || id} — prázdný`, next ? 'error' : 'success');
   };
 
   const handleVyvezPlevy = async () => {
@@ -353,8 +363,10 @@ function WastePanel({ wasteStatus, setWasteStatus }: { wasteStatus: Record<strin
         createdByName: user?.displayName || 'Neznámý',
       });
       setPlevyStatus('pending');
+      showToast('Úkol na odvoz plevů vytvořen', 'success');
     } catch (err) {
       console.error('[WastePanel]', err);
+      showToast('Chyba při vytváření úkolu', 'error');
     }
     setSaving(false);
   };
@@ -512,11 +524,18 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onEdit, onOp
 }) {
   const entity = useMemo(() => assetToEntity(asset), [asset]);
   const logs = useMemo(() => DEMO_MACHINE_LOGS.map((l) => ({ ...l, entityId: asset.id })), [asset.id]);
-  const [actionLoading, setActionLoading] = useState<'report' | 'task' | null>(null);
+  const [actionLoading, setActionLoading] = useState<'report' | 'task' | 'pest' | 'empty' | null>(null);
   const [actionResult, setActionResult] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // Pest control hook — only active for pest_trap assets
+  const isPestTrap = asset.category === 'pest_trap';
+  const isWasteBin = asset.category === 'waste_bin';
+  const pestControl = usePestControl(isPestTrap ? asset.id : null);
+  const [pestCount, setPestCount] = useState('');
+  const [pestNote, setPestNote] = useState('');
+  const [showPestForm, setShowPestForm] = useState(false);
+
   const handleAction = async (type: 'report' | 'task') => {
-    console.log('[AssetDetailSheet] Button clicked:', type, asset.id, asset.name);
     setActionLoading(type);
     setActionResult(null);
     try {
@@ -526,10 +545,52 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onEdit, onOp
         await onCreateTask(asset);
       }
       setActionResult({ type: 'success', text: type === 'report' ? 'Porucha nahlášena (P1)' : 'Úkol vytvořen (P3)' });
+      showToast(type === 'report' ? 'Porucha nahlášena' : 'Úkol vytvořen', 'success');
       setTimeout(() => onClose(), 1200);
     } catch (err) {
-      console.error('[AssetDetailSheet] Action failed:', err);
       setActionResult({ type: 'error', text: `Chyba: ${(err as Error).message}` });
+      showToast('Akce se nezdařila', 'error');
+    }
+    setActionLoading(null);
+  };
+
+  // Pest log submission
+  const handlePestSubmit = async () => {
+    const count = parseInt(pestCount, 10);
+    if (isNaN(count) || count < 0) return;
+    setActionLoading('pest');
+    try {
+      // Check for photo file input
+      const fileInput = document.getElementById('pest-photo-input') as HTMLInputElement | null;
+      const photoFile = fileInput?.files?.[0] || undefined;
+      const result = await pestControl.addPestLog(count, photoFile, pestNote);
+      const msg = result?.isCritical
+        ? `Kritický stav! ${count} kusů — úkol vytvořen`
+        : `Záznam uložen: ${count} kusů`;
+      showToast(msg, result?.isCritical ? 'error' : 'success');
+      setPestCount('');
+      setPestNote('');
+      setShowPestForm(false);
+      if (fileInput) fileInput.value = '';
+    } catch (err) {
+      showToast('Chyba při ukládání záznamu', 'error');
+    }
+    setActionLoading(null);
+  };
+
+  // Quick Empty for waste bins
+  const handleQuickEmpty = async () => {
+    setActionLoading('empty');
+    try {
+      await updateDoc(doc(db, 'assets', asset.id), {
+        lastEmptiedAt: serverTimestamp(),
+        status: 'operational',
+        updatedAt: serverTimestamp(),
+      });
+      showToast(`${asset.name} — označen jako vyvezený`, 'success');
+      setTimeout(() => onClose(), 800);
+    } catch (err) {
+      showToast('Chyba při označování', 'error');
     }
     setActionLoading(null);
   };
@@ -555,6 +616,141 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onEdit, onOp
               </span>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* ═══ PEST TRAP SECTION ═══ */}
+      {isPestTrap && (
+        <div className="mt-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Bug className="w-5 h-5 text-amber-400" />
+            <span className="font-bold text-amber-300">Hmyzolapač</span>
+            {pestControl.isCritical && (
+              <span className="px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 text-xs font-bold animate-pulse">KRITICKÝ</span>
+            )}
+          </div>
+
+          {/* Latest count */}
+          {pestControl.latestLog && (
+            <div className="flex items-center gap-3 mb-3 bg-white/5 rounded-xl p-3">
+              <div className="text-center">
+                <div className={`text-2xl font-bold ${pestControl.isCritical ? 'text-red-400' : 'text-amber-300'}`}>
+                  {pestControl.latestLog.count}
+                </div>
+                <div className="text-[10px] text-slate-500">kusů</div>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-xs text-slate-400">Poslední kontrola</div>
+                <div className="text-sm text-white">
+                  {pestControl.latestLog.loggedAt?.toDate?.()?.toLocaleDateString('cs-CZ') || '—'}
+                </div>
+                {pestControl.latestLog.note && (
+                  <div className="text-xs text-slate-500 mt-0.5 truncate">{pestControl.latestLog.note}</div>
+                )}
+              </div>
+              {pestControl.latestLog.photoUrl && (
+                <img src={pestControl.latestLog.photoUrl} alt="foto" className="w-12 h-12 rounded-lg object-cover" />
+              )}
+            </div>
+          )}
+
+          {/* Pest log form */}
+          {showPestForm ? (
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-slate-400 mb-1 block">Počet hmyzu</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={pestCount}
+                  onChange={(e) => setPestCount(e.target.value)}
+                  placeholder="0"
+                  autoFocus
+                  className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-amber-500/50"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-slate-400 mb-1 block">Foto (volitelné)</label>
+                <input
+                  id="pest-photo-input"
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="w-full text-sm text-slate-400 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-amber-500/20 file:text-amber-400 hover:file:bg-amber-500/30"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-slate-400 mb-1 block">Poznámka</label>
+                <input
+                  type="text"
+                  value={pestNote}
+                  onChange={(e) => setPestNote(e.target.value)}
+                  placeholder="Stav lapáku, komentář..."
+                  className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-amber-500/50"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowPestForm(false)}
+                  className="flex-1 py-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 text-sm font-semibold"
+                >
+                  Zrušit
+                </button>
+                <button
+                  onClick={handlePestSubmit}
+                  disabled={actionLoading === 'pest' || !pestCount}
+                  className="flex-[2] py-2.5 rounded-xl bg-amber-600 text-white text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {actionLoading === 'pest' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
+                  Uložit kontrolu
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowPestForm(true)}
+              className="w-full py-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-sm font-bold transition flex items-center justify-center gap-2"
+            >
+              <Camera className="w-4 h-4" />
+              Insect Check
+            </button>
+          )}
+
+          {/* History (last 5) */}
+          {pestControl.logs.length > 1 && (
+            <div className="mt-3">
+              <div className="text-[10px] text-slate-500 uppercase font-bold mb-1.5">Historie</div>
+              <div className="space-y-1">
+                {pestControl.logs.slice(0, 5).map((log) => (
+                  <div key={log.id} className="flex items-center gap-2 text-xs">
+                    <div className={`w-2 h-2 rounded-full ${log.isCritical ? 'bg-red-500' : 'bg-emerald-500'}`} />
+                    <span className="text-slate-400">{log.loggedAt?.toDate?.()?.toLocaleDateString('cs-CZ') || '—'}</span>
+                    <span className={`font-bold ${log.isCritical ? 'text-red-400' : 'text-white'}`}>{log.count} ks</span>
+                    {log.note && <span className="text-slate-500 truncate">{log.note}</span>}
+                    {log.photoUrl && <span className="text-blue-400">📷</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ═══ WASTE BIN SECTION ═══ */}
+      {isWasteBin && (
+        <div className="mt-4 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Trash2 className="w-5 h-5 text-emerald-400" />
+            <span className="font-bold text-emerald-300">Popelnice / Kontejner</span>
+          </div>
+          <button
+            onClick={handleQuickEmpty}
+            disabled={actionLoading === 'empty'}
+            className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold transition flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            {actionLoading === 'empty' ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+            Quick Empty — Vyvezeno
+          </button>
         </div>
       )}
 
@@ -674,7 +870,7 @@ function GlobalSearchResults({ assets, buildings, search, onSelectAsset, onSelec
   });
 
   const matchedAssets = assets.filter(a =>
-    a.name.toLowerCase().includes(q) || a.code?.toLowerCase().includes(q)
+    a.name.toLowerCase().includes(q) || a.code?.toLowerCase().includes(q) || a.category?.toLowerCase().includes(q)
   ).slice(0, 15);
 
   const total = matchedBuildings.length + matchedRooms.length + matchedAssets.length;
@@ -738,16 +934,24 @@ function GlobalSearchResults({ assets, buildings, search, onSelectAsset, onSelec
           </div>
           {matchedAssets.map(a => {
             const ast = STATUS_CONFIG[a.status] || STATUS_CONFIG.idle;
+            const catCfg = a.category ? FOLDER_CONFIG[a.category] : null;
             return (
               <button key={a.id} onClick={() => onSelectAsset(a)}
                 className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-white/[0.06] transition text-left mb-1"
               >
                 <div className="w-8 h-8 rounded-lg bg-slate-700/50 flex items-center justify-center">
-                  <span className={`w-2.5 h-2.5 rounded-full ${ast.dot}`} />
+                  {catCfg ? (
+                    <span className="text-base">{catCfg.icon}</span>
+                  ) : (
+                    <span className={`w-2.5 h-2.5 rounded-full ${ast.dot}`} />
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-white truncate">{a.name}</div>
-                  <div className="text-[11px] text-slate-500">{BUILDING_META[a.buildingId]?.name || a.buildingId}{a.areaName ? ` · ${a.areaName}` : ''}</div>
+                  <div className="text-[11px] text-slate-500">
+                    {BUILDING_META[a.buildingId]?.name || a.buildingId}{a.areaName ? ` · ${a.areaName}` : ''}
+                    {catCfg ? ` · ${catCfg.label}` : ''}
+                  </div>
                 </div>
                 {a.code && <span className="text-[10px] text-slate-500 font-mono">{a.code}</span>}
               </button>
@@ -774,6 +978,9 @@ export default function MapPage() {
   const [showAddModal, setShowAddModal] = useState<'building' | 'room' | 'asset' | null>(null);
   const [addName, setAddName] = useState('');
   const [addCode, setAddCode] = useState('');
+  const [addCategory, setAddCategory] = useState('');
+  const [addWasteType, setAddWasteType] = useState('');
+  const [addPickupFreq, setAddPickupFreq] = useState('');
   const [addSaving, setAddSaving] = useState(false);
   const [addError, setAddError] = useState('');
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
@@ -1389,7 +1596,7 @@ export default function MapPage() {
           showAddModal === 'asset' ? '⚙️ Přidat zařízení' : ''
         }
         isOpen={showAddModal !== null}
-        onClose={() => { setShowAddModal(null); setAddName(''); setAddCode(''); setAddError(''); }}
+        onClose={() => { setShowAddModal(null); setAddName(''); setAddCode(''); setAddCategory(''); setAddWasteType(''); setAddPickupFreq(''); setAddError(''); }}
       >
         <FormField
           label="Název"
@@ -1403,13 +1610,54 @@ export default function MapPage() {
           autoFocus
         />
         <FormField label="Kód" value={addCode} onChange={setAddCode} placeholder="Např. EXT-005" />
+        {showAddModal === 'asset' && (
+          <FormField
+            label="Kategorie"
+            value={addCategory}
+            onChange={(v) => { setAddCategory(v); if (v !== 'waste_bin') { setAddWasteType(''); setAddPickupFreq(''); } }}
+            type="select"
+            options={Object.entries(FOLDER_CONFIG).map(([k, v]) => ({ value: k, label: `${v.icon} ${v.label}` }))}
+          />
+        )}
+        {showAddModal === 'asset' && addCategory === 'waste_bin' && (
+          <>
+            <FormField
+              label="Typ odpadu"
+              value={addWasteType}
+              onChange={setAddWasteType}
+              type="select"
+              options={[
+                { value: 'mixed', label: 'Směsný' },
+                { value: 'plastic', label: 'Plast' },
+                { value: 'paper', label: 'Papír' },
+                { value: 'glass', label: 'Sklo' },
+                { value: 'metal', label: 'Kov' },
+                { value: 'bio', label: 'Bio' },
+                { value: 'hazardous', label: 'Nebezpečný' },
+              ]}
+            />
+            <FormField
+              label="Frekvence svozu"
+              value={addPickupFreq}
+              onChange={setAddPickupFreq}
+              type="select"
+              options={[
+                { value: 'daily', label: 'Denně' },
+                { value: 'weekly', label: 'Týdně' },
+                { value: 'biweekly', label: '2x měsíčně' },
+                { value: 'monthly', label: 'Měsíčně' },
+                { value: 'on_demand', label: 'Na objednávku' },
+              ]}
+            />
+          </>
+        )}
         {addError && (
           <div className="p-2.5 bg-red-500/20 border border-red-500/30 rounded-xl text-red-300 text-sm text-center">
             {addError}
           </div>
         )}
         <FormFooter
-          onCancel={() => { setShowAddModal(null); setAddName(''); setAddCode(''); setAddError(''); }}
+          onCancel={() => { setShowAddModal(null); setAddName(''); setAddCode(''); setAddCategory(''); setAddWasteType(''); setAddPickupFreq(''); setAddError(''); }}
           onSubmit={async () => {
             const name = addName.trim();
             if (!name) return;
@@ -1426,16 +1674,21 @@ export default function MapPage() {
             setAddError('');
             try {
               if (showAddModal === 'asset' && selectedBuildingId) {
-                await addDoc(collection(db, 'assets'), {
+                const assetData: Record<string, any> = {
                   name,
                   code: addCode.trim() || undefined,
                   buildingId: selectedBuildingId,
                   areaName: selectedRoomName || 'Ostatní',
                   status: 'operational',
-                  category: '',
+                  category: addCategory || '',
                   createdAt: serverTimestamp(),
                   updatedAt: serverTimestamp(),
-                });
+                };
+                if (addCategory === 'waste_bin') {
+                  if (addWasteType) assetData.wasteType = addWasteType;
+                  if (addPickupFreq) assetData.pickupFrequency = addPickupFreq;
+                }
+                await addDoc(collection(db, 'assets'), assetData);
               } else if (showAddModal === 'room' && selectedBuildingId) {
                 await addDoc(collection(db, 'assets'), {
                   name: `${name} — placeholder`,
@@ -1469,6 +1722,9 @@ export default function MapPage() {
               setShowAddModal(null);
               setAddName('');
               setAddCode('');
+              setAddCategory('');
+              setAddWasteType('');
+              setAddPickupFreq('');
               setAddError('');
             } catch (err) {
               console.error('[MapPage] Add failed:', err);
