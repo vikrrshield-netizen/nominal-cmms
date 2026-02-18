@@ -14,9 +14,16 @@ const ASSIGNEE_OPTIONS = [
   { value: 'Externí firma', label: 'Externí firma' },
 ];
 
+const WORK_TYPE_OPTIONS = [
+  { value: 'udrzba', label: 'Údržba' },
+  { value: 'projekt_milan', label: 'Projekt/Milan' },
+  { value: 'revize', label: 'Revize' },
+  { value: 'sanitace', label: 'Sanitace' },
+];
+
 interface CompleteTaskModalProps {
   taskTitle: string;
-  onConfirm: (data: { resolution: string; durationMinutes: number | null; completedByName: string }) => Promise<void>;
+  onConfirm: (data: { resolution: string; durationMinutes: number | null; completedByName: string; workType: string }) => Promise<void>;
   onClose: () => void;
 }
 
@@ -24,11 +31,12 @@ export default function CompleteTaskModal({ taskTitle, onConfirm, onClose }: Com
   const [resolution, setResolution] = useState('');
   const [duration, setDuration] = useState('');
   const [assignee, setAssignee] = useState('');
+  const [workType, setWorkType] = useState('');
   const [pin, setPin] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const isValid = resolution.trim().length >= 5 && pin.length === 4 && assignee !== '';
+  const isValid = resolution.trim().length >= 5 && pin.length === 4 && assignee !== '' && workType !== '';
 
   const handleSubmit = async () => {
     if (resolution.trim().length < 5) {
@@ -37,6 +45,10 @@ export default function CompleteTaskModal({ taskTitle, onConfirm, onClose }: Com
     }
     if (!assignee) {
       setError('Vyber kdo úkol provedl');
+      return;
+    }
+    if (!workType) {
+      setError('Vyber typ práce');
       return;
     }
     if (pin.length !== 4) {
@@ -51,6 +63,7 @@ export default function CompleteTaskModal({ taskTitle, onConfirm, onClose }: Com
         resolution: resolution.trim(),
         durationMinutes: duration ? Number(duration) : null,
         completedByName: assignee,
+        workType,
       });
       onClose();
     } catch (err: unknown) {
@@ -108,6 +121,16 @@ export default function CompleteTaskModal({ taskTitle, onConfirm, onClose }: Com
         type="select"
         required
         options={ASSIGNEE_OPTIONS}
+      />
+
+      {/* Work Type */}
+      <FormField
+        label="Typ práce"
+        value={workType}
+        onChange={setWorkType}
+        type="select"
+        required
+        options={WORK_TYPE_OPTIONS}
       />
 
       {/* Duration */}

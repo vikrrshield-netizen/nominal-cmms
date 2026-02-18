@@ -244,6 +244,7 @@ export default function TasksPage() {
     description: '',
     priority: 'P3',
     assignee: '',
+    workType: '',
   });
   const [saving, setSaving] = useState(false);
 
@@ -294,6 +295,7 @@ export default function TasksPage() {
         priority: form.priority || 'P3',
         type: 'corrective',
         source: 'web',
+        workType: form.workType || null,
         assigneeId: form.assignee || null,
         assigneeName: form.assignee || null,
         isDone: false,
@@ -414,6 +416,19 @@ export default function TasksPage() {
           ]}
         />
         <FormField
+          label="Typ práce"
+          value={form.workType}
+          onChange={(v) => setForm(prev => ({ ...prev, workType: v }))}
+          type="select"
+          required
+          options={[
+            { value: 'udrzba', label: 'Údržba' },
+            { value: 'projekt_milan', label: 'Projekt/Milan' },
+            { value: 'revize', label: 'Revize' },
+            { value: 'sanitace', label: 'Sanitace' },
+          ]}
+        />
+        <FormField
           label="Priorita"
           value={form.priority}
           onChange={(v) => setForm(prev => ({ ...prev, priority: v }))}
@@ -445,6 +460,7 @@ export default function TasksPage() {
               isDone: true,
               resolution: data.resolution,
               durationMinutes: data.durationMinutes,
+              workType: data.workType || null,
               completedAt: serverTimestamp(),
               completedBy: data.completedByName || user?.displayName || 'Neznámý',
               updatedAt: serverTimestamp(),
@@ -505,6 +521,7 @@ function EditTaskSheet({ task, onClose, onSave }: {
   const [priority, setPriority] = useState(task.priority);
   const [status, setStatus] = useState(task.status);
   const [assignee, setAssignee] = useState(task.assignedToName || task.assignedTo || '');
+  const [workType, setWorkType] = useState((task as any).workType || '');
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
@@ -517,6 +534,7 @@ function EditTaskSheet({ task, onClose, onSave }: {
         priority,
         status,
         assignedToName: assignee || undefined,
+        workType: workType || null,
       });
     } catch (err) {
       console.error('[TasksPage] Edit save failed:', err);
@@ -551,6 +569,19 @@ function EditTaskSheet({ task, onClose, onSave }: {
           { value: 'in_progress', label: 'V řešení' },
           { value: 'paused', label: 'Čeká na díl' },
           { value: 'completed', label: 'Hotovo' },
+        ]}
+      />
+      <FormField
+        label="Typ práce"
+        value={workType}
+        onChange={setWorkType}
+        type="select"
+        required
+        options={[
+          { value: 'udrzba', label: 'Údržba' },
+          { value: 'projekt_milan', label: 'Projekt/Milan' },
+          { value: 'revize', label: 'Revize' },
+          { value: 'sanitace', label: 'Sanitace' },
         ]}
       />
       <FormField

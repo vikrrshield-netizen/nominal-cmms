@@ -11,7 +11,7 @@ import { useRevisions } from '../hooks/useRevisions';
 import { useInspections } from '../hooks/useInspections';
 import {
   Settings, AlertTriangle, LogOut, Loader2, ClipboardCheck, Map,
-  X, Edit3, LayoutGrid, Play, CheckCircle2,
+  X, Edit3, LayoutGrid, Play, CheckCircle2, Sparkles, Send,
 } from 'lucide-react';
 import { createTask, startTask, completeTask, subscribeToActiveTasks } from '../services/taskService';
 import type { TaskDoc } from '../types/firestore';
@@ -427,7 +427,8 @@ function FullDashboard() {
   const [config, setConfig] = useState<DashConfig>(() => loadDashConfig());
 
   // Quick action modals
-  const [activeModal, setActiveModal] = useState<'idea' | 'request' | 'waste' | null>(null);
+  const [activeModal, setActiveModal] = useState<'idea' | 'request' | 'waste' | 'ai' | null>(null);
+  const [aiQuery, setAiQuery] = useState('');
   const [formText, setFormText] = useState('');
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [requestType, setRequestType] = useState('tool');
@@ -526,9 +527,10 @@ function FullDashboard() {
     const routes: Record<string, string> = {
       fault: '/kiosk', tasks: '/tasks', map: '/map', revisions: '/revisions',
       inventory: '/inventory', waste: '/waste', fleet: '/fleet', louparna: '/louparna',
-      inspections: '/inspections', calendar: '/calendar', ai: '/ai', reports: '/reports', admin: '/admin',
+      inspections: '/inspections', calendar: '/calendar', reports: '/reports', admin: '/admin',
     };
     if (routes[tile.id]) { navigate(routes[tile.id]); return; }
+    if (tile.id === 'ai') { setActiveModal('ai'); setAiQuery(''); return; }
     if (tile.id === 'idea') setActiveModal('idea');
     else if (tile.id === 'request') setActiveModal('request');
   };
@@ -758,6 +760,37 @@ function FullDashboard() {
         />
         <FormField label="Poznámka (volitelné)" value={formText} onChange={setFormText} placeholder="Lokace, poznámka..." />
         <SubmitButton label="Nahlásit" onClick={handleSubmit} loading={saving} color="orange" />
+      </BottomSheet>
+
+      {/* AI ASSISTANT PLACEHOLDER */}
+      <BottomSheet title="Nominal AI" isOpen={activeModal === 'ai'} onClose={() => setActiveModal(null)}>
+        <div className="flex items-center gap-3 p-4 mb-4 bg-gradient-to-r from-pink-500/10 to-purple-500/10 border border-pink-500/20 rounded-2xl">
+          <Sparkles className="w-6 h-6 text-pink-400 flex-shrink-0" />
+          <div>
+            <div className="text-sm font-semibold text-white">AI Asistent údržby</div>
+            <div className="text-xs text-slate-400 mt-0.5">Zeptej se na cokoliv — historii oprav, doporučení, analýzu poruch...</div>
+          </div>
+        </div>
+        <div className="relative mb-4">
+          <textarea
+            value={aiQuery}
+            onChange={(e) => setAiQuery(e.target.value)}
+            placeholder="Na co se chceš zeptat? Např. Kolikrát se rozbil balicí stroj letos?"
+            rows={3}
+            className="w-full px-4 py-3 pr-12 rounded-xl bg-white/5 border border-white/10 text-white text-[15px] placeholder-slate-600 focus:outline-none focus:border-pink-500/50 transition resize-none min-h-[48px]"
+          />
+          <button
+            disabled={!aiQuery.trim()}
+            className="absolute right-3 bottom-3 w-8 h-8 rounded-lg bg-gradient-to-r from-pink-500 to-purple-600 flex items-center justify-center text-white disabled:opacity-30 transition hover:opacity-90"
+          >
+            <Send className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4 text-center">
+          <Sparkles className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+          <div className="text-sm text-slate-500 font-medium">Připravujeme</div>
+          <div className="text-xs text-slate-600 mt-1">AI analýza bude dostupná v další verzi</div>
+        </div>
       </BottomSheet>
     </div>
   );

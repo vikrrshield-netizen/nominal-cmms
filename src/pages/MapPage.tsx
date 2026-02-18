@@ -18,6 +18,7 @@ import {
   Plus,
   Truck,
   Edit2,
+  FileText,
 } from 'lucide-react';
 import { useAuthContext } from '../context/AuthContext';
 import { createTask } from '../services/taskService';
@@ -29,6 +30,7 @@ import {
   type Blueprint,
   type EntityLogEntry,
 } from '../components/EntityCard';
+import EntityModal, { type EntityModalData, type BreadcrumbItem } from '../components/EntityModal';
 
 // ═══════════════════════════════════════════════
 // TYPES
@@ -498,12 +500,13 @@ const DEMO_MACHINE_LOGS: EntityLogEntry[] = [
 // ═══════════════════════════════════════════════
 // ASSET DETAIL SHEET — Matryoshka EntityCard style
 // ═══════════════════════════════════════════════
-function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onEdit }: {
+function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onEdit, onOpenPassport }: {
   asset: Asset;
   onClose: () => void;
   onCreateTask: (asset: Asset) => Promise<void>;
   onReport: (asset: Asset) => Promise<void>;
   onEdit: (asset: Asset) => void;
+  onOpenPassport?: (asset: Asset) => void;
 }) {
   const entity = useMemo(() => assetToEntity(asset), [asset]);
   const logs = useMemo(() => DEMO_MACHINE_LOGS.map((l) => ({ ...l, entityId: asset.id })), [asset.id]);
@@ -565,7 +568,7 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onEdit }: {
       )}
 
       {/* Action buttons */}
-      <div className="grid grid-cols-3 gap-2 mt-4">
+      <div className="grid grid-cols-2 gap-2 mt-4">
         <button
           onClick={(e) => { e.stopPropagation(); handleAction('report'); }}
           disabled={actionLoading !== null}
@@ -583,12 +586,21 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onEdit }: {
           Úkol
         </button>
         <button
-          onClick={(e) => { e.stopPropagation(); console.log('[AssetDetailSheet] Edit clicked:', asset.id); onEdit(asset); }}
+          onClick={(e) => { e.stopPropagation(); onEdit(asset); }}
           className="py-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 text-sm font-semibold active:scale-95 transition flex items-center justify-center gap-2 min-h-[48px]"
         >
           <Edit2 className="w-4 h-4" />
           Upravit
         </button>
+        {onOpenPassport && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onOpenPassport(asset); }}
+            className="py-3 rounded-xl bg-orange-500/15 border border-orange-500/30 text-orange-400 text-sm font-semibold active:scale-95 transition flex items-center justify-center gap-2 min-h-[48px]"
+          >
+            <FileText className="w-4 h-4" />
+            Pasport
+          </button>
+        )}
       </div>
     </BottomSheet>
   );
@@ -647,6 +659,33 @@ export default function MapPage() {
   const [editName, setEditName] = useState('');
   const [editStatus, setEditStatus] = useState('');
   const [editSaving, setEditSaving] = useState(false);
+
+  // EntityModal navigation stack
+  const [entityModalStack, setEntityModalStack] = useState<{ data: EntityModalData; breadcrumbs: BreadcrumbItem[] }[]>([]);
+  const currentEntityModal = entityModalStack.length > 0 ? entityModalStack[entityModalStack.length - 1] : null;
+
+  const openEntityModal = (data: EntityModalData, initialBreadcrumbs: BreadcrumbItem[]) => {
+    setEntityModalStack([{ data, breadcrumbs: [...initialBreadcrumbs, { label: data.name }] }]);
+    setSelectedAsset(null);
+  };
+
+  const navigateEntityModal = (data: EntityModalData, parentBreadcrumb: BreadcrumbItem) => {
+    setEntityModalStack((prev) => {
+      const current = prev[prev.length - 1];
+      if (!current) return prev;
+      const newBreadcrumbs = [...current.breadcrumbs.slice(0, -1), parentBreadcrumb, { label: data.name }];
+      return [...prev, { data, breadcrumbs: newBreadcrumbs }];
+    });
+  };
+
+  const entityModalBack = () => {
+    setEntityModalStack((prev) => prev.length > 1 ? prev.slice(0, -1) : []);
+  };
+
+  const closeEntityModal = () => {
+    setEntityModalStack([]);
+  };
+
   const { user } = useAuthContext();
 
   const { buildings } = useGroupedData(assets, selectedBuildingId);
@@ -1133,14 +1172,45 @@ export default function MapPage() {
         <Plus className="w-7 h-7" />
       </button>
 
-      {/* Asset detail */}
-      {selectedAsset && (
+      {/* Asset detail — opens EntityModal for the asset */}
+      {selectedAsset && !currentEntityModal && (
         <AssetDetailSheet
           asset={selectedAsset}
           onClose={() => setSelectedAsset(null)}
           onCreateTask={handleNewTask}
           onReport={handleReport}
           onEdit={handleEdit}
+          onOpenPassport={(asset: Asset) => {
+            const buildingName = BUILDING_META[asset.buildingId]?.name || asset.buildingId;
+            openEntityModal(
+              {
+                type: 'asset',
+                id: asset.id,
+                name: asset.name,
+                buildingId: asset.buildingId,
+                roomName: asset.areaName,
+                status: asset.status,
+                code: asset.code,
+                category: asset.category,
+                asset,
+              },
+              [
+                { label: buildingName, data: { type: 'building', id: asset.buildingId, name: buildingName, buildingId: asset.buildingId } },
+                ...(asset.areaName ? [{ label: asset.areaName, data: { type: 'room' as const, id: asset.areaName, name: asset.areaName, buildingId: asset.buildingId, roomName: asset.areaName } }] : []),
+              ]
+            );
+          }}
+        />
+      )}
+
+      {/* EntityModal — hierarchical drill-down */}
+      {currentEntityModal && (
+        <EntityModal
+          data={currentEntityModal.data}
+          breadcrumbs={currentEntityModal.breadcrumbs}
+          onClose={closeEntityModal}
+          onNavigate={navigateEntityModal}
+          onBack={entityModalBack}
         />
       )}
 
