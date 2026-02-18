@@ -3,10 +3,10 @@
 // Technik MUSÍ vyplnit popis řešení, volitelně čas
 
 import { useState } from 'react';
-import { CheckCircle2, X, Loader2, Clock, FileText } from 'lucide-react';
+import { Clock, FileText } from 'lucide-react';
+import BottomSheet, { FormField, FormFooter } from './BottomSheet';
 
 const ASSIGNEE_OPTIONS = [
-  { value: '', label: '— Vybrat —' },
   { value: 'Filip Novák', label: 'Filip Novák (interní)' },
   { value: 'Zdeněk Mička', label: 'Zdeněk Mička (interní)' },
   { value: 'Petr Volf', label: 'Petr Volf (interní)' },
@@ -53,154 +53,118 @@ export default function CompleteTaskModal({ taskTitle, onConfirm, onClose }: Com
         completedByName: assignee,
       });
       onClose();
-    } catch (err: any) {
-      setError(err.message || 'Nepodařilo se dokončit úkol');
+    } catch (err: unknown) {
+      setError((err as Error).message || 'Nepodařilo se dokončit úkol');
       setSaving(false);
     }
   };
 
   return (
-    <div
-      className="fixed inset-0 bg-black/70 z-50 flex items-end md:items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-slate-800 rounded-t-3xl md:rounded-3xl w-full max-w-lg border border-slate-700"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="p-4 border-b border-slate-700 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-            <h2 className="text-lg font-bold text-white">Dokončit úkol</h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg hover:bg-slate-700 text-slate-400"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+    <BottomSheet title="Dokončit úkol" isOpen onClose={onClose}>
+      {/* Task title */}
+      <div className="bg-slate-700/50 rounded-xl p-3 mb-4">
+        <div className="text-sm text-slate-400">Úkol:</div>
+        <div className="text-white font-medium">{taskTitle}</div>
+      </div>
 
-        {/* Body */}
-        <div className="p-4 space-y-4">
-          {/* Task title */}
-          <div className="bg-slate-700/50 rounded-xl p-3">
-            <div className="text-sm text-slate-400">Úkol:</div>
-            <div className="text-white font-medium">{taskTitle}</div>
-          </div>
-
-          {/* Resolution — POVINNÉ */}
-          <div>
-            <label className="text-sm text-slate-400 mb-1.5 flex items-center gap-2">
-              <FileText className="w-4 h-4" />
-              Popis řešení <span className="text-red-400">*</span>
-            </label>
-            <textarea
-              value={resolution}
-              onChange={(e) => {
-                setResolution(e.target.value);
-                if (e.target.value.trim().length >= 5) setError('');
-              }}
-              placeholder="Co jste udělali? Jaký díl jste vyměnili? Co bylo příčinou?"
-              rows={3}
-              autoFocus
-              className={`w-full bg-slate-700 text-white p-3 rounded-xl border outline-none resize-none ${
-                error && !isValid
-                  ? 'border-red-500 focus:border-red-400'
-                  : 'border-slate-600 focus:border-emerald-500'
-              }`}
-            />
-            <div className="flex justify-between mt-1">
-              {error && !isValid ? (
-                <span className="text-xs text-red-400">{error}</span>
-              ) : (
-                <span className="text-xs text-slate-500">Min. 5 znaků</span>
-              )}
-              <span className={`text-xs ${resolution.trim().length >= 5 ? 'text-emerald-400' : 'text-slate-500'}`}>
-                {resolution.trim().length}/5
-              </span>
-            </div>
-          </div>
-
-          {/* Assignee — KDO PROVEDL */}
-          <div>
-            <label className="text-sm text-slate-400 mb-1.5 flex items-center gap-2">
-              Provedl <span className="text-red-400">*</span>
-            </label>
-            <select
-              value={assignee}
-              onChange={(e) => setAssignee(e.target.value)}
-              className="w-full bg-slate-700 text-white p-3 rounded-xl border border-slate-600 focus:border-blue-500 outline-none appearance-none"
-            >
-              {ASSIGNEE_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Duration — VOLITELNÉ */}
-          <div>
-            <label className="text-sm text-slate-400 mb-1.5 flex items-center gap-2">
-              <Clock className="w-4 h-4" />
-              Čas práce v minutách <span className="text-slate-600">(volitelné)</span>
-            </label>
-            <input
-              type="number"
-              inputMode="numeric"
-              min="0"
-              max="480"
-              value={duration}
-              onChange={(e) => setDuration(e.target.value)}
-              placeholder="Např. 45"
-              className="w-full bg-slate-700 text-white p-3 rounded-xl border border-slate-600 focus:border-blue-500 outline-none"
-            />
-            {duration && Number(duration) > 0 && (
-              <span className="text-xs text-slate-500 mt-1 block">
-                = {Math.floor(Number(duration) / 60)}h {Number(duration) % 60}min
-              </span>
-            )}
-          </div>
-
-          {/* PIN Verification */}
-          <div>
-            <label className="text-sm text-slate-400 mb-1.5 flex items-center gap-2">
-              🔒 PIN pro potvrzení <span className="text-red-400">*</span>
-            </label>
-            <input
-              type="password"
-              inputMode="numeric"
-              maxLength={4}
-              value={pin}
-              onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
-              placeholder="4 číslice"
-              className="w-full bg-slate-700 text-white p-3 rounded-xl border border-slate-600 focus:border-blue-500 outline-none text-center text-2xl tracking-[0.5em] font-mono"
-            />
-            <span className="text-[11px] text-slate-600 mt-1 block">Potvrzuji dokončení zadáním PINu</span>
-          </div>
-
-          {/* Error */}
-          {error && isValid && (
-            <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-red-400 text-sm">
-              {error}
-            </div>
+      {/* Resolution — POVINNÉ (custom kvůli character counter) */}
+      <div className="mb-4">
+        <label className="block text-sm text-slate-400 font-medium mb-1.5">
+          <FileText className="w-4 h-4 inline mr-1" />
+          Popis řešení <span className="text-red-400">*</span>
+        </label>
+        <textarea
+          value={resolution}
+          onChange={(e) => {
+            setResolution(e.target.value);
+            if (e.target.value.trim().length >= 5) setError('');
+          }}
+          placeholder="Co jste udělali? Jaký díl jste vyměnili? Co bylo příčinou?"
+          rows={3}
+          autoFocus
+          className={`w-full px-4 py-3 rounded-xl bg-white/5 border text-white text-[15px] placeholder-slate-600 focus:outline-none transition resize-none min-h-[48px] ${
+            error && !isValid
+              ? 'border-red-500 focus:border-red-400'
+              : 'border-white/10 focus:border-orange-500/50'
+          }`}
+        />
+        <div className="flex justify-between mt-1">
+          {error && !isValid ? (
+            <span className="text-xs text-red-400">{error}</span>
+          ) : (
+            <span className="text-xs text-slate-500">Min. 5 znaků</span>
           )}
-
-          {/* Submit */}
-          <button
-            onClick={handleSubmit}
-            disabled={saving}
-            className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold disabled:opacity-50 flex items-center justify-center gap-2 transition"
-          >
-            {saving ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <CheckCircle2 className="w-5 h-5" />
-            )}
-            {saving ? 'Ukládám...' : 'Dokončit a uzavřít'}
-          </button>
+          <span className={`text-xs ${resolution.trim().length >= 5 ? 'text-emerald-400' : 'text-slate-500'}`}>
+            {resolution.trim().length}/5
+          </span>
         </div>
       </div>
-    </div>
+
+      {/* Assignee */}
+      <FormField
+        label="Provedl"
+        value={assignee}
+        onChange={setAssignee}
+        type="select"
+        required
+        options={ASSIGNEE_OPTIONS}
+      />
+
+      {/* Duration */}
+      <div className="mb-4">
+        <label className="block text-sm text-slate-400 font-medium mb-1.5">
+          <Clock className="w-4 h-4 inline mr-1" />
+          Čas práce v minutách <span className="text-slate-600">(volitelné)</span>
+        </label>
+        <input
+          type="number"
+          inputMode="numeric"
+          min="0"
+          max="480"
+          value={duration}
+          onChange={(e) => setDuration(e.target.value)}
+          placeholder="Např. 45"
+          className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-[15px] placeholder-slate-600 focus:outline-none focus:border-orange-500/50 transition min-h-[48px]"
+        />
+        {duration && Number(duration) > 0 && (
+          <span className="text-xs text-slate-500 mt-1 block">
+            = {Math.floor(Number(duration) / 60)}h {Number(duration) % 60}min
+          </span>
+        )}
+      </div>
+
+      {/* PIN Verification */}
+      <div className="mb-4">
+        <label className="block text-sm text-slate-400 font-medium mb-1.5">
+          PIN pro potvrzení <span className="text-red-400">*</span>
+        </label>
+        <input
+          type="password"
+          inputMode="numeric"
+          maxLength={4}
+          value={pin}
+          onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+          placeholder="4 číslice"
+          className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-[15px] placeholder-slate-600 focus:outline-none focus:border-orange-500/50 transition text-center text-2xl tracking-[0.5em] font-mono min-h-[48px]"
+        />
+        <span className="text-[11px] text-slate-600 mt-1 block">Potvrzuji dokončení zadáním PINu</span>
+      </div>
+
+      {/* Error */}
+      {error && isValid && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-red-400 text-sm mb-4">
+          {error}
+        </div>
+      )}
+
+      {/* Footer */}
+      <FormFooter
+        onCancel={onClose}
+        onSubmit={handleSubmit}
+        submitLabel="Dokončit a uzavřít"
+        loading={saving}
+        color="green"
+      />
+    </BottomSheet>
   );
 }

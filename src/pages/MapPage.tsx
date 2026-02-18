@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { useAuthContext } from '../context/AuthContext';
 import { createTask } from '../services/taskService';
-import BottomSheet from '../components/ui/BottomSheet';
+import BottomSheet, { FormField, FormFooter } from '../components/ui/BottomSheet';
 import EmptyState from '../components/ui/EmptyState';
 import {
   EntityCardFull,
@@ -1146,55 +1146,29 @@ export default function MapPage() {
 
       {/* Edit Asset Modal */}
       <BottomSheet
-        title={`✏️ Upravit: ${editingAsset?.name || ''}`}
+        title={`Upravit: ${editingAsset?.name || ''}`}
         isOpen={editingAsset !== null}
         onClose={() => setEditingAsset(null)}
       >
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm text-slate-400 font-medium mb-1.5">Název</label>
-            <input
-              type="text"
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-[15px] placeholder-slate-600 focus:outline-none focus:border-orange-500/50 transition"
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-slate-400 font-medium mb-1.5">Stav</label>
-            <div className="grid grid-cols-3 gap-2">
-              {([
-                { id: 'operational', label: 'V provozu', color: 'emerald' },
-                { id: 'maintenance', label: 'Údržba', color: 'amber' },
-                { id: 'breakdown', label: 'Porucha', color: 'red' },
-              ] as const).map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => setEditStatus(s.id)}
-                  className={`py-2.5 rounded-xl text-sm font-semibold border transition ${
-                    editStatus === s.id
-                      ? `bg-${s.color}-500/20 border-${s.color}-500/40 text-${s.color}-400`
-                      : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'
-                  }`}
-                  style={editStatus === s.id ? {
-                    backgroundColor: s.color === 'emerald' ? 'rgba(16,185,129,0.2)' : s.color === 'amber' ? 'rgba(245,158,11,0.2)' : 'rgba(239,68,68,0.2)',
-                    borderColor: s.color === 'emerald' ? 'rgba(16,185,129,0.4)' : s.color === 'amber' ? 'rgba(245,158,11,0.4)' : 'rgba(239,68,68,0.4)',
-                    color: s.color === 'emerald' ? '#34d399' : s.color === 'amber' ? '#fbbf24' : '#f87171',
-                  } : undefined}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <button
-            onClick={handleEditSave}
-            disabled={!editName.trim() || editSaving}
-            className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold text-base active:scale-[0.98] transition-all disabled:opacity-50"
-          >
-            {editSaving ? 'Ukládám...' : 'Uložit změny'}
-          </button>
-        </div>
+        <FormField label="Název" value={editName} onChange={setEditName} required autoFocus />
+        <FormField
+          label="Stav"
+          value={editStatus}
+          onChange={setEditStatus}
+          type="chips"
+          options={[
+            { value: 'operational', label: 'V provozu' },
+            { value: 'maintenance', label: 'Údržba' },
+            { value: 'breakdown', label: 'Porucha' },
+          ]}
+        />
+        <FormFooter
+          onCancel={() => setEditingAsset(null)}
+          onSubmit={handleEditSave}
+          submitLabel="Uložit změny"
+          loading={editSaving}
+          disabled={!editName.trim()}
+        />
       </BottomSheet>
 
       {/* [+] Add Modal */}
@@ -1207,105 +1181,89 @@ export default function MapPage() {
         isOpen={showAddModal !== null}
         onClose={() => { setShowAddModal(null); setAddName(''); setAddCode(''); setAddError(''); }}
       >
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm text-slate-400 font-medium mb-1.5">
-              Název <span className="text-red-400">*</span>
-            </label>
-            <input
-              type="text"
-              value={addName}
-              onChange={(e) => setAddName(e.target.value)}
-              placeholder={
-                showAddModal === 'building' ? 'Např. F — Expedice' :
-                showAddModal === 'room' ? 'Např. Míchárna' : 'Např. Extruder XL-400'
-              }
-              className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-[15px] placeholder-slate-600 focus:outline-none focus:border-orange-500/50 transition"
-            />
+        <FormField
+          label="Název"
+          value={addName}
+          onChange={setAddName}
+          placeholder={
+            showAddModal === 'building' ? 'Např. F — Expedice' :
+            showAddModal === 'room' ? 'Např. Míchárna' : 'Např. Extruder XL-400'
+          }
+          required
+          autoFocus
+        />
+        <FormField label="Kód" value={addCode} onChange={setAddCode} placeholder="Např. EXT-005" />
+        {addError && (
+          <div className="p-2.5 bg-red-500/20 border border-red-500/30 rounded-xl text-red-300 text-sm text-center">
+            {addError}
           </div>
-          <div>
-            <label className="block text-sm text-slate-400 font-medium mb-1.5">Kód</label>
-            <input
-              type="text"
-              value={addCode}
-              onChange={(e) => setAddCode(e.target.value)}
-              placeholder="Např. EXT-005"
-              className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-[15px] placeholder-slate-600 focus:outline-none focus:border-orange-500/50 transition"
-            />
-          </div>
-          {addError && (
-            <div className="p-2.5 bg-red-500/20 border border-red-500/30 rounded-xl text-red-300 text-sm text-center">
-              {addError}
-            </div>
-          )}
-          <button
-            onClick={async () => {
-              const name = addName.trim();
-              if (!name) return;
+        )}
+        <FormFooter
+          onCancel={() => { setShowAddModal(null); setAddName(''); setAddCode(''); setAddError(''); }}
+          onSubmit={async () => {
+            const name = addName.trim();
+            if (!name) return;
 
-              // Validate building code for building modal
-              if (showAddModal === 'building') {
-                const code = addCode.trim() || name.charAt(0).toUpperCase();
-                if (code.length > 5) {
-                  setAddError('Kód budovy max 5 znaků.');
-                  return;
-                }
+            if (showAddModal === 'building') {
+              const code = addCode.trim() || name.charAt(0).toUpperCase();
+              if (code.length > 5) {
+                setAddError('Kód budovy max 5 znaků.');
+                return;
               }
+            }
 
-              setAddSaving(true);
+            setAddSaving(true);
+            setAddError('');
+            try {
+              if (showAddModal === 'asset' && selectedBuildingId) {
+                await addDoc(collection(db, 'assets'), {
+                  name,
+                  code: addCode.trim() || undefined,
+                  buildingId: selectedBuildingId,
+                  areaName: selectedRoomName || 'Ostatní',
+                  status: 'operational',
+                  category: '',
+                  createdAt: serverTimestamp(),
+                  updatedAt: serverTimestamp(),
+                });
+              } else if (showAddModal === 'room' && selectedBuildingId) {
+                await addDoc(collection(db, 'assets'), {
+                  name: `${name} — placeholder`,
+                  code: addCode.trim() || undefined,
+                  buildingId: selectedBuildingId,
+                  areaName: name,
+                  status: 'idle',
+                  category: '',
+                  createdAt: serverTimestamp(),
+                  updatedAt: serverTimestamp(),
+                });
+              } else if (showAddModal === 'building') {
+                const buildingCode = addCode.trim() || name.charAt(0).toUpperCase();
+                await addDoc(collection(db, 'assets'), {
+                  name: `${name} — placeholder`,
+                  code: '',
+                  buildingId: buildingCode,
+                  areaName: 'Hlavní',
+                  status: 'idle',
+                  category: '',
+                  createdAt: serverTimestamp(),
+                  updatedAt: serverTimestamp(),
+                });
+              }
+              setShowAddModal(null);
+              setAddName('');
+              setAddCode('');
               setAddError('');
-              try {
-                if (showAddModal === 'asset' && selectedBuildingId) {
-                  await addDoc(collection(db, 'assets'), {
-                    name,
-                    code: addCode.trim() || undefined,
-                    buildingId: selectedBuildingId,
-                    areaName: selectedRoomName || 'Ostatní',
-                    status: 'operational',
-                    category: '',
-                    createdAt: serverTimestamp(),
-                    updatedAt: serverTimestamp(),
-                  });
-                } else if (showAddModal === 'room' && selectedBuildingId) {
-                  await addDoc(collection(db, 'assets'), {
-                    name: `${name} — placeholder`,
-                    code: addCode.trim() || undefined,
-                    buildingId: selectedBuildingId,
-                    areaName: name,
-                    status: 'idle',
-                    category: '',
-                    createdAt: serverTimestamp(),
-                    updatedAt: serverTimestamp(),
-                  });
-                } else if (showAddModal === 'building') {
-                  const buildingCode = addCode.trim() || name.charAt(0).toUpperCase();
-                  await addDoc(collection(db, 'assets'), {
-                    name: `${name} — placeholder`,
-                    code: '',
-                    buildingId: buildingCode,
-                    areaName: 'Hlavní',
-                    status: 'idle',
-                    category: '',
-                    createdAt: serverTimestamp(),
-                    updatedAt: serverTimestamp(),
-                  });
-                }
-                setShowAddModal(null);
-                setAddName('');
-                setAddCode('');
-                setAddError('');
-              } catch (err) {
-                console.error('[MapPage] Add failed:', err);
-                setAddError('Nepodařilo se uložit. Zkuste to znovu.');
-              }
-              setAddSaving(false);
-            }}
-            disabled={!addName.trim() || addSaving}
-            className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold text-base active:scale-[0.98] transition-all disabled:opacity-50"
-          >
-            {addSaving ? 'Ukládám...' : 'Přidat'}
-          </button>
-        </div>
+            } catch (err) {
+              console.error('[MapPage] Add failed:', err);
+              setAddError('Nepodařilo se uložit. Zkuste to znovu.');
+            }
+            setAddSaving(false);
+          }}
+          submitLabel="Přidat"
+          loading={addSaving}
+          disabled={!addName.trim()}
+        />
       </BottomSheet>
     </div>
   );

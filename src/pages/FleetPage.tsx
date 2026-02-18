@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useReports } from '../hooks/useReports';
 import ImportModal from '../components/ui/ImportModal';
+import BottomSheet, { FormField, FormFooter } from '../components/ui/BottomSheet';
 
 // ═══════════════════════════════════════════
 // TOAST SYSTEM
@@ -190,7 +191,6 @@ function AddVehicleModal({ onClose, onSuccess }: { onClose: () => void; onSucces
       const vehicleName = name.trim();
       const vehicleCode = spz.trim().replace(/\s+/g, '-').toUpperCase() || vehicleName.substring(0, 3).toUpperCase() + '-NEW';
 
-      // Write to entities collection (FleetPage realtime)
       await addDoc(collection(db, 'entities'), {
         parentId: 'entity_fleet',
         type: 'vehicle',
@@ -218,7 +218,6 @@ function AddVehicleModal({ onClose, onSuccess }: { onClose: () => void; onSucces
         isDeleted: false,
       });
 
-      // Also write to fleet collection (Dashboard useFleet compatibility)
       await addDoc(collection(db, 'fleet'), {
         name: vehicleName,
         type: 'car' as const,
@@ -244,47 +243,31 @@ function AddVehicleModal({ onClose, onSuccess }: { onClose: () => void; onSucces
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 z-50 flex items-end md:items-center justify-center" onClick={onClose}>
-      <div className="bg-slate-900 rounded-t-3xl md:rounded-3xl w-full max-w-md border border-slate-700/50" onClick={(e) => e.stopPropagation()}>
-        <div className="p-4 border-b border-slate-700/50 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-white flex items-center gap-2"><Plus className="w-5 h-5 text-blue-400" />Přidat vozidlo</h2>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-800 min-w-[44px] min-h-[44px] flex items-center justify-center"><X className="w-5 h-5 text-slate-400" /></button>
-        </div>
-        <div className="p-4 space-y-4">
-          <div>
-            <label className="text-xs text-slate-500 mb-1 block">Název vozidla *</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Např. Toyota Hilux" autoFocus
-              className="w-full p-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-slate-500 outline-none focus:border-blue-500 min-h-[48px]" />
-          </div>
-          <div>
-            <label className="text-xs text-slate-500 mb-1 block">SPZ</label>
-            <input value={spz} onChange={(e) => setSpz(e.target.value)} placeholder="1J5 1234"
-              className="w-full p-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-slate-500 outline-none focus:border-blue-500 min-h-[48px]" />
-          </div>
-          <div>
-            <label className="text-xs text-slate-500 mb-1 block">STK platnost</label>
-            <input type="date" value={stkDate} onChange={(e) => setStkDate(e.target.value)}
-              className="w-full p-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white outline-none focus:border-blue-500 min-h-[48px]" />
-          </div>
-          <div>
-            <label className="text-xs text-slate-500 mb-1 block">Palivo</label>
-            <div className="grid grid-cols-4 gap-2">
-              {['Nafta', 'Benzín', 'Elektro', 'LPG'].map((f) => (
-                <button key={f} onClick={() => setFuel(f)}
-                  className={`py-2.5 rounded-xl text-sm font-medium border transition min-h-[44px] ${
-                    fuel === f ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' : 'bg-slate-700/30 text-slate-400 border-slate-600/30'
-                  }`}>{f}</button>
-              ))}
-            </div>
-          </div>
-          <button onClick={handleSave} disabled={!name.trim() || saving}
-            className="w-full py-3.5 bg-blue-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-500 disabled:opacity-50 min-h-[48px]">
-            {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-            Uložit vozidlo
-          </button>
-        </div>
-      </div>
-    </div>
+    <BottomSheet title="Přidat vozidlo" isOpen onClose={onClose}>
+      <FormField label="Název vozidla" value={name} onChange={setName} placeholder="Např. Toyota Hilux" required autoFocus />
+      <FormField label="SPZ" value={spz} onChange={setSpz} placeholder="1J5 1234" />
+      <FormField label="STK platnost" value={stkDate} onChange={setStkDate} type="date" />
+      <FormField
+        label="Palivo"
+        value={fuel}
+        onChange={setFuel}
+        type="chips"
+        options={[
+          { value: 'Nafta', label: 'Nafta' },
+          { value: 'Benzín', label: 'Benzín' },
+          { value: 'Elektro', label: 'Elektro' },
+          { value: 'LPG', label: 'LPG' },
+        ]}
+      />
+      <FormFooter
+        onCancel={onClose}
+        onSubmit={handleSave}
+        submitLabel="Uložit vozidlo"
+        loading={saving}
+        disabled={!name.trim()}
+        color="blue"
+      />
+    </BottomSheet>
   );
 }
 

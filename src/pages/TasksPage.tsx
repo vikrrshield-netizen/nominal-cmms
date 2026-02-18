@@ -22,7 +22,7 @@ import { useReports } from '../hooks/useReports';
 
 import FAB from '../components/ui/FAB';
 import EmptyState from '../components/ui/EmptyState';
-import BottomSheet, { FormField, SubmitButton } from '../components/ui/BottomSheet';
+import BottomSheet, { FormField, FormFooter } from '../components/ui/BottomSheet';
 
 // ═══════════════════════════════════════════════════
 // TYPES
@@ -426,7 +426,13 @@ export default function TasksPage() {
             { value: 'P4', label: 'P4 — Nápad' },
           ]}
         />
-        <SubmitButton label="Vytvořit úkol" onClick={handleCreateTask} loading={saving} />
+        <FormFooter
+          onCancel={() => setShowNewTask(false)}
+          onSubmit={handleCreateTask}
+          submitLabel="Vytvořit úkol"
+          loading={saving}
+          disabled={!form.title.trim()}
+        />
       </BottomSheet>
 
       {/* Complete Task Modal */}
@@ -559,7 +565,13 @@ function EditTaskSheet({ task, onClose, onSave }: {
           { value: 'Vilém', label: 'Vilém' },
         ]}
       />
-      <SubmitButton label={saving ? 'Ukládám...' : 'Uložit změny'} onClick={handleSave} loading={saving} />
+      <FormFooter
+        onCancel={onClose}
+        onSubmit={handleSave}
+        submitLabel="Uložit změny"
+        loading={saving}
+        disabled={!title.trim()}
+      />
     </BottomSheet>
   );
 }
