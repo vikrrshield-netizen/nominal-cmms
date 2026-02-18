@@ -252,30 +252,24 @@ function SemaphoreWidget({ stats, wasteRed }: {
   stats: { breakdownAssets: number; criticalTasks: number; maintenanceAssets: number };
   wasteRed: number;
 }) {
+  const criticalTotal = stats.breakdownAssets + stats.criticalTasks;
   const items = [
     {
-      label: 'Stroje v poruše',
-      value: stats.breakdownAssets,
-      color: stats.breakdownAssets > 0 ? 'bg-red-500' : 'bg-emerald-500',
-      textColor: stats.breakdownAssets > 0 ? 'text-red-400' : 'text-emerald-400',
-      bgColor: stats.breakdownAssets > 0 ? 'bg-red-500/10 border-red-500/30' : 'bg-emerald-500/10 border-emerald-500/30',
+      label: 'Kritické',
+      value: criticalTotal,
+      color: criticalTotal > 0 ? 'bg-red-500' : 'bg-emerald-500',
+      textColor: criticalTotal > 0 ? 'text-red-400' : 'text-emerald-400',
+      bgColor: criticalTotal > 0 ? 'bg-red-500/10 border-red-500/30' : 'bg-emerald-500/10 border-emerald-500/30',
     },
     {
-      label: 'Aktivní havárie',
-      value: stats.criticalTasks,
-      color: stats.criticalTasks > 0 ? 'bg-red-500' : 'bg-emerald-500',
-      textColor: stats.criticalTasks > 0 ? 'text-red-400' : 'text-emerald-400',
-      bgColor: stats.criticalTasks > 0 ? 'bg-red-500/10 border-red-500/30' : 'bg-emerald-500/10 border-emerald-500/30',
-    },
-    {
-      label: 'V údržbě',
+      label: 'Údržba',
       value: stats.maintenanceAssets,
       color: stats.maintenanceAssets > 0 ? 'bg-amber-500' : 'bg-emerald-500',
       textColor: stats.maintenanceAssets > 0 ? 'text-amber-400' : 'text-emerald-400',
       bgColor: stats.maintenanceAssets > 0 ? 'bg-amber-500/10 border-amber-500/30' : 'bg-emerald-500/10 border-emerald-500/30',
     },
     {
-      label: 'Odpady (červený)',
+      label: 'Odpady',
       value: wasteRed,
       color: wasteRed > 0 ? 'bg-orange-500' : 'bg-emerald-500',
       textColor: wasteRed > 0 ? 'text-orange-400' : 'text-emerald-400',
@@ -284,19 +278,16 @@ function SemaphoreWidget({ stats, wasteRed }: {
   ];
 
   return (
-    <div className="bg-slate-800/60 rounded-2xl p-4 border border-slate-700/50 mb-4">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Semafor závodu</h2>
-      </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {items.map((item) => (
-          <div key={item.label} className={`rounded-xl p-3 border ${item.bgColor} text-center`}>
-            <div className={`w-4 h-4 rounded-full mx-auto mb-2 ${item.color} ${item.value > 0 ? 'animate-pulse' : ''}`} />
-            <div className={`text-2xl font-bold ${item.textColor}`}>{item.value}</div>
-            <div className="text-[10px] text-slate-500 mt-1">{item.label}</div>
+    <div className="grid grid-cols-3 gap-1 mb-4">
+      {items.map((item) => (
+        <div key={item.label} className={`rounded-xl p-1 border ${item.bgColor} text-center`}>
+          <div className="flex items-center justify-center gap-1.5">
+            <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${item.color} ${item.value > 0 ? 'animate-pulse' : ''}`} />
+            <span className={`text-lg font-bold leading-none ${item.textColor}`}>{item.value}</span>
           </div>
-        ))}
-      </div>
+          <div className="text-[9px] text-slate-500 mt-0.5">{item.label}</div>
+        </div>
+      ))}
     </div>
   );
 }

@@ -497,7 +497,12 @@ const DEMO_MACHINE_LOGS: EntityLogEntry[] = [
 // ═══════════════════════════════════════════════
 // ASSET DETAIL SHEET — Matryoshka EntityCard style
 // ═══════════════════════════════════════════════
-function AssetDetailSheet({ asset, onClose }: { asset: Asset; onClose: () => void }) {
+function AssetDetailSheet({ asset, onClose, onCreateTask, onReport }: {
+  asset: Asset;
+  onClose: () => void;
+  onCreateTask: (asset: Asset) => void;
+  onReport: (asset: Asset) => void;
+}) {
   const entity = useMemo(() => assetToEntity(asset), [asset]);
   const logs = useMemo(() => DEMO_MACHINE_LOGS.map((l) => ({ ...l, entityId: asset.id })), [asset.id]);
 
@@ -527,11 +532,17 @@ function AssetDetailSheet({ asset, onClose }: { asset: Asset; onClose: () => voi
 
       {/* Action buttons */}
       <div className="grid grid-cols-2 gap-2 mt-4">
-        <button className="py-3 rounded-xl bg-red-500/15 border border-red-500/30 text-red-400 text-sm font-semibold active:scale-95 transition flex items-center justify-center gap-2 min-h-[48px]">
+        <button
+          onClick={(e) => { e.stopPropagation(); onReport(asset); }}
+          className="py-3 rounded-xl bg-red-500/15 border border-red-500/30 text-red-400 text-sm font-semibold active:scale-95 transition flex items-center justify-center gap-2 min-h-[48px]"
+        >
           <AlertTriangle className="w-4 h-4" />
           Nahlásit
         </button>
-        <button className="py-3 rounded-xl bg-blue-500/15 border border-blue-500/30 text-blue-400 text-sm font-semibold active:scale-95 transition flex items-center justify-center gap-2 min-h-[48px]">
+        <button
+          onClick={(e) => { e.stopPropagation(); onCreateTask(asset); }}
+          className="py-3 rounded-xl bg-blue-500/15 border border-blue-500/30 text-blue-400 text-sm font-semibold active:scale-95 transition flex items-center justify-center gap-2 min-h-[48px]"
+        >
           <Wrench className="w-4 h-4" />
           Úkol
         </button>
@@ -589,6 +600,7 @@ export default function MapPage() {
   const [addCode, setAddCode] = useState('');
   const [addSaving, setAddSaving] = useState(false);
   const [addError, setAddError] = useState('');
+  const { user } = useAuthContext();
 
   const { buildings } = useGroupedData(assets, selectedBuildingId);
 
@@ -663,6 +675,51 @@ export default function MapPage() {
   const getRoomCode = (buildingId: string, room: RoomGroup, index: number) => {
     const floorNum = room.floor?.match(/(\d)/)?.[1] || '1';
     return `${buildingId}${floorNum}.${String(index + 1).padStart(2, '0')}`;
+  };
+
+  // ── Machine action handlers ──
+  const handleNewTask = async (asset: Asset) => {
+    try {
+      await createTask({
+        title: `Úkol: ${asset.name}`,
+        description: `Vytvořeno z mapy areálu. Budova ${asset.buildingId}, ${asset.areaName || ''}`,
+        priority: 'P3',
+        type: 'corrective',
+        source: 'web',
+        buildingId: asset.buildingId,
+        assetId: asset.id,
+        assetName: asset.name,
+        createdById: user?.id || 'unknown',
+        createdByName: user?.displayName || 'Neznámý',
+      });
+      setSelectedAsset(null);
+    } catch (err) { console.error('[MapPage] createTask failed:', err); }
+  };
+
+  const handleReport = async (asset: Asset) => {
+    try {
+      await createTask({
+        title: `Porucha: ${asset.name}`,
+        description: `Nahlášeno z mapy areálu. Budova ${asset.buildingId}, ${asset.areaName || ''}`,
+        priority: 'P1',
+        type: 'corrective',
+        source: 'web',
+        buildingId: asset.buildingId,
+        assetId: asset.id,
+        assetName: asset.name,
+        createdById: user?.id || 'unknown',
+        createdByName: user?.displayName || 'Neznámý',
+      });
+      setSelectedAsset(null);
+    } catch (err) { console.error('[MapPage] report failed:', err); }
+  };
+
+  // FAB handler — opens add modal for current drill level
+  const handleFabClick = () => {
+    setSelectedAsset(null);
+    if (activeLevel === 'machines' || activeLevel === 'folder') setShowAddModal('asset');
+    else if (activeLevel === 'rooms') setShowAddModal('room');
+    else setShowAddModal('building');
   };
 
   // ── Navigation handlers ──
@@ -995,9 +1052,22 @@ export default function MapPage() {
         )}
       </div>
 
+      {/* FAB — Floating Add Button */}
+      <button
+        onClick={handleFabClick}
+        className="fixed bottom-24 right-4 z-50 w-14 h-14 bg-gradient-to-br from-orange-500 to-amber-500 rounded-2xl shadow-lg shadow-orange-500/30 flex items-center justify-center text-white active:scale-90 transition-all hover:shadow-xl hover:shadow-orange-500/40"
+      >
+        <Plus className="w-7 h-7" />
+      </button>
+
       {/* Asset detail */}
       {selectedAsset && (
-        <AssetDetailSheet asset={selectedAsset} onClose={() => setSelectedAsset(null)} />
+        <AssetDetailSheet
+          asset={selectedAsset}
+          onClose={() => setSelectedAsset(null)}
+          onCreateTask={handleNewTask}
+          onReport={handleReport}
+        />
       )}
 
       {/* [+] Add Modal */}
