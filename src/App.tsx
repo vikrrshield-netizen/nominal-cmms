@@ -26,6 +26,7 @@ import AIAssistantPage from './pages/AIAssistantPage';
 import NotificationsPage from './pages/NotificationsPage';
 import LouparnaPage from './pages/LouparnaPage';
 import InspectionsPage from './pages/InspectionsPage';
+import NoticeboardPage from './pages/NoticeboardPage';
 
 // ═══════════════════════════════════════════════════════════════════
 // PROTECTED ROUTE WRAPPER
@@ -74,6 +75,7 @@ function ProtectedRoutes() {
       <Route path="/louparna" element={<LouparnaPage />} />
       <Route path="/kiosk" element={<KioskPage />} />
       <Route path="/inspections" element={<InspectionsPage />} />
+      <Route path="/noticeboard" element={<NoticeboardPage />} />
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

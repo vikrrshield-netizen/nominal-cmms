@@ -306,17 +306,36 @@ export default function AssetCardPage() {
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex gap-2 mb-4">
+        {/* Primary Action Buttons */}
+        <div className="flex gap-2 mb-2">
+          {canEditAsset && (
+            <button
+              onClick={() => navigate(`/map`)}
+              className="flex-1 py-3 bg-slate-500/15 border border-slate-500/30 text-slate-300 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-500/25 transition active:scale-[0.97] min-h-[48px]"
+            >
+              <Settings className="w-5 h-5" />
+              Upravit
+            </button>
+          )}
           {canCreateTask && (
             <button
               onClick={() => setShowFaultModal(true)}
               className="flex-1 py-3 bg-red-500/15 border border-red-500/30 text-red-400 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-red-500/25 transition active:scale-[0.97] min-h-[48px]"
             >
               <AlertTriangle className="w-5 h-5" />
-              Nahlásit poruchu
+              Nahlásit
             </button>
           )}
+          <button
+            onClick={() => setActiveTab('info')}
+            className="flex-1 py-3 bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-indigo-500/25 transition active:scale-[0.97] min-h-[48px]"
+          >
+            <FileText className="w-5 h-5" />
+            Pasport
+          </button>
+        </div>
+        {/* Secondary Action Buttons */}
+        <div className="flex gap-2 mb-4">
           {canCreateTask && (
             <button
               onClick={() => setShowTaskModal(true)}
@@ -342,7 +361,7 @@ export default function AssetCardPage() {
               className="flex-1 py-3 bg-purple-500/15 border border-purple-500/30 text-purple-400 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-purple-500/25 transition active:scale-[0.97] min-h-[48px] disabled:opacity-50"
             >
               {prefilterSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Filter className="w-5 h-5" />}
-              Výměna předfiltru
+              Předfiltr
             </button>
           )}
         </div>
@@ -350,7 +369,7 @@ export default function AssetCardPage() {
         {/* Tabs */}
         <div className="flex gap-1 mb-4 border-b border-white/10 pb-2">
           {([
-            { key: 'info' as const, label: 'Informace' },
+            { key: 'info' as const, label: 'Pasport' },
             { key: 'tasks' as const, label: `Úkoly (${tasks.length})` },
             { key: 'revisions' as const, label: `Revize (${revisions.length})`, alert: expiredRevisions.length > 0 },
           ]).map((tab) => (

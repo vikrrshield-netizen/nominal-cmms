@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
 import { useFleet } from '../hooks/useFleet';
@@ -11,7 +11,7 @@ import { useRevisions } from '../hooks/useRevisions';
 import { useInspections } from '../hooks/useInspections';
 import {
   Settings, AlertTriangle, LogOut, Loader2, ClipboardCheck, Map,
-  X, Edit3, LayoutGrid, Play, CheckCircle2, Sparkles, Send,
+  X, Edit3, LayoutGrid, Play, CheckCircle2, Sparkles, Send, Filter,
 } from 'lucide-react';
 import { createTask, startTask, completeTask, subscribeToActiveTasks } from '../services/taskService';
 import appConfig from '../appConfig';
@@ -194,6 +194,7 @@ const TILE_DEFS: TileDef[] = [
   { id: 'reports',     icon: '📊', label: 'Reporty',          gradient: 'from-slate-500 to-gray-600' },
   { id: 'idea',        icon: '💡', label: 'Nápad',            gradient: 'from-violet-500 to-purple-600' },
   { id: 'request',     icon: '🔧', label: 'Požadavky',        gradient: 'from-sky-500 to-blue-600' },
+  { id: 'noticeboard', icon: '📌', label: 'Nástěnka',         gradient: 'from-teal-500 to-cyan-600' },
   { id: 'admin',       icon: '⚙️', label: 'Administrace',     gradient: 'from-gray-500 to-slate-600' },
 ];
 
@@ -406,7 +407,7 @@ function Top5TasksWidget() {
 // OPERATIONAL HUD — MTTR, MTBF, Work Type Distribution
 // ═══════════════════════════════════════════════════════
 
-function OperationalHUD() {
+function OperationalHUD({ onFilterToggle, hasActiveFilter }: { onFilterToggle: () => void; hasActiveFilter: boolean }) {
   const stats = useStats();
 
   if (stats.loading) return null;
@@ -437,10 +438,19 @@ function OperationalHUD() {
 
   return (
     <div className="bg-slate-800/60 rounded-2xl p-4 border border-slate-700/50 mb-4">
-      <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Operational HUD</h2>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Provozní přehled</h2>
+        <button
+          onClick={onFilterToggle}
+          className={`p-1.5 rounded-lg transition ${hasActiveFilter ? 'bg-orange-500/20 text-orange-400' : 'bg-white/5 text-slate-500 hover:text-white'}`}
+          title="Filtrovat"
+        >
+          <Filter className="w-4 h-4" />
+        </button>
+      </div>
 
       {/* KPI Row */}
-      <div className="grid grid-cols-4 gap-2 mb-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
         <div className="bg-white/[0.03] rounded-xl p-2.5 text-center border border-white/[0.06]">
           <div className="text-lg font-bold text-blue-400">{stats.activeTickets}</div>
           <div className="text-[9px] text-slate-500">Aktivní</div>
@@ -451,7 +461,7 @@ function OperationalHUD() {
         </div>
         <div className="bg-white/[0.03] rounded-xl p-2.5 text-center border border-white/[0.06]">
           <div className="text-lg font-bold text-amber-400">{formatDuration(stats.mttrMinutes)}</div>
-          <div className="text-[9px] text-slate-500">MTTR</div>
+          <div className="text-[9px] text-slate-500">Prům. doba opravy</div>
         </div>
         <div className="bg-white/[0.03] rounded-xl p-2.5 text-center border border-white/[0.06]">
           <div className="text-lg font-bold text-cyan-400">{formatDuration(stats.totalLaborMinutes)}</div>
@@ -462,7 +472,7 @@ function OperationalHUD() {
       {/* Work Type Distribution Bar */}
       {workTypes.length > 0 && (
         <div>
-          <div className="text-[10px] text-slate-500 uppercase font-bold mb-1.5">Typ práce</div>
+          <div className="text-[10px] text-slate-500 uppercase font-bold mb-1.5">Typ práce (Alibi)</div>
           <div className="h-3 flex rounded-full overflow-hidden mb-2">
             {workTypes.map(([type, count]) => (
               <div
@@ -522,7 +532,7 @@ function LemonListWidget() {
             <div className="flex-1 min-w-0">
               <div className="text-[13px] font-medium text-white truncate">{entry.assetName}</div>
               <div className="text-[10px] text-slate-500">
-                {entry.mtbfHours > 0 ? `MTBF: ${entry.mtbfHours}h` : 'MTBF: N/A'}
+                {entry.mtbfHours > 0 ? `Doba bez poruchy: ${entry.mtbfHours}h` : 'Doba bez poruchy: N/A'}
               </div>
             </div>
             <div className="text-right flex-shrink-0">
@@ -566,13 +576,22 @@ function FullDashboard() {
   const [config, setConfig] = useState<DashConfig>(() => loadDashConfig());
 
   // Quick action modals
-  const [activeModal, setActiveModal] = useState<'idea' | 'request' | 'waste' | 'ai' | null>(null);
+  const [activeModal, setActiveModal] = useState<'idea' | 'request' | 'waste' | 'ai' | 'fault' | null>(null);
   const [aiQuery, setAiQuery] = useState('');
   const [formText, setFormText] = useState('');
-  const [isAnonymous, setIsAnonymous] = useState(false);
+  const [isAnonymous, setIsAnonymous] = useState(true);
+  const [ideaName, setIdeaName] = useState('');
+  const [ideaPin, setIdeaPin] = useState('');
   const [requestType, setRequestType] = useState('tool');
+  const [requestDetail, setRequestDetail] = useState('');
   const [wasteType, setWasteType] = useState('plevy');
   const [saving, setSaving] = useState(false);
+  const [faultSeverity, setFaultSeverity] = useState<'low' | 'medium' | 'high'>('medium');
+  const [faultDescription, setFaultDescription] = useState('');
+  const [showHudFilter, setShowHudFilter] = useState(false);
+  const [hudFilterBuilding, setHudFilterBuilding] = useState('ALL');
+  const [hudFilterStatus, setHudFilterStatus] = useState('ALL');
+  const [hudFilterSeverity, setHudFilterSeverity] = useState('ALL');
 
   // Move tile (stable reorder — no drag & drop)
   const moveTile = (fromIdx: number, toIdx: number) => {
@@ -653,8 +672,9 @@ function FullDashboard() {
       case 'calendar': return { subtext: time.toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' }) };
       case 'ai': return { subtext: 'Asistent údržby' };
       case 'reports': return { subtext: 'Statistiky' };
-      case 'idea': return { subtext: 'Schránka důvěry' };
+      case 'idea': return { subtext: 'Zlepšení & nápady' };
       case 'request': return { subtext: 'Nářadí, materiál' };
+      case 'noticeboard': return { subtext: 'Týmové zprávy' };
       case 'admin': return { subtext: 'Uživatelé, role' };
       default: return {};
     }
@@ -664,12 +684,14 @@ function FullDashboard() {
   const handleTileClick = (tile: TileDef) => {
     if (isEditing) return;
     const routes: Record<string, string> = {
-      fault: '/kiosk', tasks: '/tasks', map: '/map', revisions: '/revisions',
+      tasks: '/tasks', map: '/map', revisions: '/revisions',
       inventory: '/inventory', waste: '/waste', fleet: '/fleet', louparna: '/louparna',
       inspections: '/inspections', calendar: '/calendar', reports: '/reports', admin: '/admin',
+      noticeboard: '/noticeboard',
     };
     if (routes[tile.id]) { navigate(routes[tile.id]); return; }
     if (tile.id === 'ai') { setActiveModal('ai'); setAiQuery(''); return; }
+    if (tile.id === 'fault') { setActiveModal('fault'); setFormText(''); setFaultDescription(''); setFaultSeverity('medium'); return; }
     if (tile.id === 'idea') setActiveModal('idea');
     else if (tile.id === 'request') setActiveModal('request');
   };
@@ -679,24 +701,50 @@ function FullDashboard() {
     if (!formText.trim() && activeModal !== 'waste') return;
     setSaving(true);
     try {
+      const identifiedName = !isAnonymous ? (ideaName.trim() || user?.displayName || 'Neznámý') : 'Anonymní';
       const baseTask = {
         createdById: isAnonymous ? 'anonymous' : (user?.id || 'unknown'),
-        createdByName: isAnonymous ? 'Anonymní' : (user?.displayName || 'Neznámý'),
+        createdByName: identifiedName,
         source: 'web' as const,
         priority: 'P3' as const,
       };
       if (activeModal === 'idea') {
         await createTask({ ...baseTask, title: formText.trim(), type: 'improvement' });
+        // Track engagement for identified submissions
+        if (!isAnonymous) {
+          try {
+            await addDoc(collection(db, 'user_engagement'), {
+              userId: user?.id || ideaPin.trim() || 'unknown',
+              userName: identifiedName,
+              type: 'idea',
+              ideaText: formText.trim(),
+              createdAt: serverTimestamp(),
+            });
+          } catch { /* engagement tracking is best-effort */ }
+        }
+      } else if (activeModal === 'fault') {
+        const severityMap: Record<string, string> = { low: 'P3', medium: 'P2', high: 'P1' };
+        await createTask({
+          ...baseTask,
+          title: formText.trim(),
+          description: faultDescription.trim() || undefined,
+          type: 'corrective',
+          priority: severityMap[faultSeverity] as any,
+        });
       } else if (activeModal === 'request') {
         const labels: Record<string, string> = { tool: 'Chybí nářadí', clothing: 'Chybí pracovní oděv', material: 'Chybí materiál' };
-        await createTask({ ...baseTask, title: `${labels[requestType]}: ${formText.trim()}`, type: 'preventive', priority: 'P3' });
+        await createTask({ ...baseTask, title: `${labels[requestType]}: ${formText.trim()}`, type: 'preventive', priority: 'P3', description: requestDetail.trim() || undefined });
       } else if (activeModal === 'waste') {
         const labels: Record<string, string> = { plevy: 'Vyvézt vůz (plevy)', popelnice: 'Plná popelnice', kontejner: 'Plný kontejner' };
         await createTask({ ...baseTask, title: labels[wasteType] + (formText.trim() ? ` — ${formText.trim()}` : ''), type: 'corrective', priority: 'P2' });
       }
       setActiveModal(null);
       setFormText('');
-      setIsAnonymous(false);
+      setIsAnonymous(true);
+      setIdeaName('');
+      setIdeaPin('');
+      setRequestDetail('');
+      setFaultDescription('');
     } catch (err) {
       console.error('[QuickAction]', err);
     }
@@ -767,14 +815,74 @@ function FullDashboard() {
               }}
               wasteRed={wasteStats.red ?? 0}
             />
-            <OperationalHUD />
+            <OperationalHUD
+              onFilterToggle={() => setShowHudFilter(!showHudFilter)}
+              hasActiveFilter={hudFilterBuilding !== 'ALL' || hudFilterStatus !== 'ALL' || hudFilterSeverity !== 'ALL'}
+            />
+            {/* HUD FILTER PANEL */}
+            {showHudFilter && (
+              <div className="bg-slate-800/80 rounded-2xl p-4 border border-orange-500/20 mb-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Filtry</span>
+                  <button
+                    onClick={() => { setHudFilterBuilding('ALL'); setHudFilterStatus('ALL'); setHudFilterSeverity('ALL'); }}
+                    className="text-[10px] text-orange-400 hover:text-orange-300 font-semibold"
+                  >
+                    Resetovat
+                  </button>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="text-[10px] text-slate-500 uppercase font-bold block mb-1">Budova</label>
+                    <select
+                      value={hudFilterBuilding}
+                      onChange={(e) => setHudFilterBuilding(e.target.value)}
+                      className="w-full px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white text-xs focus:outline-none focus:border-orange-500/50"
+                    >
+                      <option value="ALL">Vše</option>
+                      {['A', 'B', 'C', 'D', 'E', 'L'].map(b => (
+                        <option key={b} value={b}>{b}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-500 uppercase font-bold block mb-1">Stav</label>
+                    <select
+                      value={hudFilterStatus}
+                      onChange={(e) => setHudFilterStatus(e.target.value)}
+                      className="w-full px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white text-xs focus:outline-none focus:border-orange-500/50"
+                    >
+                      <option value="ALL">Vše</option>
+                      <option value="backlog">Backlog</option>
+                      <option value="planned">Plánováno</option>
+                      <option value="in_progress">Probíhá</option>
+                      <option value="paused">Pozastaveno</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-500 uppercase font-bold block mb-1">Závažnost</label>
+                    <select
+                      value={hudFilterSeverity}
+                      onChange={(e) => setHudFilterSeverity(e.target.value)}
+                      className="w-full px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white text-xs focus:outline-none focus:border-orange-500/50"
+                    >
+                      <option value="ALL">Vše</option>
+                      <option value="P1">P1 — Havárie</option>
+                      <option value="P2">P2 — Urgentní</option>
+                      <option value="P3">P3 — Běžná</option>
+                      <option value="P4">P4 — Nápad</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
             <Top5TasksWidget />
             <LemonListWidget />
           </>
         )}
 
-        {/* ═══ TILE GRID — 3 columns ═══ */}
-        <div className="grid grid-cols-3 gap-2.5">
+        {/* ═══ TILE GRID — 2 cols mobile, 3 cols tablet+ ═══ */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
           {visibleTiles.map((tile, idx) => {
             const data = getTileData(tile.id);
             return (
@@ -870,16 +978,50 @@ function FullDashboard() {
       </div>
 
       {/* ═══ MODALS (centered) ═══ */}
-      <BottomSheet title="💡 Nápad / Schránka důvěry" isOpen={activeModal === 'idea'} onClose={() => setActiveModal(null)}>
-        <div className="mb-3 flex items-center gap-3 p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl">
-          <input type="checkbox" checked={isAnonymous} onChange={(e) => setIsAnonymous(e.target.checked)} className="w-5 h-5 accent-purple-500" />
-          <span className="text-sm text-purple-300">Poslat anonymně</span>
-        </div>
-        <FormField label="Váš nápad nebo zpráva" value={formText} onChange={setFormText} type="textarea" placeholder="Co byste chtěli zlepšit?" required />
-        <SubmitButton label="Odeslat" onClick={handleSubmit} loading={saving} color="orange" />
+      {/* FAULT REPORT MODAL */}
+      <BottomSheet title="🚨 Nahlásit poruchu" isOpen={activeModal === 'fault'} onClose={() => setActiveModal(null)}>
+        <FormField label="Název poruchy" value={formText} onChange={setFormText} placeholder="Např. Nefunguje extruder č. 3" required />
+        <FormField label="Popis závady" value={faultDescription} onChange={setFaultDescription} type="textarea" placeholder="Detailní popis problému — co se děje, kdy to začalo, zvuky, vibrace..." />
+        <FormField label="Závažnost" value={faultSeverity} onChange={(v) => setFaultSeverity(v as any)} type="select"
+          options={[
+            { value: 'high', label: '🔴 Vysoká — Havárie (P1)' },
+            { value: 'medium', label: '🟡 Střední — Urgentní (P2)' },
+            { value: 'low', label: '🟢 Nízká — Běžná (P3)' },
+          ]}
+        />
+        <SubmitButton label="Nahlásit poruchu" onClick={handleSubmit} loading={saving} color="orange" />
       </BottomSheet>
 
-      <BottomSheet title="📦 Nový požadavek" isOpen={activeModal === 'request'} onClose={() => setActiveModal(null)}>
+      {/* IDEAS MODULE */}
+      <BottomSheet title="💡 Nápad na zlepšení" isOpen={activeModal === 'idea'} onClose={() => setActiveModal(null)}>
+        {/* Mode selector */}
+        <div className="flex gap-2 mb-4">
+          <button
+            onClick={() => setIsAnonymous(true)}
+            className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition ${isAnonymous ? 'bg-purple-600 text-white' : 'bg-white/5 text-slate-400 border border-white/10'}`}
+          >
+            🔒 Anonymně
+          </button>
+          <button
+            onClick={() => setIsAnonymous(false)}
+            className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition ${!isAnonymous ? 'bg-blue-600 text-white' : 'bg-white/5 text-slate-400 border border-white/10'}`}
+          >
+            👤 Se jménem
+          </button>
+        </div>
+        {/* Identified fields */}
+        {!isAnonymous && (
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            <FormField label="Jméno" value={ideaName} onChange={setIdeaName} placeholder="Vaše jméno" />
+            <FormField label="PIN (volitelný)" value={ideaPin} onChange={setIdeaPin} placeholder="1234" />
+          </div>
+        )}
+        <FormField label="Váš nápad" value={formText} onChange={setFormText} type="textarea" placeholder="Co byste chtěli zlepšit? Popište svůj nápad..." required />
+        <SubmitButton label="Odeslat nápad" onClick={handleSubmit} loading={saving} color="orange" />
+      </BottomSheet>
+
+      {/* REQUEST/ORDER MODULE */}
+      <BottomSheet title="📦 Objednat díl / Požadavek" isOpen={activeModal === 'request'} onClose={() => setActiveModal(null)}>
         <FormField label="Typ požadavku" value={requestType} onChange={setRequestType} type="select"
           options={[
             { value: 'tool', label: '🔧 Chybí nářadí' },
@@ -887,7 +1029,8 @@ function FullDashboard() {
             { value: 'material', label: '📦 Chybí materiál' },
           ]}
         />
-        <FormField label="Upřesnění" value={formText} onChange={setFormText} placeholder="Co přesně potřebujete?" required />
+        <FormField label="Co potřebujete" value={formText} onChange={setFormText} placeholder="Stručný popis" required />
+        <FormField label="Upřesnění objednávky" value={requestDetail} onChange={setRequestDetail} type="textarea" placeholder="Přesné rozměry, typ, katalogové číslo... Např. Ložisko 6204-2RS" />
         <SubmitButton label="Odeslat požadavek" onClick={handleSubmit} loading={saving} color="orange" />
       </BottomSheet>
 

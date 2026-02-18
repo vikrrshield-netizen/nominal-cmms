@@ -1138,12 +1138,15 @@ export default function MapPage() {
   };
 
   // Edit asset handler — opens edit modal
+  const [editRoom, setEditRoom] = useState('');
+
   const handleEdit = (asset: Asset) => {
     console.log('[MapPage] handleEdit triggered:', asset.id, asset.name);
     setSelectedAsset(null);
     setEditingAsset(asset);
     setEditName(asset.name);
     setEditStatus(asset.status);
+    setEditRoom(asset.areaName || '');
   };
 
   const handleEditSave = async () => {
@@ -1153,6 +1156,7 @@ export default function MapPage() {
       await updateDoc(doc(db, 'assets', editingAsset.id), {
         name: editName.trim(),
         status: editStatus,
+        areaName: editRoom.trim() || 'Ostatní',
         updatedAt: serverTimestamp(),
       });
       showToast('Změny uloženy', 'success');
@@ -1577,6 +1581,19 @@ export default function MapPage() {
         onClose={() => setEditingAsset(null)}
       >
         <FormField label="Název" value={editName} onChange={setEditName} required autoFocus />
+        <FormField
+          label="Místnost"
+          value={editRoom}
+          onChange={setEditRoom}
+          type="select"
+          options={[
+            ...Array.from(new Set(
+              assets
+                .filter(a => a.buildingId === editingAsset?.buildingId)
+                .map(a => a.areaName || 'Ostatní')
+            )).map(room => ({ value: room, label: room })),
+          ]}
+        />
         <FormField
           label="Stav"
           value={editStatus}

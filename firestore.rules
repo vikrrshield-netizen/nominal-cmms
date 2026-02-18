@@ -427,6 +427,26 @@ service cloud.firestore {
     }
 
     // ═══════════════════════════════════════════
+    // NOTICEBOARD — týmová nástěnka
+    // ═══════════════════════════════════════════
+    match /noticeboard/{msgId} {
+      allow read: if isAnyRole();
+      allow create: if isManagement();
+      allow update: if isManagement();
+      allow delete: if isSuperAdmin();
+    }
+
+    // ═══════════════════════════════════════════
+    // USER_ENGAGEMENT — sledování zapojení
+    // ═══════════════════════════════════════════
+    match /user_engagement/{docId} {
+      allow read: if isManagement();
+      allow create: if isAnyRole();
+      allow update: if false;
+      allow delete: if isSuperAdmin();
+    }
+
+    // ═══════════════════════════════════════════
     // CATCH-ALL — deny everything else
     // ═══════════════════════════════════════════
     match /{document=**} {

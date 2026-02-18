@@ -129,6 +129,7 @@ const TOP_LEVEL_COLLECTIONS = [
   'louparna_silos', 'louparna_production', 'louparna_waste', 'louparna_machines',
   'entities', 'blueprints', 'entity_logs',
   'areas', 'facilities', 'workLogs', 'purchase_orders', 'inventory_transactions',
+  'noticeboard', 'user_engagement',
 ] as const;
 
 const SUB_COLLECTIONS: Record<string, string[]> = {
