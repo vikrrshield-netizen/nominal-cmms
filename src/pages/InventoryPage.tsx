@@ -220,35 +220,38 @@ export default function InventoryPage() {
           ))}
         </div>
 
-        {/* Items List */}
-        <div className="bg-white rounded-xl border overflow-hidden">
-          {filteredItems.length === 0 ? (
-            <div className="p-8 text-center text-slate-500">
-              Žádné položky
-            </div>
-          ) : (
-            <div className="divide-y">
-              {filteredItems.map((item) => {
-                const statusCfg = STATUS_CONFIG[item.status as StockStatus] || STATUS_CONFIG.ok;
-                const category = CATEGORIES.find(c => c.id === item.category);
+        {/* Items Grid */}
+        {filteredItems.length === 0 ? (
+          <div className="p-8 text-center text-slate-500">
+            Žádné položky
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {filteredItems.map((item) => {
+              const statusCfg = STATUS_CONFIG[item.status as StockStatus] || STATUS_CONFIG.ok;
+              const category = CATEGORIES.find(c => c.id === item.category);
 
-                return (
+              return (
+                <div
+                  key={item.id}
+                  className="bg-slate-800/60 backdrop-blur-sm rounded-2xl border border-slate-700/50 flex flex-col overflow-hidden"
+                >
+                  {/* CLICKABLE BODY */}
                   <button
-                    key={item.id}
                     onClick={() => setSelectedItem(item)}
-                    className="w-full p-4 text-left hover:bg-slate-50 transition flex items-center gap-3"
+                    className="w-full p-4 text-left hover:bg-slate-700/40 transition flex items-center gap-3"
                   >
-                    <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-xl">
+                    <div className="w-10 h-10 rounded-lg bg-slate-700/50 flex items-center justify-center text-xl flex-shrink-0">
                       {category?.icon || '📦'}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="font-mono text-xs text-slate-400">{item.code}</span>
+                        <span className="font-mono text-xs text-slate-500">{item.code}</span>
                         <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${statusCfg.bgColor} ${statusCfg.color}`}>
                           {statusCfg.label}
                         </span>
                       </div>
-                      <h4 className="font-medium text-slate-800 truncate">{item.name}</h4>
+                      <h4 className="font-medium text-white truncate">{item.name}</h4>
                       <div className="text-xs text-slate-500 mt-1">
                         📍 {item.location}
                       </div>
@@ -257,13 +260,36 @@ export default function InventoryPage() {
                       <div className="text-xl font-bold">{item.quantity}</div>
                       <div className="text-xs">{item.unit}</div>
                     </div>
-                    <Edit2 className="w-4 h-4 text-slate-400 flex-shrink-0" />
                   </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
+                  {/* ACTION FOOTER */}
+                  <div className="border-t border-slate-700/30 px-4 py-2.5 flex items-center justify-end gap-2">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setSelectedItem(item); }}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 transition flex items-center gap-1.5 min-h-[32px]"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                      Upravit
+                    </button>
+                    {canManage && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm(`Opravdu smazat "${item.name}"?`)) {
+                            deleteDoc(doc(db, 'inventory', item.id));
+                          }
+                        }}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-500/10 text-red-400 hover:bg-red-500/20 transition flex items-center gap-1.5 min-h-[32px]"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Smazat
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Item Detail Modal */}

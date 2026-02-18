@@ -714,7 +714,32 @@ export default function FleetPage() {
         {sortedEntities.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {sortedEntities.map((entity) => (
-              <EntityCardCompact key={entity.id} entity={entity} blueprint={blueprint} onClick={() => setSelectedEntity(entity)} />
+              <div key={entity.id} className="flex flex-col">
+                <EntityCardCompact entity={entity} blueprint={blueprint} onClick={() => setSelectedEntity(entity)} />
+                {/* ACTION FOOTER */}
+                <div className="bg-slate-800/60 -mt-3 pt-5 pb-2.5 px-4 rounded-b-2xl border border-t-0 border-slate-700/50 flex items-center justify-end gap-2">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setSelectedEntity(entity); }}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 transition flex items-center gap-1.5 min-h-[32px]"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    Upravit
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (window.confirm(`Opravdu smazat ${entity.name}?`)) {
+                        deleteDoc(doc(db, 'entities', entity.id));
+                        toast(`${entity.name} smazáno`, 'info');
+                      }
+                    }}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-500/10 text-red-400 hover:bg-red-500/20 transition flex items-center gap-1.5 min-h-[32px]"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Smazat
+                  </button>
+                </div>
+              </div>
             ))}
           </div>
         ) : (

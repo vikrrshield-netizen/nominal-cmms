@@ -151,80 +151,75 @@ const TAB_OPTIONS: { key: FilterTab; label: string; color: string }[] = [
 ];
 
 // ═══════════════════════════════════════════════════
-// TABLE ROW
+// TASK CARD (standardized)
 // ═══════════════════════════════════════════════════
-function TaskRow({ task, onClick, onEdit, onDelete }: { task: Task; onClick: () => void; onEdit: () => void; onDelete: () => void }) {
+function TaskCard({ task, onClick, onEdit, onDelete }: { task: Task; onClick: () => void; onEdit: () => void; onDelete: () => void }) {
   const pc = PRIORITY_CONFIG[task.priority] || PRIORITY_CONFIG.P3;
   const sb = STATUS_BADGES[task.status] || STATUS_BADGES.backlog;
   const assignee = task.assignedToName || task.assignedTo || '—';
+  const initials = assignee !== '—' ? assignee.split(' ').filter(Boolean).map(w => w[0] || '').join('').slice(0, 2) || '?' : '?';
 
   return (
-    <tr
-      onClick={onClick}
-      className="border-t border-white/5 hover:bg-white/[0.04] cursor-pointer transition-colors active:bg-white/[0.08]"
-    >
-      {/* Kdo */}
-      <td className="px-2 py-2 sm:px-3 sm:py-3 w-[44px] sm:w-[100px]">
-        <div className="flex items-center gap-1.5">
-          <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-slate-700 flex items-center justify-center flex-shrink-0">
-            <span className="text-[9px] sm:text-[10px] font-bold text-slate-300">
-              {assignee !== '—' ? assignee.split(' ').filter(Boolean).map(w => w[0] || '').join('').slice(0, 2) || '?' : '?'}
+    <div className={`bg-slate-800/60 backdrop-blur-sm rounded-2xl border border-slate-700/50 flex flex-col overflow-hidden ${pc.borderLeft}`}>
+      {/* CLICKABLE BODY */}
+      <button
+        onClick={onClick}
+        className="w-full p-4 text-left hover:bg-slate-700/40 transition"
+      >
+        {/* HEADER: Priority + Status */}
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <span
+              className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+              style={{ background: `${pc.color}20`, color: pc.color }}
+            >
+              {task.priority}
+            </span>
+            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-lg ${sb.bg} ${sb.text}`}>
+              {sb.label}
             </span>
           </div>
-          <span className="text-[12px] text-slate-300 truncate hidden sm:block max-w-[80px]">{assignee}</span>
+          <span className="text-[11px] text-slate-500">{timeAgo(task.createdAt)}</span>
         </div>
-      </td>
 
-      {/* Co */}
-      <td className="px-2 py-2 sm:px-3 sm:py-3">
-        <div className="flex items-center gap-1.5">
-          <span
-            className="text-[9px] font-bold px-1 py-0.5 rounded flex-shrink-0"
-            style={{ background: `${pc.color}20`, color: pc.color }}
-          >
-            {task.priority}
-          </span>
-          <span className="text-[13px] font-medium text-white truncate">{task.title}</span>
-        </div>
-        {task.assetName && (
-          <div className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-1">
-            <Wrench className="w-3 h-3" /> {task.assetName}
+        {/* TITLE */}
+        <h4 className="text-sm font-semibold text-white mb-2 line-clamp-2">{task.title}</h4>
+
+        {/* BODY: Assignee + Asset */}
+        <div className="flex items-center gap-3 text-xs">
+          <div className="flex items-center gap-1.5">
+            <div className="w-5 h-5 rounded-full bg-slate-700 flex items-center justify-center flex-shrink-0">
+              <span className="text-[8px] font-bold text-slate-300">{initials}</span>
+            </div>
+            <span className="text-slate-400 truncate max-w-[120px]">{assignee}</span>
           </div>
-        )}
-      </td>
-
-      {/* Termín */}
-      <td className="px-2 py-2 sm:px-3 sm:py-3 text-[11px] text-slate-500 whitespace-nowrap w-[50px] sm:w-[70px]">
-        {timeAgo(task.createdAt)}
-      </td>
-
-      {/* Status */}
-      <td className="px-2 py-2 sm:px-3 sm:py-3 w-[70px] sm:w-[100px]">
-        <span className={`text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-lg whitespace-nowrap ${sb.bg} ${sb.text}`}>
-          {sb.label}
-        </span>
-      </td>
-
-      {/* Akce */}
-      <td className="px-1 py-2 sm:px-2 w-[56px]">
-        <div className="flex items-center gap-0.5">
-          <button
-            onClick={(e) => { e.stopPropagation(); onEdit(); }}
-            className="p-1.5 rounded-lg hover:bg-white/10 text-slate-500 hover:text-amber-400 transition"
-            title="Upravit"
-          >
-            <Edit2 className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); onDelete(); }}
-            className="p-1.5 rounded-lg hover:bg-white/10 text-slate-500 hover:text-red-400 transition"
-            title="Smazat"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
+          {task.assetName && (
+            <div className="flex items-center gap-1 text-slate-500">
+              <Wrench className="w-3 h-3" />
+              <span className="truncate max-w-[120px]">{task.assetName}</span>
+            </div>
+          )}
         </div>
-      </td>
-    </tr>
+      </button>
+
+      {/* ACTION FOOTER */}
+      <div className="border-t border-slate-700/30 px-4 py-2.5 flex items-center justify-end gap-2">
+        <button
+          onClick={(e) => { e.stopPropagation(); onEdit(); }}
+          className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 transition flex items-center gap-1.5 min-h-[32px]"
+        >
+          <Edit2 className="w-3.5 h-3.5" />
+          Upravit
+        </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-500/10 text-red-400 hover:bg-red-500/20 transition flex items-center gap-1.5 min-h-[32px]"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+          Smazat
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -373,7 +368,7 @@ export default function TasksPage() {
           <FilterChip label="P4" active={filterPriority === 'P4'} onClick={() => setFilterPriority(filterPriority === 'P4' ? null : 'P4')} color="#94a3b8" />
         </div>
 
-        {/* ═══ TABLE ═══ */}
+        {/* ═══ CARD GRID ═══ */}
         {loading ? (
           <div className="flex items-center justify-center py-12 text-slate-500">
             <Loader2 className="w-6 h-6 animate-spin mr-2" /> Načítám...
@@ -387,27 +382,14 @@ export default function TasksPage() {
             onAction={() => setShowNewTask(true)}
           />
         ) : (
-          <div className="overflow-x-auto rounded-2xl border border-white/10">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-slate-800/60">
-                  <th className="text-left px-3 py-2.5 text-[11px] text-slate-500 uppercase tracking-wider font-semibold">Kdo</th>
-                  <th className="text-left px-3 py-2.5 text-[11px] text-slate-500 uppercase tracking-wider font-semibold">Co</th>
-                  <th className="text-left px-3 py-2.5 text-[11px] text-slate-500 uppercase tracking-wider font-semibold">Termín</th>
-                  <th className="text-left px-3 py-2.5 text-[11px] text-slate-500 uppercase tracking-wider font-semibold">Status</th>
-                  <th className="w-[36px]"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredTasks.map((task) => (
-                  <TaskRow key={task.id} task={task} onClick={() => setCompletingTask(task)} onEdit={() => setEditingTask(task)} onDelete={async () => {
-                    if (window.confirm(`Smazat úkol "${task.title}"?`)) {
-                      await deleteDoc(doc(db, 'tasks', task.id));
-                    }
-                  }} />
-                ))}
-              </tbody>
-            </table>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {filteredTasks.map((task) => (
+              <TaskCard key={task.id} task={task} onClick={() => setCompletingTask(task)} onEdit={() => setEditingTask(task)} onDelete={async () => {
+                if (window.confirm(`Smazat úkol "${task.title}"?`)) {
+                  await deleteDoc(doc(db, 'tasks', task.id));
+                }
+              }} />
+            ))}
           </div>
         )}
       </div>
