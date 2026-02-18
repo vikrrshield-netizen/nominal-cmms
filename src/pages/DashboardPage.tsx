@@ -14,6 +14,7 @@ import {
   X, Edit3, LayoutGrid, Play, CheckCircle2, Sparkles, Send,
 } from 'lucide-react';
 import { createTask, startTask, completeTask, subscribeToActiveTasks } from '../services/taskService';
+import appConfig from '../appConfig';
 import type { TaskDoc } from '../types/firestore';
 import BottomSheet, { FormField, SubmitButton } from '../components/ui/BottomSheet';
 
@@ -91,7 +92,7 @@ function KioskDashboard() {
               <Settings className="w-7 h-7 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-white">Nominal<span className="text-blue-400">CMMS</span></h1>
+              <h1 className="text-2xl font-bold text-white">{appConfig.APP_NAME_SHORT}<span className="text-blue-400">CMMS</span></h1>
               <p className="text-slate-400 text-sm flex items-center gap-2">
                 <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
                 Kiosek
@@ -582,7 +583,7 @@ function FullDashboard() {
         {/* HEADER */}
         <div className="flex items-center justify-between mb-5">
           <div>
-            <div className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">NOMINAL CMMS</div>
+            <div className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">{appConfig.APP_NAME}</div>
             <h1 className="text-xl font-bold text-white mt-0.5">{greeting()}, {userName}</h1>
             <div className="text-xs text-slate-500 mt-0.5">
               {time.toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
@@ -763,7 +764,7 @@ function FullDashboard() {
       </BottomSheet>
 
       {/* AI ASSISTANT PLACEHOLDER */}
-      <BottomSheet title="Nominal AI" isOpen={activeModal === 'ai'} onClose={() => setActiveModal(null)}>
+      <BottomSheet title={`${appConfig.APP_NAME_SHORT} AI`} isOpen={activeModal === 'ai'} onClose={() => setActiveModal(null)}>
         <div className="flex items-center gap-3 p-4 mb-4 bg-gradient-to-r from-pink-500/10 to-purple-500/10 border border-pink-500/20 rounded-2xl">
           <Sparkles className="w-6 h-6 text-pink-400 flex-shrink-0" />
           <div>

@@ -4,6 +4,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuthContext } from './context/AuthContext';
 import { LoadingSpinner } from './components/ui';
+import ToastContainer from './components/ui/Toast';
 
 // Pages
 import LoginPage from './pages/LoginPage';
@@ -88,6 +89,7 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <ProtectedRoutes />
+        <ToastContainer />
       </AuthProvider>
     </BrowserRouter>
   );

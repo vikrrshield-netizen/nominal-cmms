@@ -4,6 +4,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../context/AuthContext';
+import appConfig from '../appConfig';
 import {
   Sparkles, Mic, MicOff, Send, ArrowLeft, Bot, User,
   AlertTriangle, Package, Calendar, FileText,
@@ -27,7 +28,7 @@ interface Message {
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
 
-const SYSTEM_PROMPT = `Jsi AI asistent NOMINAL CMMS — systému pro správu údržby potravinářského závodu v Kozlově.
+const SYSTEM_PROMPT = `Jsi AI asistent ${appConfig.APP_NAME} — systému pro správu údržby potravinářského závodu v Kozlově.
 Odpovídej VŽDY česky. Buď stručný a profesionální.
 
 MODULY SYSTÉMU:
@@ -58,7 +59,7 @@ async function callGeminiAPI(userMessage: string, history: Message[]): Promise<s
   try {
     const contents = [
       { role: 'user', parts: [{ text: SYSTEM_PROMPT }] },
-      { role: 'model', parts: [{ text: 'Rozumím, jsem AI asistent NOMINAL CMMS. Jak vám mohu pomoci?' }] },
+      { role: 'model', parts: [{ text: `Rozumím, jsem AI asistent ${appConfig.APP_NAME}. Jak vám mohu pomoci?` }] },
       ...history.slice(-10).map(m => ({
         role: m.role === 'user' ? 'user' : 'model',
         parts: [{ text: m.content }],
@@ -129,7 +130,7 @@ export default function AIAssistantPage() {
     {
       id: '0',
       role: 'assistant',
-      content: `Ahoj ${user?.displayName || 'uživateli'}! 👋 Jsem AI asistent pro NOMINAL CMMS. Můžu vám pomoct s hlášením poruch, kontrolou skladu, přehledem revizí a dalšími úkoly. Co potřebujete?`,
+      content: `Ahoj ${user?.displayName || 'uživateli'}! 👋 Jsem AI asistent pro ${appConfig.APP_NAME}. Můžu vám pomoct s hlášením poruch, kontrolou skladu, přehledem revizí a dalšími úkoly. Co potřebujete?`,
       timestamp: new Date(),
     }
   ]);

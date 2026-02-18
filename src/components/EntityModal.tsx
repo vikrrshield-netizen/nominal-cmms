@@ -1,15 +1,16 @@
 // src/components/EntityModal.tsx
-// NOMINAL CMMS — Jednotný "Pasport" entity
+// Jednotný "Pasport" entity
 // 4 taby: Rodný list | Návaznosti | Potřeby | Historie
 // Funguje pro Building, Room i Asset
 
 import { useState, useEffect, useMemo } from 'react';
 import { collection, query, where, onSnapshot, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import appConfig from '../appConfig';
 import {
   Building2, Layers, Wrench, Package, ClipboardList, Clock,
   ChevronRight, Edit2, AlertTriangle, Loader2, Save, X, FileText,
-  Download,
+  Download, Printer, ArrowLeft,
 } from 'lucide-react';
 
 // ═══════════════════════════════════════════════
@@ -20,14 +21,14 @@ export type EntityType = 'building' | 'room' | 'asset';
 
 export interface EntityModalData {
   type: EntityType;
-  id: string;               // buildingId ('D'), roomName, or asset.id
+  id: string;
   name: string;
-  buildingId: string;        // Always set
-  roomName?: string;         // Set for room and asset
+  buildingId: string;
+  roomName?: string;
   status?: string;
   code?: string;
   category?: string;
-  asset?: MapAsset;          // Full asset object for asset type
+  asset?: MapAsset;
 }
 
 export interface MapAsset {
@@ -39,6 +40,8 @@ export interface MapAsset {
   areaName?: string;
   category?: string;
   controlPoints?: string[];
+  motorHours?: number;
+  nextRevision?: string;
 }
 
 export interface BreadcrumbItem {
@@ -70,6 +73,9 @@ const BUILDING_NAMES: Record<string, string> = {
   A: 'Administrativa', B: 'Spojovací krček', C: 'Zázemí & Vedení',
   D: 'Výrobní hala', E: 'Dílna & Sklad ND', L: 'Loupárna',
 };
+
+const BUILDING_OPTIONS = Object.entries(BUILDING_NAMES).map(([k, v]) => ({ value: k, label: `${k} — ${v}` }));
+const STATUS_OPTIONS = Object.entries(STATUS_MAP).map(([k, v]) => ({ value: k, label: v.label }));
 
 // ═══════════════════════════════════════════════
 // TAB TYPE
@@ -105,12 +111,7 @@ function useChildAssets(data: EntityModalData) {
 
     const q = query(collection(db, 'assets'), ...constraints);
     const unsub = onSnapshot(q, (snap) => {
-      const items = snap.docs.map((d) => ({ id: d.id, ...d.data() } as MapAsset));
-      if (data.type === 'building') {
-        setAssets(items);
-      } else {
-        setAssets(items);
-      }
+      setAssets(snap.docs.map((d) => ({ id: d.id, ...d.data() } as MapAsset)));
       setLoading(false);
     }, () => setLoading(false));
     return () => unsub();
@@ -176,23 +177,57 @@ function useInventoryForAsset(assetName: string | undefined) {
 }
 
 // ═══════════════════════════════════════════════
+// LIVE ASSET HOOK — refresh data after edits
+// ═══════════════════════════════════════════════
+
+function useLiveAsset(assetId: string | undefined) {
+  const [liveAsset, setLiveAsset] = useState<MapAsset | null>(null);
+
+  useEffect(() => {
+    if (!assetId) return;
+    const unsub = onSnapshot(doc(db, 'assets', assetId), (snap) => {
+      if (snap.exists()) {
+        setLiveAsset({ id: snap.id, ...snap.data() } as MapAsset);
+      }
+    });
+    return () => unsub();
+  }, [assetId]);
+
+  return liveAsset;
+}
+
+// ═══════════════════════════════════════════════
 // ENTITY MODAL — MAIN COMPONENT
 // ═══════════════════════════════════════════════
 
 export default function EntityModal({ data, breadcrumbs, onClose, onNavigate, onBack }: EntityModalProps) {
   const [activeTab, setActiveTab] = useState<TabId>('passport');
-  const [editingField, setEditingField] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState('');
-  const [saving, setSaving] = useState(false);
+  const [showPdfPreview, setShowPdfPreview] = useState(false);
 
-  const { assets: childAssets, loading: assetsLoading } = useChildAssets(data);
-  const { tasks, loading: tasksLoading } = useEntityTasks(data);
-  const { revisions } = useEntityRevisions(data);
-  const { items: spareParts } = useInventoryForAsset(data.type === 'asset' ? data.name : undefined);
+  // Live asset for real-time edit updates
+  const liveAsset = useLiveAsset(data.type === 'asset' ? data.asset?.id : undefined);
+  const effectiveData = useMemo(() => {
+    if (!liveAsset || data.type !== 'asset') return data;
+    return {
+      ...data,
+      name: liveAsset.name,
+      code: liveAsset.code,
+      category: liveAsset.category,
+      status: liveAsset.status,
+      roomName: liveAsset.areaName,
+      buildingId: liveAsset.buildingId,
+      asset: liveAsset,
+    };
+  }, [data, liveAsset]);
+
+  const { assets: childAssets, loading: assetsLoading } = useChildAssets(effectiveData);
+  const { tasks, loading: tasksLoading } = useEntityTasks(effectiveData);
+  const { revisions } = useEntityRevisions(effectiveData);
+  const { items: spareParts } = useInventoryForAsset(effectiveData.type === 'asset' ? effectiveData.name : undefined);
 
   // Grouped rooms for building view
   const rooms = useMemo(() => {
-    if (data.type !== 'building') return [];
+    if (effectiveData.type !== 'building') return [];
     const roomMap = new Map<string, MapAsset[]>();
     childAssets.forEach((a) => {
       const key = a.areaName || 'Ostatní';
@@ -205,72 +240,15 @@ export default function EntityModal({ data, breadcrumbs, onClose, onNavigate, on
       worstStatus: roomAssets.some(a => a.status === 'breakdown') ? 'breakdown'
         : roomAssets.some(a => a.status === 'maintenance') ? 'maintenance' : 'operational',
     })).sort((a, b) => a.name.localeCompare(b.name, 'cs'));
-  }, [data.type, childAssets]);
+  }, [effectiveData.type, childAssets]);
 
   // Active/done tasks
   const activeTasks = tasks.filter((t: any) => t.status !== 'done' && t.status !== 'completed');
   const doneTasks = tasks.filter((t: any) => t.status === 'done' || t.status === 'completed');
 
   // Icon for entity type
-  const TypeIcon = data.type === 'building' ? Building2 : data.type === 'room' ? Layers : Wrench;
-  const st = STATUS_MAP[data.status || 'idle'] || STATUS_MAP.idle;
-
-  // Save inline edit (for asset fields)
-  const handleSaveField = async (field: string) => {
-    if (!data.asset || !editValue.trim()) return;
-    setSaving(true);
-    try {
-      await updateDoc(doc(db, 'assets', data.asset.id), {
-        [field]: editValue.trim(),
-        updatedAt: serverTimestamp(),
-      });
-      setEditingField(null);
-    } catch (err) {
-      console.error('[EntityModal] Save failed:', err);
-    }
-    setSaving(false);
-  };
-
-  // PDF export handler
-  const handleExportPDF = () => {
-    const w = window.open('', '_blank');
-    if (!w) return;
-
-    const passportFields = data.type === 'asset' ? [
-      { label: 'Kód', value: data.code || '—' },
-      { label: 'Budova', value: BUILDING_NAMES[data.buildingId] || data.buildingId },
-      { label: 'Místnost', value: data.roomName || '—' },
-      { label: 'Kategorie', value: data.category || '—' },
-      { label: 'Stav', value: st.label },
-    ] : data.type === 'room' ? [
-      { label: 'Budova', value: BUILDING_NAMES[data.buildingId] || data.buildingId },
-      { label: 'Místnost', value: data.name },
-      { label: 'Počet strojů', value: String(childAssets.length) },
-    ] : [
-      { label: 'Budova', value: data.name },
-      { label: 'Kód', value: data.buildingId },
-      { label: 'Místností', value: String(rooms.length) },
-      { label: 'Celkem strojů', value: String(childAssets.length) },
-    ];
-
-    const fieldsHtml = passportFields.map(f =>
-      `<tr><td style="padding:8px;border:1px solid #ddd;font-weight:600;background:#f8f9fa;width:140px">${f.label}</td><td style="padding:8px;border:1px solid #ddd">${f.value}</td></tr>`
-    ).join('');
-
-    const tasksHtml = activeTasks.slice(0, 15).map((t: any) =>
-      `<tr><td style="padding:6px;border:1px solid #ddd">${t.priority || '—'}</td><td style="padding:6px;border:1px solid #ddd">${t.title}</td><td style="padding:6px;border:1px solid #ddd">${t.status || '—'}</td></tr>`
-    ).join('');
-
-    w.document.write(`<!DOCTYPE html><html><head><title>Pasport — ${data.name}</title>
-<style>body{font-family:Arial,sans-serif;margin:40px;color:#333}h1{color:#1e293b;border-bottom:3px solid #f97316;padding-bottom:10px}h2{color:#475569;margin-top:30px}table{width:100%;border-collapse:collapse;margin-top:10px}.logo{display:flex;align-items:center;gap:12px;margin-bottom:20px}.logo-box{width:48px;height:48px;background:linear-gradient(135deg,#f97316,#f59e0b);border-radius:12px;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:20px}.meta{color:#64748b;font-size:13px;margin-top:4px}@media print{body{margin:20px}}</style></head><body>
-<div class="logo"><div class="logo-box">N</div><div><div style="font-size:18px;font-weight:bold">NOMINAL CMMS</div><div class="meta">Pasport — ${data.type === 'building' ? 'Budova' : data.type === 'room' ? 'Místnost' : 'Zařízení'}</div></div></div>
-<h1>${data.name}</h1>
-<p class="meta">Vytištěno: ${new Date().toLocaleDateString('cs-CZ')} ${new Date().toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}</p>
-<h2>Rodný list</h2><table>${fieldsHtml}</table>
-${activeTasks.length > 0 ? `<h2>Otevřené úkoly (${activeTasks.length})</h2><table><tr style="background:#1e293b;color:white"><th style="padding:8px;text-align:left">Priorita</th><th style="padding:8px;text-align:left">Úkol</th><th style="padding:8px;text-align:left">Status</th></tr>${tasksHtml}</table>` : ''}
-<script>setTimeout(()=>window.print(),300)</script></body></html>`);
-    w.document.close();
-  };
+  const TypeIcon = effectiveData.type === 'building' ? Building2 : effectiveData.type === 'room' ? Layers : Wrench;
+  const st = STATUS_MAP[effectiveData.status || 'idle'] || STATUS_MAP.idle;
 
   return (
     <>
@@ -280,6 +258,19 @@ ${activeTasks.length > 0 ? `<h2>Otevřené úkoly (${activeTasks.length})</h2><t
           to { transform: translateY(0); opacity: 1; }
         }
       `}</style>
+
+      {/* PDF PREVIEW OVERLAY */}
+      {showPdfPreview && (
+        <PdfPreviewOverlay
+          data={effectiveData}
+          activeTasks={activeTasks}
+          childAssets={childAssets}
+          rooms={rooms}
+          st={st}
+          onClose={() => setShowPdfPreview(false)}
+        />
+      )}
+
       <div
         className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-md flex items-center justify-center p-4"
         onClick={onClose}
@@ -297,10 +288,7 @@ ${activeTasks.length > 0 ? `<h2>Otevřené úkoly (${activeTasks.length})</h2><t
                 <span key={i} className="flex items-center">
                   {i > 0 && <ChevronRight className="w-3 h-3 mx-0.5 text-slate-600" />}
                   {bc.data ? (
-                    <button
-                      onClick={() => onBack()}
-                      className="hover:text-blue-400 transition"
-                    >
+                    <button onClick={() => onBack()} className="hover:text-blue-400 transition">
                       {bc.label}
                     </button>
                   ) : (
@@ -317,10 +305,10 @@ ${activeTasks.length > 0 ? `<h2>Otevřené úkoly (${activeTasks.length})</h2><t
                   <TypeIcon className="w-5 h-5 text-orange-400" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-white">{data.name}</h2>
+                  <h2 className="text-lg font-bold text-white">{effectiveData.name}</h2>
                   <div className="flex items-center gap-2 text-xs">
-                    {data.code && <span className="text-slate-500 font-mono">{data.code}</span>}
-                    {data.status && (
+                    {effectiveData.code && <span className="text-slate-500 font-mono">{effectiveData.code}</span>}
+                    {effectiveData.status && (
                       <span className="flex items-center gap-1">
                         <span className={`w-2 h-2 rounded-full ${st.dot}`} />
                         <span style={{ color: st.color }}>{st.label}</span>
@@ -331,9 +319,9 @@ ${activeTasks.length > 0 ? `<h2>Otevřené úkoly (${activeTasks.length})</h2><t
               </div>
               <div className="flex items-center gap-1">
                 <button
-                  onClick={handleExportPDF}
+                  onClick={() => setShowPdfPreview(true)}
                   className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 hover:text-white transition"
-                  title="Stáhnout PDF pasport"
+                  title="PDF pasport"
                 >
                   <Download className="w-4 h-4" />
                 </button>
@@ -372,21 +360,11 @@ ${activeTasks.length > 0 ? `<h2>Otevřené úkoly (${activeTasks.length})</h2><t
           {/* ═══ TAB CONTENT ═══ */}
           <div className="flex-1 overflow-y-auto px-5 py-5">
             {activeTab === 'passport' && (
-              <TabPassport
-                data={data}
-                editingField={editingField}
-                editValue={editValue}
-                saving={saving}
-                onStartEdit={(field, value) => { setEditingField(field); setEditValue(value); }}
-                onSaveEdit={handleSaveField}
-                onCancelEdit={() => setEditingField(null)}
-                setEditValue={setEditValue}
-              />
+              <TabPassport data={effectiveData} />
             )}
-
             {activeTab === 'relations' && (
               <TabRelations
-                data={data}
+                data={effectiveData}
                 rooms={rooms}
                 childAssets={childAssets}
                 spareParts={spareParts}
@@ -394,15 +372,9 @@ ${activeTasks.length > 0 ? `<h2>Otevřené úkoly (${activeTasks.length})</h2><t
                 onNavigate={onNavigate}
               />
             )}
-
             {activeTab === 'maintenance' && (
-              <TabMaintenance
-                activeTasks={activeTasks}
-                revisions={revisions}
-                loading={tasksLoading}
-              />
+              <TabMaintenance activeTasks={activeTasks} revisions={revisions} loading={tasksLoading} />
             )}
-
             {activeTab === 'history' && (
               <TabHistory doneTasks={doneTasks} />
             )}
@@ -414,78 +386,331 @@ ${activeTasks.length > 0 ? `<h2>Otevřené úkoly (${activeTasks.length})</h2><t
 }
 
 // ═══════════════════════════════════════════════
-// TAB 1: RODNÝ LIST (Passport)
+// PDF PREVIEW OVERLAY (Task #44 fix)
 // ═══════════════════════════════════════════════
 
-function TabPassport({ data, editingField, editValue, saving, onStartEdit, onSaveEdit, onCancelEdit, setEditValue }: {
+function PdfPreviewOverlay({ data, activeTasks, childAssets, rooms, st, onClose }: {
   data: EntityModalData;
-  editingField: string | null;
-  editValue: string;
-  saving: boolean;
-  onStartEdit: (field: string, value: string) => void;
-  onSaveEdit: (field: string) => void;
-  onCancelEdit: () => void;
-  setEditValue: (v: string) => void;
+  activeTasks: any[];
+  childAssets: MapAsset[];
+  rooms: { name: string; assetCount: number; worstStatus: string }[];
+  st: { label: string; dot: string; color: string };
+  onClose: () => void;
 }) {
-  const fields = data.type === 'asset' ? [
-    { key: 'name', label: 'Název', value: data.name, editable: true },
-    { key: 'code', label: 'Inventární kód', value: data.code || '—', editable: false },
-    { key: 'buildingId', label: 'Budova', value: BUILDING_NAMES[data.buildingId] || data.buildingId, editable: false },
-    { key: 'areaName', label: 'Místnost', value: data.roomName || '—', editable: false },
-    { key: 'category', label: 'Kategorie', value: data.category || '—', editable: true },
-    { key: 'status', label: 'Stav', value: STATUS_MAP[data.status || 'idle']?.label || data.status || '—', editable: false },
+  const passportFields = data.type === 'asset' ? [
+    { label: 'Kód', value: data.code || '—' },
+    { label: 'Budova', value: BUILDING_NAMES[data.buildingId] || data.buildingId },
+    { label: 'Místnost', value: data.roomName || '—' },
+    { label: 'Kategorie', value: data.category || '—' },
+    { label: 'Stav', value: st.label },
+    ...(data.asset?.motorHours ? [{ label: 'Motohodiny', value: String(data.asset.motorHours) + ' Mth' }] : []),
+    ...(data.asset?.nextRevision ? [{ label: 'Příští revize', value: data.asset.nextRevision }] : []),
   ] : data.type === 'room' ? [
-    { key: 'name', label: 'Místnost', value: data.name, editable: false },
-    { key: 'building', label: 'Budova', value: BUILDING_NAMES[data.buildingId] || data.buildingId, editable: false },
-    { key: 'code', label: 'Kód', value: `${data.buildingId}-${data.name}`, editable: false },
+    { label: 'Budova', value: BUILDING_NAMES[data.buildingId] || data.buildingId },
+    { label: 'Místnost', value: data.name },
+    { label: 'Počet strojů', value: String(childAssets.length) },
   ] : [
-    { key: 'name', label: 'Budova', value: data.name, editable: false },
-    { key: 'id', label: 'Kód', value: data.buildingId, editable: false },
+    { label: 'Budova', value: data.name },
+    { label: 'Kód', value: data.buildingId },
+    { label: 'Místností', value: String(rooms.length) },
+    { label: 'Celkem strojů', value: String(childAssets.length) },
   ];
 
+  const handlePrint = () => {
+    const w = window.open('', '_blank');
+    if (!w) return;
+
+    const fieldsHtml = passportFields.map(f =>
+      `<tr><td style="padding:8px;border:1px solid #ddd;font-weight:600;background:#f8f9fa;width:140px">${f.label}</td><td style="padding:8px;border:1px solid #ddd">${f.value}</td></tr>`
+    ).join('');
+
+    const tasksHtml = activeTasks.slice(0, 15).map((t: any) =>
+      `<tr><td style="padding:6px;border:1px solid #ddd">${t.priority || '—'}</td><td style="padding:6px;border:1px solid #ddd">${t.title}</td><td style="padding:6px;border:1px solid #ddd">${t.status || '—'}</td></tr>`
+    ).join('');
+
+    w.document.write(`<!DOCTYPE html><html><head><title>Pasport — ${data.name}</title>
+<style>body{font-family:Arial,sans-serif;margin:40px;color:#333}h1{color:#1e293b;border-bottom:3px solid ${appConfig.PRIMARY_COLOR};padding-bottom:10px}h2{color:#475569;margin-top:30px}table{width:100%;border-collapse:collapse;margin-top:10px}.logo{display:flex;align-items:center;gap:12px;margin-bottom:20px}.logo-box{width:48px;height:48px;background:linear-gradient(135deg,${appConfig.PRIMARY_COLOR},#f59e0b);border-radius:12px;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:20px}.meta{color:#64748b;font-size:13px;margin-top:4px}@media print{body{margin:20px}}</style></head><body>
+<div class="logo"><div class="logo-box">${appConfig.LOGO_LETTER}</div><div><div style="font-size:18px;font-weight:bold">${appConfig.APP_NAME}</div><div class="meta">Pasport — ${data.type === 'building' ? 'Budova' : data.type === 'room' ? 'Místnost' : 'Zařízení'}</div></div></div>
+<h1>${data.name}</h1>
+<p class="meta">Vytištěno: ${new Date().toLocaleDateString('cs-CZ')} ${new Date().toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}</p>
+<h2>Rodný list</h2><table>${fieldsHtml}</table>
+${activeTasks.length > 0 ? `<h2>Otevřené úkoly (${activeTasks.length})</h2><table><tr style="background:#1e293b;color:white"><th style="padding:8px;text-align:left">Priorita</th><th style="padding:8px;text-align:left">Úkol</th><th style="padding:8px;text-align:left">Status</th></tr>${tasksHtml}</table>` : ''}
+<script>setTimeout(()=>{window.print();window.close()},400)</script></body></html>`);
+    w.document.close();
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[10000] bg-slate-900/95 backdrop-blur-lg flex flex-col" onClick={(e) => e.stopPropagation()}>
+      {/* Toolbar */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-slate-800/80 flex-shrink-0">
+        <button
+          onClick={onClose}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 border border-white/15 text-white text-sm font-semibold hover:bg-white/15 transition"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Zpět
+        </button>
+        <span className="text-sm text-slate-400 font-medium">PDF Pasport — {data.name}</span>
+        <button
+          onClick={handlePrint}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 text-white text-sm font-semibold hover:opacity-90 transition"
+        >
+          <Printer className="w-4 h-4" />
+          Tisk / Stáhnout
+        </button>
+      </div>
+
+      {/* Preview content */}
+      <div className="flex-1 overflow-y-auto p-6 flex justify-center">
+        <div className="w-full max-w-xl bg-white rounded-2xl shadow-2xl p-8 text-gray-800">
+          {/* Header */}
+          <div className="flex items-center gap-3 mb-6 pb-4 border-b-2" style={{ borderColor: appConfig.PRIMARY_COLOR }}>
+            <div
+              className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-xl"
+              style={{ background: `linear-gradient(135deg, ${appConfig.PRIMARY_COLOR}, #f59e0b)` }}
+            >
+              {appConfig.LOGO_LETTER}
+            </div>
+            <div>
+              <div className="text-lg font-bold text-gray-900">{appConfig.APP_NAME}</div>
+              <div className="text-sm text-gray-500">
+                Pasport — {data.type === 'building' ? 'Budova' : data.type === 'room' ? 'Místnost' : 'Zařízení'}
+              </div>
+            </div>
+          </div>
+
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">{data.name}</h1>
+          <p className="text-xs text-gray-500 mb-6">
+            Vytištěno: {new Date().toLocaleDateString('cs-CZ')} {new Date().toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}
+          </p>
+
+          <h2 className="text-sm font-bold text-gray-700 uppercase mb-3">Rodný list</h2>
+          <table className="w-full border-collapse mb-6">
+            <tbody>
+              {passportFields.map((f) => (
+                <tr key={f.label}>
+                  <td className="px-3 py-2 border border-gray-200 bg-gray-50 font-semibold text-sm w-36">{f.label}</td>
+                  <td className="px-3 py-2 border border-gray-200 text-sm">{f.value}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {activeTasks.length > 0 && (
+            <>
+              <h2 className="text-sm font-bold text-gray-700 uppercase mb-3">Otevřené úkoly ({activeTasks.length})</h2>
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="bg-gray-800 text-white">
+                    <th className="px-3 py-2 text-left text-xs">Priorita</th>
+                    <th className="px-3 py-2 text-left text-xs">Úkol</th>
+                    <th className="px-3 py-2 text-left text-xs">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {activeTasks.slice(0, 15).map((t: any) => (
+                    <tr key={t.id}>
+                      <td className="px-3 py-1.5 border border-gray-200 text-sm">{t.priority || '—'}</td>
+                      <td className="px-3 py-1.5 border border-gray-200 text-sm">{t.title}</td>
+                      <td className="px-3 py-1.5 border border-gray-200 text-sm">{t.status || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════
+// TAB 1: RODNÝ LIST (Passport) — Full edit form
+// ═══════════════════════════════════════════════
+
+function TabPassport({ data }: { data: EntityModalData }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState('');
+
+  // Edit form state for asset
+  const [editName, setEditName] = useState(data.name);
+  const [editCode, setEditCode] = useState(data.code || '');
+  const [editBuilding, setEditBuilding] = useState(data.buildingId);
+  const [editRoom, setEditRoom] = useState(data.roomName || '');
+  const [editCategory, setEditCategory] = useState(data.category || '');
+  const [editStatus, setEditStatus] = useState(data.status || 'operational');
+  const [editMotorHours, setEditMotorHours] = useState(String(data.asset?.motorHours || ''));
+  const [editNextRevision, setEditNextRevision] = useState(data.asset?.nextRevision || '');
+
+  // Sync when data changes (from live updates)
+  useEffect(() => {
+    if (!isEditing) {
+      setEditName(data.name);
+      setEditCode(data.code || '');
+      setEditBuilding(data.buildingId);
+      setEditRoom(data.roomName || '');
+      setEditCategory(data.category || '');
+      setEditStatus(data.status || 'operational');
+      setEditMotorHours(String(data.asset?.motorHours || ''));
+      setEditNextRevision(data.asset?.nextRevision || '');
+    }
+  }, [data, isEditing]);
+
+  const handleSave = async () => {
+    if (!data.asset) return;
+    setSaving(true);
+    setSaveMsg('');
+    try {
+      const updates: Record<string, any> = {
+        name: editName.trim(),
+        code: editCode.trim() || null,
+        buildingId: editBuilding,
+        areaName: editRoom.trim() || null,
+        category: editCategory.trim() || null,
+        status: editStatus,
+        updatedAt: serverTimestamp(),
+      };
+      if (editMotorHours) updates.motorHours = Number(editMotorHours);
+      if (editNextRevision) updates.nextRevision = editNextRevision;
+
+      await updateDoc(doc(db, 'assets', data.asset.id), updates);
+      setIsEditing(false);
+      setSaveMsg('Uloženo');
+      setTimeout(() => setSaveMsg(''), 2000);
+    } catch (err) {
+      console.error('[EntityModal] Save failed:', err);
+      setSaveMsg('Chyba při ukládání');
+    }
+    setSaving(false);
+  };
+
+  const fields = data.type === 'asset' ? [
+    { key: 'name', label: 'Název', value: data.name },
+    { key: 'code', label: 'Inventární kód', value: data.code || '—' },
+    { key: 'buildingId', label: 'Budova', value: BUILDING_NAMES[data.buildingId] || data.buildingId },
+    { key: 'areaName', label: 'Místnost', value: data.roomName || '—' },
+    { key: 'category', label: 'Kategorie', value: data.category || '—' },
+    { key: 'status', label: 'Stav', value: STATUS_MAP[data.status || 'idle']?.label || data.status || '—' },
+    ...(data.asset?.motorHours ? [{ key: 'motorHours', label: 'Motohodiny', value: `${data.asset.motorHours} Mth` }] : []),
+    ...(data.asset?.nextRevision ? [{ key: 'nextRevision', label: 'Příští revize', value: data.asset.nextRevision }] : []),
+  ] : data.type === 'room' ? [
+    { key: 'name', label: 'Místnost', value: data.name },
+    { key: 'building', label: 'Budova', value: BUILDING_NAMES[data.buildingId] || data.buildingId },
+    { key: 'code', label: 'Kód', value: `${data.buildingId}-${data.name}` },
+  ] : [
+    { key: 'name', label: 'Budova', value: data.name },
+    { key: 'id', label: 'Kód', value: data.buildingId },
+  ];
+
+  // Edit mode — full form
+  if (isEditing && data.type === 'asset') {
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-xs text-slate-500 uppercase font-bold">Upravit údaje</h3>
+          <button onClick={() => setIsEditing(false)} className="text-xs text-slate-500 hover:text-white transition">Zrušit</button>
+        </div>
+
+        {[
+          { label: 'Název', value: editName, onChange: setEditName, type: 'text' },
+          { label: 'Inventární kód', value: editCode, onChange: setEditCode, type: 'text' },
+          { label: 'Místnost', value: editRoom, onChange: setEditRoom, type: 'text' },
+          { label: 'Kategorie', value: editCategory, onChange: setEditCategory, type: 'text' },
+          { label: 'Motohodiny', value: editMotorHours, onChange: setEditMotorHours, type: 'number' },
+          { label: 'Příští revize', value: editNextRevision, onChange: setEditNextRevision, type: 'date' },
+        ].map((f) => (
+          <div key={f.label} className="mb-3">
+            <label className="block text-xs text-slate-500 font-medium mb-1">{f.label}</label>
+            <input
+              type={f.type}
+              value={f.value}
+              onChange={(e) => f.onChange(e.target.value)}
+              className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-slate-600 focus:outline-none focus:border-orange-500/50 transition min-h-[44px]"
+            />
+          </div>
+        ))}
+
+        {/* Budova — select */}
+        <div className="mb-3">
+          <label className="block text-xs text-slate-500 font-medium mb-1">Budova</label>
+          <select
+            value={editBuilding}
+            onChange={(e) => setEditBuilding(e.target.value)}
+            className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-orange-500/50 transition min-h-[44px]"
+          >
+            {BUILDING_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value} className="bg-slate-800">{o.label}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Stav — select */}
+        <div className="mb-3">
+          <label className="block text-xs text-slate-500 font-medium mb-1">Stav</label>
+          <select
+            value={editStatus}
+            onChange={(e) => setEditStatus(e.target.value)}
+            className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-orange-500/50 transition min-h-[44px]"
+          >
+            {STATUS_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value} className="bg-slate-800">{o.label}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Save / Cancel footer */}
+        <div className="flex items-center gap-3 pt-3 mt-2 border-t border-white/10">
+          <button
+            onClick={() => setIsEditing(false)}
+            className="flex-1 py-3 rounded-2xl bg-white/5 border border-white/10 text-slate-400 font-semibold text-sm"
+          >
+            Zrušit
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving || !editName.trim()}
+            className="flex-[2] py-3 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 text-white font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-40"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            {saving ? 'Ukládám...' : 'Uložit vše'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // View mode
   return (
     <div className="space-y-3">
-      <h3 className="text-xs text-slate-500 uppercase font-bold mb-2">Základní údaje</h3>
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-xs text-slate-500 uppercase font-bold">Základní údaje</h3>
+        {data.type === 'asset' && (
+          <button
+            onClick={() => setIsEditing(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500/15 text-orange-400 text-xs font-semibold hover:bg-orange-500/25 transition"
+          >
+            <Edit2 className="w-3 h-3" />
+            Upravit vše
+          </button>
+        )}
+      </div>
+
+      {saveMsg && (
+        <div className={`p-2.5 rounded-xl text-sm text-center font-semibold ${
+          saveMsg === 'Uloženo' ? 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-400' : 'bg-red-500/20 border border-red-500/30 text-red-400'
+        }`}>
+          {saveMsg}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {fields.map((f) => (
-          <div key={f.key} className="bg-slate-700/30 rounded-xl p-3 group relative">
-            <div className="flex items-center gap-1.5 mb-1">
-              <span className="text-xs text-slate-500">{f.label}</span>
-              {f.editable && editingField !== f.key && (
-                <button
-                  onClick={() => onStartEdit(f.key, f.value)}
-                  className="ml-auto opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-slate-600 transition"
-                >
-                  <Edit2 className="w-3 h-3 text-slate-400" />
-                </button>
-              )}
-            </div>
-            {editingField === f.key ? (
-              <div className="flex gap-1">
-                <input
-                  type="text"
-                  value={editValue}
-                  onChange={(e) => setEditValue(e.target.value)}
-                  autoFocus
-                  className="flex-1 p-1.5 bg-slate-600/50 border border-blue-500 rounded-lg text-sm text-white outline-none min-h-[36px]"
-                />
-                <button
-                  onClick={() => onSaveEdit(f.key)}
-                  disabled={saving}
-                  className="p-1.5 bg-blue-600 rounded-lg hover:bg-blue-500 min-w-[36px] min-h-[36px] flex items-center justify-center"
-                >
-                  <Save className="w-4 h-4 text-white" />
-                </button>
-                <button
-                  onClick={onCancelEdit}
-                  className="p-1.5 bg-slate-600 rounded-lg hover:bg-slate-500 min-w-[36px] min-h-[36px] flex items-center justify-center"
-                >
-                  <X className="w-4 h-4 text-slate-300" />
-                </button>
-              </div>
-            ) : (
-              <div className="text-sm font-medium text-white">{f.value}</div>
-            )}
+          <div key={f.key} className="bg-slate-700/30 rounded-xl p-3">
+            <div className="text-xs text-slate-500 mb-1">{f.label}</div>
+            <div className="text-sm font-medium text-white">{f.value}</div>
           </div>
         ))}
       </div>
@@ -527,121 +752,100 @@ function TabRelations({ data, rooms, childAssets, spareParts, loading, onNavigat
     );
   }
 
-  // Building → show rooms
   if (data.type === 'building') {
     return (
       <div className="space-y-2">
-        <h3 className="text-xs text-slate-500 uppercase font-bold mb-2">
-          Místnosti ({rooms.length})
-        </h3>
+        <h3 className="text-xs text-slate-500 uppercase font-bold mb-2">Místnosti ({rooms.length})</h3>
         {rooms.length === 0 ? (
           <div className="text-sm text-slate-500 text-center py-4">Žádné místnosti</div>
-        ) : (
-          rooms.map((room) => {
-            const rst = STATUS_MAP[room.worstStatus] || STATUS_MAP.idle;
-            return (
-              <button
-                key={room.name}
-                onClick={() => onNavigate(
-                  { type: 'room', id: room.name, name: room.name, buildingId: data.buildingId, roomName: room.name },
-                  { label: data.name, data }
-                )}
-                className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/[0.08] hover:bg-white/[0.06] transition text-left"
-              >
-                <div className="w-9 h-9 rounded-lg bg-slate-700/50 flex items-center justify-center flex-shrink-0">
-                  <Layers className="w-4 h-4 text-slate-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold text-white">{room.name}</div>
-                  <div className="text-xs text-slate-500">{room.assetCount} strojů</div>
-                </div>
-                <span className={`w-2.5 h-2.5 rounded-full ${rst.dot}`} />
-                <ChevronRight className="w-4 h-4 text-slate-600" />
-              </button>
-            );
-          })
-        )}
+        ) : rooms.map((room) => {
+          const rst = STATUS_MAP[room.worstStatus] || STATUS_MAP.idle;
+          return (
+            <button
+              key={room.name}
+              onClick={() => onNavigate(
+                { type: 'room', id: room.name, name: room.name, buildingId: data.buildingId, roomName: room.name },
+                { label: data.name, data }
+              )}
+              className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/[0.08] hover:bg-white/[0.06] transition text-left"
+            >
+              <div className="w-9 h-9 rounded-lg bg-slate-700/50 flex items-center justify-center flex-shrink-0">
+                <Layers className="w-4 h-4 text-slate-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold text-white">{room.name}</div>
+                <div className="text-xs text-slate-500">{room.assetCount} strojů</div>
+              </div>
+              <span className={`w-2.5 h-2.5 rounded-full ${rst.dot}`} />
+              <ChevronRight className="w-4 h-4 text-slate-600" />
+            </button>
+          );
+        })}
       </div>
     );
   }
 
-  // Room → show assets
   if (data.type === 'room') {
     return (
       <div className="space-y-2">
-        <h3 className="text-xs text-slate-500 uppercase font-bold mb-2">
-          Zařízení ({childAssets.length})
-        </h3>
+        <h3 className="text-xs text-slate-500 uppercase font-bold mb-2">Zařízení ({childAssets.length})</h3>
         {childAssets.length === 0 ? (
           <div className="text-sm text-slate-500 text-center py-4">Žádná zařízení</div>
-        ) : (
-          childAssets.map((asset) => {
-            const ast = STATUS_MAP[asset.status] || STATUS_MAP.idle;
-            return (
-              <button
-                key={asset.id}
-                onClick={() => onNavigate(
-                  {
-                    type: 'asset', id: asset.id, name: asset.name,
-                    buildingId: data.buildingId, roomName: data.roomName,
-                    status: asset.status, code: asset.code, category: asset.category,
-                    asset,
-                  },
-                  { label: data.name, data }
-                )}
-                className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/[0.08] hover:bg-white/[0.06] transition text-left"
-              >
-                <div className="w-9 h-9 rounded-lg bg-slate-700/50 flex items-center justify-center flex-shrink-0">
-                  <Wrench className="w-4 h-4 text-slate-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold text-white truncate">{asset.name}</div>
-                  {asset.code && <div className="text-xs text-slate-500 font-mono">{asset.code}</div>}
-                </div>
-                <span className={`w-2.5 h-2.5 rounded-full ${ast.dot}`} />
-                <ChevronRight className="w-4 h-4 text-slate-600" />
-              </button>
-            );
-          })
-        )}
+        ) : childAssets.map((asset) => {
+          const ast = STATUS_MAP[asset.status] || STATUS_MAP.idle;
+          return (
+            <button
+              key={asset.id}
+              onClick={() => onNavigate(
+                {
+                  type: 'asset', id: asset.id, name: asset.name,
+                  buildingId: data.buildingId, roomName: data.roomName,
+                  status: asset.status, code: asset.code, category: asset.category,
+                  asset,
+                },
+                { label: data.name, data }
+              )}
+              className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/[0.08] hover:bg-white/[0.06] transition text-left"
+            >
+              <div className="w-9 h-9 rounded-lg bg-slate-700/50 flex items-center justify-center flex-shrink-0">
+                <Wrench className="w-4 h-4 text-slate-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold text-white truncate">{asset.name}</div>
+                {asset.code && <div className="text-xs text-slate-500 font-mono">{asset.code}</div>}
+              </div>
+              <span className={`w-2.5 h-2.5 rounded-full ${ast.dot}`} />
+              <ChevronRight className="w-4 h-4 text-slate-600" />
+            </button>
+          );
+        })}
       </div>
     );
   }
 
-  // Asset → show spare parts from inventory
+  // Asset → spare parts
   return (
     <div className="space-y-2">
-      <h3 className="text-xs text-slate-500 uppercase font-bold mb-2">
-        Náhradní díly ({spareParts.length})
-      </h3>
+      <h3 className="text-xs text-slate-500 uppercase font-bold mb-2">Náhradní díly ({spareParts.length})</h3>
       {spareParts.length === 0 ? (
-        <div className="text-sm text-slate-500 text-center py-4">
-          Žádné propojené díly ve skladu
-        </div>
-      ) : (
-        spareParts.map((item: any) => (
-          <div
-            key={item.id}
-            className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/[0.08]"
-          >
-            <div className="w-9 h-9 rounded-lg bg-slate-700/50 flex items-center justify-center flex-shrink-0">
-              <Package className="w-4 h-4 text-slate-400" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-semibold text-white truncate">{item.name}</div>
-              <div className="text-xs text-slate-500 font-mono">{item.code}</div>
-            </div>
-            <div className="text-right">
-              <div className={`text-sm font-bold ${
-                (item.quantity || 0) <= (item.minQuantity || 0) ? 'text-red-400' : 'text-emerald-400'
-              }`}>
-                {item.quantity || 0}
-              </div>
-              <div className="text-[10px] text-slate-500">{item.unit || 'ks'}</div>
-            </div>
+        <div className="text-sm text-slate-500 text-center py-4">Žádné propojené díly ve skladu</div>
+      ) : spareParts.map((item: any) => (
+        <div key={item.id} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/[0.08]">
+          <div className="w-9 h-9 rounded-lg bg-slate-700/50 flex items-center justify-center flex-shrink-0">
+            <Package className="w-4 h-4 text-slate-400" />
           </div>
-        ))
-      )}
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-semibold text-white truncate">{item.name}</div>
+            <div className="text-xs text-slate-500 font-mono">{item.code}</div>
+          </div>
+          <div className="text-right">
+            <div className={`text-sm font-bold ${(item.quantity || 0) <= (item.minQuantity || 0) ? 'text-red-400' : 'text-emerald-400'}`}>
+              {item.quantity || 0}
+            </div>
+            <div className="text-[10px] text-slate-500">{item.unit || 'ks'}</div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -661,33 +865,21 @@ const TASK_STATUS_LABELS: Record<string, { label: string; bg: string; text: stri
   paused: { label: 'Čeká', bg: 'bg-cyan-500/20', text: 'text-cyan-400' },
 };
 
-function TabMaintenance({ activeTasks, revisions, loading }: {
-  activeTasks: any[];
-  revisions: any[];
-  loading: boolean;
-}) {
+function TabMaintenance({ activeTasks, revisions, loading }: { activeTasks: any[]; revisions: any[]; loading: boolean }) {
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-8 text-slate-500">
-        <Loader2 className="w-5 h-5 animate-spin mr-2" /> Načítám...
-      </div>
-    );
+    return <div className="flex items-center justify-center py-8 text-slate-500"><Loader2 className="w-5 h-5 animate-spin mr-2" /> Načítám...</div>;
   }
 
   const upcomingRevisions = revisions.filter((r: any) => {
     const next = r.nextRevisionAt?.toDate?.() || (r.nextRevisionAt ? new Date(r.nextRevisionAt) : null);
     if (!next) return false;
-    const days = Math.round((next.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-    return days <= 90;
+    return Math.round((next.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) <= 90;
   });
 
   return (
     <div className="space-y-6">
-      {/* Active tasks */}
       <div>
-        <h3 className="text-xs text-slate-500 uppercase font-bold mb-2">
-          Otevřené úkoly ({activeTasks.length})
-        </h3>
+        <h3 className="text-xs text-slate-500 uppercase font-bold mb-2">Otevřené úkoly ({activeTasks.length})</h3>
         {activeTasks.length === 0 ? (
           <div className="text-sm text-slate-500 text-center py-3">Žádné otevřené úkoly</div>
         ) : (
@@ -697,19 +889,12 @@ function TabMaintenance({ activeTasks, revisions, loading }: {
               const sb = TASK_STATUS_LABELS[task.status] || TASK_STATUS_LABELS.backlog;
               return (
                 <div key={task.id} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/[0.08]">
-                  <span
-                    className="text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0"
-                    style={{ background: `${pc}20`, color: pc }}
-                  >
-                    {task.priority || 'P3'}
-                  </span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0" style={{ background: `${pc}20`, color: pc }}>{task.priority || 'P3'}</span>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-white truncate">{task.title}</div>
                     {task.assigneeName && <div className="text-xs text-slate-500">{task.assigneeName}</div>}
                   </div>
-                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-lg ${sb.bg} ${sb.text}`}>
-                    {sb.label}
-                  </span>
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-lg ${sb.bg} ${sb.text}`}>{sb.label}</span>
                 </div>
               );
             })}
@@ -717,12 +902,9 @@ function TabMaintenance({ activeTasks, revisions, loading }: {
         )}
       </div>
 
-      {/* Upcoming revisions */}
       {upcomingRevisions.length > 0 && (
         <div>
-          <h3 className="text-xs text-slate-500 uppercase font-bold mb-2">
-            Blížící se revize ({upcomingRevisions.length})
-          </h3>
+          <h3 className="text-xs text-slate-500 uppercase font-bold mb-2">Blížící se revize ({upcomingRevisions.length})</h3>
           <div className="space-y-2">
             {upcomingRevisions.map((rev: any) => {
               const next = rev.nextRevisionAt?.toDate?.() || new Date(rev.nextRevisionAt);
@@ -761,18 +943,12 @@ function TabHistory({ doneTasks }: { doneTasks: any[] }) {
   }, [doneTasks]);
 
   if (sorted.length === 0) {
-    return (
-      <div className="text-sm text-slate-500 text-center py-8">
-        Zatím žádná historie
-      </div>
-    );
+    return <div className="text-sm text-slate-500 text-center py-8">Zatím žádná historie</div>;
   }
 
   return (
     <div className="space-y-2">
-      <h3 className="text-xs text-slate-500 uppercase font-bold mb-2">
-        Dokončené úkoly ({sorted.length})
-      </h3>
+      <h3 className="text-xs text-slate-500 uppercase font-bold mb-2">Dokončené úkoly ({sorted.length})</h3>
       {sorted.slice(0, 20).map((task: any) => {
         const date = task.completedAt?.toDate?.() || task.createdAt?.toDate?.();
         const dateStr = date ? date.toLocaleDateString('cs-CZ') : '—';
@@ -781,9 +957,7 @@ function TabHistory({ doneTasks }: { doneTasks: any[] }) {
             <div className="w-2 h-2 rounded-full bg-emerald-400 mt-1.5 flex-shrink-0" />
             <div className="flex-1 min-w-0">
               <div className="text-sm font-medium text-white">{task.title}</div>
-              {task.resolution && (
-                <div className="text-xs text-slate-400 mt-1">{task.resolution}</div>
-              )}
+              {task.resolution && <div className="text-xs text-slate-400 mt-1">{task.resolution}</div>}
               <div className="text-[11px] text-slate-500 mt-1 flex items-center gap-2">
                 <span>{dateStr}</span>
                 {task.completedBy && <span>· {task.completedBy}</span>}

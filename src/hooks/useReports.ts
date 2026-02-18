@@ -1,5 +1,5 @@
 // src/hooks/useReports.ts
-// NOMINAL CMMS — Export do XLSX a PDF (přímo v prohlížeči)
+// ${appConfig.APP_NAME} — Export do XLSX a PDF (přímo v prohlížeči)
 //
 // Závislosti (npm install):
 //   npm install xlsx file-saver @react-pdf/renderer
@@ -14,6 +14,7 @@ import { useCallback } from 'react';
 import { collection, getDocs, query, where, orderBy, Timestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
+import appConfig from '../appConfig';
 
 // ═══════════════════════════════════════════
 // XLSX EXPORT (pomocí SheetJS)
@@ -69,12 +70,12 @@ async function exportToXLSX(
     { Položka: 'Exportováno', Hodnota: new Date().toLocaleString('cs-CZ') },
     { Položka: 'Typ', Hodnota: sheetName },
     { Položka: 'Počet záznamů', Hodnota: rows.length },
-    { Položka: 'Systém', Hodnota: 'NOMINAL CMMS v1.0' },
+    { Položka: 'Systém', Hodnota: `${appConfig.APP_NAME} ${appConfig.VERSION}` },
   ]);
   XLSX.utils.book_append_sheet(wb, metaWs, 'Info');
 
   // Export
-  const filename = options?.filename || `NOMINAL_${type}_${formatDateFile(new Date())}.xlsx`;
+  const filename = options?.filename || `${appConfig.APP_NAME_SHORT}_${type}_${formatDateFile(new Date())}.xlsx`;
   const buffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
   saveAs(new Blob([buffer], { type: 'application/octet-stream' }), filename);
 
@@ -175,7 +176,7 @@ function serviceReportHTML(data: Record<string, any>, css: string): string {
       <div class="meta">
         <div>Č. dokumentu: SL-${task?.id?.slice(0, 8) || 'XXX'}</div>
         <div>Datum: ${formatDateCZ(completedAt || new Date())}</div>
-        <div>NOMINAL CMMS</div>
+        <div>${appConfig.APP_NAME}</div>
       </div>
     </div>
 
@@ -221,7 +222,7 @@ function serviceReportHTML(data: Record<string, any>, css: string): string {
       <div>Převzal (vedení)</div>
     </div>
 
-    <div class="footer">NOMINAL CMMS — Automaticky generovaný dokument — ${formatDateCZ(new Date())}</div>
+    <div class="footer">${appConfig.APP_NAME} — Automaticky generovaný dokument — ${formatDateCZ(new Date())}</div>
   </body></html>`;
 }
 
@@ -261,7 +262,7 @@ function handoverProtocolHTML(data: Record<string, any>, css: string): string {
       <div>Přejímající</div>
     </div>
 
-    <div class="footer">NOMINAL CMMS — ${formatDateCZ(new Date())}</div>
+    <div class="footer">${appConfig.APP_NAME} — ${formatDateCZ(new Date())}</div>
   </body></html>`;
 }
 
@@ -301,7 +302,7 @@ function revisionReportHTML(data: Record<string, any>, css: string): string {
       <div>Odpovědná osoba</div>
     </div>
 
-    <div class="footer">NOMINAL CMMS — ${formatDateCZ(new Date())}</div>
+    <div class="footer">${appConfig.APP_NAME} — ${formatDateCZ(new Date())}</div>
   </body></html>`;
 }
 
@@ -335,7 +336,7 @@ function inventoryReportHTML(data: Record<string, any>, css: string): string {
       </table>
     </div>
 
-    <div class="footer">NOMINAL CMMS — ${formatDateCZ(new Date())}</div>
+    <div class="footer">${appConfig.APP_NAME} — ${formatDateCZ(new Date())}</div>
   </body></html>`;
 }
 
@@ -369,7 +370,7 @@ function taskSummaryHTML(data: Record<string, any>, css: string): string {
       </table>
     </div>
 
-    <div class="footer">NOMINAL CMMS — ${formatDateCZ(new Date())}</div>
+    <div class="footer">${appConfig.APP_NAME} — ${formatDateCZ(new Date())}</div>
   </body></html>`;
 }
 

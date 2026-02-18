@@ -19,10 +19,12 @@ import {
   Truck,
   Edit2,
   FileText,
+  Building2,
 } from 'lucide-react';
 import { useAuthContext } from '../context/AuthContext';
 import { createTask } from '../services/taskService';
 import BottomSheet, { FormField, FormFooter } from '../components/ui/BottomSheet';
+import { showToast } from '../components/ui/Toast';
 import EmptyState from '../components/ui/EmptyState';
 import {
   EntityCardFull,
@@ -639,6 +641,125 @@ function SummaryBar({ assets }: { assets: Asset[] }) {
 }
 
 // ═══════════════════════════════════════════════
+// GLOBAL SEARCH RESULTS
+// ═══════════════════════════════════════════════
+function GlobalSearchResults({ assets, buildings, search, onSelectAsset, onSelectRoom, onSelectBuilding }: {
+  assets: Asset[];
+  buildings: BuildingGroup[];
+  search: string;
+  onSelectAsset: (asset: Asset) => void;
+  onSelectRoom: (buildingId: string, roomName: string) => void;
+  onSelectBuilding: (buildingId: string) => void;
+}) {
+  const q = search.toLowerCase().trim();
+
+  const matchedBuildings = buildings.filter(b =>
+    b.name.toLowerCase().includes(q) || b.id.toLowerCase().includes(q)
+  );
+
+  const matchedRooms: { buildingId: string; buildingName: string; roomName: string }[] = [];
+  const seenRooms = new Set<string>();
+  assets.forEach(a => {
+    const room = a.areaName || 'Ostatní';
+    const key = `${a.buildingId}::${room}`;
+    if (seenRooms.has(key)) return;
+    if (room.toLowerCase().includes(q)) {
+      seenRooms.add(key);
+      matchedRooms.push({
+        buildingId: a.buildingId,
+        buildingName: BUILDING_META[a.buildingId]?.name || a.buildingId,
+        roomName: room,
+      });
+    }
+  });
+
+  const matchedAssets = assets.filter(a =>
+    a.name.toLowerCase().includes(q) || a.code?.toLowerCase().includes(q)
+  ).slice(0, 15);
+
+  const total = matchedBuildings.length + matchedRooms.length + matchedAssets.length;
+
+  if (total === 0) {
+    return (
+      <div className="bg-slate-800/60 rounded-2xl border border-slate-700/50 p-6 text-center mb-4">
+        <div className="text-slate-500 text-sm">Nic nenalezeno pro "{search}"</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-slate-800/60 rounded-2xl border border-slate-700/50 p-4 mb-4 space-y-3 max-h-[60vh] overflow-y-auto">
+      <div className="text-xs text-slate-500 font-bold uppercase">Výsledky ({total})</div>
+
+      {matchedBuildings.length > 0 && (
+        <div>
+          <div className="text-[10px] text-slate-600 uppercase font-bold mb-1.5 flex items-center gap-1">
+            <Building2 className="w-3 h-3" /> Budovy
+          </div>
+          {matchedBuildings.map(b => (
+            <button key={b.id} onClick={() => onSelectBuilding(b.id)}
+              className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-white/[0.06] transition text-left mb-1"
+            >
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold" style={{ background: `${b.color}20`, color: b.color }}>{b.id}</div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium text-white">{b.name}</div>
+                <div className="text-[11px] text-slate-500">{b.totalAssets} zařízení</div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-slate-600" />
+            </button>
+          ))}
+        </div>
+      )}
+
+      {matchedRooms.length > 0 && (
+        <div>
+          <div className="text-[10px] text-slate-600 uppercase font-bold mb-1.5 flex items-center gap-1">
+            <Layers className="w-3 h-3" /> Místnosti
+          </div>
+          {matchedRooms.slice(0, 10).map(r => (
+            <button key={`${r.buildingId}-${r.roomName}`} onClick={() => onSelectRoom(r.buildingId, r.roomName)}
+              className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-white/[0.06] transition text-left mb-1"
+            >
+              <div className="w-8 h-8 rounded-lg bg-slate-700/50 flex items-center justify-center"><Layers className="w-4 h-4 text-slate-400" /></div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium text-white">{r.roomName}</div>
+                <div className="text-[11px] text-slate-500">{r.buildingName}</div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-slate-600" />
+            </button>
+          ))}
+        </div>
+      )}
+
+      {matchedAssets.length > 0 && (
+        <div>
+          <div className="text-[10px] text-slate-600 uppercase font-bold mb-1.5 flex items-center gap-1">
+            <Wrench className="w-3 h-3" /> Zařízení
+          </div>
+          {matchedAssets.map(a => {
+            const ast = STATUS_CONFIG[a.status] || STATUS_CONFIG.idle;
+            return (
+              <button key={a.id} onClick={() => onSelectAsset(a)}
+                className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-white/[0.06] transition text-left mb-1"
+              >
+                <div className="w-8 h-8 rounded-lg bg-slate-700/50 flex items-center justify-center">
+                  <span className={`w-2.5 h-2.5 rounded-full ${ast.dot}`} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-white truncate">{a.name}</div>
+                  <div className="text-[11px] text-slate-500">{BUILDING_META[a.buildingId]?.name || a.buildingId}{a.areaName ? ` · ${a.areaName}` : ''}</div>
+                </div>
+                {a.code && <span className="text-[10px] text-slate-500 font-mono">{a.code}</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════
 // MAIN PAGE — Drill-down: Buildings → Rooms → Machines
 // ═══════════════════════════════════════════════
 export default function MapPage() {
@@ -818,10 +939,11 @@ export default function MapPage() {
         status: editStatus,
         updatedAt: serverTimestamp(),
       });
-      console.log('[MapPage] Edit saved:', editingAsset.id);
+      showToast('Změny uloženy', 'success');
       setEditingAsset(null);
     } catch (err) {
       console.error('[MapPage] Edit save failed:', err);
+      showToast('Chyba při ukládání', 'error');
     }
     setEditSaving(false);
   };
@@ -933,18 +1055,36 @@ export default function MapPage() {
           </div>
         )}
 
-        {/* Search — rooms & machines levels */}
-        {activeLevel !== 'buildings' && (
-          <div className="relative mb-3">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={activeLevel === 'rooms' ? 'Hledat místnost...' : activeLevel === 'folder' ? 'Hledat ve složce...' : 'Hledat stroj...'}
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-slate-600 focus:outline-none focus:border-orange-500/50 transition"
-            />
-          </div>
+        {/* Global Search — all levels */}
+        <div className="relative mb-3">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Hledat budovu, místnost nebo stroj..."
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-slate-600 focus:outline-none focus:border-orange-500/50 transition"
+          />
+        </div>
+
+        {/* Global search results overlay — only at buildings level */}
+        {activeLevel === 'buildings' && search.trim() && (
+          <GlobalSearchResults
+            assets={assets}
+            buildings={buildings}
+            search={search}
+            onSelectAsset={(asset) => { setSearch(''); setSelectedAsset(asset); }}
+            onSelectRoom={(buildingId, roomName) => {
+              setSearch('');
+              setSelectedBuildingId(buildingId);
+              setSelectedRoomName(roomName);
+              setDrillLevel('machines');
+            }}
+            onSelectBuilding={(buildingId) => {
+              setSearch('');
+              handleBuildingClick(buildingId);
+            }}
+          />
         )}
 
         {/* ═══ LEVEL 1: Buildings (Tiles) ═══ */}
@@ -1320,13 +1460,21 @@ export default function MapPage() {
                   updatedAt: serverTimestamp(),
                 });
               }
+              showToast(
+                showAddModal === 'building' ? `Budova "${name}" vytvořena` :
+                showAddModal === 'room' ? `Místnost "${name}" vytvořena` :
+                `Zařízení "${name}" přidáno`,
+                'success'
+              );
               setShowAddModal(null);
               setAddName('');
               setAddCode('');
               setAddError('');
             } catch (err) {
               console.error('[MapPage] Add failed:', err);
-              setAddError('Nepodařilo se uložit. Zkuste to znovu.');
+              const errMsg = (err as Error).message || 'Nepodařilo se uložit';
+              setAddError(errMsg);
+              showToast(`Chyba: ${errMsg}`, 'error');
             }
             setAddSaving(false);
           }}
