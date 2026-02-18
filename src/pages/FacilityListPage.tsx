@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { db } from '../lib/firebase';
 import { collection, getDocs } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
-import { Home, MapPin, ChevronRight, Building2 } from 'lucide-react';
+import { Home, MapPin, ChevronRight, Building2, ArrowLeft } from 'lucide-react';
 
 const FacilityListPage = () => {
   const [items, setItems] = useState<any[]>([]);
@@ -21,16 +21,21 @@ const FacilityListPage = () => {
     fetchData();
   }, []);
 
-  if (loading) return <div className="p-10 text-center">Naèítám správu budov...</div>;
+  if (loading) return <div className="p-10 text-center">Naï¿½ï¿½tï¿½m sprï¿½vu budov...</div>;
 
   const buildings = items.filter(i => i.type === 'Budova' || !i.parentId);
-  const rooms = items.filter(i => i.type === 'Místnost');
+  const rooms = items.filter(i => i.type === 'Mï¿½stnost');
 
   return (
     <div className="p-4 pb-24 bg-slate-50 min-h-screen">
-      <h1 className="text-2xl font-bold mb-6 flex items-center gap-2">
-        <Building2 className="text-blue-600" /> Správa budov
-      </h1>
+      <div className="flex items-center gap-3 mb-6">
+        <button onClick={() => navigate('/')} className="p-2 rounded-xl bg-white/10 border border-white/10 hover:bg-white/20 transition">
+          <ArrowLeft className="w-5 h-5 text-slate-400" />
+        </button>
+        <h1 className="text-2xl font-bold flex items-center gap-2">
+          <Building2 className="text-blue-600" /> SprÃ¡va budov
+        </h1>
+      </div>
 
       {buildings.map(building => (
         <div key={building.id} className="bg-white rounded-2xl shadow-sm border border-slate-200 mb-4 overflow-hidden">

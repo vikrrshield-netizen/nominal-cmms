@@ -593,6 +593,8 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onEdit, onOp
       await addDoc(collection(db, 'assets', asset.id, 'empty_logs'), {
         emptiedBy: wasteUser?.displayName || 'Neznámý',
         emptiedAt: serverTimestamp(),
+        createdById: wasteUser?.uid || '',
+        createdByName: wasteUser?.displayName || 'Neznámý',
       });
       showToast(`${asset.name} — označen jako vyvezený`, 'success');
       setTimeout(() => onClose(), 800);
@@ -1718,7 +1720,7 @@ export default function MapPage() {
                 const buildingCode = addCode.trim() || name.charAt(0).toUpperCase();
                 await addDoc(collection(db, 'assets'), {
                   name: `${name} — placeholder`,
-                  code: '',
+                  code: buildingCode,
                   buildingId: buildingCode,
                   areaName: 'Hlavní',
                   status: 'idle',

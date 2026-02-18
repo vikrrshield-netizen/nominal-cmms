@@ -1,5 +1,5 @@
 // src/pages/AIAssistantPage.tsx
-// NOMINAL CMMS — Search & Nominal AI
+// VIKRR — Krejčí Asset Shield — Search & VIKRR AI
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -242,7 +242,7 @@ export default function AIAssistantPage() {
               <Sparkles className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-white">Search &amp; Nominal AI</h1>
+              <h1 className="text-lg font-bold text-white">Search &amp; VIKRR AI</h1>
               <p className="text-xs text-slate-400">
                 {isListening ? '🎤 Poslouchám...' : isProcessing ? '🤔 Přemýšlím...' : '✨ Připraven'}
               </p>

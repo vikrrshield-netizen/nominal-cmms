@@ -1,9 +1,10 @@
 // src/pages/LoginPage.tsx
-// NOMINAL CMMS — Přihlášení PIN kódem
+// VIKRR — Krejčí Asset Shield — Přihlášení PIN kódem
 
 import { useState } from 'react';
 import { useAuthContext } from '../context/AuthContext';
-import { Settings, Delete, LogIn } from 'lucide-react';
+import { Shield, Delete, LogIn } from 'lucide-react';
+import appConfig from '../appConfig';
 
 export default function LoginPage() {
   const { login } = useAuthContext();
@@ -46,13 +47,13 @@ export default function LoginPage() {
     <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6">
       
       {/* Logo */}
-      <div className="flex items-center gap-3 mb-8">
-        <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center">
-          <Settings className="w-8 h-8 text-white" />
+      <div className="flex flex-col items-center gap-2 mb-8">
+        <div className="w-16 h-16 bg-gradient-to-br from-[#1e3a5f] to-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/20">
+          <Shield className="w-9 h-9 text-white" />
         </div>
-        <div>
-          <h1 className="text-2xl font-bold text-white">Nominal<span className="text-blue-400">CMMS</span></h1>
-          <p className="text-slate-500 text-sm">Systém údržby</p>
+        <div className="text-center">
+          <h1 className="text-2xl font-black tracking-tight text-white">{appConfig.BRAND_NAME}</h1>
+          <p className="text-blue-400/80 text-[10px] font-medium tracking-widest uppercase">{appConfig.PRODUCT_NAME_SHORT}</p>
         </div>
       </div>
 

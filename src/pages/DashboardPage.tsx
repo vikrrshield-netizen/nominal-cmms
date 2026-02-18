@@ -90,11 +90,11 @@ function KioskDashboard() {
       <div className="relative z-10 flex flex-col min-h-screen">
         <header className="p-6 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/25">
+            <div className="w-14 h-14 bg-gradient-to-br from-[#1e3a5f] to-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/25">
               <Settings className="w-7 h-7 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-white">{appConfig.APP_NAME_SHORT}<span className="text-blue-400">CMMS</span></h1>
+              <h1 className="text-2xl font-black tracking-tight text-white">{appConfig.BRAND_NAME}</h1>
               <p className="text-slate-400 text-sm flex items-center gap-2">
                 <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
                 Kiosek
@@ -190,7 +190,7 @@ const TILE_DEFS: TileDef[] = [
   { id: 'louparna',    icon: '🌾', label: 'Loupárna',         gradient: 'from-lime-500 to-green-600' },
   { id: 'inspections', icon: '✅', label: 'Kontroly',         gradient: 'from-teal-500 to-emerald-600' },
   { id: 'calendar',    icon: '📅', label: 'Kalendář',         gradient: 'from-indigo-500 to-purple-600' },
-  { id: 'ai',          icon: '🤖', label: 'Nominal AI',       gradient: 'from-pink-500 to-rose-600' },
+  { id: 'ai',          icon: '🤖', label: 'VIKRR AI',          gradient: 'from-pink-500 to-rose-600' },
   { id: 'reports',     icon: '📊', label: 'Reporty',          gradient: 'from-slate-500 to-gray-600' },
   { id: 'idea',        icon: '💡', label: 'Nápad',            gradient: 'from-violet-500 to-purple-600' },
   { id: 'request',     icon: '🔧', label: 'Požadavky',        gradient: 'from-sky-500 to-blue-600' },
@@ -210,7 +210,7 @@ interface DashConfig {
 
 function loadDashConfig(): DashConfig {
   try {
-    const raw = localStorage.getItem('nominal-dash-v2');
+    const raw = localStorage.getItem('vikrr-dash-v1');
     if (raw) {
       const parsed = JSON.parse(raw);
       const tileOrder = Array.isArray(parsed?.tileOrder) ? parsed.tileOrder : [];
@@ -228,7 +228,7 @@ function loadDashConfig(): DashConfig {
 }
 
 function saveDashConfig(c: DashConfig) {
-  localStorage.setItem('nominal-dash-v2', JSON.stringify(c));
+  localStorage.setItem('vikrr-dash-v1', JSON.stringify(c));
 }
 
 // ═══════════════════════════════════════════════════════
