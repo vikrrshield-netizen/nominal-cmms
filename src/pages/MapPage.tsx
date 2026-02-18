@@ -4,7 +4,7 @@
 // Budova D → interaktivní SVG půdorys 2.NP
 
 import { useState, useEffect, useMemo } from 'react';
-import { collection, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import {
   ArrowLeft,
@@ -17,6 +17,7 @@ import {
   Layers,
   Plus,
   Truck,
+  Edit2,
 } from 'lucide-react';
 import { useAuthContext } from '../context/AuthContext';
 import { createTask } from '../services/taskService';
@@ -497,14 +498,36 @@ const DEMO_MACHINE_LOGS: EntityLogEntry[] = [
 // ═══════════════════════════════════════════════
 // ASSET DETAIL SHEET — Matryoshka EntityCard style
 // ═══════════════════════════════════════════════
-function AssetDetailSheet({ asset, onClose, onCreateTask, onReport }: {
+function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onEdit }: {
   asset: Asset;
   onClose: () => void;
-  onCreateTask: (asset: Asset) => void;
-  onReport: (asset: Asset) => void;
+  onCreateTask: (asset: Asset) => Promise<void>;
+  onReport: (asset: Asset) => Promise<void>;
+  onEdit: (asset: Asset) => void;
 }) {
   const entity = useMemo(() => assetToEntity(asset), [asset]);
   const logs = useMemo(() => DEMO_MACHINE_LOGS.map((l) => ({ ...l, entityId: asset.id })), [asset.id]);
+  const [actionLoading, setActionLoading] = useState<'report' | 'task' | null>(null);
+  const [actionResult, setActionResult] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const handleAction = async (type: 'report' | 'task') => {
+    console.log('[AssetDetailSheet] Button clicked:', type, asset.id, asset.name);
+    setActionLoading(type);
+    setActionResult(null);
+    try {
+      if (type === 'report') {
+        await onReport(asset);
+      } else {
+        await onCreateTask(asset);
+      }
+      setActionResult({ type: 'success', text: type === 'report' ? 'Porucha nahlášena (P1)' : 'Úkol vytvořen (P3)' });
+      setTimeout(() => onClose(), 1200);
+    } catch (err) {
+      console.error('[AssetDetailSheet] Action failed:', err);
+      setActionResult({ type: 'error', text: `Chyba: ${(err as Error).message}` });
+    }
+    setActionLoading(null);
+  };
 
   return (
     <BottomSheet title={asset.name} isOpen={true} onClose={onClose}>
@@ -530,21 +553,41 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport }: {
         </div>
       )}
 
+      {/* Action result feedback */}
+      {actionResult && (
+        <div className={`mt-3 p-3 rounded-xl text-sm font-semibold text-center ${
+          actionResult.type === 'success'
+            ? 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-400'
+            : 'bg-red-500/20 border border-red-500/30 text-red-400'
+        }`}>
+          {actionResult.type === 'success' ? '✅ ' : '❌ '}{actionResult.text}
+        </div>
+      )}
+
       {/* Action buttons */}
-      <div className="grid grid-cols-2 gap-2 mt-4">
+      <div className="grid grid-cols-3 gap-2 mt-4">
         <button
-          onClick={(e) => { e.stopPropagation(); onReport(asset); }}
-          className="py-3 rounded-xl bg-red-500/15 border border-red-500/30 text-red-400 text-sm font-semibold active:scale-95 transition flex items-center justify-center gap-2 min-h-[48px]"
+          onClick={(e) => { e.stopPropagation(); handleAction('report'); }}
+          disabled={actionLoading !== null}
+          className="py-3 rounded-xl bg-red-500/15 border border-red-500/30 text-red-400 text-sm font-semibold active:scale-95 transition flex items-center justify-center gap-2 min-h-[48px] disabled:opacity-50"
         >
-          <AlertTriangle className="w-4 h-4" />
+          {actionLoading === 'report' ? <Loader2 className="w-4 h-4 animate-spin" /> : <AlertTriangle className="w-4 h-4" />}
           Nahlásit
         </button>
         <button
-          onClick={(e) => { e.stopPropagation(); onCreateTask(asset); }}
-          className="py-3 rounded-xl bg-blue-500/15 border border-blue-500/30 text-blue-400 text-sm font-semibold active:scale-95 transition flex items-center justify-center gap-2 min-h-[48px]"
+          onClick={(e) => { e.stopPropagation(); handleAction('task'); }}
+          disabled={actionLoading !== null}
+          className="py-3 rounded-xl bg-blue-500/15 border border-blue-500/30 text-blue-400 text-sm font-semibold active:scale-95 transition flex items-center justify-center gap-2 min-h-[48px] disabled:opacity-50"
         >
-          <Wrench className="w-4 h-4" />
+          {actionLoading === 'task' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wrench className="w-4 h-4" />}
           Úkol
+        </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); console.log('[AssetDetailSheet] Edit clicked:', asset.id); onEdit(asset); }}
+          className="py-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 text-sm font-semibold active:scale-95 transition flex items-center justify-center gap-2 min-h-[48px]"
+        >
+          <Edit2 className="w-4 h-4" />
+          Upravit
         </button>
       </div>
     </BottomSheet>
@@ -600,6 +643,10 @@ export default function MapPage() {
   const [addCode, setAddCode] = useState('');
   const [addSaving, setAddSaving] = useState(false);
   const [addError, setAddError] = useState('');
+  const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editStatus, setEditStatus] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
   const { user } = useAuthContext();
 
   const { buildings } = useGroupedData(assets, selectedBuildingId);
@@ -712,6 +759,32 @@ export default function MapPage() {
       });
       setSelectedAsset(null);
     } catch (err) { console.error('[MapPage] report failed:', err); }
+  };
+
+  // Edit asset handler — opens edit modal
+  const handleEdit = (asset: Asset) => {
+    console.log('[MapPage] handleEdit triggered:', asset.id, asset.name);
+    setSelectedAsset(null);
+    setEditingAsset(asset);
+    setEditName(asset.name);
+    setEditStatus(asset.status);
+  };
+
+  const handleEditSave = async () => {
+    if (!editingAsset || !editName.trim()) return;
+    setEditSaving(true);
+    try {
+      await updateDoc(doc(db, 'assets', editingAsset.id), {
+        name: editName.trim(),
+        status: editStatus,
+        updatedAt: serverTimestamp(),
+      });
+      console.log('[MapPage] Edit saved:', editingAsset.id);
+      setEditingAsset(null);
+    } catch (err) {
+      console.error('[MapPage] Edit save failed:', err);
+    }
+    setEditSaving(false);
   };
 
   // FAB handler — opens add modal for current drill level
@@ -1067,8 +1140,62 @@ export default function MapPage() {
           onClose={() => setSelectedAsset(null)}
           onCreateTask={handleNewTask}
           onReport={handleReport}
+          onEdit={handleEdit}
         />
       )}
+
+      {/* Edit Asset Modal */}
+      <BottomSheet
+        title={`✏️ Upravit: ${editingAsset?.name || ''}`}
+        isOpen={editingAsset !== null}
+        onClose={() => setEditingAsset(null)}
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm text-slate-400 font-medium mb-1.5">Název</label>
+            <input
+              type="text"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-[15px] placeholder-slate-600 focus:outline-none focus:border-orange-500/50 transition"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-slate-400 font-medium mb-1.5">Stav</label>
+            <div className="grid grid-cols-3 gap-2">
+              {([
+                { id: 'operational', label: 'V provozu', color: 'emerald' },
+                { id: 'maintenance', label: 'Údržba', color: 'amber' },
+                { id: 'breakdown', label: 'Porucha', color: 'red' },
+              ] as const).map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => setEditStatus(s.id)}
+                  className={`py-2.5 rounded-xl text-sm font-semibold border transition ${
+                    editStatus === s.id
+                      ? `bg-${s.color}-500/20 border-${s.color}-500/40 text-${s.color}-400`
+                      : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'
+                  }`}
+                  style={editStatus === s.id ? {
+                    backgroundColor: s.color === 'emerald' ? 'rgba(16,185,129,0.2)' : s.color === 'amber' ? 'rgba(245,158,11,0.2)' : 'rgba(239,68,68,0.2)',
+                    borderColor: s.color === 'emerald' ? 'rgba(16,185,129,0.4)' : s.color === 'amber' ? 'rgba(245,158,11,0.4)' : 'rgba(239,68,68,0.4)',
+                    color: s.color === 'emerald' ? '#34d399' : s.color === 'amber' ? '#fbbf24' : '#f87171',
+                  } : undefined}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <button
+            onClick={handleEditSave}
+            disabled={!editName.trim() || editSaving}
+            className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold text-base active:scale-[0.98] transition-all disabled:opacity-50"
+          >
+            {editSaving ? 'Ukládám...' : 'Uložit změny'}
+          </button>
+        </div>
+      </BottomSheet>
 
       {/* [+] Add Modal */}
       <BottomSheet
