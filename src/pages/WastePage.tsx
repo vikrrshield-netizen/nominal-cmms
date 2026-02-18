@@ -9,8 +9,11 @@ import type { WasteContainer, FillLevel } from '../hooks/useWaste';
 import { Breadcrumb } from '../components/ui';
 import {
   Recycle, Calendar, Bell, CheckCircle2, AlertTriangle,
-  Truck, X, Loader2, Edit2,
+  Truck, X, Loader2, Edit2, Download, Trash2,
 } from 'lucide-react';
+import { useReports } from '../hooks/useReports';
+import { doc, deleteDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 // ═══════════════════════════════════════════
 // COMPONENT
@@ -23,6 +26,7 @@ export default function WastePage() {
     containers, loading, stats, shouldNotify,
     getNextPickup, updateFillLevel, markEmptied, formatDay,
   } = useWaste();
+  const { exportXLSX } = useReports();
 
   // State
   const [showNotification, setShowNotification] = useState(true);
@@ -73,6 +77,22 @@ export default function WastePage() {
             <Recycle className="w-6 h-6 text-emerald-600" />
             Odpadové hospodářství
           </h1>
+          <button
+            onClick={() => {
+              const data = containers.map(c => ({
+                name: c.name, type: c.type, location: c.location,
+                fillLevel: c.fillLevel,
+                schedule_day: c.schedule?.dayOfWeek ?? '',
+                schedule_company: c.schedule?.company ?? '',
+              }));
+              exportXLSX('waste', data, { filename: `NOMINAL_odpady_${new Date().toISOString().slice(0, 10)}.xlsx` });
+            }}
+            className="bg-slate-700 text-white px-3 py-2 rounded-lg font-medium flex items-center gap-2 hover:bg-slate-600"
+            title="Export XLSX"
+          >
+            <Download className="w-4 h-4" />
+            <span className="hidden sm:inline">Export</span>
+          </button>
         </div>
       </div>
 
@@ -348,6 +368,20 @@ function ContainerModal({ container, onClose, onUpdateFill, onMarkEmptied, forma
           >
             {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
             Označit jako vyvezený
+          </button>
+
+          {/* Delete */}
+          <button
+            onClick={async () => {
+              if (window.confirm(`Opravdu smazat kontejner "${container.name}"?`)) {
+                await deleteDoc(doc(db, 'waste', container.id));
+                onClose();
+              }
+            }}
+            className="w-full py-2.5 bg-red-50 text-red-600 rounded-xl font-medium hover:bg-red-100 flex items-center justify-center gap-2 border border-red-200"
+          >
+            <Trash2 className="w-4 h-4" />
+            Smazat kontejner
           </button>
         </div>
       </div>

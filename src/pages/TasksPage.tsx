@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, onSnapshot, doc, updateDoc, addDoc, Timestamp, serverTimestamp } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, addDoc, deleteDoc, Timestamp, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
 import { useFormDraft } from '../hooks/useFormDraft';
@@ -15,7 +15,10 @@ import {
   Loader2,
   Inbox,
   Edit2,
+  Download,
+  Trash2,
 } from 'lucide-react';
+import { useReports } from '../hooks/useReports';
 
 import FAB from '../components/ui/FAB';
 import EmptyState from '../components/ui/EmptyState';
@@ -150,7 +153,7 @@ const TAB_OPTIONS: { key: FilterTab; label: string; color: string }[] = [
 // ═══════════════════════════════════════════════════
 // TABLE ROW
 // ═══════════════════════════════════════════════════
-function TaskRow({ task, onClick, onEdit }: { task: Task; onClick: () => void; onEdit: () => void }) {
+function TaskRow({ task, onClick, onEdit, onDelete }: { task: Task; onClick: () => void; onEdit: () => void; onDelete: () => void }) {
   const pc = PRIORITY_CONFIG[task.priority] || PRIORITY_CONFIG.P3;
   const sb = STATUS_BADGES[task.status] || STATUS_BADGES.backlog;
   const assignee = task.assignedToName || task.assignedTo || '—';
@@ -203,14 +206,23 @@ function TaskRow({ task, onClick, onEdit }: { task: Task; onClick: () => void; o
       </td>
 
       {/* Akce */}
-      <td className="px-1 py-2 sm:px-2 w-[36px]">
-        <button
-          onClick={(e) => { e.stopPropagation(); onEdit(); }}
-          className="p-1.5 rounded-lg hover:bg-white/10 text-slate-500 hover:text-amber-400 transition"
-          title="Upravit"
-        >
-          <Edit2 className="w-3.5 h-3.5" />
-        </button>
+      <td className="px-1 py-2 sm:px-2 w-[56px]">
+        <div className="flex items-center gap-0.5">
+          <button
+            onClick={(e) => { e.stopPropagation(); onEdit(); }}
+            className="p-1.5 rounded-lg hover:bg-white/10 text-slate-500 hover:text-amber-400 transition"
+            title="Upravit"
+          >
+            <Edit2 className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            className="p-1.5 rounded-lg hover:bg-white/10 text-slate-500 hover:text-red-400 transition"
+            title="Smazat"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </td>
     </tr>
   );
@@ -223,6 +235,7 @@ export default function TasksPage() {
   const navigate = useNavigate();
   const { user } = useAuthContext();
   const { tasks, loading } = useTasks();
+  const { exportXLSX } = useReports();
 
   const [showNewTask, setShowNewTask] = useState(false);
   const [completingTask, setCompletingTask] = useState<Task | null>(null);
@@ -320,6 +333,13 @@ export default function TasksPage() {
               {activeCount} otevřených · {doneCount} hotových
             </p>
           </div>
+          <button
+            onClick={() => exportXLSX('tasks', filteredTasks, { filename: `NOMINAL_ukoly_${new Date().toISOString().slice(0, 10)}.xlsx` })}
+            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition"
+            title="Export XLSX"
+          >
+            <Download className="w-5 h-5 text-slate-400" />
+          </button>
           {loading && <Loader2 className="w-5 h-5 text-slate-500 animate-spin" />}
         </div>
 
@@ -380,7 +400,11 @@ export default function TasksPage() {
               </thead>
               <tbody>
                 {filteredTasks.map((task) => (
-                  <TaskRow key={task.id} task={task} onClick={() => setCompletingTask(task)} onEdit={() => setEditingTask(task)} />
+                  <TaskRow key={task.id} task={task} onClick={() => setCompletingTask(task)} onEdit={() => setEditingTask(task)} onDelete={async () => {
+                    if (window.confirm(`Smazat úkol "${task.title}"?`)) {
+                      await deleteDoc(doc(db, 'tasks', task.id));
+                    }
+                  }} />
                 ))}
               </tbody>
             </table>

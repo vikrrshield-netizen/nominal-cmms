@@ -9,7 +9,13 @@ import { Breadcrumb } from '../components/ui';
 import {
   Search, Plus, QrCode, Truck, X,
   CheckCircle2, TrendingDown, TrendingUp, Loader2, Edit2,
+  Download, Trash2, Upload,
 } from 'lucide-react';
+import { useReports } from '../hooks/useReports';
+import { doc, deleteDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import ImportModal from '../components/ui/ImportModal';
+import { importInventory, type InventoryImportRow } from '../utils/importers/importInventory';
 
 // ═══════════════════════════════════════════
 // CONFIG
@@ -43,6 +49,7 @@ export default function InventoryPage() {
   const [searchParams] = useSearchParams();
   const { hasPermission } = useAuthContext();
   const { items, loading, stats, issueItem, receiveItem } = useInventory();
+  const { exportXLSX } = useReports();
 
   // State
   const [searchQuery, setSearchQuery] = useState('');
@@ -50,6 +57,7 @@ export default function InventoryPage() {
   const [filterStatus, setFilterStatus] = useState<StockStatus | 'all'>('all');
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
   const [showOrderModal, setShowOrderModal] = useState(searchParams.get('order') === '1');
+  const [showImportModal, setShowImportModal] = useState(false);
 
   // Permissions
   const canManage = hasPermission('inventory.issue') || hasPermission('inventory.receive');
@@ -102,6 +110,24 @@ export default function InventoryPage() {
             )}
           </div>
           <div className="flex gap-2">
+            <button
+              onClick={() => exportXLSX('inventory', items, { filename: `NOMINAL_sklad_${new Date().toISOString().slice(0, 10)}.xlsx` })}
+              className="bg-slate-700 text-white px-3 py-2 rounded-lg font-medium flex items-center gap-2 hover:bg-slate-600"
+              title="Export XLSX"
+            >
+              <Download className="w-5 h-5" />
+              <span className="hidden sm:inline">Export</span>
+            </button>
+            {canManage && (
+              <button
+                onClick={() => setShowImportModal(true)}
+                className="bg-indigo-600 text-white px-3 py-2 rounded-lg font-medium flex items-center gap-2 hover:bg-indigo-700"
+                title="Import z Excelu"
+              >
+                <Upload className="w-5 h-5" />
+                <span className="hidden sm:inline">Import</span>
+              </button>
+            )}
             {canOrder && (
               <button
                 onClick={() => setShowOrderModal(true)}
@@ -258,6 +284,18 @@ export default function InventoryPage() {
           onClose={() => setShowOrderModal(false)}
         />
       )}
+
+      {/* Import Modal */}
+      {showImportModal && (
+        <ImportModal
+          title="Import skladu z Excelu"
+          onClose={() => setShowImportModal(false)}
+          onImport={async (rows) => {
+            const result = await importInventory(rows as unknown as InventoryImportRow[]);
+            return { imported: result.imported, failed: result.failed, errors: result.errors };
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -367,6 +405,22 @@ function ItemDetailModal({ item, onClose, canManage, onIssue, onReceive }: {
                 ))}
               </div>
             </div>
+          )}
+
+          {/* Delete */}
+          {canManage && (
+            <button
+              onClick={async () => {
+                if (window.confirm(`Opravdu smazat "${item.name}"?`)) {
+                  await deleteDoc(doc(db, 'inventory', item.id));
+                  onClose();
+                }
+              }}
+              className="w-full py-2.5 bg-red-50 text-red-600 rounded-xl font-medium hover:bg-red-100 flex items-center justify-center gap-2 border border-red-200"
+            >
+              <Trash2 className="w-4 h-4" />
+              Smazat položku
+            </button>
           )}
 
           {/* Adjust Quantity */}

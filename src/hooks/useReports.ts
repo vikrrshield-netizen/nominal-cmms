@@ -25,6 +25,7 @@ type ExportType =
   | 'transactions'     // Pohyby na skladu
   | 'revisions'        // Revize a kalibrace
   | 'fleet'            // Vozový park
+  | 'waste'            // Odpady
   | 'audit';           // Audit log
 
 interface ExportOptions {
@@ -382,6 +383,7 @@ const SHEET_NAMES: Record<string, string> = {
   transactions: 'Pohyby skladu',
   revisions: 'Revize',
   fleet: 'Vozidla',
+  waste: 'Odpady',
   audit: 'Audit log',
 };
 

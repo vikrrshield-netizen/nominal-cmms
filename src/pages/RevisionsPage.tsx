@@ -13,8 +13,10 @@ import { Breadcrumb } from '../components/ui';
 import { useReports } from '../hooks/useReports';
 import {
   Shield, AlertTriangle, CheckCircle2,
-  Loader2, Calendar, Search, X, Download, Edit2,
+  Loader2, Calendar, Search, X, Download, Edit2, Trash2,
 } from 'lucide-react';
+import { doc, deleteDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 // ═══════════════════════════════════════════
 // COMPONENT
@@ -410,6 +412,20 @@ function RevisionDetailModal({ revision, onClose, canEdit, onLog }: {
           >
             <Download className="w-5 h-5" />
             Export PDF
+          </button>
+
+          {/* Delete */}
+          <button
+            onClick={async () => {
+              if (window.confirm(`Opravdu smazat revizi "${revision.title}"?`)) {
+                await deleteDoc(doc(db, 'revisions', revision.id));
+                onClose();
+              }
+            }}
+            className="w-full py-2.5 bg-red-50 text-red-600 rounded-xl font-medium hover:bg-red-100 flex items-center justify-center gap-2 border border-red-200"
+          >
+            <Trash2 className="w-4 h-4" />
+            Smazat revizi
           </button>
 
           {/* Log new revision */}

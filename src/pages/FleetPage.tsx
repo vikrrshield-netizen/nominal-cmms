@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, query, where, onSnapshot, doc, getDoc, addDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, getDoc, addDoc, updateDoc, deleteDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
 import { useEntityLogs } from '../hooks/useEntityLogs';
@@ -15,7 +15,10 @@ import {
 import {
   ArrowLeft, X, Loader2, Car, Send, Clock, Plus,
   AlertTriangle, CheckCircle2, Pencil, Droplets, Printer, PlusCircle, Save,
+  Download, Trash2, Upload,
 } from 'lucide-react';
+import { useReports } from '../hooks/useReports';
+import ImportModal from '../components/ui/ImportModal';
 
 // ═══════════════════════════════════════════
 // TOAST SYSTEM
@@ -580,6 +583,21 @@ function VehicleDetailModal({ entity, blueprint, onClose, toast }: {
               </div>
             </div>
           )}
+
+          {/* Delete */}
+          <button
+            onClick={async () => {
+              if (window.confirm(`Opravdu smazat ${entity.name}?`)) {
+                await deleteDoc(doc(db, 'entities', entity.id));
+                toast(`${entity.name} smazáno`, 'info');
+                onClose();
+              }
+            }}
+            className="w-full py-3 bg-red-500/10 text-red-400 rounded-xl font-bold hover:bg-red-500/20 flex items-center justify-center gap-2 border border-red-500/20"
+          >
+            <Trash2 className="w-5 h-5" />
+            Smazat vozidlo
+          </button>
         </div>
       </div>
     </div>
@@ -632,8 +650,10 @@ export default function FleetPage() {
   const navigate = useNavigate();
   const { entities, loading } = useEntities('vehicle');
   const blueprint = useBlueprint('blueprint_vehicle');
+  const { exportXLSX } = useReports();
   const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const { toasts, show: toast } = useToast();
 
   const sortedEntities = useMemo(() => {
@@ -666,10 +686,25 @@ export default function FleetPage() {
               <div className="text-xs text-slate-500">{entities.length} vozidel</div>
             </div>
           </div>
-          <button onClick={() => setShowAddModal(true)}
-            className="p-3 bg-blue-600 rounded-xl hover:bg-blue-500 transition active:scale-[0.95] min-w-[48px] min-h-[48px] flex items-center justify-center shadow-lg shadow-blue-500/20">
-            <Plus className="w-6 h-6 text-white" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => {
+              const data = entities.map(e => ({ name: e.name, code: e.code, status: e.status, ...e.data }));
+              exportXLSX('fleet', data, { filename: `NOMINAL_fleet_${new Date().toISOString().slice(0, 10)}.xlsx` });
+            }}
+              className="p-3 bg-slate-700 rounded-xl hover:bg-slate-600 transition min-w-[48px] min-h-[48px] flex items-center justify-center"
+              title="Export XLSX">
+              <Download className="w-5 h-5 text-white" />
+            </button>
+            <button onClick={() => setShowImportModal(true)}
+              className="p-3 bg-indigo-600 rounded-xl hover:bg-indigo-500 transition min-w-[48px] min-h-[48px] flex items-center justify-center"
+              title="Import z Excelu">
+              <Upload className="w-5 h-5 text-white" />
+            </button>
+            <button onClick={() => setShowAddModal(true)}
+              className="p-3 bg-blue-600 rounded-xl hover:bg-blue-500 transition active:scale-[0.95] min-w-[48px] min-h-[48px] flex items-center justify-center shadow-lg shadow-blue-500/20">
+              <Plus className="w-6 h-6 text-white" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -696,6 +731,49 @@ export default function FleetPage() {
       {/* Modals */}
       {selectedEntity && <VehicleDetailModal entity={selectedEntity} blueprint={blueprint} onClose={() => setSelectedEntity(null)} toast={toast} />}
       {showAddModal && <AddVehicleModal onClose={() => setShowAddModal(false)} onSuccess={(name) => { setShowAddModal(false); toast(`${name} přidáno do flotily`); }} />}
+      {showImportModal && (
+        <ImportModal
+          title="Import vozidel z Excelu"
+          onClose={() => setShowImportModal(false)}
+          onImport={async (rows) => {
+            const BATCH_SIZE = 500;
+            let imported = 0;
+            let failed = 0;
+            const errors: string[] = [];
+            for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+              const chunk = rows.slice(i, i + BATCH_SIZE);
+              const batch = writeBatch(db);
+              for (const row of chunk) {
+                try {
+                  const name = String(row.name || row.nazev || '');
+                  if (!name) { failed++; continue; }
+                  const ref = doc(collection(db, 'entities'));
+                  batch.set(ref, {
+                    parentId: 'entity_fleet', type: 'vehicle', blueprintId: 'blueprint_vehicle',
+                    name, code: String(row.code || row.spz || name.substring(0, 3).toUpperCase()),
+                    status: 'operational',
+                    data: {
+                      registration: String(row.spz || row.registration || ''),
+                      stk_date: String(row.stk_date || row.stk || ''),
+                      fuel_type: String(row.fuel_type || row.palivo || 'Nafta'),
+                      year: Number(row.year || row.rok || new Date().getFullYear()),
+                      tachometer: Number(row.tachometer || row.km || 0),
+                      oil_hours: 0, oil_limit: 500, oil_type: '', insurance_date: '', keys_location: '',
+                      assigned_to: String(row.assigned_to || row.ridic || ''),
+                    },
+                    tags: [], createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+                    createdBy: 'import', isDeleted: false,
+                  });
+                  imported++;
+                } catch (err) { failed++; errors.push(`Chyba: ${(err as Error).message}`); }
+              }
+              try { await batch.commit(); } catch (err) { failed += chunk.length; imported -= chunk.length; errors.push(`Batch selhal: ${(err as Error).message}`); }
+            }
+            if (imported > 0) toast(`${imported} vozidel importováno`);
+            return { imported, failed, errors };
+          }}
+        />
+      )}
 
       {/* Toast */}
       <ToastContainer toasts={toasts} />
