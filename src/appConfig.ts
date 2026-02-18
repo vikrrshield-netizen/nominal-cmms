@@ -5,6 +5,8 @@
 const appConfig = {
   APP_NAME: 'Nominal CMMS',
   APP_NAME_SHORT: 'Nominal',
+  COMPANY_NAME: 'NOMINAL s.r.o.',
+  COMPANY_ADDRESS: 'Kozlov 68, 594 51',
   PRIMARY_COLOR: '#f97316',        // orange-500
   LOGO_URL: '',                    // Optional: URL to logo image
   LOGO_LETTER: 'N',               // Fallback letter when no LOGO_URL

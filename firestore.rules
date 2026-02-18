@@ -123,6 +123,36 @@ service cloud.firestore {
 
       // HARD DELETE — POUZE SUPERADMIN
       allow delete: if isSuperAdmin();
+
+      // SUB-COLLECTION: pest_logs (hmyzolapače)
+      match /pest_logs/{logId} {
+        allow read: if isAnyRole();
+        allow create: if isAnyRole();
+        allow update: if false;  // Logy se needitují
+        allow delete: if isSuperAdmin();
+      }
+
+      // SUB-COLLECTION: empty_logs (vývoz popelnic)
+      match /empty_logs/{logId} {
+        allow read: if isAnyRole();
+        allow create: if isAnyRole();
+        allow update: if false;
+        allow delete: if isSuperAdmin();
+      }
+    }
+
+    // ═══════════════════════════════════════════
+    // STATS_AGGREGATES — agregovaná statistika
+    // ═══════════════════════════════════════════
+    match /stats_aggregates/{docId} {
+      allow read: if isAnyRole();
+      // Zápis jen Cloud Functions (Admin SDK) nebo SUPERADMIN
+      allow write: if isSuperAdmin();
+    }
+
+    match /stats_aggregates/{docId}/{subCol}/{subDocId} {
+      allow read: if isAnyRole();
+      allow write: if isSuperAdmin();
     }
 
     // ═══════════════════════════════════════════

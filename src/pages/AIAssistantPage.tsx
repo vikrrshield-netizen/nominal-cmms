@@ -28,7 +28,7 @@ interface Message {
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
 
-const SYSTEM_PROMPT = `Jsi AI asistent ${appConfig.APP_NAME} — systému pro správu údržby potravinářského závodu v Kozlově.
+const SYSTEM_PROMPT = `Jsi AI asistent ${appConfig.APP_NAME} — systému pro správu údržby potravinářského závodu (${appConfig.COMPANY_NAME}, ${appConfig.COMPANY_ADDRESS}).
 Odpovídej VŽDY česky. Buď stručný a profesionální.
 
 MODULY SYSTÉMU:

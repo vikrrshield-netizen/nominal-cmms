@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { BUILDINGS, ROOMS, ZONE_COLORS, CATEGORY_ICONS } from '../data/factory';
 import type { Room } from '../data/factory';
+import appConfig from '../appConfig';
 
 interface FactoryMapProps {
   onRoomSelect?: (room: Room) => void;
@@ -22,7 +23,7 @@ export const FactoryMap = ({ onRoomSelect, selectedRoomId }: FactoryMapProps) =>
     <div className="space-y-4">
       <div className="bg-slate-800 rounded-2xl p-4 border border-slate-700">
         <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
-          <span>🏭</span> NOMINAL s.r.o. - Kozlov 68
+          <span>🏭</span> {appConfig.COMPANY_NAME} - {appConfig.COMPANY_ADDRESS}
         </h3>
         
         <div className="grid grid-cols-5 gap-2 mb-4">

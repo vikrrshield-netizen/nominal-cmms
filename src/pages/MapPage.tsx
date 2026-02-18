@@ -578,14 +578,21 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onEdit, onOp
     setActionLoading(null);
   };
 
-  // Quick Empty for waste bins
+  // Quick Empty for waste bins — update asset + log to history
+  const { user: wasteUser } = useAuthContext();
   const handleQuickEmpty = async () => {
     setActionLoading('empty');
     try {
+      // Update asset status
       await updateDoc(doc(db, 'assets', asset.id), {
         lastEmptiedAt: serverTimestamp(),
         status: 'operational',
         updatedAt: serverTimestamp(),
+      });
+      // Log to empty_logs sub-collection for history
+      await addDoc(collection(db, 'assets', asset.id, 'empty_logs'), {
+        emptiedBy: wasteUser?.displayName || 'Neznámý',
+        emptiedAt: serverTimestamp(),
       });
       showToast(`${asset.name} — označen jako vyvezený`, 'success');
       setTimeout(() => onClose(), 800);
@@ -1673,14 +1680,19 @@ export default function MapPage() {
             setAddSaving(true);
             setAddError('');
             try {
+              const createdById = user?.id || 'unknown';
+              const createdByName = user?.displayName || 'Neznámý';
+
               if (showAddModal === 'asset' && selectedBuildingId) {
                 const assetData: Record<string, any> = {
                   name,
-                  code: addCode.trim() || undefined,
+                  code: addCode.trim() || '',
                   buildingId: selectedBuildingId,
                   areaName: selectedRoomName || 'Ostatní',
                   status: 'operational',
                   category: addCategory || '',
+                  createdById,
+                  createdByName,
                   createdAt: serverTimestamp(),
                   updatedAt: serverTimestamp(),
                 };
@@ -1692,11 +1704,13 @@ export default function MapPage() {
               } else if (showAddModal === 'room' && selectedBuildingId) {
                 await addDoc(collection(db, 'assets'), {
                   name: `${name} — placeholder`,
-                  code: addCode.trim() || undefined,
+                  code: addCode.trim() || '',
                   buildingId: selectedBuildingId,
                   areaName: name,
                   status: 'idle',
                   category: '',
+                  createdById,
+                  createdByName,
                   createdAt: serverTimestamp(),
                   updatedAt: serverTimestamp(),
                 });
@@ -1709,6 +1723,8 @@ export default function MapPage() {
                   areaName: 'Hlavní',
                   status: 'idle',
                   category: '',
+                  createdById,
+                  createdByName,
                   createdAt: serverTimestamp(),
                   updatedAt: serverTimestamp(),
                 });

@@ -172,7 +172,7 @@ function serviceReportHTML(data: Record<string, any>, css: string): string {
   const { task, asset, parts = [], technician, completedAt } = data;
   return `<!DOCTYPE html><html lang="cs"><head><meta charset="utf-8">${css}</head><body>
     <div class="header">
-      <div><h1>Servisní list</h1><p>NOMINAL s.r.o. — Kozlov 68, 594 51</p></div>
+      <div><h1>Servisní list</h1><p>${appConfig.COMPANY_NAME} — ${appConfig.COMPANY_ADDRESS}</p></div>
       <div class="meta">
         <div>Č. dokumentu: SL-${task?.id?.slice(0, 8) || 'XXX'}</div>
         <div>Datum: ${formatDateCZ(completedAt || new Date())}</div>
@@ -233,7 +233,7 @@ function handoverProtocolHTML(data: Record<string, any>, css: string): string {
   const { asset, fromUser, toUser, notes, items = [] } = data;
   return `<!DOCTYPE html><html lang="cs"><head><meta charset="utf-8">${css}</head><body>
     <div class="header">
-      <div><h1>Předávací protokol</h1><p>NOMINAL s.r.o.</p></div>
+      <div><h1>Předávací protokol</h1><p>${appConfig.COMPANY_NAME}</p></div>
       <div class="meta"><div>Datum: ${formatDateCZ(new Date())}</div></div>
     </div>
 
@@ -273,7 +273,7 @@ function revisionReportHTML(data: Record<string, any>, css: string): string {
   const { revision, assets = [] } = data;
   return `<!DOCTYPE html><html lang="cs"><head><meta charset="utf-8">${css}</head><body>
     <div class="header">
-      <div><h1>Revizní zpráva</h1><p>NOMINAL s.r.o.</p></div>
+      <div><h1>Revizní zpráva</h1><p>${appConfig.COMPANY_NAME}</p></div>
       <div class="meta"><div>Datum: ${formatDateCZ(new Date())}</div></div>
     </div>
 
@@ -313,7 +313,7 @@ function inventoryReportHTML(data: Record<string, any>, css: string): string {
   const { items = [], generatedBy } = data;
   return `<!DOCTYPE html><html lang="cs"><head><meta charset="utf-8">${css}</head><body>
     <div class="header">
-      <div><h1>Stav skladu</h1><p>NOMINAL s.r.o.</p></div>
+      <div><h1>Stav skladu</h1><p>${appConfig.COMPANY_NAME}</p></div>
       <div class="meta">
         <div>Datum: ${formatDateCZ(new Date())}</div>
         <div>Vytvořil: ${generatedBy || '—'}</div>
@@ -347,7 +347,7 @@ function taskSummaryHTML(data: Record<string, any>, css: string): string {
   const { tasks = [], dateFrom, dateTo, generatedBy } = data;
   return `<!DOCTYPE html><html lang="cs"><head><meta charset="utf-8">${css}</head><body>
     <div class="header">
-      <div><h1>Přehled úkolů</h1><p>NOMINAL s.r.o.</p></div>
+      <div><h1>Přehled úkolů</h1><p>${appConfig.COMPANY_NAME}</p></div>
       <div class="meta">
         <div>Období: ${formatDateCZ(dateFrom)} – ${formatDateCZ(dateTo)}</div>
         <div>Vytvořil: ${generatedBy || '—'}</div>

@@ -804,7 +804,7 @@ function PickupModal({ ticket, onClose, onConfirm }: {
               type="text"
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="Kompostárna Kozlov"
+              placeholder="Poznámka k vývozu"
               className="w-full bg-slate-700 text-white p-3 rounded-xl border border-slate-600 outline-none"
             />
           </div>
