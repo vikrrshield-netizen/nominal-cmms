@@ -1,5 +1,5 @@
 // src/hooks/useEntityLogs.ts
-// NOMINAL CMMS — Entity logs hook (realtime, audit-proof)
+// VIKRR — Asset Shield — Entity logs hook (realtime, audit-proof)
 
 import { useState, useEffect, useCallback } from 'react';
 import {

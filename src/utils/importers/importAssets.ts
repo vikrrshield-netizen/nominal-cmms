@@ -1,5 +1,5 @@
 // src/utils/importers/importAssets.ts
-// NOMINAL CMMS — Bulk asset importer
+// VIKRR — Asset Shield — Bulk asset importer
 //
 // Reads validated rows and creates asset documents in Firestore.
 

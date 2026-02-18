@@ -1,5 +1,5 @@
 // src/types/firestore.ts
-// NOMINAL CMMS — Firestore Schema (všechny kolekce)
+// VIKRR — Asset Shield — Firestore Schema (všechny kolekce)
 
 import { Timestamp } from 'firebase/firestore';
 

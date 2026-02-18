@@ -1,5 +1,5 @@
 // src/pages/InspectionsPage.tsx
-// NOMINAL CMMS — Kontrolní body budovy (měsíční checklist)
+// VIKRR — Asset Shield — Kontrolní body budovy (měsíční checklist)
 // Digitalizace formuláře "Kontrola budovy C,D"
 
 import { useState } from 'react';

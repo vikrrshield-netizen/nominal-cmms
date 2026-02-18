@@ -1,5 +1,5 @@
 // src/utils/backupService.ts
-// NOMINAL CMMS — Auto-backup service
+// VIKRR — Asset Shield — Auto-backup service
 // Saves snapshots to LocalStorage before destructive operations.
 // Can also push to Firestore _backups collection for persistence.
 

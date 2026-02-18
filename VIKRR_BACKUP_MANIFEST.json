@@ -1,0 +1,218 @@
+{
+  "manifest": {
+    "name": "VIKRR Asset Shield",
+    "version": "2.1",
+    "brand": "VIKRR",
+    "product": "Asset Shield",
+    "generatedAt": "2026-02-18T00:00:00.000Z",
+    "generatedBy": "Claude AI + Vilém Krejčí",
+    "deployUrl": "https://nominal-cmms.web.app",
+    "targetDomain": "shield.vikrr.com"
+  },
+
+  "stack": {
+    "framework": "React 19",
+    "language": "TypeScript 5.9",
+    "bundler": "Vite 7",
+    "styling": "Tailwind CSS v4",
+    "backend": "Firebase (Auth, Firestore, Storage, Hosting, Cloud Functions)",
+    "router": "React Router DOM v7",
+    "offlinePersistence": "Firestore IndexedDB + localStorage"
+  },
+
+  "architecture": {
+    "entryPoint": "src/main.tsx",
+    "appRoot": "src/App.tsx",
+    "config": "src/appConfig.ts",
+    "globalCSS": "src/index.css",
+    "firebaseInit": "src/lib/firebase.ts"
+  },
+
+  "pages": {
+    "count": 23,
+    "files": [
+      { "file": "src/pages/DashboardPage.tsx", "route": "/", "description": "Hlavní dashboard s dlaždicemi, HUD, Lemon List" },
+      { "file": "src/pages/LoginPage.tsx", "route": null, "description": "PIN přihlášení (4ciferný kód)" },
+      { "file": "src/pages/KioskPage.tsx", "route": "/kiosk", "description": "Kiosk mód pro operátory" },
+      { "file": "src/pages/TasksPage.tsx", "route": "/tasks", "description": "Pracovní příkazy (WO-YYYY-NNN)" },
+      { "file": "src/pages/MapPage.tsx", "route": "/map", "description": "Mapa areálu s budovami a zařízeními" },
+      { "file": "src/pages/AssetCardPage.tsx", "route": "/asset/:assetId", "description": "Detail zařízení — pasport, úkoly, revize" },
+      { "file": "src/pages/InventoryPage.tsx", "route": "/inventory", "description": "Sklad náhradních dílů" },
+      { "file": "src/pages/FleetPage.tsx", "route": "/fleet", "description": "Vozový park" },
+      { "file": "src/pages/RevisionsPage.tsx", "route": "/revisions", "description": "Přehled revizí (elektrické, požární, tlakové)" },
+      { "file": "src/pages/WastePage.tsx", "route": "/waste", "description": "Odpadové hospodářství se semaforem" },
+      { "file": "src/pages/CalendarPage.tsx", "route": "/calendar", "description": "Týdenní plán" },
+      { "file": "src/pages/LouparnaPage.tsx", "route": "/louparna", "description": "Loupárna — sila, výroba, plevy" },
+      { "file": "src/pages/InspectionsPage.tsx", "route": "/inspections", "description": "Měsíční kontroly budov s carry-over pamětí" },
+      { "file": "src/pages/BuildingInspectionPage.tsx", "route": "/inspection", "description": "Kontrola budov (denní obchůzka)" },
+      { "file": "src/pages/TrustBoxPage.tsx", "route": "/trustbox", "description": "Anonymní schránka důvěry" },
+      { "file": "src/pages/NotificationsPage.tsx", "route": "/notifications", "description": "Centrum notifikací" },
+      { "file": "src/pages/ReportsPage.tsx", "route": "/reports", "description": "Reporty a statistiky s exportem" },
+      { "file": "src/pages/AIAssistantPage.tsx", "route": "/ai", "description": "AI asistent údržby (Gemini)" },
+      { "file": "src/pages/AdminPage.tsx", "route": "/admin", "description": "Administrace uživatelů, rolí, import/export" },
+      { "file": "src/pages/NoticeboardPage.tsx", "route": "/noticeboard", "description": "Týmová nástěnka s připínáním" },
+      { "file": "src/pages/AcademyPage.tsx", "route": "/academy", "description": "Znalostní báze — příručka, logika, AI legacy" },
+      { "file": "src/pages/FacilityListPage.tsx", "route": null, "description": "Seznam provozoven" },
+      { "file": "src/pages/FacilityDetailPage.tsx", "route": null, "description": "Detail provozovny" }
+    ]
+  },
+
+  "hooks": {
+    "count": 15,
+    "files": [
+      { "file": "src/hooks/useAuth.ts", "purpose": "PIN autentizace přes Firebase Auth" },
+      { "file": "src/hooks/useFirestore.ts", "purpose": "Generic CRUD (useDocument, useCollection)" },
+      { "file": "src/hooks/useFirestoreAction.ts", "purpose": "Bezpečné Firestore operace" },
+      { "file": "src/hooks/usePermissions.ts", "purpose": "Dynamický RBAC" },
+      { "file": "src/hooks/useStats.ts", "purpose": "Dashboard statistiky (MTBF, MTTR, Lemon List)" },
+      { "file": "src/hooks/useFleet.ts", "purpose": "Vozový park (realtime)" },
+      { "file": "src/hooks/useWaste.ts", "purpose": "Odpadové hospodářství (realtime)" },
+      { "file": "src/hooks/useInventory.ts", "purpose": "Sklad s transakčním odpisem" },
+      { "file": "src/hooks/useRevisions.ts", "purpose": "Revize (realtime)" },
+      { "file": "src/hooks/useInspections.ts", "purpose": "Kontroly budov + carry-over paměť" },
+      { "file": "src/hooks/useLouparna.ts", "purpose": "Loupárna (sila, výroba, plevy)" },
+      { "file": "src/hooks/usePestControl.ts", "purpose": "Hmyzolapače (pest_logs)" },
+      { "file": "src/hooks/useFormDraft.ts", "purpose": "Auto-save rozpracovaných formulářů" },
+      { "file": "src/hooks/useEntityLogs.ts", "purpose": "Audit trail pro entity" },
+      { "file": "src/hooks/useReports.ts", "purpose": "Generování reportů a exportů" }
+    ]
+  },
+
+  "services": {
+    "count": 5,
+    "files": [
+      { "file": "src/services/taskService.ts", "purpose": "Pracovní příkazy (CRUD + status flow)" },
+      { "file": "src/services/assetService.ts", "purpose": "Správa zařízení" },
+      { "file": "src/services/fleetService.ts", "purpose": "Vozidla" },
+      { "file": "src/services/workLogService.ts", "purpose": "Pracovní záznamy" },
+      { "file": "src/services/workOrderService.ts", "purpose": "Work orders" }
+    ]
+  },
+
+  "components": {
+    "ui": [
+      "BottomSheet.tsx", "Toast.tsx", "NominalLogo.tsx", "ImportModal.tsx",
+      "CompleteTaskModal.tsx", "AlertSemaphore.tsx", "StatCard.tsx",
+      "EmptyState.tsx", "FAB.tsx", "Timeline.tsx", "Tile.tsx", "index.tsx"
+    ],
+    "shared": [
+      "BottomNav.tsx", "EntityCard.tsx", "EntityModal.tsx",
+      "AssetList.tsx", "AssetDetail.tsx", "CreateWorkOrderModal.tsx", "FactoryMap.tsx"
+    ],
+    "maps": ["FloorPlan2NP.tsx"]
+  },
+
+  "types": [
+    { "file": "src/types/firestore.ts", "purpose": "Kompletní Firestore schéma" },
+    { "file": "src/types/user.ts", "purpose": "Uživatelé, role, oprávnění" },
+    { "file": "src/types/asset.ts", "purpose": "Zařízení a stroje" },
+    { "file": "src/types/inventory.ts", "purpose": "Skladové položky" },
+    { "file": "src/types/rbac.ts", "purpose": "Dynamické RBAC definice" }
+  ],
+
+  "utilities": [
+    { "file": "src/utils/vikrr_migration.ts", "purpose": "Export 30+ kolekcí pro migraci" },
+    { "file": "src/utils/backupService.ts", "purpose": "Auto-backup do localStorage" },
+    { "file": "src/utils/seedInspections.ts", "purpose": "Seed kontrolních bodů budov" },
+    { "file": "src/utils/importers/excelImporter.ts", "purpose": "Excel/CSV parser s fuzzy mapováním" },
+    { "file": "src/utils/importers/importAssets.ts", "purpose": "Bulk import zařízení" },
+    { "file": "src/utils/importers/importInventory.ts", "purpose": "Bulk import skladu" },
+    { "file": "src/utils/importers/validateExcelData.ts", "purpose": "Validace importovaných dat" },
+    { "file": "src/utils/importers/index.ts", "purpose": "Barrel export importérů" }
+  ],
+
+  "firebase": {
+    "projectId": "nominal-cmms",
+    "authMethod": "Email/Password (PIN → pin_XXXX@nominal.local)",
+    "firestoreCollections": [
+      "users", "assets", "tasks", "inventory", "fleet", "revisions", "waste",
+      "inspections", "inspection_templates", "inspection_logs",
+      "notifications", "trustbox", "trustbox_ingress", "trustbox_public",
+      "noticeboard", "user_engagement",
+      "stats_aggregates", "audit_logs", "settings",
+      "louparna_silos", "louparna_production", "louparna_waste", "louparna_machines",
+      "entities", "blueprints", "entity_logs",
+      "areas", "facilities", "workLogs", "purchase_orders", "inventory_transactions",
+      "roles", "permissions", "prefilters", "shiftNotes"
+    ],
+    "subCollections": {
+      "assets": ["pest_logs", "empty_logs"],
+      "revisions": ["history", "documents"],
+      "stats_aggregates": ["daily", "weekly", "monthly"]
+    },
+    "storagePaths": [
+      "revisions/{revisionId}/",
+      "assets/{assetId}/",
+      "users/{userId}/",
+      "temp/{userId}/"
+    ],
+    "cloudFunctions": ["aggregateTaskStats"],
+    "securityRules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+
+  "offlineStrategy": {
+    "firestorePersistence": "enableIndexedDbPersistence (IndexedDB)",
+    "localStorageKeys": [
+      "vikrr-dash-v1 (tile layout)",
+      "nominal-cmms-backup (auto-backup)",
+      "nominal_draft_* (form drafts)",
+      "nominal-role-toggles (admin UI)",
+      "nominal-admin-config (admin preferences)"
+    ],
+    "academyContent": "All Academy content is hardcoded in AcademyPage.tsx — zero network requests",
+    "serviceWorker": "Vite PWA-ready (static asset caching)"
+  },
+
+  "roles": {
+    "SUPERADMIN": "Plný přístup + hard delete + systémové nastavení",
+    "MAJITEL": "Plný přístup k datům a funkcím",
+    "VEDENI": "Management — čtení všeho, zápis většiny",
+    "UDRZBA": "Technik údržby — stroje, úkoly, díly, vozidla",
+    "VYROBA": "Technik výroby — stroje, úkoly, díly",
+    "OPERATOR": "Kiosk mode — hlášení poruch, předfiltry, schránka důvěry"
+  },
+
+  "buildings": {
+    "A": "Administrativa",
+    "B": "Spojovací krček",
+    "C": "Zázemí & Vedení",
+    "D": "Výrobní hala",
+    "E": "Dílna & Sklad ND",
+    "L": "Loupárna"
+  },
+
+  "academy": {
+    "sections": [
+      {
+        "id": "guide",
+        "label": "Uživatelská příručka",
+        "articles": 6,
+        "topics": ["Hlášení poruchy", "Objednávka dílu", "Nástěnka", "Nápady", "Trustbox", "Rozvržení"]
+      },
+      {
+        "id": "tech",
+        "label": "Pod kapotou",
+        "articles": 5,
+        "topics": ["Firestore Data Flow", "Offline-first", "Inspection Memory", "Cloud Functions", "RBAC"]
+      },
+      {
+        "id": "ai",
+        "label": "AI Legacy — Příběh vzniku",
+        "articles": 4,
+        "topics": ["Vznik VIKRR", "Prompt Engineering", "Tech stack", "Čísla projektu"]
+      }
+    ],
+    "totalArticles": 15,
+    "storageMethod": "Inline (hardcoded in AcademyPage.tsx)",
+    "networkRequired": false
+  },
+
+  "commits": [
+    { "hash": "ec41e8b", "message": "feat: Inspection Memory, Pest Control, Waste hierarchy & UI refinement" },
+    { "hash": "d9f66db", "message": "feat: Stats dashboard (MTBF/MTTR/Lemon List), creation bug fix, appConfig branding" },
+    { "hash": "fa8a5e2", "message": "feat: VIKRR rebrand, core fixes, migration export" },
+    { "hash": "73d47e1", "message": "feat: Remove Krejčí from brand, Cloud Functions upgrade, Admin Import/Export" },
+    { "hash": "2f0e59d", "message": "feat: Ideas module, Noticeboard, HUD filters, asset view upgrade" }
+  ]
+}

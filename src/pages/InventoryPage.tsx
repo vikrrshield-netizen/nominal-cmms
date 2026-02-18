@@ -1,5 +1,5 @@
 // src/pages/InventoryPage.tsx
-// NOMINAL CMMS — Sklad ND (Firestore LIVE)
+// VIKRR — Asset Shield — Sklad ND (Firestore LIVE)
 
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';

@@ -210,8 +210,8 @@ export async function exportMigrationData(
   const metadata: MigrationMetadata = {
     exportDate: new Date().toISOString(),
     exportTimestamp: Date.now(),
-    sourceProject: 'Nominal CMMS',
-    sourceProjectId: 'nominal-cmms',
+    sourceProject: 'VIKRR Asset Shield',
+    sourceProjectId: 'vikrr-asset-shield',
     version: '1.0.0',
     exportedBy,
     collections: Object.keys(data),

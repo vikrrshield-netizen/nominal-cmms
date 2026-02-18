@@ -1,5 +1,5 @@
 // src/pages/AssetCardPage.tsx
-// NOMINAL CMMS — Karta stroje / zařízení (Dark Glassmorphism — sjednoceno s FleetPage)
+// VIKRR — Asset Shield — Karta stroje / zařízení
 
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -1038,7 +1038,7 @@ function ModalShell({ title, icon, onClose, children }: {
   title: string; icon: React.ReactNode; onClose: () => void; children: React.ReactNode;
 }) {
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end md:items-center justify-center" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[9999] flex items-end md:items-center justify-center" onClick={onClose}>
       <div
         className="bg-slate-800 rounded-t-3xl md:rounded-3xl w-full max-w-lg max-h-[85vh] overflow-y-auto border border-slate-700/50"
         onClick={(e) => e.stopPropagation()}

@@ -1,5 +1,5 @@
 // src/utils/importers/validateExcelData.ts
-// NOMINAL CMMS — Excel/CSV data validator
+// VIKRR — Asset Shield — Excel/CSV data validator
 //
 // Validates imported data against expected schema before Firestore write.
 // Used by AI Architect and bulk import features.

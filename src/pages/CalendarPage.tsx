@@ -1,5 +1,5 @@
 // src/pages/CalendarPage.tsx
-// NOMINAL CMMS — Týdenní plán (Firestore LIVE)
+// VIKRR — Asset Shield — Týdenní plán (Firestore LIVE)
 // Flexibilní kalendář — upravuje se denně dle situace
 
 import { useState, useEffect, useMemo } from 'react';

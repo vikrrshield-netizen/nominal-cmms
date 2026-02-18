@@ -1,5 +1,5 @@
 // src/pages/MapPage.tsx
-// NOMINAL CMMS — Mapa areálu (v25 - SVG floor plan for building D)
+// VIKRR — Asset Shield — Mapa areálu (v25 - SVG floor plan for building D)
 // Sekce místností → karty strojů v gridu (jako údržba v24)
 // Budova D → interaktivní SVG půdorys 2.NP
 

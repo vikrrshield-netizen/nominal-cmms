@@ -1,5 +1,5 @@
 // src/components/maps/FloorPlan2NP.tsx
-// NOMINAL CMMS — Interaktivní SVG půdorys 2.NP budovy D
+// VIKRR — Asset Shield — Interaktivní SVG půdorys 2.NP budovy D
 // Napojeno na Firestore assets
 
 import { useMemo } from 'react';

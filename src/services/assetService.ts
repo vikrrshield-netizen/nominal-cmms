@@ -1,5 +1,5 @@
 // src/services/assetService.ts
-// NOMINAL CMMS — Asset Service
+// VIKRR — Asset Shield — Asset Service
 
 import { db } from '../lib/firebase';
 import { 

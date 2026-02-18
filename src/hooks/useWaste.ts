@@ -1,5 +1,5 @@
 // src/hooks/useWaste.ts
-// NOMINAL CMMS — Odpadové hospodářství hook (Firestore realtime)
+// VIKRR — Asset Shield — Odpadové hospodářství hook (Firestore realtime)
 
 import { useState, useEffect, useCallback } from 'react';
 import {

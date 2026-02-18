@@ -1,5 +1,5 @@
 // src/components/EntityCard.tsx
-// NOMINAL CMMS — Univerzální Entity karta (Matryoshka architektura)
+// VIKRR — Asset Shield — Univerzální Entity karta (Matryoshka architektura)
 // Touch-friendly, dark glassmorphism theme
 
 import { useMemo } from 'react';

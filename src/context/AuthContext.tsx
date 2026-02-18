@@ -1,5 +1,5 @@
 // src/context/AuthContext.tsx
-// NOMINAL CMMS — AuthContext s dynamickým RBAC
+// VIKRR — Asset Shield — AuthContext s dynamickým RBAC
 // Zpětně kompatibilní: stávající stránky fungují beze změny
 
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';

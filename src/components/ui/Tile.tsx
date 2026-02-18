@@ -1,5 +1,5 @@
 // src/components/ui/Tile.tsx
-// NOMINAL CMMS — Unified Tile Component (Design System v3)
+// VIKRR — Asset Shield — Unified Tile Component (Design System v3)
 // Používá se VŠUDE: Dashboard, Tasks, MapPage, Revize, Admin
 
 import { ChevronRight } from 'lucide-react';

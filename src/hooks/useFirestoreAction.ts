@@ -1,5 +1,5 @@
 // src/hooks/useFirestoreAction.ts
-// NOMINAL CMMS — Bezpečné Firestore operace
+// VIKRR — Asset Shield — Bezpečné Firestore operace
 // Auto timestamps, soft delete, audit logging
 
 import { useState, useCallback } from 'react';

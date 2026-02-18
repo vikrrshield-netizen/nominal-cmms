@@ -195,6 +195,7 @@ const TILE_DEFS: TileDef[] = [
   { id: 'idea',        icon: '💡', label: 'Nápad',            gradient: 'from-violet-500 to-purple-600' },
   { id: 'request',     icon: '🔧', label: 'Požadavky',        gradient: 'from-sky-500 to-blue-600' },
   { id: 'noticeboard', icon: '📌', label: 'Nástěnka',         gradient: 'from-teal-500 to-cyan-600' },
+  { id: 'academy',     icon: '📚', label: 'Akademie',          gradient: 'from-blue-600 to-indigo-700' },
   { id: 'admin',       icon: '⚙️', label: 'Administrace',     gradient: 'from-gray-500 to-slate-600' },
 ];
 
@@ -675,6 +676,7 @@ function FullDashboard() {
       case 'idea': return { subtext: 'Zlepšení & nápady' };
       case 'request': return { subtext: 'Nářadí, materiál' };
       case 'noticeboard': return { subtext: 'Týmové zprávy' };
+      case 'academy': return { subtext: 'Příručka & logika' };
       case 'admin': return { subtext: 'Uživatelé, role' };
       default: return {};
     }
@@ -687,7 +689,7 @@ function FullDashboard() {
       tasks: '/tasks', map: '/map', revisions: '/revisions',
       inventory: '/inventory', waste: '/waste', fleet: '/fleet', louparna: '/louparna',
       inspections: '/inspections', calendar: '/calendar', reports: '/reports', admin: '/admin',
-      noticeboard: '/noticeboard',
+      noticeboard: '/noticeboard', academy: '/academy',
     };
     if (routes[tile.id]) { navigate(routes[tile.id]); return; }
     if (tile.id === 'ai') { setActiveModal('ai'); setAiQuery(''); return; }

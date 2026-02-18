@@ -1,5 +1,5 @@
 // src/pages/AdminPage.tsx
-// NOMINAL CMMS — Administrace uživatelů a nastavení
+// VIKRR — Asset Shield — Administrace uživatelů a nastavení
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -54,9 +54,9 @@ const ROLE_CONFIG: Record<UserRole, { label: string; icon: string; color: string
 // ═══════════════════════════════════════════════════════════════════
 
 const INITIAL_USERS: AdminUser[] = [
-  { id: 'u1', displayName: 'Milan Novák', pin: '1111', role: 'MAJITEL', email: 'milan@nominal.cz', active: true, createdAt: '2024-01-01', lastLogin: '2026-02-12' },
-  { id: 'u2', displayName: 'Martina', pin: '2222', role: 'VEDENI', email: 'martina@nominal.cz', active: true, createdAt: '2024-01-01', lastLogin: '2026-02-11' },
-  { id: 'u3', displayName: 'Vilém', pin: '3333', role: 'SUPERADMIN', email: 'vilem@nominal.cz', phone: '+420 777 123 456', active: true, createdAt: '2024-01-01', lastLogin: '2026-02-12' },
+  { id: 'u1', displayName: 'Milan Novák', pin: '1111', role: 'MAJITEL', email: 'milan@vikrr.cz', active: true, createdAt: '2024-01-01', lastLogin: '2026-02-12' },
+  { id: 'u2', displayName: 'Martina', pin: '2222', role: 'VEDENI', email: 'martina@vikrr.cz', active: true, createdAt: '2024-01-01', lastLogin: '2026-02-11' },
+  { id: 'u3', displayName: 'Vilém', pin: '3333', role: 'SUPERADMIN', email: 'vilem@vikrr.cz', phone: '+420 777 123 456', active: true, createdAt: '2024-01-01', lastLogin: '2026-02-12' },
   { id: 'u4', displayName: 'Pavla Drápelová', pin: '4444', role: 'VYROBA', building: 'D', active: true, createdAt: '2024-03-15', lastLogin: '2026-02-12' },
   { id: 'u5', displayName: 'Zdeněk Mička', pin: '5555', role: 'UDRZBA', building: 'D', active: true, createdAt: '2024-03-15', lastLogin: '2026-02-11' },
   { id: 'u6', displayName: 'Petr Volf', pin: '6666', role: 'UDRZBA', building: 'D', active: true, createdAt: '2024-06-01', lastLogin: '2026-02-10' },
@@ -648,7 +648,7 @@ function NewUserModal({ existingPins, onClose, onSave }: {
               value={formData.email}
               onChange={e => setFormData(prev => ({ ...prev, email: e.target.value }))}
               className="w-full p-2 bg-white/5 border border-white/10 rounded-lg mt-1 text-white"
-              placeholder="jan@nominal.cz"
+              placeholder="jan@vikrr.cz"
             />
           </div>
 

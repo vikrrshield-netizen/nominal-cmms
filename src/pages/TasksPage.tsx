@@ -1,5 +1,5 @@
 // src/pages/TasksPage.tsx
-// NOMINAL CMMS — Úkoly (responsive grid: 1col mobil, 2col tablet, 3col PC)
+// VIKRR — Asset Shield — Úkoly (responsive grid: 1col mobil, 2col tablet, 3col PC)
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';

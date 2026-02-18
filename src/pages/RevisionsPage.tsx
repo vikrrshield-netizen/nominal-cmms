@@ -1,5 +1,5 @@
 // src/pages/RevisionsPage.tsx
-// NOMINAL CMMS — Přehled revizí (Firestore LIVE, semafor)
+// VIKRR — Asset Shield — Přehled revizí (Firestore LIVE, semafor)
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';

@@ -1,5 +1,5 @@
 // src/components/ui/BottomSheet.tsx
-// NOMINAL CMMS — Unified Modal/Sheet component
+// VIKRR — Asset Shield — Unified Modal/Sheet component
 // Standardizovaný layout pro všechny formuláře
 
 import { Loader2, X } from 'lucide-react';

@@ -1,5 +1,5 @@
 // src/components/ui/Timeline.tsx
-// NOMINAL CMMS — Timeline pro historii zásahů
+// VIKRR — Asset Shield — Timeline pro historii zásahů
 
 import { UserBadge } from './index';
 

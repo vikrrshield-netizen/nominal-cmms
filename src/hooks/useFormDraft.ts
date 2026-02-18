@@ -1,5 +1,5 @@
 // src/hooks/useFormDraft.ts
-// NOMINAL CMMS — Save Draft (localStorage sync)
+// VIKRR — Asset Shield — Save Draft (localStorage sync)
 // Náhrada za useState ve formulářích — přežije refresh i pád appky
 
 import { useState, useEffect, useCallback } from 'react';

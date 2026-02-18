@@ -1,5 +1,5 @@
 // src/components/ui/EmptyState.tsx
-// NOMINAL CMMS — Empty State
+// VIKRR — Asset Shield — Empty State
 // Nikdy prázdná obrazovka — vždy nabídne akci
 
 import { Plus } from 'lucide-react';

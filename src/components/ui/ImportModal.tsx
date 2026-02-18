@@ -1,5 +1,5 @@
 // src/components/ui/ImportModal.tsx
-// NOMINAL CMMS — Reusable Excel/CSV import modal
+// VIKRR — Asset Shield — Reusable Excel/CSV import modal
 // Drag & drop → parse → preview column mappings → import
 
 import { useState, useRef } from 'react';

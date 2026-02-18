@@ -1,5 +1,5 @@
 // src/hooks/usePestControl.ts
-// NOMINAL CMMS — Pest control (Hmyzolapače) hook — pest_logs sub-collection
+// VIKRR — Asset Shield — Pest control (Hmyzolapače) hook — pest_logs sub-collection
 
 import { useState, useEffect, useCallback } from 'react';
 import {

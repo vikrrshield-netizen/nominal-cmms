@@ -1,5 +1,5 @@
 // src/pages/NotificationsPage.tsx
-// NOMINAL CMMS — Centrum notifikací a upomínek
+// VIKRR — Asset Shield — Centrum notifikací a upomínek
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';

@@ -1,5 +1,5 @@
 // src/pages/FleetPage.tsx
-// NOMINAL CMMS — Vozový park (DEMO SPRINT — všechno v jednom)
+// VIKRR — Asset Shield — Vozový park (DEMO SPRINT — všechno v jednom)
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';

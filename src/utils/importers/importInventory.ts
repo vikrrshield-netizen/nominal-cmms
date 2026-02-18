@@ -1,5 +1,5 @@
 // src/utils/importers/importInventory.ts
-// NOMINAL CMMS — Bulk inventory importer
+// VIKRR — Asset Shield — Bulk inventory importer
 
 import { writeBatch, doc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../lib/firebase';

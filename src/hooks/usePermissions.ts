@@ -1,5 +1,5 @@
 // src/hooks/usePermissions.ts
-// NOMINAL CMMS — Dynamický RBAC hook
+// VIKRR — Asset Shield — Dynamický RBAC hook
 // Čte role z Firestore, počítá efektivní oprávnění uživatele
 
 import { useState, useEffect, useCallback, useMemo } from 'react';

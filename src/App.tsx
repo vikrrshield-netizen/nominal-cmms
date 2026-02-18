@@ -1,5 +1,5 @@
 // src/App.tsx
-// NOMINAL CMMS — Hlavní aplikace s routingem
+// VIKRR — Asset Shield — Hlavní aplikace s routingem
 
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuthContext } from './context/AuthContext';
@@ -27,6 +27,7 @@ import NotificationsPage from './pages/NotificationsPage';
 import LouparnaPage from './pages/LouparnaPage';
 import InspectionsPage from './pages/InspectionsPage';
 import NoticeboardPage from './pages/NoticeboardPage';
+import AcademyPage from './pages/AcademyPage';
 
 // ═══════════════════════════════════════════════════════════════════
 // PROTECTED ROUTE WRAPPER
@@ -76,6 +77,7 @@ function ProtectedRoutes() {
       <Route path="/kiosk" element={<KioskPage />} />
       <Route path="/inspections" element={<InspectionsPage />} />
       <Route path="/noticeboard" element={<NoticeboardPage />} />
+      <Route path="/academy" element={<AcademyPage />} />
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

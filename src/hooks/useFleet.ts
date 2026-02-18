@@ -1,5 +1,5 @@
 // src/hooks/useFleet.ts
-// NOMINAL CMMS — Vozový park hook (Firestore realtime)
+// VIKRR — Asset Shield — Vozový park hook (Firestore realtime)
 
 import { useState, useEffect, useCallback } from 'react';
 import {

@@ -1,5 +1,5 @@
 // src/hooks/useFirestore.ts
-// NOMINAL CMMS — Generic Firestore hooks
+// VIKRR — Asset Shield — Generic Firestore hooks
 
 import { useState, useEffect, useCallback } from 'react';
 import {

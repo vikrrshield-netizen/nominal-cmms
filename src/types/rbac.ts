@@ -1,5 +1,5 @@
 // src/types/rbac.ts
-// NOMINAL CMMS — Dynamické role a oprávnění
+// VIKRR — Asset Shield — Dynamické role a oprávnění
 
 import type { Timestamp } from 'firebase/firestore';
 

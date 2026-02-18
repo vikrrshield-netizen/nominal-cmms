@@ -1,5 +1,5 @@
 // src/components/ui/CompleteTaskModal.tsx
-// NOMINAL CMMS — Povinná pole při dokončení úkolu
+// VIKRR — Asset Shield — Povinná pole při dokončení úkolu
 // Technik MUSÍ vyplnit popis řešení, volitelně čas
 
 import { useState } from 'react';

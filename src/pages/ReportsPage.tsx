@@ -1,5 +1,5 @@
 // src/pages/ReportsPage.tsx
-// NOMINAL CMMS — Reporty a statistiky s exportem
+// VIKRR — Asset Shield — Reporty a statistiky s exportem
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';

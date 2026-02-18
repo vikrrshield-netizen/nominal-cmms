@@ -1,5 +1,5 @@
 // src/components/ui/index.tsx
-// NOMINAL CMMS — Sdílené UI komponenty
+// VIKRR — Asset Shield — Sdílené UI komponenty
 
 import { type ReactNode } from 'react';
 import { ChevronRight, Clock, CheckCircle2, AlertTriangle, FileWarning } from 'lucide-react';

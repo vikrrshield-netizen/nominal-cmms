@@ -1,5 +1,5 @@
 // src/pages/BuildingInspectionPage.tsx
-// NOMINAL CMMS — Kontrola budov (Firestore LIVE + CRUD)
+// VIKRR — Asset Shield — Kontrola budov (Firestore LIVE + CRUD)
 
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';

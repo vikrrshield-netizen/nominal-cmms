@@ -1,5 +1,5 @@
 // src/hooks/useInventory.ts
-// NOMINAL CMMS — Skladový hook s transakčním odpisem
+// VIKRR — Asset Shield — Skladový hook s transakčním odpisem
 //
 // Funkce:
 // - issueItem()     → výdej ze skladu (ručně nebo z úkolu)

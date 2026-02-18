@@ -1,5 +1,5 @@
 // src/hooks/useLouparna.ts
-// NOMINAL CMMS — Loupárna hook (sila + výroba + plevy + stanice)
+// VIKRR — Asset Shield — Loupárna hook (sila + výroba + plevy + stanice)
 
 import { useState, useEffect, useCallback } from 'react';
 import {

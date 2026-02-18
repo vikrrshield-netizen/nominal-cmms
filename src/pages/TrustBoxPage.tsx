@@ -1,5 +1,5 @@
 // src/pages/TrustBoxPage.tsx
-// NOMINAL CMMS — Schránka důvěry (anonymní hlášení)
+// VIKRR — Asset Shield — Schránka důvěry (anonymní hlášení)
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';

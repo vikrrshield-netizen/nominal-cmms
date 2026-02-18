@@ -1,5 +1,5 @@
 // src/types/inventory.ts
-// NOMINAL CMMS — Skladové typy
+// VIKRR — Asset Shield — Skladové typy
 
 import type { Timestamp } from 'firebase/firestore';
 

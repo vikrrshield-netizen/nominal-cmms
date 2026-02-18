@@ -1,5 +1,5 @@
 // src/pages/LouparnaPage.tsx
-// NOMINAL CMMS — Loupárna (Budova L) — Firestore LIVE
+// VIKRR — Asset Shield — Loupárna (Budova L) — Firestore LIVE
 // Sila + Výroba + Plevy + Stanice
 
 import { useState } from 'react';

@@ -1,7 +1,7 @@
 const getUserClaims = async () => ({} as any);
 const refreshToken = async () => { await (window as any).__fb_auth?.currentUser?.getIdToken(true); };
 // src/hooks/useAuth.ts
-// NOMINAL CMMS — Autentizace s novou hierarchií
+// VIKRR — Asset Shield — Autentizace s novou hierarchií
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { User } from 'firebase/auth';

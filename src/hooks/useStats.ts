@@ -1,5 +1,5 @@
 // src/hooks/useStats.ts
-// NOMINAL CMMS — Dashboard stats: MTBF, MTTR, Lemon List, Operational HUD
+// VIKRR — Asset Shield — Dashboard stats: MTBF, MTTR, Lemon List, Operational HUD
 // Client-side computation (fallback until Cloud Functions are deployed)
 
 import { useState, useEffect, useMemo } from 'react';

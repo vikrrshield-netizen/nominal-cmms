@@ -1,5 +1,5 @@
 // src/components/ui/StatCard.tsx
-// NOMINAL CMMS — Stat Card pro Dashboard
+// VIKRR — Asset Shield — Stat Card pro Dashboard
 
 import type { ReactNode } from 'react';
 

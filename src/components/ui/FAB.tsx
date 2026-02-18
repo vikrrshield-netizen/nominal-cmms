@@ -1,5 +1,5 @@
 // src/components/ui/FAB.tsx
-// NOMINAL CMMS — Floating Action Button
+// VIKRR — Asset Shield — Floating Action Button
 // Hlavní akce na každé stránce (Nahlásit poruchu, Přidat úkol, atd.)
 
 import type { ReactNode } from 'react';

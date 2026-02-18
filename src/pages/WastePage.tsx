@@ -1,5 +1,5 @@
 // src/pages/WastePage.tsx
-// NOMINAL CMMS — Odpadové hospodářství (Firestore LIVE, semafor)
+// VIKRR — Asset Shield — Odpadové hospodářství (Firestore LIVE, semafor)
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';

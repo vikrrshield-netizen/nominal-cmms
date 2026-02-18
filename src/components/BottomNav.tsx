@@ -1,5 +1,5 @@
 // src/components/BottomNav.tsx
-// NOMINAL CMMS — Bottom Navigation (Dark Glassmorphism)
+// VIKRR — Asset Shield — Bottom Navigation (Dark Glassmorphism)
 
 import { Link, useLocation } from 'react-router-dom';
 import {

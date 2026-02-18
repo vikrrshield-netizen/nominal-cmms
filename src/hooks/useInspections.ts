@@ -1,5 +1,5 @@
 // src/hooks/useInspections.ts
-// NOMINAL CMMS — Kontrolní body budovy (měsíční checklist)
+// VIKRR — Asset Shield — Kontrolní body budovy (měsíční checklist)
 
 import { useState, useEffect, useMemo } from 'react';
 import { collection, query, where, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, Timestamp } from 'firebase/firestore';

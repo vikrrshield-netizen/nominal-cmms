@@ -1,5 +1,5 @@
 // src/types/user.ts
-// NOMINAL CMMS — Uživatelé a role
+// VIKRR — Asset Shield — Uživatelé a role
 
 // ═══════════════════════════════════════════════════════════════════
 // ROLE

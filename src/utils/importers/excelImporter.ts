@@ -1,5 +1,5 @@
 // src/utils/importers/excelImporter.ts
-// NOMINAL CMMS — Excel file parser with auto-column mapping
+// VIKRR — Asset Shield — Excel file parser with auto-column mapping
 //
 // Drag & drop file → Parse → Auto-map columns → Return rows
 

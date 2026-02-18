@@ -1,5 +1,5 @@
 // src/pages/KioskPage.tsx
-// NOMINAL CMMS — Kiosk mód pro tablet (s Firestore zápisem)
+// VIKRR — Asset Shield — Kiosk mód pro tablet (s Firestore zápisem)
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';

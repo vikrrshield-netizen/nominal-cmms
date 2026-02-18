@@ -1,5 +1,5 @@
 // src/components/ui/AlertSemaphore.tsx
-// NOMINAL CMMS — Semafor upozornění
+// VIKRR — Asset Shield — Semafor upozornění
 // P1=havárie (červená), P2=tento týden (žlutá), nová hlášení (modrá)
 
 import { CheckCircle, ChevronRight } from 'lucide-react';

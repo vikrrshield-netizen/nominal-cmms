@@ -1,5 +1,5 @@
 // src/types/asset.ts
-// NOMINAL CMMS — Asset typy
+// VIKRR — Asset Shield — Asset typy
 
 export type AssetStatus = 'operational' | 'maintenance' | 'broken' | 'stopped';
 
