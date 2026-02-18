@@ -9,8 +9,13 @@ import { useAuthContext } from '../context/AuthContext';
 import {
   Users, Shield, Edit2, Trash2, Save,
   X, ArrowLeft, AlertTriangle, Eye, EyeOff, UserPlus,
-  Lock, Unlock, History, Building2, Settings2, Plus, Check, Loader2
+  Lock, Unlock, History, Building2, Settings2, Plus, Check, Loader2,
+  Upload, FileSpreadsheet, Download, CheckCircle2,
 } from 'lucide-react';
+import { parseExcelFile } from '../utils/importers/excelImporter';
+import type { ParseResult } from '../utils/importers/excelImporter';
+import { showToast } from '../components/ui/Toast';
+import { exportMigrationData, downloadMigrationJson } from '../utils/vikrr_migration';
 
 // ═══════════════════════════════════════════════════════════════════
 // TYPES
@@ -79,7 +84,7 @@ export default function AdminPage() {
   const [users, setUsers] = useState<AdminUser[]>(INITIAL_USERS);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [showNewUserModal, setShowNewUserModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<'users' | 'roles' | 'config' | 'audit'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'roles' | 'config' | 'audit' | 'import'>('users');
   const [filterRole, setFilterRole] = useState<UserRole | 'ALL'>('ALL');
 
   // Hardened access: permission check + explicit role bypass for admin-level roles
@@ -164,6 +169,7 @@ export default function AdminPage() {
               { id: 'users', label: 'Uživatelé', icon: Users },
               { id: 'roles', label: 'Role', icon: Shield },
               { id: 'config', label: 'Konfigurace', icon: Settings2 },
+              { id: 'import', label: 'Import', icon: Upload },
               { id: 'audit', label: 'Audit log', icon: History },
             ].map(tab => (
               <button
@@ -262,6 +268,10 @@ export default function AdminPage() {
 
           {activeTab === 'config' && (
             <DynamicConfigTab />
+          )}
+
+          {activeTab === 'import' && (
+            <ImportExportTab />
           )}
 
           {activeTab === 'audit' && (
@@ -939,6 +949,255 @@ function AuditTrailTab() {
             <div className="text-[11px] text-slate-500 flex-shrink-0">{log.time}</div>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// IMPORT / EXPORT TAB
+// ═══════════════════════════════════════════════════════════════════
+
+type ImportTarget = 'assets' | 'inventory' | 'fleet';
+
+const IMPORT_TARGETS: { id: ImportTarget; label: string; icon: string; collection: string }[] = [
+  { id: 'assets', label: 'Zařízení & Stroje', icon: '🏭', collection: 'assets' },
+  { id: 'inventory', label: 'Sklad ND', icon: '📦', collection: 'inventory' },
+  { id: 'fleet', label: 'Vozidla', icon: '🚗', collection: 'fleet' },
+];
+
+function ImportExportTab() {
+  const { user } = useAuthContext();
+  const [importTarget, setImportTarget] = useState<ImportTarget>('assets');
+  const [parseResult, setParseResult] = useState<ParseResult | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importedCount, setImportedCount] = useState(0);
+  const [exporting, setExporting] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+
+  const handleFile = async (file: File) => {
+    try {
+      const result = await parseExcelFile(file);
+      setParseResult(result);
+      setImportedCount(0);
+      showToast(`Načteno ${result.rowCount} řádků z "${result.sheetName}"`, 'success');
+    } catch (err) {
+      showToast((err as Error).message, 'error');
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  };
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleFile(file);
+    e.target.value = '';
+  };
+
+  const handleImport = async () => {
+    if (!parseResult) return;
+    setImporting(true);
+    const target = IMPORT_TARGETS.find(t => t.id === importTarget)!;
+    let count = 0;
+
+    try {
+      for (const row of parseResult.rows) {
+        const data: Record<string, any> = { ...row };
+        delete data._id;
+        delete data._path;
+        data.createdAt = serverTimestamp();
+        data.updatedAt = serverTimestamp();
+        data.createdById = user?.uid || '';
+        data.createdByName = user?.displayName || 'Import';
+        data.importedAt = serverTimestamp();
+
+        if (importTarget === 'assets') {
+          data.status = data.status || 'operational';
+          data.buildingId = data.buildingId || '';
+          data.category = data.category || '';
+        } else if (importTarget === 'inventory') {
+          data.quantity = Number(data.quantity) || 0;
+          data.minQuantity = Number(data.minQuantity) || 0;
+          data.unit = data.unit || 'ks';
+        } else if (importTarget === 'fleet') {
+          data.status = data.status || 'available';
+        }
+
+        await addDoc(collection(db, target.collection), data);
+        count++;
+      }
+
+      setImportedCount(count);
+      showToast(`Importováno ${count} záznamů do ${target.label}`, 'success');
+    } catch (err) {
+      showToast(`Chyba importu: ${(err as Error).message}`, 'error');
+    }
+    setImporting(false);
+  };
+
+  const handleExportMigration = async () => {
+    setExporting(true);
+    try {
+      const data = await exportMigrationData(user?.uid || 'admin', {
+        onProgress: (msg, current, total) => {
+          console.log(`[Export] ${current}/${total}: ${msg}`);
+        },
+      });
+      downloadMigrationJson(data);
+      showToast(`Export dokončen: ${data.metadata.totalDocuments} dokumentů`, 'success');
+    } catch (err) {
+      showToast(`Chyba exportu: ${(err as Error).message}`, 'error');
+    }
+    setExporting(false);
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* IMPORT SECTION */}
+      <div className="bg-slate-800/50 rounded-2xl border border-slate-700/50 p-5">
+        <h3 className="text-white font-bold text-lg mb-4 flex items-center gap-2">
+          <Upload className="w-5 h-5 text-blue-400" />
+          Hromadný import (CSV / Excel)
+        </h3>
+
+        {/* Target selector */}
+        <div className="flex gap-2 mb-4">
+          {IMPORT_TARGETS.map(t => (
+            <button
+              key={t.id}
+              onClick={() => { setImportTarget(t.id); setParseResult(null); setImportedCount(0); }}
+              className={`flex-1 p-3 rounded-xl text-sm font-medium transition ${
+                importTarget === t.id
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white/5 text-slate-400 hover:text-white border border-white/10'
+              }`}
+            >
+              <span className="mr-1">{t.icon}</span> {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Drop zone */}
+        <div
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={handleDrop}
+          className={`relative border-2 border-dashed rounded-xl p-8 text-center transition ${
+            dragOver
+              ? 'border-blue-400 bg-blue-500/10'
+              : 'border-slate-600 hover:border-slate-500'
+          }`}
+        >
+          <FileSpreadsheet className="w-10 h-10 text-slate-500 mx-auto mb-3" />
+          <p className="text-slate-400 text-sm mb-2">
+            Přetáhněte soubor sem nebo
+          </p>
+          <label className="inline-block px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg cursor-pointer hover:bg-blue-500 transition">
+            Vybrat soubor
+            <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFileInput} className="hidden" />
+          </label>
+          <p className="text-slate-600 text-xs mt-2">Podporováno: .xlsx, .xls, .csv</p>
+        </div>
+
+        {/* Preview */}
+        {parseResult && (
+          <div className="mt-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-slate-400">
+                <span className="text-white font-semibold">{parseResult.rowCount}</span> řádků,{' '}
+                <span className="text-white font-semibold">{parseResult.columns.length}</span> sloupců
+                {' '}(list: {parseResult.sheetName})
+              </div>
+              {importedCount > 0 && (
+                <span className="flex items-center gap-1 text-emerald-400 text-sm">
+                  <CheckCircle2 className="w-4 h-4" /> {importedCount} importováno
+                </span>
+              )}
+            </div>
+
+            {/* Column mappings */}
+            <div className="bg-slate-900/50 rounded-xl p-3 max-h-48 overflow-y-auto">
+              <div className="text-xs text-slate-500 mb-2 font-semibold uppercase tracking-wide">Mapování sloupců</div>
+              {parseResult.mappings.map((m, i) => (
+                <div key={i} className="flex items-center gap-2 py-1 text-sm">
+                  <span className="text-slate-500 truncate flex-1">{m.excelColumn}</span>
+                  <span className="text-slate-600">→</span>
+                  <span className={`truncate flex-1 ${m.confidence > 0.6 ? 'text-emerald-400' : m.confidence > 0.3 ? 'text-amber-400' : 'text-slate-500'}`}>
+                    {m.mappedTo}
+                  </span>
+                  <span className="text-[10px] text-slate-600 w-8 text-right">{Math.round(m.confidence * 100)}%</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Data preview */}
+            <div className="bg-slate-900/50 rounded-xl p-3 overflow-x-auto">
+              <div className="text-xs text-slate-500 mb-2 font-semibold uppercase tracking-wide">Náhled dat (prvních 5)</div>
+              <table className="text-xs w-full">
+                <thead>
+                  <tr>
+                    {parseResult.mappings.slice(0, 6).map((m, i) => (
+                      <th key={i} className="text-left text-slate-500 pb-1 pr-3 whitespace-nowrap">{m.mappedTo}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {parseResult.rows.slice(0, 5).map((row, ri) => (
+                    <tr key={ri}>
+                      {parseResult!.mappings.slice(0, 6).map((m, ci) => (
+                        <td key={ci} className="text-slate-300 py-0.5 pr-3 whitespace-nowrap truncate max-w-[120px]">
+                          {String(row[m.mappedTo] ?? row[m.excelColumn] ?? '—')}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Import button */}
+            <button
+              onClick={handleImport}
+              disabled={importing || importedCount > 0}
+              className="w-full py-3 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-500 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {importing ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> Importuji...</>
+              ) : importedCount > 0 ? (
+                <><CheckCircle2 className="w-4 h-4" /> Hotovo ({importedCount})</>
+              ) : (
+                <><Upload className="w-4 h-4" /> Importovat {parseResult.rowCount} záznamů</>
+              )}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* EXPORT SECTION */}
+      <div className="bg-slate-800/50 rounded-2xl border border-slate-700/50 p-5">
+        <h3 className="text-white font-bold text-lg mb-4 flex items-center gap-2">
+          <Download className="w-5 h-5 text-emerald-400" />
+          Export dat (migrace)
+        </h3>
+        <p className="text-slate-400 text-sm mb-4">
+          Kompletní export všech dat z Firestore (30+ kolekcí) pro migraci na nový VIKRR projekt.
+        </p>
+        <button
+          onClick={handleExportMigration}
+          disabled={exporting}
+          className="w-full py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-500 transition disabled:opacity-50 flex items-center justify-center gap-2"
+        >
+          {exporting ? (
+            <><Loader2 className="w-4 h-4 animate-spin" /> Exportuji kolekce...</>
+          ) : (
+            <><Download className="w-4 h-4" /> Stáhnout vikrr-migration.json</>
+          )}
+        </button>
       </div>
     </div>
   );

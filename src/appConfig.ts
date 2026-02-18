@@ -6,18 +6,18 @@ const appConfig = {
   // ── Umbrella Brand ──
   BRAND_NAME: 'VIKRR',
   // ── Product Identity ──
-  PRODUCT_NAME: 'Krejčí Asset Shield',
+  PRODUCT_NAME: 'VIKRR Asset Shield',
   PRODUCT_NAME_SHORT: 'Asset Shield',
   // ── Legacy aliases (used across codebase) ──
-  APP_NAME: 'Krejčí Asset Shield',
+  APP_NAME: 'VIKRR Asset Shield',
   APP_NAME_SHORT: 'VIKRR',
   // ── Company ──
-  COMPANY_NAME: 'VIKRR | Vilém Krejčí',
+  COMPANY_NAME: 'VIKRR',
   COMPANY_ADDRESS: 'Kozlov 68, 594 51',
   // ── Domain ──
   DOMAIN: 'shield.vikrr.com',
   // ── Legal ──
-  COPYRIGHT: '© 2026 VIKRR | Vilém Krejčí. All rights reserved.',
+  COPYRIGHT: '© 2026 VIKRR. Všechna práva vyhrazena.',
   // ── Visual Identity ──
   PRIMARY_COLOR: '#1e3a5f',          // Deep Blue
   ACCENT_COLOR: '#3b82f6',           // Blue-500 accent

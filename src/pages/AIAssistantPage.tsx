@@ -1,5 +1,5 @@
 // src/pages/AIAssistantPage.tsx
-// VIKRR — Krejčí Asset Shield — Search & VIKRR AI
+// VIKRR — Asset Shield — Search & VIKRR AI
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';

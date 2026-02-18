@@ -1,5 +1,5 @@
 // src/pages/LoginPage.tsx
-// VIKRR — Krejčí Asset Shield — Přihlášení PIN kódem
+// VIKRR — Asset Shield — Přihlášení PIN kódem
 
 import { useState } from 'react';
 import { useAuthContext } from '../context/AuthContext';

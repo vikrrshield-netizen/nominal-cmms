@@ -134,4 +134,4 @@ VITE_GEMINI_API_KEY=              # Google AI Studio API klíč (pro AI modul)
 
 ---
 
-*© 2026 VIKRR | Vilém Krejčí. All rights reserved.*
+*© 2026 VIKRR. Všechna práva vyhrazena.*

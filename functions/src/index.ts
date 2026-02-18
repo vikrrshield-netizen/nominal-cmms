@@ -1,5 +1,5 @@
 // functions/src/index.ts
-// NOMINAL CMMS — Cloud Functions: Task stats aggregation
+// VIKRR — Asset Shield — Cloud Functions: Task stats aggregation
 
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
@@ -18,15 +18,21 @@ export const aggregateTaskStats = functions.firestore
       const tasksSnap = await db.collection('tasks').get();
       const tasks = tasksSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
 
-      // ── Work Type Distribution ──
+      // ── Work Type Distribution (Alibi) ──
       const workTypeCounts: Record<string, number> = {};
       tasks.forEach(t => {
-        const wt = t.workType || 'unknown';
+        const wt = t.workType || 'Nespecifikováno';
         workTypeCounts[wt] = (workTypeCounts[wt] || 0) + 1;
       });
 
+      // ── Task Type Distribution ──
+      const taskTypeCounts: Record<string, number> = {};
+      tasks.forEach(t => {
+        const tt = t.type || 'other';
+        taskTypeCounts[tt] = (taskTypeCounts[tt] || 0) + 1;
+      });
+
       // ── MTTR (Mean Time To Repair) ──
-      // Average time from creation to completion for corrective tasks
       const completedCorrective = tasks.filter(
         t => t.status === 'completed' && t.type === 'corrective' && t.createdAt && t.completedAt
       );
@@ -41,7 +47,6 @@ export const aggregateTaskStats = functions.firestore
       }
 
       // ── MTBF (Mean Time Between Failures) per asset ──
-      // Group P1 tasks by assetId, compute average gap between failures
       const assetFailures: Record<string, Date[]> = {};
       tasks
         .filter(t => t.priority === 'P1' && t.assetId && t.createdAt)
@@ -53,24 +58,36 @@ export const aggregateTaskStats = functions.firestore
 
       const assetMtbf: Record<string, number> = {};
       Object.entries(assetFailures).forEach(([assetId, dates]) => {
-        if (dates.length < 2) { assetMtbf[assetId] = -1; return; } // Not enough data
+        if (dates.length < 2) { assetMtbf[assetId] = -1; return; }
         dates.sort((a, b) => a.getTime() - b.getTime());
         let totalGap = 0;
         for (let i = 1; i < dates.length; i++) {
           totalGap += dates[i].getTime() - dates[i - 1].getTime();
         }
-        assetMtbf[assetId] = Math.round(totalGap / (dates.length - 1) / 3600000); // hours
+        assetMtbf[assetId] = Math.round(totalGap / (dates.length - 1) / 3600000);
       });
 
-      // ── Total Spend (Labor) ──
+      // ── Total Labor (minutes) ──
       const totalLaborMinutes = tasks
         .filter(t => t.actualMinutes)
         .reduce((sum, t) => sum + (t.actualMinutes || 0), 0);
+
+      // ── Parts Cost Aggregation ──
+      let totalPartsCost = 0;
+      tasks.forEach(t => {
+        if (t.partsCost) totalPartsCost += Number(t.partsCost) || 0;
+        if (t.partsUsed && Array.isArray(t.partsUsed)) {
+          t.partsUsed.forEach((p: any) => {
+            totalPartsCost += (Number(p.cost) || 0) * (Number(p.quantity) || 1);
+          });
+        }
+      });
 
       // ── Active / Critical ticket counts ──
       const activeStatuses = ['backlog', 'planned', 'in_progress', 'paused'];
       const activeTasks = tasks.filter(t => activeStatuses.includes(t.status));
       const criticalTasks = activeTasks.filter(t => t.priority === 'P1');
+      const inProgressTasks = activeTasks.filter(t => t.status === 'in_progress');
 
       // ── Lemon List: Top 5 assets with most P1/P2 tasks (last 30 days) ──
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 3600000);
@@ -97,10 +114,13 @@ export const aggregateTaskStats = functions.firestore
       // ── Write to stats_aggregates/global ──
       await db.doc('stats_aggregates/global').set({
         workTypeDistribution: workTypeCounts,
+        taskTypeDistribution: taskTypeCounts,
         mttrMinutes,
         totalLaborMinutes,
+        totalPartsCost,
         activeTickets: activeTasks.length,
         criticalTickets: criticalTasks.length,
+        inProgressTickets: inProgressTasks.length,
         totalTasks: tasks.length,
         completedTasks: tasks.filter(t => t.status === 'completed').length,
         lemonList,
@@ -118,6 +138,9 @@ export const aggregateTaskStats = functions.firestore
           p1Count: assetTasks.filter(t => t.priority === 'P1').length,
           p2Count: assetTasks.filter(t => t.priority === 'P2').length,
           completedCount: assetTasks.filter(t => t.status === 'completed').length,
+          totalLaborMinutes: assetTasks
+            .filter(t => t.actualMinutes)
+            .reduce((s, t) => s + (t.actualMinutes || 0), 0),
           avgRepairMinutes: (() => {
             const completed = assetTasks.filter(t => t.actualMinutes && t.status === 'completed');
             if (completed.length === 0) return 0;
@@ -128,7 +151,7 @@ export const aggregateTaskStats = functions.firestore
       });
       await batch.commit();
 
-      console.log('[aggregateTaskStats] Global + per-asset stats updated');
+      console.log(`[aggregateTaskStats] Global + ${Object.keys(assetMtbf).length} per-asset stats updated`);
     } catch (err) {
       console.error('[aggregateTaskStats] Error:', err);
     }
