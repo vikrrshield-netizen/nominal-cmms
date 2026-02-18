@@ -71,7 +71,7 @@ export default function InventoryPage() {
     if (filterStatus !== 'all' && item.status !== filterStatus) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
-      if (!item.name.toLowerCase().includes(q) && !item.code.toLowerCase().includes(q)) return false;
+      if (!(item.name || '').toLowerCase().includes(q) && !(item.code || '').toLowerCase().includes(q)) return false;
     }
     return true;
   });
@@ -331,8 +331,8 @@ function ItemDetailModal({ item, onClose, canManage, onIssue, onReceive }: {
       setAdjustMode(null);
       setAdjustAmount('');
       onClose();
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err: unknown) {
+      alert((err as Error).message);
     }
     setSaving(false);
   };

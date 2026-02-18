@@ -168,7 +168,7 @@ function TaskRow({ task, onClick, onEdit, onDelete }: { task: Task; onClick: () 
         <div className="flex items-center gap-1.5">
           <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-slate-700 flex items-center justify-center flex-shrink-0">
             <span className="text-[9px] sm:text-[10px] font-bold text-slate-300">
-              {assignee !== '—' ? assignee.split(' ').map(w => w[0]).join('').slice(0, 2) : '?'}
+              {assignee !== '—' ? assignee.split(' ').filter(Boolean).map(w => w[0] || '').join('').slice(0, 2) || '?' : '?'}
             </span>
           </div>
           <span className="text-[12px] text-slate-300 truncate hidden sm:block max-w-[80px]">{assignee}</span>

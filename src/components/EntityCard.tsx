@@ -154,7 +154,7 @@ export function computeEntityStatus(entity: Entity, blueprint: Blueprint | null)
   let worst: SemaphoreColor = 'green';
   for (const field of blueprint.fields) {
     if (!field.alert) continue;
-    const val = entity.data[field.key];
+    const val = entity.data?.[field.key];
     const sem = getFieldSemaphore(field, val);
     if (sem === 'red') return 'red';
     if (sem === 'yellow') worst = 'yellow';
@@ -182,12 +182,12 @@ export function EntityCardCompact({ entity, blueprint, onClick }: EntityCardComp
   const keyFields = useMemo(() => {
     if (!blueprint) return [];
     return blueprint.fields
-      .filter((f) => f.alert && entity.data[f.key])
+      .filter((f) => f.alert && entity.data?.[f.key])
       .slice(0, 3)
       .map((f) => ({
         ...f,
-        value: entity.data[f.key],
-        semaphore: getFieldSemaphore(f, entity.data[f.key]),
+        value: entity.data?.[f.key],
+        semaphore: getFieldSemaphore(f, entity.data?.[f.key]),
       }));
   }, [blueprint, entity.data]);
 
@@ -245,7 +245,7 @@ export function EntityCardCompact({ entity, blueprint, onClick }: EntityCardComp
           </div>
 
           {/* Assigned / tags */}
-          {entity.data.assigned_to && entity.data.assigned_to !== 'Pool (sdílený)' && (
+          {entity.data?.assigned_to && entity.data.assigned_to !== 'Pool (sdílený)' && (
             <div className="mt-2 text-xs text-blue-400">
               → {entity.data.assigned_to}
             </div>
@@ -314,7 +314,7 @@ export function EntityCardFull({ entity, blueprint, logs, breadcrumbs, children,
           {entity.code && (
             <div className="text-sm text-slate-500 font-mono">{entity.code}</div>
           )}
-          {entity.data.assigned_to && (
+          {entity.data?.assigned_to && (
             <div className="text-sm text-blue-400 mt-1">→ {entity.data.assigned_to}</div>
           )}
         </div>
@@ -326,9 +326,9 @@ export function EntityCardFull({ entity, blueprint, logs, breadcrumbs, children,
           <h3 className="text-xs text-slate-500 uppercase font-bold mb-3">Rodný list</h3>
           <div className="grid grid-cols-2 gap-3">
             {blueprint.fields
-              .filter((f) => f.type !== 'photo' && entity.data[f.key] !== undefined && entity.data[f.key] !== '')
+              .filter((f) => f.type !== 'photo' && entity.data?.[f.key] !== undefined && entity.data?.[f.key] !== '')
               .map((f) => {
-                const val = entity.data[f.key];
+                const val = entity.data?.[f.key];
                 const sem = getFieldSemaphore(f, val);
                 const daysLeft = f.type === 'date' ? daysUntilDate(val) : null;
 
@@ -363,7 +363,7 @@ export function EntityCardFull({ entity, blueprint, logs, breadcrumbs, children,
       )}
 
       {/* Photo */}
-      {entity.data.photo_url && (
+      {entity.data?.photo_url && (
         <div className="rounded-2xl overflow-hidden border border-slate-700/50">
           <img src={entity.data.photo_url} alt={entity.name} className="w-full h-48 object-cover" />
         </div>

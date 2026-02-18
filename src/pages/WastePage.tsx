@@ -203,7 +203,7 @@ export default function WastePage() {
           <div className="space-y-2">
             {containers
               .filter(c => c.schedule && c.schedule.dayOfWeek > 0)
-              .sort((a, b) => a.schedule.dayOfWeek - b.schedule.dayOfWeek)
+              .sort((a, b) => (a.schedule?.dayOfWeek ?? 0) - (b.schedule?.dayOfWeek ?? 0))
               .map(container => {
                 const wasteCfg = WASTE_CONFIG[container.type] || { label: container.type, icon: '🗑️' };
                 return (
@@ -211,11 +211,11 @@ export default function WastePage() {
                     <span className="text-xl">{wasteCfg.icon}</span>
                     <div className="flex-1">
                       <div className="font-medium text-sm">{container.name}</div>
-                      <div className="text-xs text-slate-500">{container.schedule.company}</div>
+                      <div className="text-xs text-slate-500">{container.schedule?.company ?? '—'}</div>
                     </div>
                     <div className="text-right">
-                      <div className="font-medium text-sm">{formatDay(container.schedule.dayOfWeek)}</div>
-                      <div className="text-xs text-slate-500">{container.schedule.notifyTime || '—'}</div>
+                      <div className="font-medium text-sm">{formatDay(container.schedule?.dayOfWeek ?? 0)}</div>
+                      <div className="text-xs text-slate-500">{container.schedule?.notifyTime || '—'}</div>
                     </div>
                   </div>
                 );

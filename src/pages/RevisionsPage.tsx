@@ -47,9 +47,9 @@ export default function RevisionsPage() {
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       if (
-        !rev.title.toLowerCase().includes(q) &&
-        !rev.assetName.toLowerCase().includes(q) &&
-        !rev.revisionCompany.toLowerCase().includes(q)
+        !(rev.title || '').toLowerCase().includes(q) &&
+        !(rev.assetName || '').toLowerCase().includes(q) &&
+        !(rev.revisionCompany || '').toLowerCase().includes(q)
       ) return false;
     }
     return true;

@@ -90,8 +90,8 @@ function printVehicleReport(entity: Entity, blueprint: Blueprint | null, logs: E
   if (!w) return;
 
   const fieldsHtml = (blueprint?.fields || [])
-    .filter((f) => f.type !== 'photo' && entity.data[f.key] !== undefined && entity.data[f.key] !== '')
-    .map((f) => `<tr><td style="padding:8px;border:1px solid #ddd;font-weight:600;background:#f8f9fa;">${f.label}</td><td style="padding:8px;border:1px solid #ddd;">${entity.data[f.key]}${f.unit ? ' ' + f.unit : ''}</td></tr>`)
+    .filter((f) => f.type !== 'photo' && entity.data?.[f.key] !== undefined && entity.data?.[f.key] !== '')
+    .map((f) => `<tr><td style="padding:8px;border:1px solid #ddd;font-weight:600;background:#f8f9fa;">${f.label}</td><td style="padding:8px;border:1px solid #ddd;">${entity.data?.[f.key] ?? ''}${f.unit ? ' ' + f.unit : ''}</td></tr>`)
     .join('');
 
   const logsHtml = logs.slice(0, 20).map((l) => {
@@ -132,7 +132,7 @@ function SemaphorePanel({ entities, blueprint }: { entities: Entity[]; blueprint
     if (!stkField) return { ok: 0, warning: 0, expired: 0 };
     let ok = 0, warning = 0, expired = 0;
     for (const e of entities) {
-      const sem = getFieldSemaphore(stkField, e.data.stk_date);
+      const sem = getFieldSemaphore(stkField, e.data?.stk_date);
       if (sem === 'red') expired++; else if (sem === 'yellow') warning++; else if (sem === 'green') ok++;
     }
     return { ok, warning, expired };
@@ -339,7 +339,7 @@ function VehicleDetailModal({ entity, blueprint, onClose, toast }: {
         'data.oil_hours': 0,
         updatedAt: serverTimestamp(),
       });
-      await addLog('maintenance', `Výměna oleje — reset motohodin na 0. Typ: ${entity.data.oil_type || 'neuvedeno'}.`, { oil_reset: true });
+      await addLog('maintenance', `Výměna oleje — reset motohodin na 0. Typ: ${entity.data?.oil_type || 'neuvedeno'}.`, { oil_reset: true });
       toast('Olej vyměněn — Mth reset na 0');
     } catch (err: unknown) {
       toast('Chyba: ' + ((err as Error).message || err), 'error');
@@ -424,7 +424,7 @@ function VehicleDetailModal({ entity, blueprint, onClose, toast }: {
             <div className="flex-1">
               <h2 className="text-xl font-bold text-white">{entity.name}</h2>
               <div className="text-sm text-slate-500 font-mono">{entity.code}</div>
-              {entity.data.assigned_to && <div className="text-sm text-blue-400 mt-1">→ {entity.data.assigned_to}</div>}
+              {entity.data?.assigned_to && <div className="text-sm text-blue-400 mt-1">→ {entity.data.assigned_to}</div>}
             </div>
           </div>
 
@@ -434,9 +434,9 @@ function VehicleDetailModal({ entity, blueprint, onClose, toast }: {
               <h3 className="text-xs text-slate-500 uppercase font-bold mb-3">Rodný list</h3>
               <div className="grid grid-cols-2 gap-3">
                 {blueprint.fields
-                  .filter((f) => f.type !== 'photo' && entity.data[f.key] !== undefined && entity.data[f.key] !== '')
+                  .filter((f) => f.type !== 'photo' && entity.data?.[f.key] !== undefined && entity.data?.[f.key] !== '')
                   .map((f) => {
-                    const val = entity.data[f.key];
+                    const val = entity.data?.[f.key];
                     const sem = getFieldSemaphore(f, val);
                     const isEditing = editingField === f.key;
                     const SEMAPHORE_TEXT: Record<string, string> = { green: 'text-emerald-400', yellow: 'text-amber-400', red: 'text-red-400', gray: 'text-slate-400' };
@@ -613,7 +613,7 @@ function HandoverForm({ entity, onSubmit, onCancel }: {
   onSubmit: (data: { tachometer: string; condition: string; note: string }) => void;
   onCancel: () => void;
 }) {
-  const [tachometer, setTachometer] = useState(entity.data.tachometer ? String(entity.data.tachometer) : '');
+  const [tachometer, setTachometer] = useState(entity.data?.tachometer ? String(entity.data.tachometer) : '');
   const [condition, setCondition] = useState<'ok' | 'minor' | 'damage'>('ok');
   const [note, setNote] = useState('');
 
