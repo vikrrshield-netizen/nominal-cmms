@@ -53,6 +53,7 @@ interface Asset {
   areaName?: string;
   category?: string;
   controlPoints?: string[];
+  parentId?: string;
 }
 
 // ═══════════════════════════════════════════════
@@ -560,13 +561,15 @@ const DEMO_MACHINE_LOGS: EntityLogEntry[] = [
 // ═══════════════════════════════════════════════
 // ASSET DETAIL SHEET — Matryoshka EntityCard style
 // ═══════════════════════════════════════════════
-function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onEdit, onOpenPassport }: {
+function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onEdit, onDelete, onOpenPassport, canManage }: {
   asset: Asset;
   onClose: () => void;
   onCreateTask: (asset: Asset) => Promise<void>;
   onReport: (asset: Asset) => Promise<void>;
   onEdit: (asset: Asset) => void;
+  onDelete?: (asset: Asset) => void;
   onOpenPassport?: (asset: Asset) => void;
+  canManage?: boolean;
 }) {
   const entity = useMemo(() => assetToEntity(asset), [asset]);
   const logs = useMemo(() => DEMO_MACHINE_LOGS.map((l) => ({ ...l, entityId: asset.id })), [asset.id]);
@@ -838,13 +841,24 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onEdit, onOp
           {actionLoading === 'task' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wrench className="w-4 h-4" />}
           Úkol
         </button>
-        <button
-          onClick={(e) => { e.stopPropagation(); onEdit(asset); }}
-          className="py-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 text-sm font-semibold active:scale-95 transition flex items-center justify-center gap-2 min-h-[48px]"
-        >
-          <Edit2 className="w-4 h-4" />
-          Upravit
-        </button>
+        {canManage && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onEdit(asset); }}
+            className="py-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 text-sm font-semibold active:scale-95 transition flex items-center justify-center gap-2 min-h-[48px]"
+          >
+            <Edit2 className="w-4 h-4" />
+            Upravit
+          </button>
+        )}
+        {canManage && onDelete && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(asset); }}
+            className="py-3 rounded-xl bg-red-500/15 border border-red-500/30 text-red-400 text-sm font-semibold active:scale-95 transition flex items-center justify-center gap-2 min-h-[48px]"
+          >
+            <Trash2 className="w-4 h-4" />
+            Smazat
+          </button>
+        )}
         {onOpenPassport && (
           <button
             onClick={(e) => { e.stopPropagation(); onOpenPassport(asset); }}
@@ -1194,6 +1208,25 @@ export default function MapPage() {
     } catch (err) { console.error('[MapPage] report failed:', err); }
   };
 
+  // Delete asset handler
+  const handleDeleteAsset = (asset: Asset) => {
+    setDeleteTarget({ type: 'asset', name: asset.name, buildingId: asset.buildingId });
+    setDeleteImpact(null);
+    setShowDeleteModal(true);
+  };
+
+  const confirmAssetDelete = async () => {
+    if (!deleteTarget || deleteTarget.type !== 'asset') return;
+    const toDelete = assets.find(a => a.name === deleteTarget.name && a.buildingId === deleteTarget.buildingId);
+    if (toDelete) {
+      await deleteDoc(doc(db, 'assets', toDelete.id));
+      showToast(`Zařízení "${deleteTarget.name}" smazáno`, 'success');
+    }
+    setShowDeleteModal(false);
+    setDeleteTarget(null);
+    setSelectedAsset(null);
+  };
+
   // Edit asset handler — opens edit modal
   const [editRoom, setEditRoom] = useState('');
 
@@ -1475,14 +1508,16 @@ export default function MapPage() {
                     );
                   })}
 
-                  {/* [+] Add building tile */}
-                  <button
-                    onClick={() => setShowAddModal('building')}
-                    className="flex flex-col items-center justify-center p-3 rounded-2xl border-2 border-dashed border-slate-700/50 text-slate-500 hover:text-orange-400 hover:border-orange-500/30 transition cursor-pointer text-center min-h-[120px]"
-                  >
-                    <Plus className="w-8 h-8 mb-1" />
-                    <span className="text-[12px] font-medium">Přidat</span>
-                  </button>
+                  {/* [+] Add building tile (admin only) */}
+                  {canManageAssets && (
+                    <button
+                      onClick={() => setShowAddModal('building')}
+                      className="flex flex-col items-center justify-center p-3 rounded-2xl border-2 border-dashed border-slate-700/50 text-slate-500 hover:text-orange-400 hover:border-orange-500/30 transition cursor-pointer text-center min-h-[120px]"
+                    >
+                      <Plus className="w-8 h-8 mb-1" />
+                      <span className="text-[12px] font-medium">Přidat</span>
+                    </button>
+                  )}
                 </div>
               </>
             )}
@@ -1540,14 +1575,16 @@ export default function MapPage() {
                   />
                 ))}
 
-                {/* [+] Add room tile */}
-                <button
-                  onClick={() => setShowAddModal('room')}
-                  className="flex flex-col items-center justify-center p-3 rounded-2xl border-2 border-dashed border-slate-700/50 text-slate-500 hover:text-orange-400 hover:border-orange-500/30 transition cursor-pointer text-center min-h-[110px]"
-                >
-                  <Plus className="w-7 h-7 mb-1" />
-                  <span className="text-[12px] font-medium">Přidat</span>
-                </button>
+                {/* [+] Add room tile (admin only) */}
+                {canManageAssets && (
+                  <button
+                    onClick={() => setShowAddModal('room')}
+                    className="flex flex-col items-center justify-center p-3 rounded-2xl border-2 border-dashed border-slate-700/50 text-slate-500 hover:text-orange-400 hover:border-orange-500/30 transition cursor-pointer text-center min-h-[110px]"
+                  >
+                    <Plus className="w-7 h-7 mb-1" />
+                    <span className="text-[12px] font-medium">Přidat</span>
+                  </button>
+                )}
               </div>
             )}
           </>
@@ -1596,14 +1633,16 @@ export default function MapPage() {
                     <MachineCard key={asset.id} asset={asset} onClick={() => setSelectedAsset(asset)} />
                   ))}
 
-                  {/* [+] Add asset tile */}
-                  <button
-                    onClick={() => setShowAddModal('asset')}
-                    className="flex flex-col items-center justify-center p-3 rounded-2xl border-2 border-dashed border-slate-700/50 text-slate-500 hover:text-orange-400 hover:border-orange-500/30 transition cursor-pointer text-center min-h-[100px]"
-                  >
-                    <Plus className="w-7 h-7 mb-1" />
-                    <span className="text-[12px] font-medium">Přidat</span>
-                  </button>
+                  {/* [+] Add asset tile (admin only) */}
+                  {canManageAssets && (
+                    <button
+                      onClick={() => setShowAddModal('asset')}
+                      className="flex flex-col items-center justify-center p-3 rounded-2xl border-2 border-dashed border-slate-700/50 text-slate-500 hover:text-orange-400 hover:border-orange-500/30 transition cursor-pointer text-center min-h-[100px]"
+                    >
+                      <Plus className="w-7 h-7 mb-1" />
+                      <span className="text-[12px] font-medium">Přidat</span>
+                    </button>
+                  )}
                 </div>
               </>
             )}
@@ -1650,13 +1689,15 @@ export default function MapPage() {
         )}
       </div>
 
-      {/* FAB — Floating Add Button */}
-      <button
-        onClick={handleFabClick}
-        className="fixed bottom-24 right-4 z-50 w-14 h-14 bg-gradient-to-br from-orange-500 to-amber-500 rounded-2xl shadow-lg shadow-orange-500/30 flex items-center justify-center text-white active:scale-90 transition-all hover:shadow-xl hover:shadow-orange-500/40"
-      >
-        <Plus className="w-7 h-7" />
-      </button>
+      {/* FAB — Floating Add Button (admin only) */}
+      {canManageAssets && (
+        <button
+          onClick={handleFabClick}
+          className="fixed bottom-24 right-4 z-50 w-14 h-14 bg-gradient-to-br from-orange-500 to-amber-500 rounded-2xl shadow-lg shadow-orange-500/30 flex items-center justify-center text-white active:scale-90 transition-all hover:shadow-xl hover:shadow-orange-500/40"
+        >
+          <Plus className="w-7 h-7" />
+        </button>
+      )}
 
       {/* Asset detail — opens EntityModal for the asset */}
       {selectedAsset && !currentEntityModal && (
@@ -1666,6 +1707,8 @@ export default function MapPage() {
           onCreateTask={handleNewTask}
           onReport={handleReport}
           onEdit={handleEdit}
+          onDelete={handleDeleteAsset}
+          canManage={canManageAssets}
           onOpenPassport={(asset: Asset) => {
             const buildingName = BUILDING_META[asset.buildingId]?.name || asset.buildingId;
             openEntityModal(
@@ -1744,9 +1787,9 @@ export default function MapPage() {
       <ConfirmDeleteModal
         isOpen={showDeleteModal}
         onClose={() => { setShowDeleteModal(false); setDeleteTarget(null); }}
-        onConfirm={confirmRoomDelete}
+        onConfirm={deleteTarget?.type === 'asset' ? confirmAssetDelete : confirmRoomDelete}
         itemName={deleteTarget?.name || ''}
-        itemType="místnost"
+        itemType={deleteTarget?.type === 'asset' ? 'zařízení' : 'místnost'}
         impactWarning={deleteImpact}
         requirePin={true}
       />

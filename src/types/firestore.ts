@@ -42,6 +42,7 @@ export interface AssetDoc {
   type: AssetType;
   status: AssetStatus;
   buildingId: BuildingId;
+  parentId?: string;              // Hierarchie: nadřazený asset
   areaId?: string;
   areaName?: string;
   manufacturer?: string;
