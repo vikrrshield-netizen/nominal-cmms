@@ -296,12 +296,6 @@ function FullDashboard() {
   // Quick action modals
   const [activeModal, setActiveModal] = useState<'idea' | 'request' | 'waste' | 'ai' | 'fault' | null>(null);
 
-  // HUD filter state
-  const [showHudFilter, setShowHudFilter] = useState(false);
-  const [hudFilterBuilding, setHudFilterBuilding] = useState('ALL');
-  const [hudFilterStatus, setHudFilterStatus] = useState('ALL');
-  const [hudFilterSeverity, setHudFilterSeverity] = useState('ALL');
-
   // Tile data (defensive — all hook data accessed safely)
   const invStats = inventory?.stats ?? { low: 0, critical: 0, out: 0 };
   const lowStockCount = (invStats.low ?? 0) + (invStats.critical ?? 0) + (invStats.out ?? 0);
@@ -374,7 +368,7 @@ function FullDashboard() {
 
   // Feature flags — filter widgets by enabled modules for current role
   // Sandbox mode bypasses tenant restrictions: all modules enabled
-  const FULL_WIDTH_IDS = ['semaphore', 'hud', 'top5', 'lemon'];
+  const FULL_WIDTH_IDS = ['semaphore', 'top5', 'lemon'];
   const enabledModules = useMemo(() => {
     if (isSandbox) {
       return MODULE_DEFINITIONS.map(m => m.id);
@@ -449,64 +443,6 @@ function FullDashboard() {
           </div>
         )}
 
-        {/* HUD FILTER PANEL */}
-        {isAdmin && !isEditing && showHudFilter && (
-          <div className="bg-slate-800/80 rounded-2xl p-4 border border-orange-500/20 mb-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Filtry</span>
-              <button
-                onClick={() => { setHudFilterBuilding('ALL'); setHudFilterStatus('ALL'); setHudFilterSeverity('ALL'); }}
-                className="text-[10px] text-orange-400 hover:text-orange-300 font-semibold"
-              >
-                Resetovat
-              </button>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              <div>
-                <label className="text-[10px] text-slate-500 uppercase font-bold block mb-1">Budova</label>
-                <select
-                  value={hudFilterBuilding}
-                  onChange={(e) => setHudFilterBuilding(e.target.value)}
-                  className="w-full px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white text-xs focus:outline-none focus:border-orange-500/50"
-                >
-                  <option value="ALL">Vše</option>
-                  {['A', 'B', 'C', 'D', 'E', 'L'].map(b => (
-                    <option key={b} value={b}>{b}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-[10px] text-slate-500 uppercase font-bold block mb-1">Stav</label>
-                <select
-                  value={hudFilterStatus}
-                  onChange={(e) => setHudFilterStatus(e.target.value)}
-                  className="w-full px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white text-xs focus:outline-none focus:border-orange-500/50"
-                >
-                  <option value="ALL">Vše</option>
-                  <option value="backlog">Backlog</option>
-                  <option value="planned">Plánováno</option>
-                  <option value="in_progress">Probíhá</option>
-                  <option value="paused">Pozastaveno</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-[10px] text-slate-500 uppercase font-bold block mb-1">Závažnost</label>
-                <select
-                  value={hudFilterSeverity}
-                  onChange={(e) => setHudFilterSeverity(e.target.value)}
-                  className="w-full px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white text-xs focus:outline-none focus:border-orange-500/50"
-                >
-                  <option value="ALL">Vše</option>
-                  <option value="P1">P1 — Havárie</option>
-                  <option value="P2">P2 — Urgentní</option>
-                  <option value="P3">P3 — Běžná</option>
-                  <option value="P4">P4 — Nápad</option>
-                </select>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* DASHBOARD GRID */}
         {!configLoading && filteredWidgets.length > 0 && (
           <DashboardGrid
@@ -519,8 +455,6 @@ function FullDashboard() {
               maintenanceAssets: stats.maintenanceAssets,
             }}
             wasteRed={wasteStats.red ?? 0}
-            onFilterToggle={() => setShowHudFilter(!showHudFilter)}
-            hasActiveFilter={hudFilterBuilding !== 'ALL' || hudFilterStatus !== 'ALL' || hudFilterSeverity !== 'ALL'}
             getTileData={getTileData}
             onTileClick={handleTileClick}
             isAdmin={isAdmin}

@@ -9,7 +9,6 @@ import WidgetLibrary from './WidgetLibrary';
 
 // ── Widget component imports ──
 import SemaphoreWidget from './SemaphoreWidget';
-import OperationalHUD from './OperationalHUD';
 import Top5TasksWidget from './Top5TasksWidget';
 import LemonListWidget from './LemonListWidget';
 
@@ -30,8 +29,6 @@ interface DashboardGridProps {
   // Data props for widgets
   semaphoreStats: { breakdownAssets: number; criticalTasks: number; maintenanceAssets: number };
   wasteRed: number;
-  onFilterToggle: () => void;
-  hasActiveFilter: boolean;
   // Tile data resolver
   getTileData: (id: string) => TileData;
   onTileClick: (tileId: string) => void;
@@ -66,8 +63,6 @@ export default function DashboardGrid({
   onConfigChange,
   semaphoreStats,
   wasteRed,
-  onFilterToggle,
-  hasActiveFilter,
   getTileData,
   onTileClick,
   isAdmin,
@@ -139,9 +134,6 @@ export default function DashboardGrid({
       case 'SemaphoreWidget':
         content = <SemaphoreWidget stats={semaphoreStats} wasteRed={wasteRed} />;
         break;
-      case 'OperationalHUD':
-        content = <OperationalHUD onFilterToggle={onFilterToggle} hasActiveFilter={hasActiveFilter} />;
-        break;
       case 'Top5TasksWidget':
         content = <Top5TasksWidget />;
         break;
@@ -166,8 +158,8 @@ export default function DashboardGrid({
     );
   };
 
-  // Split full-width widgets: TOP (semaphore, hud) vs BOTTOM (top5, lemon)
-  const TOP_WIDGETS = ['semaphore', 'hud'];
+  // Split full-width widgets: TOP (semaphore) vs BOTTOM (top5, lemon)
+  const TOP_WIDGETS = ['semaphore'];
   const topWidgets = fullWidgets.filter(w => TOP_WIDGETS.includes(w.widgetId));
   const bottomWidgets = fullWidgets.filter(w => !TOP_WIDGETS.includes(w.widgetId));
 
@@ -175,7 +167,7 @@ export default function DashboardGrid({
     <>
       <style>{JIGGLE_CSS}</style>
 
-      {/* TOP: Semafor + HUD */}
+      {/* TOP: Semafor */}
       {isAdmin && !isEditing && topWidgets.map(renderFullWidget)}
 
       {/* After-top slot (Reminder Strip) */}

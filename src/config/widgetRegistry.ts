@@ -33,7 +33,6 @@ export const WIDGET_DEFINITIONS: WidgetDefinition[] = [
 
   // ── Full-width widget blocks (above tile grid) ──
   { id: 'semaphore', type: 'widget', label: 'Semafor',          icon: '🚦', gradient: '', defaultSize: 'full', component: 'SemaphoreWidget' },
-  { id: 'hud',       type: 'widget', label: 'Provozní přehled', icon: '📈', gradient: '', defaultSize: 'full', component: 'OperationalHUD' },
   { id: 'top5',      type: 'widget', label: 'Top 5 úkolů',     icon: '🔥', gradient: '', defaultSize: 'full', component: 'Top5TasksWidget' },
   { id: 'lemon',     type: 'widget', label: 'Lemon List',       icon: '🍋', gradient: '', defaultSize: 'full', component: 'LemonListWidget' },
 ];
@@ -67,7 +66,7 @@ function makeInstances(ids: string[]): WidgetInstance[] {
 
 // Admin roles see everything including full-width widgets above tiles
 const ADMIN_ORDER = [
-  'semaphore', 'hud', 'top5', 'lemon',
+  'semaphore', 'top5', 'lemon',
   'fault', 'tasks', 'map', 'revisions', 'inventory', 'waste',
   'fleet', 'louparna', 'inspections', 'calendar', 'ai', 'reports',
   'idea', 'request', 'noticeboard', 'academy', 'production', 'warehouse', 'shifts', 'admin',
