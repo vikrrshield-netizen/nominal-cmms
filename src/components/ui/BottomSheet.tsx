@@ -10,9 +10,10 @@ interface BottomSheetProps {
   isOpen: boolean;
   onClose: () => void;
   children: ReactNode;
+  titleActions?: ReactNode;
 }
 
-export default function BottomSheet({ title, isOpen, onClose, children }: BottomSheetProps) {
+export default function BottomSheet({ title, isOpen, onClose, children, titleActions }: BottomSheetProps) {
   if (!isOpen) return null;
 
   return (
@@ -34,10 +35,11 @@ export default function BottomSheet({ title, isOpen, onClose, children }: Bottom
         >
         {/* Header */}
         <div className="flex items-center justify-between px-6 pb-4 pt-5 border-b border-white/10">
-          <h2 className="text-xl font-bold text-white">{title}</h2>
+          <h2 className="text-xl font-bold text-white flex-1 min-w-0 truncate">{title}</h2>
+          {titleActions && <div className="flex items-center gap-1.5 ml-2 flex-shrink-0">{titleActions}</div>}
           <button
             onClick={onClose}
-            className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-slate-400 hover:text-white transition min-w-[36px] min-h-[36px]"
+            className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-slate-400 hover:text-white transition min-w-[36px] min-h-[36px] ml-2 flex-shrink-0"
           >
             <X className="w-5 h-5" />
           </button>

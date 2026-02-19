@@ -4,7 +4,7 @@
 // Budova D → interaktivní SVG půdorys 2.NP
 
 import { useState, useEffect, useMemo } from 'react';
-import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, updateDoc, doc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import {
   ArrowLeft,
@@ -18,6 +18,7 @@ import {
   Plus,
   Truck,
   Edit2,
+  Save,
   FileText,
   Building2,
   Camera,
@@ -54,6 +55,7 @@ interface Asset {
   category?: string;
   controlPoints?: string[];
   parentId?: string;
+  isDeleted?: boolean;
 }
 
 // ═══════════════════════════════════════════════
@@ -162,7 +164,7 @@ function useAssets() {
 
   useEffect(() => {
     const unsub = onSnapshot(
-      collection(db, 'assets'),
+      query(collection(db, 'assets'), where('isDeleted', '==', false)),
       (snap) => {
         setAssets(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Asset)));
         setLoading(false);
@@ -561,20 +563,60 @@ const DEMO_MACHINE_LOGS: EntityLogEntry[] = [
 // ═══════════════════════════════════════════════
 // ASSET DETAIL SHEET — Matryoshka EntityCard style
 // ═══════════════════════════════════════════════
-function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onEdit, onDelete, onOpenPassport, canManage }: {
+function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onDelete, onOpenPassport, canManage, allAssets }: {
   asset: Asset;
   onClose: () => void;
   onCreateTask: (asset: Asset) => Promise<void>;
   onReport: (asset: Asset) => Promise<void>;
-  onEdit: (asset: Asset) => void;
   onDelete?: (asset: Asset) => void;
   onOpenPassport?: (asset: Asset) => void;
   canManage?: boolean;
+  allAssets?: Asset[];
 }) {
   const entity = useMemo(() => assetToEntity(asset), [asset]);
   const logs = useMemo(() => DEMO_MACHINE_LOGS.map((l) => ({ ...l, entityId: asset.id })), [asset.id]);
   const [actionLoading, setActionLoading] = useState<'report' | 'task' | 'pest' | 'empty' | null>(null);
   const [actionResult, setActionResult] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // ── Inline editing ──
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState(asset.name);
+  const [editStatus, setEditStatus] = useState(asset.status);
+  const [editRoom, setEditRoom] = useState(asset.areaName || '');
+  const [editSaving, setEditSaving] = useState(false);
+
+  // Reset edit state when asset changes (prevents stale data)
+  useEffect(() => {
+    setEditName(asset.name);
+    setEditStatus(asset.status);
+    setEditRoom(asset.areaName || '');
+    setIsEditing(false);
+  }, [asset.id]);
+
+  const roomOptions = useMemo(() => {
+    if (!allAssets) return [];
+    return Array.from(new Set(
+      allAssets.filter(a => a.buildingId === asset.buildingId).map(a => a.areaName || 'Ostatní')
+    ));
+  }, [allAssets, asset.buildingId]);
+
+  const handleInlineSave = async () => {
+    if (!editName.trim()) return;
+    setEditSaving(true);
+    try {
+      await updateDoc(doc(db, 'assets', asset.id), {
+        name: editName.trim(),
+        status: editStatus,
+        areaName: editRoom.trim() || 'Ostatní',
+        updatedAt: serverTimestamp(),
+      });
+      showToast('Změny uloženy', 'success');
+      setIsEditing(false);
+    } catch {
+      showToast('Chyba při ukládání', 'error');
+    }
+    setEditSaving(false);
+  };
 
   // Pest control hook — only active for pest_trap assets
   const isPestTrap = asset.category === 'pest_trap';
@@ -654,7 +696,93 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onEdit, onDe
   };
 
   return (
-    <BottomSheet title={asset.name} isOpen={true} onClose={onClose}>
+    <BottomSheet
+      title={asset.name}
+      isOpen={true}
+      onClose={onClose}
+      titleActions={canManage ? (
+        <>
+          {isEditing ? (
+            <button
+              onClick={handleInlineSave}
+              disabled={editSaving || !editName.trim()}
+              className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-400 hover:bg-emerald-500/30 transition disabled:opacity-50"
+              title="Uložit"
+            >
+              {editSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            </button>
+          ) : (
+            <button
+              onClick={() => setIsEditing(true)}
+              className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center text-amber-400 hover:bg-amber-500/30 transition"
+              title="Upravit"
+            >
+              <Edit2 className="w-4 h-4" />
+            </button>
+          )}
+          {!isEditing && onDelete && (
+            <button
+              onClick={() => onDelete(asset)}
+              className="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center text-red-400 hover:bg-red-500/30 transition"
+              title="Smazat"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
+        </>
+      ) : undefined}
+    >
+      {/* Inline edit form */}
+      {isEditing && (
+        <div className="mb-4 bg-amber-500/5 border border-amber-500/20 rounded-2xl p-4 space-y-3">
+          <div>
+            <label className="text-xs text-slate-400 mb-1 block">Název</label>
+            <input
+              type="text"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              autoFocus
+              className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-amber-500/50 transition"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-slate-400 mb-1 block">Stav</label>
+            <div className="flex gap-1.5">
+              {([
+                { value: 'operational', label: 'V provozu', active: 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400' },
+                { value: 'maintenance', label: 'Údržba', active: 'bg-amber-500/20 border-amber-500/40 text-amber-400' },
+                { value: 'breakdown', label: 'Porucha', active: 'bg-red-500/20 border-red-500/40 text-red-400' },
+              ] as const).map((s) => (
+                <button
+                  key={s.value}
+                  onClick={() => setEditStatus(s.value)}
+                  className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition ${
+                    editStatus === s.value ? s.active : 'bg-white/5 border-white/10 text-slate-400'
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {roomOptions.length > 0 && (
+            <div>
+              <label className="text-xs text-slate-400 mb-1 block">Místnost</label>
+              <select
+                value={editRoom}
+                onChange={(e) => setEditRoom(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-amber-500/50 transition"
+                style={{ appearance: 'auto' }}
+              >
+                {roomOptions.map((r) => (
+                  <option key={r} value={r} className="bg-slate-800">{r}</option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+      )}
+
       <EntityCardFull
         entity={entity}
         blueprint={MACHINE_BLUEPRINT}
@@ -841,28 +969,10 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onEdit, onDe
           {actionLoading === 'task' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wrench className="w-4 h-4" />}
           Úkol
         </button>
-        {canManage && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onEdit(asset); }}
-            className="py-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 text-sm font-semibold active:scale-95 transition flex items-center justify-center gap-2 min-h-[48px]"
-          >
-            <Edit2 className="w-4 h-4" />
-            Upravit
-          </button>
-        )}
-        {canManage && onDelete && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onDelete(asset); }}
-            className="py-3 rounded-xl bg-red-500/15 border border-red-500/30 text-red-400 text-sm font-semibold active:scale-95 transition flex items-center justify-center gap-2 min-h-[48px]"
-          >
-            <Trash2 className="w-4 h-4" />
-            Smazat
-          </button>
-        )}
         {onOpenPassport && (
           <button
             onClick={(e) => { e.stopPropagation(); onOpenPassport(asset); }}
-            className="py-3 rounded-xl bg-orange-500/15 border border-orange-500/30 text-orange-400 text-sm font-semibold active:scale-95 transition flex items-center justify-center gap-2 min-h-[48px]"
+            className="col-span-2 py-3 rounded-xl bg-orange-500/15 border border-orange-500/30 text-orange-400 text-sm font-semibold active:scale-95 transition flex items-center justify-center gap-2 min-h-[48px]"
           >
             <FileText className="w-4 h-4" />
             Pasport
@@ -1052,10 +1162,7 @@ export default function MapPage() {
   const [addPickupFreq, setAddPickupFreq] = useState('');
   const [addSaving, setAddSaving] = useState(false);
   const [addError, setAddError] = useState('');
-  const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
-  const [editName, setEditName] = useState('');
-  const [editStatus, setEditStatus] = useState('');
-  const [editSaving, setEditSaving] = useState(false);
+  // editingAsset state removed — inline editing in AssetDetailSheet
 
   // EntityModal navigation stack
   const [entityModalStack, setEntityModalStack] = useState<{ data: EntityModalData; breadcrumbs: BreadcrumbItem[] }[]>([]);
@@ -1087,7 +1194,7 @@ export default function MapPage() {
   const canManageAssets = hasPermission('asset.delete');
 
   // Delete modal state
-  const [deleteTarget, setDeleteTarget] = useState<{ type: 'room' | 'asset'; name: string; buildingId: string; roomName?: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ type: 'room' | 'asset'; name: string; buildingId: string; roomName?: string; assetId?: string } | null>(null);
   const [deleteImpact, setDeleteImpact] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
@@ -1208,55 +1315,56 @@ export default function MapPage() {
     } catch (err) { console.error('[MapPage] report failed:', err); }
   };
 
-  // Delete asset handler
-  const handleDeleteAsset = (asset: Asset) => {
-    setDeleteTarget({ type: 'asset', name: asset.name, buildingId: asset.buildingId });
+  // Delete asset handler — checks history + children, then soft-deletes
+  const [allowArchive, setAllowArchive] = useState(false);
+
+  const handleDeleteAsset = async (asset: Asset) => {
+    setSelectedAsset(null);
+    setDeleteTarget({ type: 'asset', name: asset.name, buildingId: asset.buildingId, assetId: asset.id });
+    setAllowArchive(false);
     setDeleteImpact(null);
+
+    try {
+      // Check for linked tasks
+      const tasksSnap = await getDocs(
+        query(collection(db, 'tasks'), where('assetId', '==', asset.id))
+      );
+      const taskCount = tasksSnap.size;
+
+      // Check for child assets
+      const childrenSnap = await getDocs(
+        query(collection(db, 'assets'), where('parentId', '==', asset.id))
+      );
+      const childCount = childrenSnap.docs.filter(d => !d.data().isDeleted).length;
+
+      if (taskCount > 0 || childCount > 0) {
+        const parts: string[] = [];
+        if (taskCount > 0) parts.push(`${taskCount} úkolů`);
+        if (childCount > 0) parts.push(`${childCount} podřízených zařízení`);
+        setDeleteImpact(`Zařízení obsahuje historii: ${parts.join(', ')}. Bude archivováno.`);
+        setAllowArchive(true);
+      }
+    } catch {
+      // If queries fail, allow simple delete
+    }
+
     setShowDeleteModal(true);
   };
 
   const confirmAssetDelete = async () => {
-    if (!deleteTarget || deleteTarget.type !== 'asset') return;
-    const toDelete = assets.find(a => a.name === deleteTarget.name && a.buildingId === deleteTarget.buildingId);
-    if (toDelete) {
-      await deleteDoc(doc(db, 'assets', toDelete.id));
-      showToast(`Zařízení "${deleteTarget.name}" smazáno`, 'success');
-    }
+    if (!deleteTarget || deleteTarget.type !== 'asset' || !deleteTarget.assetId) return;
+    // Soft delete — mark as archived (lookup by ID, not name)
+    await updateDoc(doc(db, 'assets', deleteTarget.assetId), {
+      isDeleted: true,
+      updatedAt: serverTimestamp(),
+    });
+    showToast(`Zařízení "${deleteTarget.name}" archivováno`, 'success');
     setShowDeleteModal(false);
     setDeleteTarget(null);
     setSelectedAsset(null);
   };
 
-  // Edit asset handler — opens edit modal
-  const [editRoom, setEditRoom] = useState('');
-
-  const handleEdit = (asset: Asset) => {
-    console.log('[MapPage] handleEdit triggered:', asset.id, asset.name);
-    setSelectedAsset(null);
-    setEditingAsset(asset);
-    setEditName(asset.name);
-    setEditStatus(asset.status);
-    setEditRoom(asset.areaName || '');
-  };
-
-  const handleEditSave = async () => {
-    if (!editingAsset || !editName.trim()) return;
-    setEditSaving(true);
-    try {
-      await updateDoc(doc(db, 'assets', editingAsset.id), {
-        name: editName.trim(),
-        status: editStatus,
-        areaName: editRoom.trim() || 'Ostatní',
-        updatedAt: serverTimestamp(),
-      });
-      showToast('Změny uloženy', 'success');
-      setEditingAsset(null);
-    } catch (err) {
-      console.error('[MapPage] Edit save failed:', err);
-      showToast('Chyba při ukládání', 'error');
-    }
-    setEditSaving(false);
-  };
+  // Edit is now inline in AssetDetailSheet — no separate modal needed
 
   // FAB handler — opens add modal for current drill level
   const handleFabClick = () => {
@@ -1302,9 +1410,11 @@ export default function MapPage() {
     const roomAssets = assets.filter(
       a => a.buildingId === deleteTarget.buildingId && (a.areaName || 'Ostatní') === deleteTarget.name
     );
-    // Delete all assets in this room
-    await Promise.all(roomAssets.map(a => deleteDoc(doc(db, 'assets', a.id))));
-    showToast(`Místnost "${deleteTarget.name}" smazána (${roomAssets.length} zařízení)`, 'success');
+    // Soft delete all assets in this room
+    await Promise.all(roomAssets.map(a =>
+      updateDoc(doc(db, 'assets', a.id), { isDeleted: true, updatedAt: serverTimestamp() })
+    ));
+    showToast(`Místnost "${deleteTarget.name}" archivována (${roomAssets.length} zařízení)`, 'success');
     setShowDeleteModal(false);
     setDeleteTarget(null);
   };
@@ -1706,9 +1816,9 @@ export default function MapPage() {
           onClose={() => setSelectedAsset(null)}
           onCreateTask={handleNewTask}
           onReport={handleReport}
-          onEdit={handleEdit}
           onDelete={handleDeleteAsset}
           canManage={canManageAssets}
+          allAssets={assets}
           onOpenPassport={(asset: Asset) => {
             const buildingName = BUILDING_META[asset.buildingId]?.name || asset.buildingId;
             openEntityModal(
@@ -1743,55 +1853,18 @@ export default function MapPage() {
         />
       )}
 
-      {/* Edit Asset Modal */}
-      <BottomSheet
-        title={`Upravit: ${editingAsset?.name || ''}`}
-        isOpen={editingAsset !== null}
-        onClose={() => setEditingAsset(null)}
-      >
-        <FormField label="Název" value={editName} onChange={setEditName} required autoFocus />
-        <FormField
-          label="Místnost"
-          value={editRoom}
-          onChange={setEditRoom}
-          type="select"
-          options={[
-            ...Array.from(new Set(
-              assets
-                .filter(a => a.buildingId === editingAsset?.buildingId)
-                .map(a => a.areaName || 'Ostatní')
-            )).map(room => ({ value: room, label: room })),
-          ]}
-        />
-        <FormField
-          label="Stav"
-          value={editStatus}
-          onChange={setEditStatus}
-          type="chips"
-          options={[
-            { value: 'operational', label: 'V provozu' },
-            { value: 'maintenance', label: 'Údržba' },
-            { value: 'breakdown', label: 'Porucha' },
-          ]}
-        />
-        <FormFooter
-          onCancel={() => setEditingAsset(null)}
-          onSubmit={handleEditSave}
-          submitLabel="Uložit změny"
-          loading={editSaving}
-          disabled={!editName.trim()}
-        />
-      </BottomSheet>
+      {/* Edit Asset Modal removed — inline editing in AssetDetailSheet */}
 
       {/* Confirm Delete Modal */}
       <ConfirmDeleteModal
         isOpen={showDeleteModal}
-        onClose={() => { setShowDeleteModal(false); setDeleteTarget(null); }}
+        onClose={() => { setShowDeleteModal(false); setDeleteTarget(null); setAllowArchive(false); }}
         onConfirm={deleteTarget?.type === 'asset' ? confirmAssetDelete : confirmRoomDelete}
         itemName={deleteTarget?.name || ''}
         itemType={deleteTarget?.type === 'asset' ? 'zařízení' : 'místnost'}
         impactWarning={deleteImpact}
-        requirePin={true}
+        requirePin={!allowArchive}
+        allowArchive={allowArchive}
       />
 
       {/* Room Rename Modal */}
@@ -1906,6 +1979,7 @@ export default function MapPage() {
                   areaName: selectedRoomName || 'Ostatní',
                   status: 'operational',
                   category: addCategory || '',
+                  isDeleted: false,
                   createdById,
                   createdByName,
                   createdAt: serverTimestamp(),
@@ -1924,6 +1998,7 @@ export default function MapPage() {
                   areaName: name,
                   status: 'idle',
                   category: '',
+                  isDeleted: false,
                   createdById,
                   createdByName,
                   createdAt: serverTimestamp(),
@@ -1938,6 +2013,7 @@ export default function MapPage() {
                   areaName: 'Hlavní',
                   status: 'idle',
                   category: '',
+                  isDeleted: false,
                   createdById,
                   createdByName,
                   createdAt: serverTimestamp(),

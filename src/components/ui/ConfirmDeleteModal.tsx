@@ -10,8 +10,9 @@ interface ConfirmDeleteModalProps {
   onConfirm: () => Promise<void> | void;
   itemName: string;
   itemType?: string;               // e.g. 'místnost', 'zařízení', 'uživatel'
-  impactWarning?: string | null;   // If set, shows warning in step 2 and blocks
+  impactWarning?: string | null;   // If set, shows warning in step 2
   requirePin?: boolean;            // Default true — step 3 PIN entry
+  allowArchive?: boolean;          // If true + impactWarning → allow archiving with name confirm
 }
 
 export default function ConfirmDeleteModal({
@@ -22,15 +23,18 @@ export default function ConfirmDeleteModal({
   itemType = 'položku',
   impactWarning,
   requirePin = true,
+  allowArchive = false,
 }: ConfirmDeleteModalProps) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [pin, setPin] = useState('');
+  const [nameConfirm, setNameConfirm] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');
 
   const reset = () => {
     setStep(1);
     setPin('');
+    setNameConfirm('');
     setDeleting(false);
     setError('');
   };
@@ -129,20 +133,66 @@ export default function ConfirmDeleteModal({
             </>
           )}
 
-          {/* ═══ STEP 2: Impact warning (blocking) ═══ */}
+          {/* ═══ STEP 2: Impact warning ═══ */}
           {step === 2 && (
             <>
               <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 text-center">
                 <ShieldAlert className="w-10 h-10 text-amber-400 mx-auto mb-2" />
-                <p className="text-sm font-bold text-amber-300 mb-1">Nelze smazat — aktivní vazby</p>
+                <p className="text-sm font-bold text-amber-300 mb-1">
+                  {allowArchive ? 'Zařízení obsahuje historii' : 'Nelze smazat — aktivní vazby'}
+                </p>
                 <p className="text-sm text-slate-300">{impactWarning}</p>
+                {allowArchive && (
+                  <p className="text-xs text-amber-400/70 mt-2">Bude archivováno (soft delete).</p>
+                )}
               </div>
-              <button
-                onClick={handleClose}
-                className="w-full py-3 bg-slate-600 text-white rounded-xl font-semibold hover:bg-slate-500 transition"
-              >
-                Rozumím, zavřít
-              </button>
+              {allowArchive ? (
+                <>
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1.5">
+                      Pro potvrzení opište název: <strong className="text-white">{itemName}</strong>
+                    </label>
+                    <input
+                      type="text"
+                      value={nameConfirm}
+                      onChange={(e) => { setNameConfirm(e.target.value); setError(''); }}
+                      placeholder={itemName}
+                      autoFocus
+                      className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-slate-600 focus:outline-none focus:border-amber-500/50 transition"
+                    />
+                  </div>
+                  {error && <div className="text-center text-red-400 text-sm">{error}</div>}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleClose}
+                      className="flex-1 py-3 border border-white/20 text-white rounded-xl font-semibold hover:bg-white/5 transition"
+                    >
+                      Zrušit
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (nameConfirm.trim() !== itemName.trim()) {
+                          setError('Název nesouhlasí');
+                          return;
+                        }
+                        handleFinalConfirm();
+                      }}
+                      disabled={deleting || nameConfirm.trim() !== itemName.trim()}
+                      className="flex-1 py-3 bg-amber-600 text-white rounded-xl font-bold hover:bg-amber-500 transition disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                      Archivovat
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <button
+                  onClick={handleClose}
+                  className="w-full py-3 bg-slate-600 text-white rounded-xl font-semibold hover:bg-slate-500 transition"
+                >
+                  Rozumím, zavřít
+                </button>
+              )}
             </>
           )}
 

@@ -54,6 +54,7 @@ export interface AssetDoc {
   nextMaintenanceAt?: Timestamp;
   specifications?: Record<string, string>;
   imageUrl?: string;
+  isDeleted?: boolean;              // Soft delete (archivace)
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

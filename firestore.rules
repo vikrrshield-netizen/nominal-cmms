@@ -162,17 +162,15 @@ service cloud.firestore {
       allow read: if isAnyRole();
 
       // Vytvořit úkol může kdokoliv (i OPERATOR hlásí poruchu)
-      allow create: if request.auth != null;
+      allow create: if request.auth != null && hasTimestamp();
 
       // Update — STATUS LOCK logika:
       //   1. SUPERADMIN může vždy
-      //   2. Pokud task NENÍ done → normální update (s timestamp)
-      //   3. Pokud task JE done → BLOKOVÁNO (jen SUPERADMIN)
-      //   4. Výjimka: přechod isDone false→true je povolený (uzavření)
+      //   2. Pokud task NENÍ completed/cancelled → normální update (s timestamp)
+      //   3. Pokud task JE completed/cancelled → BLOKOVÁNO (jen SUPERADMIN)
       allow update: if isAuth() && hasTimestamp() && (
         isSuperAdmin()
-        || resource.data.isDone == false
-        || (resource.data.isDone == false && request.resource.data.isDone == true)
+        || !(resource.data.status in ['completed', 'cancelled'])
       );
 
       // HARD DELETE — POUZE SUPERADMIN
