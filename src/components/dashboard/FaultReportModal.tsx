@@ -9,13 +9,7 @@ import { createTask } from '../../services/taskService';
 import BottomSheet, { FormField, SubmitButton } from '../ui/BottomSheet';
 import MicButton from '../ui/MicButton';
 import { Camera, X } from 'lucide-react';
-
-// ── Categories ──
-const FAULT_CATEGORIES = [
-  { value: 'elektro', label: '⚡ Elektro' },
-  { value: 'mechanika', label: '🔧 Mechanika' },
-  { value: 'budova', label: '🏢 Budova' },
-];
+import { cmmsConfig } from '../../cmmsConfig';
 
 // ── Assets hook ──
 interface SimpleAsset { id: string; name: string; code?: string; buildingId?: string; category?: string; }
@@ -172,7 +166,7 @@ export default function FaultReportModal({ isOpen, onClose, userId, userName }: 
         value={category}
         onChange={setCategory}
         type="select"
-        options={FAULT_CATEGORIES.map((c) => ({ value: c.value, label: c.label }))}
+        options={cmmsConfig.faultCategories.map((c) => ({ value: c.id, label: c.label }))}
       />
 
       {/* 3. Title */}
@@ -219,12 +213,7 @@ export default function FaultReportModal({ isOpen, onClose, userId, userName }: 
 
       {/* 6. Severity / Priority */}
       <FormField label="Závažnost" value={priority} onChange={setPriority} type="select"
-        options={[
-          { value: 'P1', label: '🔴 P1 — Kritická (havárie)' },
-          { value: 'P2', label: '🟠 P2 — Vysoká' },
-          { value: 'P3', label: '🟡 P3 — Střední' },
-          { value: 'P4', label: '🔵 P4 — Nízká' },
-        ]}
+        options={cmmsConfig.priorities.map((p) => ({ value: p.id, label: p.label }))}
       />
 
       <SubmitButton label="Nahlásit poruchu" onClick={handleSubmit} loading={saving} color="orange" />

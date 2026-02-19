@@ -25,6 +25,7 @@ import {
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+import { cmmsConfig } from '../cmmsConfig';
 import FAB from '../components/ui/FAB';
 import EmptyState from '../components/ui/EmptyState';
 import BottomSheet, { FormField, FormFooter } from '../components/ui/BottomSheet';
@@ -505,12 +506,7 @@ export default function TasksPage() {
           onChange={(v) => setForm(prev => ({ ...prev, workType: v }))}
           type="select"
           required
-          options={[
-            { value: 'udrzba', label: 'Údržba' },
-            { value: 'projekt_milan', label: 'Projekt/Milan' },
-            { value: 'revize', label: 'Revize' },
-            { value: 'sanitace', label: 'Sanitace' },
-          ]}
+          options={cmmsConfig.workTypes.map(w => ({ value: w.id, label: w.label }))}
         />
         <FormField
           label="Priorita"
@@ -518,12 +514,7 @@ export default function TasksPage() {
           onChange={(v) => setForm(prev => ({ ...prev, priority: v }))}
           type="select"
           required
-          options={[
-            { value: 'P1', label: 'P1 — Havárie' },
-            { value: 'P2', label: 'P2 — Tento týden' },
-            { value: 'P3', label: 'P3 — Běžná' },
-            { value: 'P4', label: 'P4 — Nápad' },
-          ]}
+          options={cmmsConfig.priorities.map(p => ({ value: p.id, label: p.label }))}
         />
         <FormFooter
           onCancel={() => setShowNewTask(false)}
@@ -640,12 +631,7 @@ function EditTaskSheet({ task, onClose, onSave }: {
         value={priority}
         onChange={setPriority}
         type="select"
-        options={[
-          { value: 'P1', label: 'P1 — Havárie' },
-          { value: 'P2', label: 'P2 — Tento týden' },
-          { value: 'P3', label: 'P3 — Běžná' },
-          { value: 'P4', label: 'P4 — Nápad' },
-        ]}
+        options={cmmsConfig.priorities.map(p => ({ value: p.id, label: p.label }))}
       />
       <FormField
         label="Status"
@@ -667,12 +653,7 @@ function EditTaskSheet({ task, onClose, onSave }: {
         onChange={setWorkType}
         type="select"
         required
-        options={[
-          { value: 'udrzba', label: 'Údržba' },
-          { value: 'projekt_milan', label: 'Projekt/Milan' },
-          { value: 'revize', label: 'Revize' },
-          { value: 'sanitace', label: 'Sanitace' },
-        ]}
+        options={cmmsConfig.workTypes.map(w => ({ value: w.id, label: w.label }))}
       />
       <FormField
         label="Přiřadit"
