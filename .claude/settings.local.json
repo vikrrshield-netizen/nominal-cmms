@@ -18,7 +18,8 @@
       "Bash(powershell -File:*)",
       "WebFetch(domain:nominal-cmms.web.app)",
       "Bash(git status:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(npm install:*)"
     ]
   }
 }

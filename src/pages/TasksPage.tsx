@@ -22,7 +22,8 @@ import {
   PauseCircle,
   CheckCircle2,
 } from 'lucide-react';
-import { useReports } from '../hooks/useReports';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 import FAB from '../components/ui/FAB';
 import EmptyState from '../components/ui/EmptyState';
@@ -274,8 +275,6 @@ export default function TasksPage() {
   const { user } = useAuthContext();
   const { tasks, loading } = useTasks();
   const technicians = useTechnicians();
-  const { exportXLSX } = useReports();
-
   const [showNewTask, setShowNewTask] = useState(false);
   const [actionsTask, setActionsTask] = useState<Task | null>(null);
   const [completingTask, setCompletingTask] = useState<Task | null>(null);
@@ -380,13 +379,35 @@ export default function TasksPage() {
               {activeCount} otevřených · {doneCount} hotových
             </p>
           </div>
-          <button
-            onClick={() => exportXLSX('tasks', filteredTasks, { filename: `NOMINAL_ukoly_${new Date().toISOString().slice(0, 10)}.xlsx` })}
-            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition"
-            title="Export XLSX"
-          >
-            <Download className="w-5 h-5 text-slate-400" />
-          </button>
+          {filterTab === 'done' && (
+            <button
+              onClick={() => {
+                const pdf = new jsPDF();
+                pdf.setFontSize(14);
+                pdf.text('Nominal CMMS — Dokončené úkoly', 14, 15);
+                pdf.setFontSize(9);
+                pdf.text(`Export: ${new Date().toLocaleDateString('cs-CZ')}`, 14, 22);
+                autoTable(pdf, {
+                  startY: 28,
+                  head: [['Priorita', 'Název úkolu', 'Zařízení', 'Dokončeno', 'Řešitel']],
+                  body: filteredTasks.map(t => [
+                    t.priority,
+                    t.title,
+                    t.assetName || '—',
+                    t.completedAt ? (t.completedAt.toDate ? t.completedAt.toDate() : new Date(t.completedAt)).toLocaleDateString('cs-CZ') : '—',
+                    t.completedBy || t.assignedToName || '—',
+                  ]),
+                  styles: { fontSize: 8 },
+                  headStyles: { fillColor: [30, 41, 59] },
+                });
+                pdf.save(`NOMINAL_hotove_${new Date().toISOString().slice(0, 10)}.pdf`);
+              }}
+              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition"
+              title="Export PDF"
+            >
+              <Download className="w-5 h-5 text-slate-400" />
+            </button>
+          )}
           {loading && <Loader2 className="w-5 h-5 text-slate-500 animate-spin" />}
         </div>
 
@@ -411,30 +432,32 @@ export default function TasksPage() {
           ))}
         </div>
 
-        {/* Priority chips */}
-        <div className="flex gap-1.5 mb-2 overflow-x-auto">
-          <FilterChip label="Vše" active={!filterPriority} onClick={() => setFilterPriority(null)} color="#94a3b8" />
-          <FilterChip label="P1" active={filterPriority === 'P1'} onClick={() => setFilterPriority(filterPriority === 'P1' ? null : 'P1')} color="#f87171" />
-          <FilterChip label="P2" active={filterPriority === 'P2'} onClick={() => setFilterPriority(filterPriority === 'P2' ? null : 'P2')} color="#fbbf24" />
-          <FilterChip label="P3" active={filterPriority === 'P3'} onClick={() => setFilterPriority(filterPriority === 'P3' ? null : 'P3')} color="#60a5fa" />
-          <FilterChip label="P4" active={filterPriority === 'P4'} onClick={() => setFilterPriority(filterPriority === 'P4' ? null : 'P4')} color="#94a3b8" />
+        {/* Compact filters — priority + technician in one row */}
+        <div className="flex gap-2 mb-4">
+          <select
+            value={filterPriority || ''}
+            onChange={(e) => setFilterPriority(e.target.value || null)}
+            className="flex-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-semibold text-slate-300 focus:outline-none focus:border-orange-500/40 transition"
+          >
+            <option value="">Priorita: Vše</option>
+            <option value="P1">P1 — Havárie</option>
+            <option value="P2">P2 — Tento týden</option>
+            <option value="P3">P3 — Běžná</option>
+            <option value="P4">P4 — Nápad</option>
+          </select>
+          {technicians.length > 0 && (
+            <select
+              value={filterTechnician || ''}
+              onChange={(e) => setFilterTechnician(e.target.value || null)}
+              className="flex-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-semibold text-slate-300 focus:outline-none focus:border-orange-500/40 transition"
+            >
+              <option value="">Technik: Všichni</option>
+              {technicians.map((t) => (
+                <option key={t.id} value={t.displayName}>{t.displayName}</option>
+              ))}
+            </select>
+          )}
         </div>
-
-        {/* Technician dispatcher bar */}
-        {technicians.length > 0 && (
-          <div className="flex gap-1.5 mb-4 overflow-x-auto">
-            <FilterChip label="Všichni" active={!filterTechnician} onClick={() => setFilterTechnician(null)} color="#94a3b8" />
-            {technicians.map((t) => (
-              <FilterChip
-                key={t.id}
-                label={t.displayName}
-                active={filterTechnician === t.displayName}
-                onClick={() => setFilterTechnician(filterTechnician === t.displayName ? null : t.displayName)}
-                color="#f97316"
-              />
-            ))}
-          </div>
-        )}
 
         {/* ═══ CARD GRID ═══ */}
         {loading ? (
@@ -576,25 +599,6 @@ export default function TasksPage() {
         />
       )}
     </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════
-// FILTER CHIP
-// ═══════════════════════════════════════════════════
-function FilterChip({ label, active, onClick, color }: { label: string; active: boolean; onClick: () => void; color: string }) {
-  return (
-    <button
-      onClick={onClick}
-      className="px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all active:scale-95 flex-shrink-0"
-      style={{
-        background: active ? `${color}25` : 'rgba(255,255,255,0.05)',
-        border: `1px solid ${active ? color + '50' : 'rgba(255,255,255,0.08)'}`,
-        color: active ? color : '#64748b',
-      }}
-    >
-      {label}
-    </button>
   );
 }
 
