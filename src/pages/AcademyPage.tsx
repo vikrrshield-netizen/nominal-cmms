@@ -3,8 +3,9 @@
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ChevronDown, BookOpen, Cpu, Sparkles, Shield } from 'lucide-react';
+import { ArrowLeft, ChevronDown, BookOpen, Cpu, Sparkles, Shield, GraduationCap } from 'lucide-react';
 import appConfig from '../appConfig';
+import { useAuthContext } from '../context/AuthContext';
 
 // ═══════════════════════════════════════════════════════════════════
 // LOCAL CONTENT — all text stored in-code (zero external fetching)
@@ -357,8 +358,25 @@ function Accordion({ item, isOpen, onToggle }: {
 
 export default function AcademyPage() {
   const navigate = useNavigate();
+  const { logout, login } = useAuthContext();
   const [openItems, setOpenItems] = useState<Set<string>>(new Set());
   const [activeSection, setActiveSection] = useState<string | null>(null);
+  const [startingTraining, setStartingTraining] = useState(false);
+
+  const handleStartTraining = async () => {
+    setStartingTraining(true);
+    try {
+      await logout();
+      // Small delay to ensure logout completes
+      setTimeout(async () => {
+        const ok = await login('0000');
+        if (ok) navigate('/');
+        setStartingTraining(false);
+      }, 500);
+    } catch {
+      setStartingTraining(false);
+    }
+  };
 
   const toggleItem = (key: string) => {
     setOpenItems(prev => {
@@ -391,6 +409,23 @@ export default function AcademyPage() {
         {/* Section selector */}
         {!activeSection && (
           <div className="space-y-3">
+            {/* Training sandbox button */}
+            <button
+              onClick={handleStartTraining}
+              disabled={startingTraining}
+              className="w-full flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-blue-600/20 to-cyan-600/20 border border-blue-500/40 hover:from-blue-600/30 hover:to-cyan-600/30 transition active:scale-[0.98] disabled:opacity-50"
+            >
+              <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-blue-600/30">
+                <GraduationCap className="w-6 h-6 text-white" />
+              </div>
+              <div className="text-left flex-1">
+                <div className="text-[15px] font-semibold text-white">Spustit trenažér</div>
+                <div className="text-xs text-blue-300/70 mt-0.5">
+                  Bezpečné prostředí pro učení — změny se neukládají
+                </div>
+              </div>
+            </button>
+
             <p className="text-sm text-slate-500 mb-4">
               Kompletní znalostní báze {appConfig.PRODUCT_NAME}. Veškerý obsah je uložen lokálně — funguje bez internetu.
             </p>

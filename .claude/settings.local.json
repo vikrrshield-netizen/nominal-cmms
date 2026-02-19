@@ -17,7 +17,8 @@
       "Bash(powershell -Command \"Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing; $bmp = New-Object System.Drawing.Bitmap\\(1280, 720\\); $g = [System.Drawing.Graphics]::FromImage\\($bmp\\); $g.CopyFromScreen\\(0, 0, 0, 0, $bmp.Size\\); $g.Dispose\\(\\); $bmp.Save\\(''C:/Utrizene_Soubory/04_Projekty/nominal-cmms/screenshot.png''\\); $bmp.Dispose\\(\\); Write-Output ''Done''\")",
       "Bash(powershell -File:*)",
       "WebFetch(domain:nominal-cmms.web.app)",
-      "Bash(git status:*)"
+      "Bash(git status:*)",
+      "Bash(wc:*)"
     ]
   }
 }

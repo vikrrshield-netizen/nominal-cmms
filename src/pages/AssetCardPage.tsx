@@ -20,8 +20,9 @@ import {
   AlertTriangle, ArrowLeft, CheckCircle2,
   Clock, Loader2, Shield, Wrench, X,
   ChevronRight, Settings, Building2, MapPin,
-  Cog, PlusCircle, FileText, Filter,
+  Cog, PlusCircle, FileText, Filter, Printer,
 } from 'lucide-react';
+import MicButton from '../components/ui/MicButton';
 
 // ═══════════════════════════════════════════
 // TYPES
@@ -122,6 +123,98 @@ export default function AssetCardPage() {
 
   const canCreateTask = hasPermission('tasks.create');
   const canEditAsset = hasPermission('assets.edit');
+
+  // ─── PRINT ASSET PASSPORT ───
+  const printAssetPassport = () => {
+    if (!asset) return;
+    const now = new Date().toLocaleDateString('cs-CZ');
+    const stInfo = STATUS_MAP[asset.status || 'operational'] || STATUS_MAP.operational;
+
+    const taskRows = tasks.map((t) => {
+      const pCfg = PRIORITY_CONFIG[t.priority] || PRIORITY_CONFIG.P3;
+      const date = t.createdAt && typeof t.createdAt.toDate === 'function'
+        ? t.createdAt.toDate().toLocaleDateString('cs-CZ') : '—';
+      const done = t.completedAt && typeof t.completedAt.toDate === 'function'
+        ? t.completedAt.toDate().toLocaleDateString('cs-CZ') : '';
+      return `<tr>
+        <td>${date}</td>
+        <td>${pCfg.label}</td>
+        <td class="wrap">${t.title}</td>
+        <td>${t.assignedToName || '—'}</td>
+        <td>${t.status}</td>
+        <td>${done}</td>
+      </tr>`;
+    }).join('');
+
+    const revRows = revisions.map((r) => {
+      const days = daysUntilRevision(r.nextRevisionDate);
+      const stLabel = r.status === 'expired' ? 'PROŠLÁ' : r.status === 'expiring' ? 'Končí' : 'Platná';
+      return `<tr>
+        <td>${r.title}</td>
+        <td>${formatRevisionDate(r.lastRevisionDate)}</td>
+        <td>${formatRevisionDate(r.nextRevisionDate)}</td>
+        <td>${stLabel} (${days < 0 ? Math.abs(days) + 'd po' : 'za ' + days + 'd'})</td>
+        <td>${r.revisionCompany || '—'}</td>
+        <td>${r.certificateNumber || '—'}</td>
+      </tr>`;
+    }).join('');
+
+    const html = `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8">
+      <title>Pasport — ${asset.name}</title>
+      <style>
+        body { font-family: Arial, sans-serif; font-size: 11px; color: #000; margin: 20px; }
+        .print-header { text-align: center; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 2px solid #000; }
+        .print-header h1 { font-size: 14px; margin: 0; }
+        .print-header p { font-size: 10px; color: #475569; margin: 2px 0 0; }
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-bottom: 16px; }
+        .info-box { border: 1px solid #ccc; padding: 6px 8px; border-radius: 4px; }
+        .info-box .lbl { font-size: 9px; text-transform: uppercase; color: #666; }
+        .info-box .val { font-size: 12px; font-weight: 600; }
+        h2 { font-size: 12px; margin: 14px 0 6px; text-transform: uppercase; border-bottom: 1px solid #999; padding-bottom: 3px; }
+        table { width: 100%; border-collapse: collapse; font-size: 10px; margin-bottom: 12px; }
+        th { background: #f1f5f9; text-align: left; padding: 4px 6px; border: 1px solid #000; font-size: 9px; text-transform: uppercase; }
+        td { padding: 3px 6px; border: 1px solid #000; vertical-align: top; }
+        td.wrap { max-width: 200px; word-wrap: break-word; white-space: pre-wrap; }
+        tr:nth-child(even) { background: #f8fafc; }
+        @page { margin: 12mm; size: A4 landscape; }
+        @media print { * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } }
+      </style></head><body>
+      <div class="print-header">
+        <h1>NOMINAL CMMS — Pasport zařízení</h1>
+        <p>${asset.name} ${asset.code ? '(' + asset.code + ')' : ''} · Vytištěno: ${now}</p>
+      </div>
+      <div class="info-grid">
+        <div class="info-box"><div class="lbl">Název</div><div class="val">${asset.name}</div></div>
+        <div class="info-box"><div class="lbl">Kód</div><div class="val">${asset.code || '—'}</div></div>
+        <div class="info-box"><div class="lbl">Stav</div><div class="val">${stInfo.label}</div></div>
+        <div class="info-box"><div class="lbl">Budova</div><div class="val">${BUILDING_NAMES[asset.buildingId] || asset.buildingId}</div></div>
+        <div class="info-box"><div class="lbl">Místnost</div><div class="val">${asset.areaName || '—'}</div></div>
+        <div class="info-box"><div class="lbl">Kategorie</div><div class="val">${asset.category || '—'}</div></div>
+        ${asset.manufacturer ? `<div class="info-box"><div class="lbl">Výrobce</div><div class="val">${asset.manufacturer}</div></div>` : ''}
+        ${asset.model ? `<div class="info-box"><div class="lbl">Model</div><div class="val">${asset.model}</div></div>` : ''}
+        ${asset.serialNumber ? `<div class="info-box"><div class="lbl">Sériové č.</div><div class="val">${asset.serialNumber}</div></div>` : ''}
+        ${asset.year ? `<div class="info-box"><div class="lbl">Rok výroby</div><div class="val">${asset.year}</div></div>` : ''}
+        ${asset.mthCounter != null ? `<div class="info-box"><div class="lbl">Motohodiny</div><div class="val">${asset.mthCounter.toLocaleString('cs-CZ')} Mth</div></div>` : ''}
+      </div>
+      ${tasks.length > 0 ? `
+        <h2>Historie úkolů (${tasks.length})</h2>
+        <table><thead><tr><th>Datum</th><th>Priorita</th><th>Název</th><th>Řešitel</th><th>Stav</th><th>Dokončeno</th></tr></thead>
+        <tbody>${taskRows}</tbody></table>
+      ` : '<p>Žádné úkoly.</p>'}
+      ${revisions.length > 0 ? `
+        <h2>Revize (${revisions.length})</h2>
+        <table><thead><tr><th>Typ</th><th>Poslední</th><th>Příští</th><th>Stav</th><th>Firma</th><th>Č. zprávy</th></tr></thead>
+        <tbody>${revRows}</tbody></table>
+      ` : ''}
+    </body></html>`;
+
+    const win = window.open('', '_blank');
+    if (win) {
+      win.document.write(html);
+      win.document.close();
+      setTimeout(() => win.print(), 400);
+    }
+  };
 
   // Handler: Výměna předfiltru (extruder)
   const handlePrefilterChange = async () => {
@@ -364,6 +457,13 @@ export default function AssetCardPage() {
               Předfiltr
             </button>
           )}
+          <button
+            onClick={printAssetPassport}
+            className="flex-1 py-3 bg-slate-500/15 border border-slate-500/30 text-slate-300 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-500/25 transition active:scale-[0.97] min-h-[48px]"
+          >
+            <Printer className="w-5 h-5" />
+            Tisk historie
+          </button>
         </div>
 
         {/* Tabs */}
@@ -767,13 +867,18 @@ function FaultModal({ asset, user, onClose, onCreated }: {
         autoFocus
       />
 
-      <textarea
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-        placeholder="Detailní popis závady — co se stalo, kde přesně, okolnosti..."
-        rows={4}
-        className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-red-500/50 transition resize-none mb-3"
-      />
+      <div className="flex gap-2 items-start mb-3">
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Detailní popis závady — co se stalo, kde přesně, okolnosti..."
+          rows={4}
+          className="flex-1 p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-red-500/50 transition resize-none"
+        />
+        <div className="pt-2">
+          <MicButton onTranscript={(t) => setDescription((prev) => prev ? prev + ' ' + t : t)} />
+        </div>
+      </div>
 
       <div className="mb-3">
         <div className="text-sm font-medium text-slate-400 mb-2">Priorita</div>
@@ -913,13 +1018,18 @@ function TaskModal({ asset, user, onClose, onCreated }: {
         autoFocus
       />
 
-      <textarea
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-        placeholder="Podrobnosti (volitelné)..."
-        rows={3}
-        className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/50 transition resize-none mb-3"
-      />
+      <div className="flex gap-2 items-start mb-3">
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Podrobnosti (volitelné)..."
+          rows={3}
+          className="flex-1 p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/50 transition resize-none"
+        />
+        <div className="pt-2">
+          <MicButton onTranscript={(t) => setDescription((prev) => prev ? prev + ' ' + t : t)} />
+        </div>
+      </div>
 
       <div className="mb-4">
         <div className="text-sm font-medium text-slate-400 mb-2">Priorita</div>

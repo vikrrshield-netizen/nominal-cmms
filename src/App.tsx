@@ -28,10 +28,26 @@ import LouparnaPage from './pages/LouparnaPage';
 import InspectionsPage from './pages/InspectionsPage';
 import NoticeboardPage from './pages/NoticeboardPage';
 import AcademyPage from './pages/AcademyPage';
+import SchedulesPage from './pages/SchedulesPage';
+import PersonalDiaryPage from './pages/PersonalDiaryPage';
+import ProductionPage from './pages/ProductionPage';
+import WarehousePage from './pages/WarehousePage';
+import ShiftPlannerPage from './pages/ShiftPlannerPage';
+import SettingsPage from './pages/SettingsPage';
 
 // ═══════════════════════════════════════════════════════════════════
 // PROTECTED ROUTE WRAPPER
 // ═══════════════════════════════════════════════════════════════════
+
+function SandboxBanner() {
+  const { isSandbox } = useAuthContext();
+  if (!isSandbox) return null;
+  return (
+    <div className="bg-blue-600 text-white text-center py-2 text-sm font-bold tracking-wider sticky top-0 z-50 shadow-lg shadow-blue-600/30">
+      UČŇOVSKÝ TRENAŽÉR — Změny se neukládají
+    </div>
+  );
+}
 
 function ProtectedRoutes() {
   const { isAuthenticated, isLoading, isKiosk } = useAuthContext();
@@ -78,6 +94,12 @@ function ProtectedRoutes() {
       <Route path="/inspections" element={<InspectionsPage />} />
       <Route path="/noticeboard" element={<NoticeboardPage />} />
       <Route path="/academy" element={<AcademyPage />} />
+      <Route path="/schedules" element={<SchedulesPage />} />
+      <Route path="/notes" element={<PersonalDiaryPage />} />
+      <Route path="/production" element={<ProductionPage />} />
+      <Route path="/warehouse" element={<WarehousePage />} />
+      <Route path="/shifts" element={<ShiftPlannerPage />} />
+      <Route path="/settings" element={<SettingsPage />} />
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
@@ -92,6 +114,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <SandboxBanner />
         <ProtectedRoutes />
         <ToastContainer />
       </AuthProvider>

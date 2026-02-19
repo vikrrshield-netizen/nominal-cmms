@@ -5,10 +5,11 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../context/AuthContext';
 import appConfig from '../appConfig';
+import VoiceMemoRecorder from '../components/ui/VoiceMemoRecorder';
 import {
   Sparkles, Mic, MicOff, Send, ArrowLeft, Bot, User,
   AlertTriangle, Package, Calendar, FileText,
-  Volume2, VolumeX, Loader2,
+  Volume2, VolumeX, Loader2, Camera, X, Save, CheckCircle2,
 } from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════════════════
@@ -111,6 +112,32 @@ function getFallbackResponse(userMessage: string): string {
   return 'Nerozuměl jsem. Zkuste to prosím jinak nebo řekněte "help" pro seznam příkazů.';
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// OCR STUB — Handwritten Notes Processing
+// ═══════════════════════════════════════════════════════════════════
+
+interface OcrResult {
+  rawText: string;
+  assetName: string | null;
+  task: string | null;
+  technician: string | null;
+}
+
+async function processHandwrittenNotes(image: File): Promise<OcrResult> {
+  // Stub: simulate OCR processing delay
+  await new Promise((r) => setTimeout(r, 1500));
+
+  // Demo extraction based on filename or random data
+  const demoResults: OcrResult[] = [
+    { rawText: 'Výměna ložiska na EXT-001, vibrace odstraněny. Technik: Zdeněk M.', assetName: 'Extruder 1 (EXT-001)', task: 'Výměna ložiska — vibrace odstraněny', technician: 'Zdeněk Mička' },
+    { rawText: 'Balička Karel — ucpaná dýza, vyčištěno. Volf P.', assetName: 'Balička Karel', task: 'Ucpaná dýza — vyčištěno', technician: 'Petr Volf' },
+    { rawText: 'Kompresor 2 — netěsnost hadice, vyměněno těsnění. Novák F.', assetName: 'Kompresor 2', task: 'Netěsnost hadice — výměna těsnění', technician: 'Filip Novák' },
+  ];
+  const idx = Math.floor(Math.random() * demoResults.length);
+  console.log('[OCR] Processing image:', image.name, '→', demoResults[idx].rawText);
+  return demoResults[idx];
+}
+
 const QUICK_COMMANDS = [
   { label: 'Nahlásit poruchu', icon: AlertTriangle, color: 'bg-red-500', keyword: 'porucha' },
   { label: 'Stav skladu', icon: Package, color: 'bg-emerald-500', keyword: 'sklad' },
@@ -138,6 +165,13 @@ export default function AIAssistantPage() {
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSpeaking] = useState(false);
+
+  // OCR state
+  const [showOcr, setShowOcr] = useState(false);
+  const [ocrProcessing, setOcrProcessing] = useState(false);
+  const [ocrResult, setOcrResult] = useState<OcrResult | null>(null);
+  const [ocrSaved, setOcrSaved] = useState(false);
+  const ocrInputRef = useRef<HTMLInputElement>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -219,6 +253,33 @@ export default function AIAssistantPage() {
     }
   };
 
+  // OCR handlers
+  const handleOcrImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setOcrProcessing(true);
+    setOcrResult(null);
+    setOcrSaved(false);
+    try {
+      const result = await processHandwrittenNotes(file);
+      setOcrResult(result);
+    } catch {
+      setOcrResult({ rawText: 'Chyba při zpracování obrázku', assetName: null, task: null, technician: null });
+    }
+    setOcrProcessing(false);
+    // Reset file input
+    if (ocrInputRef.current) ocrInputRef.current.value = '';
+  };
+
+  const handleOcrSave = () => {
+    if (!ocrResult) return;
+    setOcrSaved(true);
+    // Send extracted data as message to AI
+    const msg = `📋 OCR Import — Zařízení: ${ocrResult.assetName || '?'}, Úkol: ${ocrResult.task || '?'}, Technik: ${ocrResult.technician || '?'}`;
+    handleSend(msg);
+    setTimeout(() => { setShowOcr(false); setOcrResult(null); setOcrSaved(false); }, 800);
+  };
+
   return (
     <div className="min-h-screen bg-[#0f172a] flex flex-col">
       {/* Background */}
@@ -250,6 +311,14 @@ export default function AIAssistantPage() {
           </div>
 
           <button
+            onClick={() => setShowOcr(!showOcr)}
+            title="Skenovat papírový deník"
+            className={`p-2 rounded-xl transition ${showOcr ? 'bg-violet-500 text-white' : 'bg-white/5 hover:bg-white/10 text-slate-400'}`}
+          >
+            <Camera className="w-5 h-5" />
+          </button>
+
+          <button
             onClick={() => isSpeaking ? speechSynthesis.cancel() : null}
             className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition"
           >
@@ -257,6 +326,72 @@ export default function AIAssistantPage() {
           </button>
         </div>
       </header>
+
+      {/* OCR Panel */}
+      {showOcr && (
+        <div className="relative z-10 mx-4 mt-3 bg-violet-500/10 border border-violet-500/30 rounded-2xl p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-violet-400 flex items-center gap-2">
+              <Camera className="w-4 h-4" /> Skenovat papírový deník
+            </h3>
+            <button onClick={() => { setShowOcr(false); setOcrResult(null); }} className="p-1 rounded-lg bg-white/5 text-slate-500 hover:text-white transition">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Upload */}
+          <div>
+            <input ref={ocrInputRef} type="file" accept="image/*" capture="environment" onChange={handleOcrImageSelect} className="hidden" id="ocr-upload" />
+            <label htmlFor="ocr-upload"
+              className="w-full py-3 rounded-xl bg-white/5 border border-dashed border-violet-500/40 text-violet-300 text-sm font-semibold hover:bg-white/8 transition flex items-center justify-center gap-2 cursor-pointer min-h-[48px]">
+              <Camera className="w-4 h-4" />
+              {ocrProcessing ? 'Zpracovávám...' : 'Vyfotit nebo nahrát obrázek'}
+            </label>
+          </div>
+
+          {/* Processing */}
+          {ocrProcessing && (
+            <div className="flex items-center gap-3 text-violet-300 text-sm">
+              <Loader2 className="w-4 h-4 animate-spin" /> Rozpoznávám text z obrázku...
+            </div>
+          )}
+
+          {/* Result preview */}
+          {ocrResult && !ocrProcessing && (
+            <div className="bg-white/5 rounded-xl p-3 space-y-2">
+              <div className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">Rozpoznaná data</div>
+              <div className="text-xs text-slate-300 italic bg-black/20 rounded-lg p-2">&ldquo;{ocrResult.rawText}&rdquo;</div>
+              <div className="grid grid-cols-1 gap-1.5 mt-2">
+                {ocrResult.assetName && (
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-slate-500 w-16">Zařízení:</span>
+                    <span className="text-white font-medium">{ocrResult.assetName}</span>
+                  </div>
+                )}
+                {ocrResult.task && (
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-slate-500 w-16">Úkol:</span>
+                    <span className="text-white font-medium">{ocrResult.task}</span>
+                  </div>
+                )}
+                {ocrResult.technician && (
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-slate-500 w-16">Technik:</span>
+                    <span className="text-white font-medium">{ocrResult.technician}</span>
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={handleOcrSave}
+                disabled={ocrSaved}
+                className="w-full mt-2 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-bold hover:bg-violet-500 disabled:opacity-50 transition flex items-center justify-center gap-2 min-h-[44px]"
+              >
+                {ocrSaved ? <><CheckCircle2 className="w-4 h-4" /> Uloženo</> : <><Save className="w-4 h-4" /> Uložit do systému</>}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Messages */}
       <div className="relative z-10 flex-1 overflow-y-auto p-4 space-y-4">
@@ -320,20 +455,29 @@ export default function AIAssistantPage() {
         </div>
       )}
 
+      {/* Voice Memo */}
+      <div className="relative z-10 px-4 pt-2">
+        <VoiceMemoRecorder
+          userId={user?.uid || 'anon'}
+          label="Hlasová zpráva pro AI"
+          onUpload={(url) => handleSend(`[Hlasová zpráva: ${url}]`)}
+        />
+      </div>
+
       {/* Input */}
       <div className="relative z-10 p-4 border-t border-white/10">
         <div className="flex gap-2">
           <button
             onClick={toggleListening}
             className={`p-4 rounded-2xl transition ${
-              isListening 
-                ? 'bg-red-500 text-white animate-pulse' 
+              isListening
+                ? 'bg-red-500 text-white animate-pulse'
                 : 'bg-white/10 text-slate-400 hover:bg-white/20'
             }`}
           >
             {isListening ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
           </button>
-          
+
           <input
             type="text"
             value={input}
@@ -343,7 +487,7 @@ export default function AIAssistantPage() {
             className="flex-1 p-4 bg-white/10 border border-white/10 rounded-2xl text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/50"
             disabled={isListening}
           />
-          
+
           <button
             onClick={() => handleSend()}
             disabled={!input.trim() || isProcessing}
@@ -352,7 +496,7 @@ export default function AIAssistantPage() {
             <Send className="w-6 h-6" />
           </button>
         </div>
-        
+
         <p className="text-xs text-slate-500 text-center mt-2">
           {GEMINI_API_KEY ? '✨ Powered by Gemini 1.5 Flash' : '💡 Tip: Řekněte "help" pro seznam příkazů'}
         </p>

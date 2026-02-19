@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, onSnapshot, doc, updateDoc, addDoc, deleteDoc, writeBatch, Timestamp } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, addDoc, deleteDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
 import {
@@ -19,8 +19,6 @@ import {
   Trash2,
   User,
   Clock,
-  ClipboardCheck,
-  Printer,
 } from 'lucide-react';
 
 import FAB from '../components/ui/FAB';
@@ -436,134 +434,6 @@ export default function BuildingInspectionPage() {
     }
   };
 
-  // ─── COMPLETE AREA ───
-  const [completing, setCompleting] = useState(false);
-
-  const completeArea = async () => {
-    if (!filterBuilding || completing) return;
-    const inspector = selectedInspector || user?.displayName || 'Unknown';
-    const areaPoints = points.filter((p) => p.buildingId === filterBuilding);
-    if (areaPoints.length === 0) return;
-
-    setCompleting(true);
-    try {
-      // Batch update — mark all pending checkpoints in this building as 'ok'
-      const batch = writeBatch(db);
-      const now = Timestamp.now();
-      for (const p of areaPoints) {
-        if (p.status === 'pending' || p.status === 'missing') {
-          batch.update(doc(db, 'inspections', p.id), {
-            status: 'ok',
-            lastInspectedBy: inspector,
-            lastInspectedAt: now,
-          });
-        }
-      }
-      await batch.commit();
-
-      // Write master log to inspection_logs
-      const issueCount = areaPoints.filter((p) => p.status === 'issue').length;
-      await addDoc(collection(db, 'inspection_logs'), {
-        areaId: filterBuilding,
-        areaLabel: BUILDINGS.find((b) => b.value === filterBuilding)?.label || filterBuilding,
-        timestamp: now,
-        inspectorUid: user?.uid || user?.id || '',
-        inspectorName: inspector,
-        status: issueCount > 0 ? 'issue' : 'ok',
-        auditReady: true,
-        totalPoints: areaPoints.length,
-        okCount: areaPoints.filter((p) => p.status === 'ok').length + areaPoints.filter((p) => p.status === 'pending' || p.status === 'missing').length,
-        issueCount,
-        issues: areaPoints
-          .filter((p) => p.status === 'issue')
-          .map((p) => ({ roomCode: p.roomCode, roomName: p.roomName, note: p.issueNote || '' })),
-      });
-    } catch (err) {
-      console.error('[Inspection] Complete area failed:', err);
-    }
-    setCompleting(false);
-  };
-
-  // Can complete: building filter active, has pending points or all reviewed
-  const canComplete = filterBuilding && !completing && points.some((p) => p.buildingId === filterBuilding);
-
-  // ─── PRINT INSPECTION REPORT ───
-  const printInspectionReport = () => {
-    const now = new Date().toLocaleDateString('cs-CZ');
-    const inspector = selectedInspector || user?.displayName || '—';
-    const scope = filterBuilding
-      ? BUILDINGS.find((b) => b.value === filterBuilding)?.label || `Budova ${filterBuilding}`
-      : 'Všechny budovy';
-    const data = filterBuilding ? points.filter((p) => p.buildingId === filterBuilding) : points;
-    const okCount = data.filter((p) => p.status === 'ok').length;
-    const issueCount = data.filter((p) => p.status === 'issue').length;
-    const pendingCount = data.filter((p) => p.status === 'pending' || p.status === 'missing').length;
-
-    const rows = data.map((p) => {
-      const st = STATUS_STYLES[p.status] || STATUS_STYLES.pending;
-      const inspDate = p.lastInspectedAt
-        ? (p.lastInspectedAt.toDate ? p.lastInspectedAt.toDate().toLocaleDateString('cs-CZ') : '')
-        : '';
-      return `<tr>
-        <td>${p.roomCode}</td>
-        <td>${p.roomName}</td>
-        <td>${p.floor}</td>
-        <td>${p.category || '—'}</td>
-        <td class="wrap">${p.description}</td>
-        <td style="font-weight:bold;color:${p.status === 'ok' ? '#16a34a' : p.status === 'issue' ? '#dc2626' : '#d97706'}">${st.label}</td>
-        <td class="wrap">${p.issueNote || ''}</td>
-        <td>${p.lastInspectedBy || '—'}</td>
-        <td>${inspDate}</td>
-      </tr>`;
-    }).join('');
-
-    const html = `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8">
-      <title>Protokol kontroly — ${scope}</title>
-      <style>
-        body { font-family: Arial, sans-serif; font-size: 11px; color: #000; margin: 20px; }
-        .print-header { text-align: center; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 2px solid #000; }
-        .print-header h1 { font-size: 14px; margin: 0; }
-        .print-header p { font-size: 10px; color: #475569; margin: 2px 0 0; }
-        .summary { display: flex; gap: 16px; margin-bottom: 12px; font-size: 12px; }
-        .summary span { font-weight: 700; }
-        table { width: 100%; border-collapse: collapse; font-size: 10px; }
-        th { background: #f1f5f9; text-align: left; padding: 4px 6px; border: 1px solid #000; font-size: 9px; text-transform: uppercase; }
-        td { padding: 3px 6px; border: 1px solid #000; vertical-align: top; }
-        td.wrap { max-width: 180px; word-wrap: break-word; white-space: pre-wrap; }
-        tr:nth-child(even) { background: #f8fafc; }
-        .sign { margin-top: 30px; display: flex; justify-content: space-between; }
-        .sign div { border-top: 1px solid #000; width: 200px; text-align: center; padding-top: 4px; font-size: 10px; }
-        @page { margin: 12mm; size: A4 landscape; }
-        @media print { * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } }
-      </style></head><body>
-      <div class="print-header">
-        <h1>NOMINAL CMMS — Protokol kontroly budov</h1>
-        <p>${scope} · Inspektor: ${inspector} · Datum: ${now}</p>
-      </div>
-      <div class="summary">
-        Celkem: <span>${data.length}</span> &nbsp;|&nbsp;
-        OK: <span style="color:#16a34a">${okCount}</span> &nbsp;|&nbsp;
-        Závady: <span style="color:#dc2626">${issueCount}</span> &nbsp;|&nbsp;
-        Čeká: <span style="color:#d97706">${pendingCount}</span>
-      </div>
-      <table>
-        <thead><tr><th>Kód</th><th>Místnost</th><th>Patro</th><th>Kategorie</th><th>Popis</th><th>Stav</th><th>Poznámka</th><th>Inspektor</th><th>Datum</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-      <div class="sign">
-        <div>Inspektor: ${inspector}</div>
-        <div>Podpis vedoucího</div>
-      </div>
-    </body></html>`;
-
-    const win = window.open('', '_blank');
-    if (win) {
-      win.document.write(html);
-      win.document.close();
-      setTimeout(() => win.print(), 400);
-    }
-  };
-
   // Unique buildings from data
   const activeBuildings = [...new Set(points.map((p) => p.buildingId))].sort();
 
@@ -584,9 +454,6 @@ export default function BuildingInspectionPage() {
             <p className="text-xs text-slate-500">{done}/{points.length} zkontrolováno · {progress}%</p>
           </div>
           {loading && <Loader2 className="w-5 h-5 text-slate-500 animate-spin" />}
-          <button onClick={printInspectionReport} className="px-3 py-1.5 rounded-lg bg-white/5 text-[11px] text-slate-400 font-semibold hover:text-white transition active:scale-95">
-            <Printer className="w-3.5 h-3.5 inline mr-1" /> Tisk
-          </button>
           {isAdmin && (
             <button onClick={resetAll} className="px-3 py-1.5 rounded-lg bg-white/5 text-[11px] text-slate-400 font-semibold hover:text-white transition active:scale-95">
               <RotateCcw className="w-3.5 h-3.5 inline mr-1" /> Reset
@@ -640,22 +507,6 @@ export default function BuildingInspectionPage() {
             <FilterChip key={bid} label={`Budova ${bid}`} active={filterBuilding === bid} onClick={() => setFilterBuilding(filterBuilding === bid ? null : bid)} color="#f97316" />
           ))}
         </div>
-
-        {/* Complete Area — shown when building filter is active */}
-        {canComplete && (
-          <button
-            onClick={completeArea}
-            disabled={completing}
-            className="w-full py-4 mb-4 rounded-2xl bg-gradient-to-r from-teal-500 to-emerald-500 text-white text-base font-bold flex items-center justify-center gap-2.5 shadow-lg shadow-teal-500/25 active:scale-[0.97] transition-all disabled:opacity-50"
-          >
-            {completing ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <ClipboardCheck className="w-5 h-5" />
-            )}
-            {completing ? 'Ukládám...' : `Hotovo — Uzavřít budovu ${filterBuilding}`}
-          </button>
-        )}
 
         {/* Cards grid */}
         {loading ? (

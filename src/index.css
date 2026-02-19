@@ -150,5 +150,41 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+/* ═══════════════════════════════════════════
+   PRINT STYLES — Audit-ready PDF output
+   ═══════════════════════════════════════════ */
+@media print {
+  /* Reset dark theme for paper */
+  html, body, #root { background: #fff !important; color: #000 !important; }
+
+  /* Hide UI chrome */
+  .no-print,
+  nav, header button, [class*="FAB"],
+  [class*="backdrop"], [class*="blur"],
+  [class*="shadow"], [class*="animate"],
+  .fixed { display: none !important; }
+
+  /* Show print-only elements */
+  .print-only { display: block !important; }
+
+  /* Tables: black borders, readable */
+  .print-table { width: 100%; border-collapse: collapse; font-size: 10px; }
+  .print-table th { background: #f1f5f9; text-align: left; padding: 4px 6px; border: 1px solid #000; font-size: 9px; text-transform: uppercase; }
+  .print-table td { padding: 3px 6px; border: 1px solid #000; vertical-align: top; }
+  .print-table td.wrap { max-width: 180px; word-wrap: break-word; white-space: pre-wrap; }
+  .print-table tr:nth-child(even) { background: #f8fafc; }
+
+  /* Print header */
+  .print-header { text-align: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #000; }
+  .print-header h1 { font-size: 14px; margin: 0; }
+  .print-header p { font-size: 10px; color: #475569; margin: 2px 0 0; }
+
+  /* Force colors to print */
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+  /* Page setup */
+  @page { margin: 12mm; size: A4 landscape; }
+}
+
 
 

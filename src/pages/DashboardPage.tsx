@@ -1,6 +1,9 @@
-import { useState, useEffect } from 'react';
+// src/pages/DashboardPage.tsx
+// VIKRR — Asset Shield — Dashboard (refactored: widget system)
+
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, query, where, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
 import { useFleet } from '../hooks/useFleet';
@@ -9,16 +12,96 @@ import { useInventory } from '../hooks/useInventory';
 import { useLouparna } from '../hooks/useLouparna';
 import { useRevisions } from '../hooks/useRevisions';
 import { useInspections } from '../hooks/useInspections';
+import { useDashboardConfig } from '../hooks/useDashboardConfig';
 import {
   Settings, AlertTriangle, LogOut, Loader2, ClipboardCheck, Map,
-  X, Edit3, LayoutGrid, Play, CheckCircle2, Sparkles, Send, Filter,
+  Edit3, LayoutGrid, Sparkles,
 } from 'lucide-react';
-import { createTask, startTask, completeTask, subscribeToActiveTasks } from '../services/taskService';
 import appConfig from '../appConfig';
-import type { TaskDoc } from '../types/firestore';
-import BottomSheet, { FormField, SubmitButton } from '../components/ui/BottomSheet';
-import { useStats } from '../hooks/useStats';
-import type { LemonEntry } from '../hooks/useStats';
+import { DEFAULT_ENABLED_MODULES, MODULE_DEFINITIONS } from '../types/user';
+import type { UserRole } from '../types/user';
+import { SANDBOX_STATS, initSandboxMockData } from '../lib/sandboxDb';
+import { showToast } from '../components/ui/Toast';
+
+// Dashboard components
+import DashboardGrid from '../components/dashboard/DashboardGrid';
+import FaultReportModal from '../components/dashboard/FaultReportModal';
+import IdeaModal from '../components/dashboard/IdeaModal';
+import RequestModal from '../components/dashboard/RequestModal';
+import WasteModal from '../components/dashboard/WasteModal';
+import AiModal from '../components/dashboard/AiModal';
+
+// ═══════════════════════════════════════════════════════
+// REMINDER STRIP — recurring tasks active today
+// ═══════════════════════════════════════════════════════
+
+interface RecurringTask { id: string; title: string; daysOfWeek: number[]; time: string; active: boolean; }
+
+function useRecurringToday() {
+  const [tasks, setTasks] = useState<RecurringTask[]>([]);
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'recurring_tasks'), (snap) => {
+      const today = new Date().getDay();
+      setTasks(
+        snap.docs
+          .map((d) => ({ id: d.id, ...d.data() } as RecurringTask))
+          .filter((t) => t.active && t.daysOfWeek?.includes(today))
+          .sort((a, b) => (a.time || '').localeCompare(b.time || ''))
+      );
+    });
+    return () => unsub();
+  }, []);
+  return tasks;
+}
+
+function ReminderStrip({ tasks, onNavigate }: { tasks: RecurringTask[]; onNavigate: () => void }) {
+  if (tasks.length === 0) return null;
+  return (
+    <div className="my-3">
+      <div className="flex items-center justify-between mb-1.5 px-0.5">
+        <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Dnešní rozvrh</span>
+        <button onClick={onNavigate} className="text-[10px] text-orange-400 hover:underline font-semibold">Spravovat →</button>
+      </div>
+      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+        {tasks.map((t) => (
+          <div
+            key={t.id}
+            className="flex-shrink-0 w-[140px] bg-gradient-to-br from-orange-500/15 to-amber-500/10 border border-orange-500/25 rounded-xl p-3 flex flex-col gap-1"
+          >
+            <span className="text-[10px] text-orange-400/70 font-bold">{t.time}</span>
+            <span className="text-xs font-semibold text-white leading-tight line-clamp-2">{t.title}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════
+// AI TIP CARD — optimization tips based on stats
+// ═══════════════════════════════════════════════════════
+
+const AI_TIPS = [
+  { condition: (s: { criticalTasks: number }) => s.criticalTasks > 0, tip: 'Máte P1 havárii — ověřte dostupnost náhradních dílů ve skladu.', color: 'from-red-500/15 to-rose-500/10', border: 'border-red-500/25' },
+  { condition: (s: { breakdownAssets: number }) => s.breakdownAssets > 1, tip: 'Více strojů mimo provoz — zvažte prioritizaci dle dopadu na výrobu.', color: 'from-orange-500/15 to-amber-500/10', border: 'border-orange-500/25' },
+  { condition: (s: { maintenanceAssets: number }) => s.maintenanceAssets > 2, tip: 'Několik strojů v servisu — zkontrolujte, zda nechybí naplánované revize.', color: 'from-amber-500/15 to-yellow-500/10', border: 'border-amber-500/25' },
+  { condition: (s: { openTasks: number }) => s.openTasks > 20, tip: 'Vysoký počet otevřených úkolů — prioritizujte backlog a uzavřete staré záznamy.', color: 'from-blue-500/15 to-sky-500/10', border: 'border-blue-500/25' },
+  { condition: (s: { inProgress: number }) => s.inProgress > 5, tip: 'Mnoho paralelních úkolů — lepší dokončit rozpracované než začínat nové.', color: 'from-violet-500/15 to-purple-500/10', border: 'border-violet-500/25' },
+  { condition: () => true, tip: 'Pravidelná preventivní údržba snižuje výskyt havárií až o 40%.', color: 'from-emerald-500/15 to-teal-500/10', border: 'border-emerald-500/25' },
+];
+
+function AiTipCard({ stats }: { stats: { criticalTasks: number; breakdownAssets: number; maintenanceAssets: number; openTasks: number; inProgress: number } }) {
+  const tip = AI_TIPS.find((t) => t.condition(stats)) || AI_TIPS[AI_TIPS.length - 1];
+  return (
+    <div className={`my-2 bg-gradient-to-r ${tip.color} border ${tip.border} rounded-xl p-3 flex items-start gap-2.5`}>
+      <Sparkles className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
+      <div>
+        <div className="text-[10px] text-amber-400/70 font-bold uppercase tracking-wider mb-0.5">AI Tip</div>
+        <div className="text-xs text-white/90 leading-relaxed">{tip.tip}</div>
+      </div>
+    </div>
+  );
+}
 
 // ═══════════════════════════════════════════════════════
 // FIREBASE HOOKS (LIVE DATA)
@@ -73,7 +156,7 @@ function useDashboardStats() {
 }
 
 // ═══════════════════════════════════════════════════════
-// KIOSK DASHBOARD (OPERATOR role)
+// KIOSK DASHBOARD (OPERATOR role) — unchanged
 // ═══════════════════════════════════════════════════════
 
 function KioskDashboard() {
@@ -169,394 +252,31 @@ function KioskDashboard() {
 }
 
 // ═══════════════════════════════════════════════════════
-// TILE DEFINITIONS
-// ═══════════════════════════════════════════════════════
-
-interface TileDef {
-  id: string;
-  icon: string;
-  label: string;
-  gradient: string;
-}
-
-const TILE_DEFS: TileDef[] = [
-  { id: 'fault',       icon: '🚨', label: 'Nahlásit poruchu', gradient: 'from-red-500 to-rose-600' },
-  { id: 'tasks',       icon: '📋', label: 'Úkoly',            gradient: 'from-orange-500 to-amber-600' },
-  { id: 'map',         icon: '🗺️', label: 'Mapa areálu',      gradient: 'from-blue-500 to-indigo-600' },
-  { id: 'revisions',   icon: '🔍', label: 'Revize',           gradient: 'from-purple-500 to-violet-600' },
-  { id: 'inventory',   icon: '📦', label: 'Sklad ND',         gradient: 'from-emerald-500 to-teal-600' },
-  { id: 'waste',       icon: '♻️', label: 'Odpady',            gradient: 'from-yellow-500 to-amber-600' },
-  { id: 'fleet',       icon: '🚗', label: 'Vozidla',          gradient: 'from-cyan-500 to-blue-600' },
-  { id: 'louparna',    icon: '🌾', label: 'Loupárna',         gradient: 'from-lime-500 to-green-600' },
-  { id: 'inspections', icon: '✅', label: 'Kontroly',         gradient: 'from-teal-500 to-emerald-600' },
-  { id: 'calendar',    icon: '📅', label: 'Kalendář',         gradient: 'from-indigo-500 to-purple-600' },
-  { id: 'ai',          icon: '🤖', label: 'VIKRR AI',          gradient: 'from-pink-500 to-rose-600' },
-  { id: 'reports',     icon: '📊', label: 'Reporty',          gradient: 'from-slate-500 to-gray-600' },
-  { id: 'idea',        icon: '💡', label: 'Nápad',            gradient: 'from-violet-500 to-purple-600' },
-  { id: 'request',     icon: '🔧', label: 'Požadavky',        gradient: 'from-sky-500 to-blue-600' },
-  { id: 'noticeboard', icon: '📌', label: 'Nástěnka',         gradient: 'from-teal-500 to-cyan-600' },
-  { id: 'academy',     icon: '📚', label: 'Akademie',          gradient: 'from-blue-600 to-indigo-700' },
-  { id: 'admin',       icon: '⚙️', label: 'Administrace',     gradient: 'from-gray-500 to-slate-600' },
-];
-
-const DEFAULT_ORDER = TILE_DEFS.map(t => t.id);
-
-// ═══════════════════════════════════════════════════════
-// DASHBOARD CONFIG (localStorage)
-// ═══════════════════════════════════════════════════════
-
-interface DashConfig {
-  tileOrder: string[];
-  hiddenTiles: string[];
-}
-
-function loadDashConfig(): DashConfig {
-  try {
-    const raw = localStorage.getItem('vikrr-dash-v1');
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      const tileOrder = Array.isArray(parsed?.tileOrder) ? parsed.tileOrder : [];
-      const hiddenTiles = Array.isArray(parsed?.hiddenTiles) ? parsed.hiddenTiles : [];
-      const allIds = new Set(DEFAULT_ORDER);
-      const existing = new Set([...tileOrder, ...hiddenTiles]);
-      const missing = DEFAULT_ORDER.filter(id => !existing.has(id));
-      return {
-        tileOrder: [...tileOrder.filter((id: string) => allIds.has(id)), ...missing],
-        hiddenTiles: hiddenTiles.filter((id: string) => allIds.has(id)),
-      };
-    }
-  } catch { /* ignore */ }
-  return { tileOrder: [...DEFAULT_ORDER], hiddenTiles: [] };
-}
-
-function saveDashConfig(c: DashConfig) {
-  localStorage.setItem('vikrr-dash-v1', JSON.stringify(c));
-}
-
-// ═══════════════════════════════════════════════════════
-// JIGGLE CSS
-// ═══════════════════════════════════════════════════════
-
-const JIGGLE_CSS = `
-@keyframes nominalJiggle {
-  0%, 100% { transform: rotate(-0.7deg) scale(1); }
-  25% { transform: rotate(0.7deg) scale(1.01); }
-  50% { transform: rotate(-0.5deg) scale(1); }
-  75% { transform: rotate(0.5deg) scale(0.99); }
-}
-.tile-jiggle { animation: nominalJiggle 0.3s ease-in-out infinite; }
-.tile-jiggle:nth-child(2n) { animation-delay: 0.05s; }
-.tile-jiggle:nth-child(3n) { animation-delay: 0.1s; }
-`;
-
-// ═══════════════════════════════════════════════════════
-// SEMAPHORE WIDGET — Critical machines, Active incidents, Waste
-// ═══════════════════════════════════════════════════════
-
-function SemaphoreWidget({ stats, wasteRed }: {
-  stats: { breakdownAssets: number; criticalTasks: number; maintenanceAssets: number };
-  wasteRed: number;
-}) {
-  const criticalTotal = stats.breakdownAssets + stats.criticalTasks;
-  const items = [
-    {
-      label: 'Kritické',
-      value: criticalTotal,
-      color: criticalTotal > 0 ? 'bg-red-500' : 'bg-emerald-500',
-      textColor: criticalTotal > 0 ? 'text-red-400' : 'text-emerald-400',
-      bgColor: criticalTotal > 0 ? 'bg-red-500/10 border-red-500/30' : 'bg-emerald-500/10 border-emerald-500/30',
-    },
-    {
-      label: 'Údržba',
-      value: stats.maintenanceAssets,
-      color: stats.maintenanceAssets > 0 ? 'bg-amber-500' : 'bg-emerald-500',
-      textColor: stats.maintenanceAssets > 0 ? 'text-amber-400' : 'text-emerald-400',
-      bgColor: stats.maintenanceAssets > 0 ? 'bg-amber-500/10 border-amber-500/30' : 'bg-emerald-500/10 border-emerald-500/30',
-    },
-    {
-      label: 'Odpady',
-      value: wasteRed,
-      color: wasteRed > 0 ? 'bg-orange-500' : 'bg-emerald-500',
-      textColor: wasteRed > 0 ? 'text-orange-400' : 'text-emerald-400',
-      bgColor: wasteRed > 0 ? 'bg-orange-500/10 border-orange-500/30' : 'bg-emerald-500/10 border-emerald-500/30',
-    },
-  ];
-
-  return (
-    <div className="grid grid-cols-3 gap-1 mb-4">
-      {items.map((item) => (
-        <div key={item.label} className={`rounded-xl p-1 border ${item.bgColor} text-center`}>
-          <div className="flex items-center justify-center gap-1.5">
-            <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${item.color} ${item.value > 0 ? 'animate-pulse' : ''}`} />
-            <span className={`text-lg font-bold leading-none ${item.textColor}`}>{item.value}</span>
-          </div>
-          <div className="text-[9px] text-slate-500 mt-0.5">{item.label}</div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════
-// TOP 5 TASKS WIDGET — Interactive daily tasks
-// ═══════════════════════════════════════════════════════
-
-function Top5TasksWidget() {
-  const [tasks, setTasks] = useState<TaskDoc[]>([]);
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    const unsub = subscribeToActiveTasks((allTasks) => {
-      // Top 5 sorted by priority then date
-      const sorted = allTasks
-        .sort((a, b) => {
-          const pOrder: Record<string, number> = { P1: 0, P2: 1, P3: 2, P4: 3 };
-          return (pOrder[a.priority] ?? 9) - (pOrder[b.priority] ?? 9);
-        })
-        .slice(0, 5);
-      setTasks(sorted);
-    });
-    return () => unsub();
-  }, []);
-
-  const handleStart = async (taskId: string) => {
-    setActionLoading(taskId);
-    try { await startTask(taskId); } catch (e) { console.error(e); }
-    setActionLoading(null);
-  };
-
-  const handleComplete = async (taskId: string) => {
-    setActionLoading(taskId);
-    try { await completeTask(taskId); } catch (e) { console.error(e); }
-    setActionLoading(null);
-  };
-
-  const PRIORITY_COLORS: Record<string, string> = {
-    P1: 'bg-red-500',
-    P2: 'bg-orange-500',
-    P3: 'bg-blue-500',
-    P4: 'bg-slate-500',
-  };
-
-  const STATUS_LABELS: Record<string, string> = {
-    backlog: 'Backlog',
-    planned: 'Plánováno',
-    in_progress: 'Probíhá',
-    paused: 'Pozastaveno',
-  };
-
-  if (tasks.length === 0) {
-    return (
-      <div className="bg-slate-800/60 rounded-2xl p-4 border border-slate-700/50 mb-4">
-        <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Top úkoly</h2>
-        <div className="text-center py-4 text-slate-600 text-sm">Žádné aktivní úkoly</div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="bg-slate-800/60 rounded-2xl p-4 border border-slate-700/50 mb-4">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Top 5 úkolů</h2>
-        <button onClick={() => navigate('/tasks')} className="text-[11px] text-orange-400 hover:text-orange-300 font-semibold">
-          Vše →
-        </button>
-      </div>
-      <div className="space-y-2">
-        {tasks.map((task) => (
-          <div key={task.id} className="flex items-center gap-3 p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.06] transition">
-            <div className={`w-2 h-8 rounded-full flex-shrink-0 ${PRIORITY_COLORS[task.priority] || 'bg-slate-500'}`} />
-            <div className="flex-1 min-w-0">
-              <div className="text-[13px] font-medium text-white truncate">{task.title}</div>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-[10px] text-slate-500 font-mono">{task.code}</span>
-                <span className="text-[10px] text-slate-600">•</span>
-                <span className="text-[10px] text-slate-500">{STATUS_LABELS[task.status] || task.status}</span>
-              </div>
-            </div>
-            <div className="flex gap-1.5 flex-shrink-0">
-              {(task.status === 'backlog' || task.status === 'planned') && (
-                <button
-                  onClick={() => handleStart(task.id)}
-                  disabled={actionLoading === task.id}
-                  className="px-2.5 py-1.5 rounded-lg bg-blue-500/15 border border-blue-500/30 text-blue-400 text-[11px] font-semibold hover:bg-blue-500/25 transition flex items-center gap-1"
-                >
-                  {actionLoading === task.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
-                  Přebrat
-                </button>
-              )}
-              {task.status === 'in_progress' && (
-                <button
-                  onClick={() => handleComplete(task.id)}
-                  disabled={actionLoading === task.id}
-                  className="px-2.5 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[11px] font-semibold hover:bg-emerald-500/25 transition flex items-center gap-1"
-                >
-                  {actionLoading === task.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
-                  Dokončit
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════
-// OPERATIONAL HUD — MTTR, MTBF, Work Type Distribution
-// ═══════════════════════════════════════════════════════
-
-function OperationalHUD({ onFilterToggle, hasActiveFilter }: { onFilterToggle: () => void; hasActiveFilter: boolean }) {
-  const stats = useStats();
-
-  if (stats.loading) return null;
-
-  const formatDuration = (minutes: number): string => {
-    if (minutes <= 0) return '—';
-    if (minutes < 60) return `${minutes} min`;
-    const h = Math.floor(minutes / 60);
-    const m = minutes % 60;
-    if (h < 24) return `${h}h ${m}m`;
-    const d = Math.floor(h / 24);
-    return `${d}d ${h % 24}h`;
-  };
-
-  const workTypes = Object.entries(stats.workTypeDistribution)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 4);
-
-  const totalForBar = workTypes.reduce((s, [, v]) => s + v, 0) || 1;
-
-  const WORK_COLORS: Record<string, string> = {
-    'Údržba': 'bg-blue-500',
-    'Projekt/Milan': 'bg-purple-500',
-    'Revize': 'bg-amber-500',
-    'Sanitace': 'bg-emerald-500',
-    'Nespecifikováno': 'bg-slate-500',
-  };
-
-  return (
-    <div className="bg-slate-800/60 rounded-2xl p-4 border border-slate-700/50 mb-4">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Provozní přehled</h2>
-        <button
-          onClick={onFilterToggle}
-          className={`p-1.5 rounded-lg transition ${hasActiveFilter ? 'bg-orange-500/20 text-orange-400' : 'bg-white/5 text-slate-500 hover:text-white'}`}
-          title="Filtrovat"
-        >
-          <Filter className="w-4 h-4" />
-        </button>
-      </div>
-
-      {/* KPI Row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
-        <div className="bg-white/[0.03] rounded-xl p-2.5 text-center border border-white/[0.06]">
-          <div className="text-lg font-bold text-blue-400">{stats.activeTickets}</div>
-          <div className="text-[9px] text-slate-500">Aktivní</div>
-        </div>
-        <div className="bg-white/[0.03] rounded-xl p-2.5 text-center border border-white/[0.06]">
-          <div className={`text-lg font-bold ${stats.criticalTickets > 0 ? 'text-red-400 animate-pulse' : 'text-emerald-400'}`}>{stats.criticalTickets}</div>
-          <div className="text-[9px] text-slate-500">P1 Kritické</div>
-        </div>
-        <div className="bg-white/[0.03] rounded-xl p-2.5 text-center border border-white/[0.06]">
-          <div className="text-lg font-bold text-amber-400">{formatDuration(stats.mttrMinutes)}</div>
-          <div className="text-[9px] text-slate-500">Prům. doba opravy</div>
-        </div>
-        <div className="bg-white/[0.03] rounded-xl p-2.5 text-center border border-white/[0.06]">
-          <div className="text-lg font-bold text-cyan-400">{formatDuration(stats.totalLaborMinutes)}</div>
-          <div className="text-[9px] text-slate-500">Celkem práce</div>
-        </div>
-      </div>
-
-      {/* Work Type Distribution Bar */}
-      {workTypes.length > 0 && (
-        <div>
-          <div className="text-[10px] text-slate-500 uppercase font-bold mb-1.5">Typ práce (Alibi)</div>
-          <div className="h-3 flex rounded-full overflow-hidden mb-2">
-            {workTypes.map(([type, count]) => (
-              <div
-                key={type}
-                className={`${WORK_COLORS[type] || 'bg-slate-600'} transition-all`}
-                style={{ width: `${(count / totalForBar) * 100}%` }}
-                title={`${type}: ${count}`}
-              />
-            ))}
-          </div>
-          <div className="flex flex-wrap gap-x-3 gap-y-1">
-            {workTypes.map(([type, count]) => (
-              <div key={type} className="flex items-center gap-1.5">
-                <div className={`w-2 h-2 rounded-full ${WORK_COLORS[type] || 'bg-slate-600'}`} />
-                <span className="text-[10px] text-slate-400">{type} ({count})</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════
-// LEMON LIST — Top 5 worst assets (most P1/P2 issues)
-// ═══════════════════════════════════════════════════════
-
-function LemonListWidget() {
-  const stats = useStats();
-  const navigate = useNavigate();
-
-  if (stats.loading || stats.lemonList.length === 0) return null;
-
-  return (
-    <div className="bg-slate-800/60 rounded-2xl p-4 border border-slate-700/50 mb-4">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-          <span>🍋</span> Lemon List
-        </h2>
-        <span className="text-[10px] text-slate-600">posledních 30 dní</span>
-      </div>
-      <div className="space-y-2">
-        {stats.lemonList.map((entry: LemonEntry, idx: number) => (
-          <div
-            key={entry.assetId}
-            className="flex items-center gap-3 p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.06] transition cursor-pointer"
-            onClick={() => navigate(`/asset/${entry.assetId}`)}
-          >
-            <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-sm font-bold ${
-              idx === 0 ? 'bg-red-500/20 text-red-400' :
-              idx === 1 ? 'bg-orange-500/20 text-orange-400' :
-              'bg-amber-500/20 text-amber-400'
-            }`}>
-              {idx + 1}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-[13px] font-medium text-white truncate">{entry.assetName}</div>
-              <div className="text-[10px] text-slate-500">
-                {entry.mtbfHours > 0 ? `Doba bez poruchy: ${entry.mtbfHours}h` : 'Doba bez poruchy: N/A'}
-              </div>
-            </div>
-            <div className="text-right flex-shrink-0">
-              <div className={`text-lg font-bold ${entry.issueCount >= 3 ? 'text-red-400' : 'text-amber-400'}`}>
-                {entry.issueCount}
-              </div>
-              <div className="text-[9px] text-slate-500">problémů</div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════
-// FULL DASHBOARD — 3-column Icon Tile Grid
+// FULL DASHBOARD — Widget Grid System
 // ═══════════════════════════════════════════════════════
 
 function FullDashboard() {
   const navigate = useNavigate();
-  const { user, logout } = useAuthContext();
-  const stats = useDashboardStats();
+  const { user, logout, isSandbox } = useAuthContext();
+  const rawStats = useDashboardStats();
+
+  // Sandbox: override stats with mock data + show welcome toast
+  const stats = isSandbox ? { ...SANDBOX_STATS } : rawStats;
+  useEffect(() => {
+    if (isSandbox) {
+      initSandboxMockData();
+      showToast('REŽIM UČNĚ: Změny se ukládají pouze dočasně.', 'success');
+    }
+  }, [isSandbox]);
+
+  // Recurring tasks for today's reminder strip
+  const recurringToday = useRecurringToday();
+
+  // Widget config (Firestore + localStorage + role defaults)
+  const { widgets, loading: configLoading, updateWidgets } = useDashboardConfig(
+    user?.id,
+    user?.role ?? 'VYROBA'
+  );
 
   // Live data hooks
   const fleet = useFleet();
@@ -573,70 +293,14 @@ function FullDashboard() {
   // Edit mode
   const [isEditing, setIsEditing] = useState(false);
 
-  // Tile order + hidden (persisted)
-  const [config, setConfig] = useState<DashConfig>(() => loadDashConfig());
-
   // Quick action modals
   const [activeModal, setActiveModal] = useState<'idea' | 'request' | 'waste' | 'ai' | 'fault' | null>(null);
-  const [aiQuery, setAiQuery] = useState('');
-  const [formText, setFormText] = useState('');
-  const [isAnonymous, setIsAnonymous] = useState(true);
-  const [ideaName, setIdeaName] = useState('');
-  const [ideaPin, setIdeaPin] = useState('');
-  const [requestType, setRequestType] = useState('tool');
-  const [requestDetail, setRequestDetail] = useState('');
-  const [wasteType, setWasteType] = useState('plevy');
-  const [saving, setSaving] = useState(false);
-  const [faultSeverity, setFaultSeverity] = useState<'low' | 'medium' | 'high'>('medium');
-  const [faultDescription, setFaultDescription] = useState('');
+
+  // HUD filter state
   const [showHudFilter, setShowHudFilter] = useState(false);
   const [hudFilterBuilding, setHudFilterBuilding] = useState('ALL');
   const [hudFilterStatus, setHudFilterStatus] = useState('ALL');
   const [hudFilterSeverity, setHudFilterSeverity] = useState('ALL');
-
-  // Move tile (stable reorder — no drag & drop)
-  const moveTile = (fromIdx: number, toIdx: number) => {
-    const visibleIds = config.tileOrder.filter(id => !config.hiddenTiles.includes(id));
-    if (toIdx < 0 || toIdx >= visibleIds.length) return;
-    const updated = [...visibleIds];
-    const [moved] = updated.splice(fromIdx, 1);
-    updated.splice(toIdx, 0, moved);
-    const newConfig: DashConfig = {
-      tileOrder: [...updated, ...config.hiddenTiles],
-      hiddenTiles: config.hiddenTiles,
-    };
-    setConfig(newConfig);
-    saveDashConfig(newConfig);
-  };
-
-  // Remove / Restore tiles
-  const removeTile = (id: string) => {
-    const newConfig: DashConfig = {
-      tileOrder: config.tileOrder.filter(t => t !== id),
-      hiddenTiles: [...config.hiddenTiles, id],
-    };
-    setConfig(newConfig);
-    saveDashConfig(newConfig);
-  };
-
-  const restoreTile = (id: string) => {
-    const newConfig: DashConfig = {
-      tileOrder: [...config.tileOrder, id],
-      hiddenTiles: config.hiddenTiles.filter(t => t !== id),
-    };
-    setConfig(newConfig);
-    saveDashConfig(newConfig);
-  };
-
-  // Visible & hidden tile defs
-  const visibleTiles = config.tileOrder
-    .filter(id => !config.hiddenTiles.includes(id))
-    .map(id => TILE_DEFS.find(t => t.id === id))
-    .filter((t): t is TileDef => !!t);
-
-  const hiddenTileDefs = config.hiddenTiles
-    .map(id => TILE_DEFS.find(t => t.id === id))
-    .filter((t): t is TileDef => !!t);
 
   // Tile data (defensive — all hook data accessed safely)
   const invStats = inventory?.stats ?? { low: 0, critical: 0, out: 0 };
@@ -682,75 +346,20 @@ function FullDashboard() {
     }
   };
 
-  // Tile click
-  const handleTileClick = (tile: TileDef) => {
-    if (isEditing) return;
+  // Tile click → navigate or open modal
+  const handleTileClick = (tileId: string) => {
     const routes: Record<string, string> = {
       tasks: '/tasks', map: '/map', revisions: '/revisions',
       inventory: '/inventory', waste: '/waste', fleet: '/fleet', louparna: '/louparna',
       inspections: '/inspections', calendar: '/calendar', reports: '/reports', admin: '/admin',
       noticeboard: '/noticeboard', academy: '/academy',
+      production: '/production', warehouse: '/warehouse', shifts: '/shifts',
     };
-    if (routes[tile.id]) { navigate(routes[tile.id]); return; }
-    if (tile.id === 'ai') { setActiveModal('ai'); setAiQuery(''); return; }
-    if (tile.id === 'fault') { setActiveModal('fault'); setFormText(''); setFaultDescription(''); setFaultSeverity('medium'); return; }
-    if (tile.id === 'idea') setActiveModal('idea');
-    else if (tile.id === 'request') setActiveModal('request');
-  };
-
-  // Modal submit
-  const handleSubmit = async () => {
-    if (!formText.trim() && activeModal !== 'waste') return;
-    setSaving(true);
-    try {
-      const identifiedName = !isAnonymous ? (ideaName.trim() || user?.displayName || 'Neznámý') : 'Anonymní';
-      const baseTask = {
-        createdById: isAnonymous ? 'anonymous' : (user?.id || 'unknown'),
-        createdByName: identifiedName,
-        source: 'web' as const,
-        priority: 'P3' as const,
-      };
-      if (activeModal === 'idea') {
-        await createTask({ ...baseTask, title: formText.trim(), type: 'improvement' });
-        // Track engagement for identified submissions
-        if (!isAnonymous) {
-          try {
-            await addDoc(collection(db, 'user_engagement'), {
-              userId: user?.id || ideaPin.trim() || 'unknown',
-              userName: identifiedName,
-              type: 'idea',
-              ideaText: formText.trim(),
-              createdAt: serverTimestamp(),
-            });
-          } catch { /* engagement tracking is best-effort */ }
-        }
-      } else if (activeModal === 'fault') {
-        const severityMap: Record<string, string> = { low: 'P3', medium: 'P2', high: 'P1' };
-        await createTask({
-          ...baseTask,
-          title: formText.trim(),
-          description: faultDescription.trim() || undefined,
-          type: 'corrective',
-          priority: severityMap[faultSeverity] as any,
-        });
-      } else if (activeModal === 'request') {
-        const labels: Record<string, string> = { tool: 'Chybí nářadí', clothing: 'Chybí pracovní oděv', material: 'Chybí materiál' };
-        await createTask({ ...baseTask, title: `${labels[requestType]}: ${formText.trim()}`, type: 'preventive', priority: 'P3', description: requestDetail.trim() || undefined });
-      } else if (activeModal === 'waste') {
-        const labels: Record<string, string> = { plevy: 'Vyvézt vůz (plevy)', popelnice: 'Plná popelnice', kontejner: 'Plný kontejner' };
-        await createTask({ ...baseTask, title: labels[wasteType] + (formText.trim() ? ` — ${formText.trim()}` : ''), type: 'corrective', priority: 'P2' });
-      }
-      setActiveModal(null);
-      setFormText('');
-      setIsAnonymous(true);
-      setIdeaName('');
-      setIdeaPin('');
-      setRequestDetail('');
-      setFaultDescription('');
-    } catch (err) {
-      console.error('[QuickAction]', err);
-    }
-    setSaving(false);
+    if (routes[tileId]) { navigate(routes[tileId]); return; }
+    if (tileId === 'ai') { setActiveModal('ai'); return; }
+    if (tileId === 'fault') { setActiveModal('fault'); return; }
+    if (tileId === 'idea') { setActiveModal('idea'); return; }
+    if (tileId === 'request') { setActiveModal('request'); return; }
   };
 
   const greeting = () => {
@@ -763,9 +372,43 @@ function FullDashboard() {
   const userName = user?.displayName?.split(' ')[0] || 'uživateli';
   const isAdmin = (['MAJITEL', 'VEDENI', 'SUPERADMIN', 'UDRZBA'] as string[]).includes(user?.role || '');
 
+  // Feature flags — filter widgets by enabled modules for current role
+  // Sandbox mode bypasses tenant restrictions: all modules enabled
+  const FULL_WIDTH_IDS = ['semaphore', 'hud', 'top5', 'lemon'];
+  const enabledModules = useMemo(() => {
+    if (isSandbox) {
+      return MODULE_DEFINITIONS.map(m => m.id);
+    }
+    const role = user?.role || 'VYROBA';
+    // Try tenant-level modules from localStorage (synced by useTenantSettings)
+    try {
+      const tenantRaw = localStorage.getItem('nominal-tenant-modules');
+      if (tenantRaw) {
+        const tenantConfig = JSON.parse(tenantRaw) as Record<string, string[]>;
+        const tenantId = (user as any)?.tenantId || 'main_firm';
+        if (tenantConfig[tenantId]) return tenantConfig[tenantId];
+      }
+    } catch { /* ignore */ }
+    // Fallback: role-level defaults
+    try {
+      const raw = localStorage.getItem('nominal-enabled-modules');
+      if (raw) {
+        const config = JSON.parse(raw) as Record<string, string[]>;
+        if (config[role]) return config[role];
+      }
+    } catch { /* ignore */ }
+    return DEFAULT_ENABLED_MODULES[role as UserRole] ?? [];
+  }, [user?.role, isSandbox]);
+
+  const filteredWidgets = useMemo(() => {
+    return widgets.filter(w => {
+      if (FULL_WIDTH_IDS.includes(w.widgetId)) return true;
+      return enabledModules.includes(w.widgetId);
+    });
+  }, [widgets, enabledModules]);
+
   return (
     <div className="min-h-screen bg-slate-900">
-      <style>{JIGGLE_CSS}</style>
       <div className="max-w-4xl mx-auto px-3 pt-4 pb-24">
 
         {/* HEADER */}
@@ -780,7 +423,7 @@ function FullDashboard() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIsEditing(!isEditing)}
-              title="Upravit rozvržení dlaždic (drag & drop)"
+              title="Upravit rozvržení dlaždic"
               className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold transition ${
                 isEditing
                   ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/25'
@@ -800,284 +443,124 @@ function FullDashboard() {
         </div>
 
         {/* LOADING */}
-        {stats.loading && (
+        {(stats.loading || configLoading) && (
           <div className="flex items-center gap-2 mb-4 text-slate-500 text-sm">
             <Loader2 className="w-4 h-4 animate-spin" /> Načítám data...
           </div>
         )}
 
-        {/* SEMAPHORE + TOP 5 TASKS — admin only */}
-        {isAdmin && !isEditing && (
-          <>
-            <SemaphoreWidget
-              stats={{
-                breakdownAssets: stats.breakdownAssets,
-                criticalTasks: stats.criticalTasks,
-                maintenanceAssets: stats.maintenanceAssets,
-              }}
-              wasteRed={wasteStats.red ?? 0}
-            />
-            <OperationalHUD
-              onFilterToggle={() => setShowHudFilter(!showHudFilter)}
-              hasActiveFilter={hudFilterBuilding !== 'ALL' || hudFilterStatus !== 'ALL' || hudFilterSeverity !== 'ALL'}
-            />
-            {/* HUD FILTER PANEL */}
-            {showHudFilter && (
-              <div className="bg-slate-800/80 rounded-2xl p-4 border border-orange-500/20 mb-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Filtry</span>
-                  <button
-                    onClick={() => { setHudFilterBuilding('ALL'); setHudFilterStatus('ALL'); setHudFilterSeverity('ALL'); }}
-                    className="text-[10px] text-orange-400 hover:text-orange-300 font-semibold"
-                  >
-                    Resetovat
-                  </button>
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <div>
-                    <label className="text-[10px] text-slate-500 uppercase font-bold block mb-1">Budova</label>
-                    <select
-                      value={hudFilterBuilding}
-                      onChange={(e) => setHudFilterBuilding(e.target.value)}
-                      className="w-full px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white text-xs focus:outline-none focus:border-orange-500/50"
-                    >
-                      <option value="ALL">Vše</option>
-                      {['A', 'B', 'C', 'D', 'E', 'L'].map(b => (
-                        <option key={b} value={b}>{b}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-500 uppercase font-bold block mb-1">Stav</label>
-                    <select
-                      value={hudFilterStatus}
-                      onChange={(e) => setHudFilterStatus(e.target.value)}
-                      className="w-full px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white text-xs focus:outline-none focus:border-orange-500/50"
-                    >
-                      <option value="ALL">Vše</option>
-                      <option value="backlog">Backlog</option>
-                      <option value="planned">Plánováno</option>
-                      <option value="in_progress">Probíhá</option>
-                      <option value="paused">Pozastaveno</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-500 uppercase font-bold block mb-1">Závažnost</label>
-                    <select
-                      value={hudFilterSeverity}
-                      onChange={(e) => setHudFilterSeverity(e.target.value)}
-                      className="w-full px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white text-xs focus:outline-none focus:border-orange-500/50"
-                    >
-                      <option value="ALL">Vše</option>
-                      <option value="P1">P1 — Havárie</option>
-                      <option value="P2">P2 — Urgentní</option>
-                      <option value="P3">P3 — Běžná</option>
-                      <option value="P4">P4 — Nápad</option>
-                    </select>
-                  </div>
-                </div>
+        {/* HUD FILTER PANEL */}
+        {isAdmin && !isEditing && showHudFilter && (
+          <div className="bg-slate-800/80 rounded-2xl p-4 border border-orange-500/20 mb-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Filtry</span>
+              <button
+                onClick={() => { setHudFilterBuilding('ALL'); setHudFilterStatus('ALL'); setHudFilterSeverity('ALL'); }}
+                className="text-[10px] text-orange-400 hover:text-orange-300 font-semibold"
+              >
+                Resetovat
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <label className="text-[10px] text-slate-500 uppercase font-bold block mb-1">Budova</label>
+                <select
+                  value={hudFilterBuilding}
+                  onChange={(e) => setHudFilterBuilding(e.target.value)}
+                  className="w-full px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white text-xs focus:outline-none focus:border-orange-500/50"
+                >
+                  <option value="ALL">Vše</option>
+                  {['A', 'B', 'C', 'D', 'E', 'L'].map(b => (
+                    <option key={b} value={b}>{b}</option>
+                  ))}
+                </select>
               </div>
-            )}
-            <Top5TasksWidget />
-            <LemonListWidget />
-          </>
+              <div>
+                <label className="text-[10px] text-slate-500 uppercase font-bold block mb-1">Stav</label>
+                <select
+                  value={hudFilterStatus}
+                  onChange={(e) => setHudFilterStatus(e.target.value)}
+                  className="w-full px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white text-xs focus:outline-none focus:border-orange-500/50"
+                >
+                  <option value="ALL">Vše</option>
+                  <option value="backlog">Backlog</option>
+                  <option value="planned">Plánováno</option>
+                  <option value="in_progress">Probíhá</option>
+                  <option value="paused">Pozastaveno</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] text-slate-500 uppercase font-bold block mb-1">Závažnost</label>
+                <select
+                  value={hudFilterSeverity}
+                  onChange={(e) => setHudFilterSeverity(e.target.value)}
+                  className="w-full px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white text-xs focus:outline-none focus:border-orange-500/50"
+                >
+                  <option value="ALL">Vše</option>
+                  <option value="P1">P1 — Havárie</option>
+                  <option value="P2">P2 — Urgentní</option>
+                  <option value="P3">P3 — Běžná</option>
+                  <option value="P4">P4 — Nápad</option>
+                </select>
+              </div>
+            </div>
+          </div>
         )}
 
-        {/* ═══ TILE GRID — 2 cols mobile, 3 cols tablet+ ═══ */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-          {visibleTiles.map((tile, idx) => {
-            const data = getTileData(tile.id);
-            return (
-              <div
-                key={tile.id}
-                onClick={() => handleTileClick(tile)}
-                className={`
-                  relative p-3.5 rounded-2xl bg-gradient-to-br ${tile.gradient}
-                  cursor-pointer transition-all min-h-[110px] flex flex-col justify-between
-                  shadow-lg shadow-black/20 border border-white/10
-                  ${isEditing ? 'tile-jiggle' : 'hover:scale-[1.03] active:scale-[0.95]'}
-                `}
-              >
-                {/* Edit mode: Remove + Move buttons */}
-                {isEditing && (
-                  <div className="absolute -top-1.5 left-0 right-0 flex items-center justify-between z-10 px-0.5">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); removeTile(tile.id); }}
-                      className="w-6 h-6 bg-slate-800 border-2 border-slate-600 rounded-full flex items-center justify-center hover:bg-red-600 hover:border-red-500 transition"
-                    >
-                      <X className="w-3.5 h-3.5 text-white" />
-                    </button>
-                    <div className="flex gap-1">
-                      {idx > 0 && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); moveTile(idx, idx - 1); }}
-                          className="w-6 h-6 bg-slate-800/90 border border-slate-600 rounded-full flex items-center justify-center text-white text-[10px] font-bold hover:bg-blue-600 hover:border-blue-500 transition"
-                        >◀</button>
-                      )}
-                      {idx < visibleTiles.length - 1 && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); moveTile(idx, idx + 1); }}
-                          className="w-6 h-6 bg-slate-800/90 border border-slate-600 rounded-full flex items-center justify-center text-white text-[10px] font-bold hover:bg-blue-600 hover:border-blue-500 transition"
-                        >▶</button>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Badge */}
-                {!isEditing && data.badge != null && data.badge > 0 && (
-                  <div className="absolute top-2 right-2 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center shadow-md">
-                    {data.badge}
-                  </div>
-                )}
-
-                {/* Icon */}
-                <span className="text-3xl drop-shadow-md">{tile.icon}</span>
-
-                {/* Content */}
-                <div>
-                  <div className="text-[12px] font-bold text-white/90 leading-tight">{tile.label}</div>
-                  {data.value != null && (
-                    <div className="text-2xl font-extrabold text-white mt-0.5 leading-none">{data.value}</div>
-                  )}
-                  {data.subtext != null && (
-                    <div className="text-[10px] text-white/60 mt-0.5">{data.subtext}</div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* ═══ LIBRARY — Hidden tiles ═══ */}
-        {isEditing && (
-          <div className="mt-5">
-            <div className="text-[11px] text-slate-500 uppercase tracking-wider font-bold mb-2 flex items-center gap-2">
-              <LayoutGrid className="w-3.5 h-3.5" />
-              Knihovna ({hiddenTileDefs.length})
-            </div>
-            {hiddenTileDefs.length === 0 ? (
-              <div className="text-sm text-slate-600 text-center py-4 bg-white/[0.02] rounded-xl border border-dashed border-slate-700/50">
-                Všechny dlaždice jsou zobrazeny
-              </div>
-            ) : (
-              <div className="grid grid-cols-3 gap-2.5">
-                {hiddenTileDefs.map(tile => (
-                  <button
-                    key={tile.id}
-                    onClick={() => restoreTile(tile.id)}
-                    className="p-3.5 rounded-2xl border-2 border-dashed border-slate-700/50 text-center opacity-50 hover:opacity-100 hover:border-orange-500/40 transition min-h-[90px] flex flex-col items-center justify-center gap-1"
-                  >
-                    <span className="text-2xl">{tile.icon}</span>
-                    <div className="text-[11px] text-slate-400 font-medium">{tile.label}</div>
-                    <div className="text-[10px] text-emerald-400 font-bold">+ Přidat</div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+        {/* DASHBOARD GRID */}
+        {!configLoading && filteredWidgets.length > 0 && (
+          <DashboardGrid
+            widgets={filteredWidgets}
+            isEditing={isEditing}
+            onConfigChange={updateWidgets}
+            semaphoreStats={{
+              breakdownAssets: stats.breakdownAssets,
+              criticalTasks: stats.criticalTasks,
+              maintenanceAssets: stats.maintenanceAssets,
+            }}
+            wasteRed={wasteStats.red ?? 0}
+            onFilterToggle={() => setShowHudFilter(!showHudFilter)}
+            hasActiveFilter={hudFilterBuilding !== 'ALL' || hudFilterStatus !== 'ALL' || hudFilterSeverity !== 'ALL'}
+            getTileData={getTileData}
+            onTileClick={handleTileClick}
+            isAdmin={isAdmin}
+            afterTopSlot={<>
+              <AiTipCard stats={stats} />
+              <ReminderStrip tasks={recurringToday} onNavigate={() => navigate('/schedules')} />
+            </>}
+          />
         )}
       </div>
 
-      {/* ═══ MODALS (centered) ═══ */}
-      {/* FAULT REPORT MODAL */}
-      <BottomSheet title="🚨 Nahlásit poruchu" isOpen={activeModal === 'fault'} onClose={() => setActiveModal(null)}>
-        <FormField label="Název poruchy" value={formText} onChange={setFormText} placeholder="Např. Nefunguje extruder č. 3" required />
-        <FormField label="Popis závady" value={faultDescription} onChange={setFaultDescription} type="textarea" placeholder="Detailní popis problému — co se děje, kdy to začalo, zvuky, vibrace..." />
-        <FormField label="Závažnost" value={faultSeverity} onChange={(v) => setFaultSeverity(v as any)} type="select"
-          options={[
-            { value: 'high', label: '🔴 Vysoká — Havárie (P1)' },
-            { value: 'medium', label: '🟡 Střední — Urgentní (P2)' },
-            { value: 'low', label: '🟢 Nízká — Běžná (P3)' },
-          ]}
-        />
-        <SubmitButton label="Nahlásit poruchu" onClick={handleSubmit} loading={saving} color="orange" />
-      </BottomSheet>
-
-      {/* IDEAS MODULE */}
-      <BottomSheet title="💡 Nápad na zlepšení" isOpen={activeModal === 'idea'} onClose={() => setActiveModal(null)}>
-        {/* Mode selector */}
-        <div className="flex gap-2 mb-4">
-          <button
-            onClick={() => setIsAnonymous(true)}
-            className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition ${isAnonymous ? 'bg-purple-600 text-white' : 'bg-white/5 text-slate-400 border border-white/10'}`}
-          >
-            🔒 Anonymně
-          </button>
-          <button
-            onClick={() => setIsAnonymous(false)}
-            className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition ${!isAnonymous ? 'bg-blue-600 text-white' : 'bg-white/5 text-slate-400 border border-white/10'}`}
-          >
-            👤 Se jménem
-          </button>
-        </div>
-        {/* Identified fields */}
-        {!isAnonymous && (
-          <div className="grid grid-cols-2 gap-2 mb-3">
-            <FormField label="Jméno" value={ideaName} onChange={setIdeaName} placeholder="Vaše jméno" />
-            <FormField label="PIN (volitelný)" value={ideaPin} onChange={setIdeaPin} placeholder="1234" />
-          </div>
-        )}
-        <FormField label="Váš nápad" value={formText} onChange={setFormText} type="textarea" placeholder="Co byste chtěli zlepšit? Popište svůj nápad..." required />
-        <SubmitButton label="Odeslat nápad" onClick={handleSubmit} loading={saving} color="orange" />
-      </BottomSheet>
-
-      {/* REQUEST/ORDER MODULE */}
-      <BottomSheet title="📦 Objednat díl / Požadavek" isOpen={activeModal === 'request'} onClose={() => setActiveModal(null)}>
-        <FormField label="Typ požadavku" value={requestType} onChange={setRequestType} type="select"
-          options={[
-            { value: 'tool', label: '🔧 Chybí nářadí' },
-            { value: 'clothing', label: '👕 Chybí pracovní oděv' },
-            { value: 'material', label: '📦 Chybí materiál' },
-          ]}
-        />
-        <FormField label="Co potřebujete" value={formText} onChange={setFormText} placeholder="Stručný popis" required />
-        <FormField label="Upřesnění objednávky" value={requestDetail} onChange={setRequestDetail} type="textarea" placeholder="Přesné rozměry, typ, katalogové číslo... Např. Ložisko 6204-2RS" />
-        <SubmitButton label="Odeslat požadavek" onClick={handleSubmit} loading={saving} color="orange" />
-      </BottomSheet>
-
-      <BottomSheet title="🚜 Odpad / Plevy" isOpen={activeModal === 'waste'} onClose={() => setActiveModal(null)}>
-        <FormField label="Typ" value={wasteType} onChange={setWasteType} type="select"
-          options={[
-            { value: 'plevy', label: '🌾 Vyvézt vůz (plevy)' },
-            { value: 'popelnice', label: '🗑️ Plná popelnice' },
-            { value: 'kontejner', label: '📦 Plný kontejner' },
-          ]}
-        />
-        <FormField label="Poznámka (volitelné)" value={formText} onChange={setFormText} placeholder="Lokace, poznámka..." />
-        <SubmitButton label="Nahlásit" onClick={handleSubmit} loading={saving} color="orange" />
-      </BottomSheet>
-
-      {/* AI ASSISTANT PLACEHOLDER */}
-      <BottomSheet title={`${appConfig.APP_NAME_SHORT} AI`} isOpen={activeModal === 'ai'} onClose={() => setActiveModal(null)}>
-        <div className="flex items-center gap-3 p-4 mb-4 bg-gradient-to-r from-pink-500/10 to-purple-500/10 border border-pink-500/20 rounded-2xl">
-          <Sparkles className="w-6 h-6 text-pink-400 flex-shrink-0" />
-          <div>
-            <div className="text-sm font-semibold text-white">AI Asistent údržby</div>
-            <div className="text-xs text-slate-400 mt-0.5">Zeptej se na cokoliv — historii oprav, doporučení, analýzu poruch...</div>
-          </div>
-        </div>
-        <div className="relative mb-4">
-          <textarea
-            value={aiQuery}
-            onChange={(e) => setAiQuery(e.target.value)}
-            placeholder="Na co se chceš zeptat? Např. Kolikrát se rozbil balicí stroj letos?"
-            rows={3}
-            className="w-full px-4 py-3 pr-12 rounded-xl bg-white/5 border border-white/10 text-white text-[15px] placeholder-slate-600 focus:outline-none focus:border-pink-500/50 transition resize-none min-h-[48px]"
-          />
-          <button
-            disabled={!aiQuery.trim()}
-            className="absolute right-3 bottom-3 w-8 h-8 rounded-lg bg-gradient-to-r from-pink-500 to-purple-600 flex items-center justify-center text-white disabled:opacity-30 transition hover:opacity-90"
-          >
-            <Send className="w-4 h-4" />
-          </button>
-        </div>
-        <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4 text-center">
-          <Sparkles className="w-8 h-8 text-slate-600 mx-auto mb-2" />
-          <div className="text-sm text-slate-500 font-medium">Připravujeme</div>
-          <div className="text-xs text-slate-600 mt-1">AI analýza bude dostupná v další verzi</div>
-        </div>
-      </BottomSheet>
+      {/* ACTION MODALS */}
+      <FaultReportModal
+        isOpen={activeModal === 'fault'}
+        onClose={() => setActiveModal(null)}
+        userId={user?.id || 'unknown'}
+        userName={user?.displayName || 'Neznámý'}
+      />
+      <IdeaModal
+        isOpen={activeModal === 'idea'}
+        onClose={() => setActiveModal(null)}
+        userId={user?.id || 'unknown'}
+        userName={user?.displayName || 'Neznámý'}
+      />
+      <RequestModal
+        isOpen={activeModal === 'request'}
+        onClose={() => setActiveModal(null)}
+        userId={user?.id || 'unknown'}
+        userName={user?.displayName || 'Neznámý'}
+      />
+      <WasteModal
+        isOpen={activeModal === 'waste'}
+        onClose={() => setActiveModal(null)}
+        userId={user?.id || 'unknown'}
+        userName={user?.displayName || 'Neznámý'}
+      />
+      <AiModal
+        isOpen={activeModal === 'ai'}
+        onClose={() => setActiveModal(null)}
+      />
     </div>
   );
 }

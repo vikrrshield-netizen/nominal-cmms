@@ -4,7 +4,7 @@
 // Budova D → interaktivní SVG půdorys 2.NP
 
 import { useState, useEffect, useMemo } from 'react';
-import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import {
   ArrowLeft,
@@ -30,7 +30,6 @@ import { createTask } from '../services/taskService';
 import BottomSheet, { FormField, FormFooter } from '../components/ui/BottomSheet';
 import { showToast } from '../components/ui/Toast';
 import EmptyState from '../components/ui/EmptyState';
-import ConfirmDeleteModal from '../components/ui/ConfirmDeleteModal';
 import { usePestControl } from '../hooks/usePestControl';
 import {
   EntityCardFull,
@@ -201,7 +200,6 @@ function useGroupedData(assets: Asset[], selectedBuilding: string | null) {
   return useMemo(() => {
     const buildingMap = new Map<string, BuildingGroup>();
 
-    // Seed known buildings from BUILDING_META
     Object.entries(BUILDING_META).forEach(([id, meta]) => {
       buildingMap.set(id, {
         id,
@@ -213,26 +211,9 @@ function useGroupedData(assets: Asset[], selectedBuilding: string | null) {
       });
     });
 
-    // Dynamic color palette for buildings not in BUILDING_META
-    const DYNAMIC_COLORS = ['#ec4899', '#14b8a6', '#f43f5e', '#06b6d4', '#84cc16', '#d946ef'];
-    let dynamicIdx = 0;
-
     const roomMap = new Map<string, Map<string, Asset[]>>();
     assets.forEach((asset) => {
       const bid = asset.buildingId || '?';
-
-      // Ensure dynamic buildings get a BuildingGroup entry
-      if (!buildingMap.has(bid)) {
-        buildingMap.set(bid, {
-          id: bid,
-          name: bid,
-          color: DYNAMIC_COLORS[dynamicIdx++ % DYNAMIC_COLORS.length],
-          rooms: [],
-          totalAssets: 0,
-          issueCount: 0,
-        });
-      }
-
       if (!roomMap.has(bid)) roomMap.set(bid, new Map());
       const rooms = roomMap.get(bid)!;
       const roomKey = asset.areaName || 'Ostatní';
@@ -241,7 +222,8 @@ function useGroupedData(assets: Asset[], selectedBuilding: string | null) {
     });
 
     roomMap.forEach((rooms, bid) => {
-      const building = buildingMap.get(bid)!;
+      const building = buildingMap.get(bid);
+      if (!building) return;
 
       rooms.forEach((roomAssets, roomName) => {
         const issues = roomAssets.filter(
@@ -319,57 +301,29 @@ function FolderTile({ folder, onClick }: { folder: FolderGroup; onClick: () => v
 // ═══════════════════════════════════════════════
 // ROOM TILE — drill-down level 2 (iPhone tile)
 // ═══════════════════════════════════════════════
-function RoomTile({ room, color, onClick, code, canManage, onEdit, onDelete }: {
-  room: RoomGroup; color: string; onClick: () => void; code: string;
-  canManage?: boolean; onEdit?: () => void; onDelete?: () => void;
-}) {
+function RoomTile({ room, color, onClick, code }: { room: RoomGroup; color: string; onClick: () => void; code: string }) {
   const roomWorst = getWorstStatus(room.assets);
   const roomSt = STATUS_CONFIG[roomWorst] || STATUS_CONFIG.idle;
 
   return (
-    <div className="relative group">
-      <button
-        onClick={onClick}
-        className="w-full flex flex-col items-center justify-center p-3 rounded-2xl border transition-all active:scale-[0.96] cursor-pointer text-center min-h-[110px] relative bg-slate-800/40 border-slate-700/30 hover:bg-slate-700/40"
+    <button
+      onClick={onClick}
+      className="flex flex-col items-center justify-center p-3 rounded-2xl border transition-all active:scale-[0.96] cursor-pointer text-center min-h-[110px] relative bg-slate-800/40 border-slate-700/30 hover:bg-slate-700/40"
+    >
+      <div className={`absolute top-2 right-2 w-2.5 h-2.5 rounded-full ${roomSt.dot}`} />
+      <div
+        className="w-12 h-12 rounded-xl flex items-center justify-center mb-1.5"
+        style={{ background: `${color}20` }}
       >
-        <div className={`absolute top-2 right-2 w-2.5 h-2.5 rounded-full ${roomSt.dot}`} />
-        <div
-          className="w-12 h-12 rounded-xl flex items-center justify-center mb-1.5"
-          style={{ background: `${color}20` }}
-        >
-          <Layers className="w-6 h-6" style={{ color }} />
-        </div>
-        <span className="text-[13px] font-semibold text-white leading-tight">{room.name}</span>
-        <span className="text-[10px] font-mono text-slate-500 mt-0.5">{code}</span>
-        <span className="text-[11px] text-slate-500 mt-0.5">{room.assets.length} strojů</span>
-        {room.issueCount > 0 && (
-          <span className="text-[11px] text-red-400 mt-0.5">{room.issueCount} problémů</span>
-        )}
-      </button>
-      {/* Edit/Delete overlay — visible on hover for users with asset.delete permission */}
-      {canManage && (
-        <div className="absolute top-1 left-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-          {onEdit && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onEdit(); }}
-              className="w-7 h-7 rounded-lg bg-amber-500/80 text-white flex items-center justify-center hover:bg-amber-500 transition"
-              title="Přejmenovat místnost"
-            >
-              <Edit2 className="w-3.5 h-3.5" />
-            </button>
-          )}
-          {onDelete && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onDelete(); }}
-              className="w-7 h-7 rounded-lg bg-red-500/80 text-white flex items-center justify-center hover:bg-red-500 transition"
-              title="Smazat místnost"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
+        <Layers className="w-6 h-6" style={{ color }} />
+      </div>
+      <span className="text-[13px] font-semibold text-white leading-tight">{room.name}</span>
+      <span className="text-[10px] font-mono text-slate-500 mt-0.5">{code}</span>
+      <span className="text-[11px] text-slate-500 mt-0.5">{room.assets.length} strojů</span>
+      {room.issueCount > 0 && (
+        <span className="text-[11px] text-red-400 mt-0.5">{room.issueCount} problémů</span>
       )}
-    </div>
+    </button>
   );
 }
 
@@ -1069,18 +1023,7 @@ export default function MapPage() {
     setEntityModalStack([]);
   };
 
-  const { user, hasPermission } = useAuthContext();
-  const canManageAssets = hasPermission('asset.delete');
-
-  // Delete modal state
-  const [deleteTarget, setDeleteTarget] = useState<{ type: 'room' | 'asset'; name: string; buildingId: string; roomName?: string } | null>(null);
-  const [deleteImpact, setDeleteImpact] = useState<string | null>(null);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-
-  // Room rename state
-  const [renamingRoom, setRenamingRoom] = useState<{ buildingId: string; oldName: string } | null>(null);
-  const [renameValue, setRenameValue] = useState('');
-  const [renameSaving, setRenameSaving] = useState(false);
+  const { user } = useAuthContext();
 
   const { buildings } = useGroupedData(assets, selectedBuildingId);
 
@@ -1231,72 +1174,6 @@ export default function MapPage() {
     if (activeLevel === 'machines' || activeLevel === 'folder') setShowAddModal('asset');
     else if (activeLevel === 'rooms') setShowAddModal('room');
     else setShowAddModal('building');
-  };
-
-  // ── Room management handlers ──
-  const handleRoomDelete = async (buildingId: string, roomName: string) => {
-    // Check for active tasks linked to assets in this room
-    const roomAssets = assets.filter(a => a.buildingId === buildingId && (a.areaName || 'Ostatní') === roomName);
-    const assetIds = roomAssets.map(a => a.id);
-
-    if (assetIds.length > 0) {
-      // Check tasks collection for active tasks referencing these assets
-      try {
-        const tasksQuery = query(
-          collection(db, 'tasks'),
-          where('assetId', 'in', assetIds.slice(0, 10)), // Firestore 'in' max 10
-          where('status', 'in', ['backlog', 'planned', 'in_progress', 'paused']),
-        );
-        const snap = await getDocs(tasksQuery);
-        if (!snap.empty) {
-          setDeleteImpact(`Nelze smazat — lokalita má ${snap.size} aktivních úkolů.`);
-          setDeleteTarget({ type: 'room', name: roomName, buildingId });
-          setShowDeleteModal(true);
-          return;
-        }
-      } catch {
-        // If composite query fails, proceed without impact check
-      }
-    }
-
-    setDeleteImpact(null);
-    setDeleteTarget({ type: 'room', name: roomName, buildingId });
-    setShowDeleteModal(true);
-  };
-
-  const confirmRoomDelete = async () => {
-    if (!deleteTarget || deleteTarget.type !== 'room') return;
-    const roomAssets = assets.filter(
-      a => a.buildingId === deleteTarget.buildingId && (a.areaName || 'Ostatní') === deleteTarget.name
-    );
-    // Delete all assets in this room
-    await Promise.all(roomAssets.map(a => deleteDoc(doc(db, 'assets', a.id))));
-    showToast(`Místnost "${deleteTarget.name}" smazána (${roomAssets.length} zařízení)`, 'success');
-    setShowDeleteModal(false);
-    setDeleteTarget(null);
-  };
-
-  const handleRoomRename = (buildingId: string, oldName: string) => {
-    setRenamingRoom({ buildingId, oldName });
-    setRenameValue(oldName);
-  };
-
-  const saveRoomRename = async () => {
-    if (!renamingRoom || !renameValue.trim()) return;
-    setRenameSaving(true);
-    const roomAssets = assets.filter(
-      a => a.buildingId === renamingRoom.buildingId && (a.areaName || 'Ostatní') === renamingRoom.oldName
-    );
-    try {
-      await Promise.all(roomAssets.map(a =>
-        updateDoc(doc(db, 'assets', a.id), { areaName: renameValue.trim(), updatedAt: serverTimestamp() })
-      ));
-      showToast(`Místnost přejmenována na "${renameValue.trim()}"`, 'success');
-      setRenamingRoom(null);
-    } catch (err) {
-      showToast('Chyba při přejmenování', 'error');
-    }
-    setRenameSaving(false);
   };
 
   // ── Navigation handlers ──
@@ -1534,9 +1411,6 @@ export default function MapPage() {
                     color={currentColor}
                     code={getRoomCode(selectedBuildingId || '', room, idx)}
                     onClick={() => handleRoomClick(room.name)}
-                    canManage={canManageAssets}
-                    onEdit={() => handleRoomRename(selectedBuildingId || '', room.name)}
-                    onDelete={() => handleRoomDelete(selectedBuildingId || '', room.name)}
                   />
                 ))}
 
@@ -1737,33 +1611,6 @@ export default function MapPage() {
           submitLabel="Uložit změny"
           loading={editSaving}
           disabled={!editName.trim()}
-        />
-      </BottomSheet>
-
-      {/* Confirm Delete Modal */}
-      <ConfirmDeleteModal
-        isOpen={showDeleteModal}
-        onClose={() => { setShowDeleteModal(false); setDeleteTarget(null); }}
-        onConfirm={confirmRoomDelete}
-        itemName={deleteTarget?.name || ''}
-        itemType="místnost"
-        impactWarning={deleteImpact}
-        requirePin={true}
-      />
-
-      {/* Room Rename Modal */}
-      <BottomSheet
-        title={`Přejmenovat: ${renamingRoom?.oldName || ''}`}
-        isOpen={renamingRoom !== null}
-        onClose={() => setRenamingRoom(null)}
-      >
-        <FormField label="Nový název" value={renameValue} onChange={setRenameValue} required autoFocus />
-        <FormFooter
-          onCancel={() => setRenamingRoom(null)}
-          onSubmit={saveRoomRename}
-          submitLabel="Přejmenovat"
-          loading={renameSaving}
-          disabled={!renameValue.trim() || renameValue.trim() === renamingRoom?.oldName}
         />
       </BottomSheet>
 

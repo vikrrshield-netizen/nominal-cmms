@@ -21,6 +21,7 @@ import {
 import { useReports } from '../hooks/useReports';
 import ImportModal from '../components/ui/ImportModal';
 import BottomSheet, { FormField, FormFooter } from '../components/ui/BottomSheet';
+import MicButton from '../components/ui/MicButton';
 
 // ═══════════════════════════════════════════
 // TOAST SYSTEM
@@ -616,8 +617,13 @@ function HandoverForm({ entity, onSubmit, onCancel }: {
             className={`py-2.5 rounded-xl text-xs font-medium border transition min-h-[44px] ${condition === c.id ? c.c : 'bg-slate-700/30 text-slate-400 border-slate-600/30'}`}>{c.label}</button>
         ))}
       </div>
-      <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Poznámka..." rows={2}
-        className="w-full p-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-slate-500 outline-none resize-none min-h-[48px]" />
+      <div className="flex gap-2 items-start">
+        <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Poznámka..." rows={2}
+          className="flex-1 p-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-slate-500 outline-none resize-none min-h-[48px]" />
+        <div className="pt-1">
+          <MicButton onTranscript={(t) => setNote((prev) => prev ? prev + ' ' + t : t)} />
+        </div>
+      </div>
       <div className="flex gap-2">
         <button onClick={onCancel} className="flex-1 py-3 bg-slate-700 text-slate-300 rounded-xl font-medium min-h-[48px]">Zrušit</button>
         <button onClick={() => onSubmit({ tachometer, condition, note })} className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold min-h-[48px]"><Send className="w-4 h-4 inline mr-1" />Předat</button>

@@ -60,7 +60,7 @@ service cloud.firestore {
     }
 
     function isAnyRole() {
-      return isAuth() && userRole() in ['SUPERADMIN', 'MAJITEL', 'VEDENI', 'VYROBA', 'UDRZBA', 'OPERATOR'];
+      return isAuth() && userRole() in ['SUPERADMIN', 'MAJITEL', 'VEDENI', 'VYROBA', 'UDRZBA', 'SKLADNIK', 'OPERATOR'];
     }
 
     // Soft delete check — update MUST only set isDeleted=true, not actually delete
@@ -443,6 +443,40 @@ service cloud.firestore {
       allow read: if isManagement();
       allow create: if isAnyRole();
       allow update: if false;
+      allow delete: if isSuperAdmin();
+    }
+
+    // ═══════════════════════════════════════════
+    // DASHBOARD_CONFIGS — uživatelská konfigurace dashboardu
+    // ═══════════════════════════════════════════
+    match /dashboard_configs/{userId} {
+      allow read: if isAuth() && request.auth.uid == userId;
+      allow write: if isAuth() && request.auth.uid == userId;
+    }
+
+    // ═══════════════════════════════════════════
+    // DASHBOARD_DEFAULTS — výchozí konfigurace per role
+    // ═══════════════════════════════════════════
+    match /dashboard_defaults/{role} {
+      allow read: if isAnyRole();
+      allow write: if isAdmin();
+    }
+
+    // ═══════════════════════════════════════════
+    // TENANT_SETTINGS — multi-tenant module config
+    // ═══════════════════════════════════════════
+    match /tenant_settings/{tenantId} {
+      allow read: if isAnyRole();
+      allow write: if isSuperAdmin();
+    }
+
+    // ═══════════════════════════════════════════
+    // TENANT_ROLES — custom positions per tenant
+    // ═══════════════════════════════════════════
+    match /tenant_roles/{roleId} {
+      allow read: if isAnyRole();
+      allow create: if isManagement();
+      allow update: if isManagement();
       allow delete: if isSuperAdmin();
     }
 

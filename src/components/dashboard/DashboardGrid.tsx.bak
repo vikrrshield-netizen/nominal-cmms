@@ -1,0 +1,248 @@
+// src/components/dashboard/DashboardGrid.tsx
+// VIKRR — Asset Shield — Main grid renderer for dashboard widgets
+
+import { X } from 'lucide-react';
+import type { WidgetInstance } from '../../types/dashboard';
+import { getWidgetDef } from '../../config/widgetRegistry';
+import WidgetShell from './WidgetShell';
+import WidgetLibrary from './WidgetLibrary';
+
+// ── Widget component imports ──
+import SemaphoreWidget from './SemaphoreWidget';
+import OperationalHUD from './OperationalHUD';
+import Top5TasksWidget from './Top5TasksWidget';
+import LemonListWidget from './LemonListWidget';
+
+// ═══════════════════════════════════════════════════════
+// TYPES
+// ═══════════════════════════════════════════════════════
+
+interface TileData {
+  value?: string;
+  subtext?: string;
+  badge?: number;
+}
+
+interface DashboardGridProps {
+  widgets: WidgetInstance[];
+  isEditing: boolean;
+  onConfigChange: (widgets: WidgetInstance[]) => void;
+  // Data props for widgets
+  semaphoreStats: { breakdownAssets: number; criticalTasks: number; maintenanceAssets: number };
+  wasteRed: number;
+  onFilterToggle: () => void;
+  hasActiveFilter: boolean;
+  // Tile data resolver
+  getTileData: (id: string) => TileData;
+  onTileClick: (tileId: string) => void;
+  isAdmin: boolean;
+}
+
+// ═══════════════════════════════════════════════════════
+// JIGGLE CSS
+// ═══════════════════════════════════════════════════════
+
+const JIGGLE_CSS = `
+@keyframes nominalJiggle {
+  0%, 100% { transform: rotate(-0.7deg) scale(1); }
+  25% { transform: rotate(0.7deg) scale(1.01); }
+  50% { transform: rotate(-0.5deg) scale(1); }
+  75% { transform: rotate(0.5deg) scale(0.99); }
+}
+.tile-jiggle { animation: nominalJiggle 0.3s ease-in-out infinite; }
+.tile-jiggle:nth-child(2n) { animation-delay: 0.05s; }
+.tile-jiggle:nth-child(3n) { animation-delay: 0.1s; }
+`;
+
+// ═══════════════════════════════════════════════════════
+// COMPONENT
+// ═══════════════════════════════════════════════════════
+
+export default function DashboardGrid({
+  widgets,
+  isEditing,
+  onConfigChange,
+  semaphoreStats,
+  wasteRed,
+  onFilterToggle,
+  hasActiveFilter,
+  getTileData,
+  onTileClick,
+  isAdmin,
+}: DashboardGridProps) {
+  // Sorted visible widgets
+  const visible = widgets
+    .filter(w => w.visible)
+    .sort((a, b) => a.position - b.position);
+
+  // Split into full-width widgets and tile widgets
+  const fullWidgets = visible.filter(w => {
+    const def = getWidgetDef(w.widgetId);
+    return def?.type === 'widget';
+  });
+
+  const tileWidgets = visible.filter(w => {
+    const def = getWidgetDef(w.widgetId);
+    return def?.type === 'tile' || def?.type === 'action';
+  });
+
+  // ── Reorder helpers ──
+  const moveTile = (fromIdx: number, toIdx: number) => {
+    if (toIdx < 0 || toIdx >= tileWidgets.length) return;
+    const reordered = [...tileWidgets];
+    const [moved] = reordered.splice(fromIdx, 1);
+    reordered.splice(toIdx, 0, moved);
+
+    // Rebuild positions: full widgets keep their positions, tiles get re-numbered
+    const updated = widgets.map(w => {
+      const tileIdx = reordered.findIndex(t => t.widgetId === w.widgetId);
+      if (tileIdx !== -1) {
+        return { ...w, position: fullWidgets.length + tileIdx };
+      }
+      return w;
+    });
+    onConfigChange(updated);
+  };
+
+  const removeTile = (widgetId: string) => {
+    const updated = widgets.map(w =>
+      w.widgetId === widgetId ? { ...w, visible: false } : w
+    );
+    onConfigChange(updated);
+  };
+
+  const restoreTile = (widgetId: string) => {
+    const maxPos = Math.max(...widgets.filter(w => w.visible).map(w => w.position), 0);
+    const updated = widgets.map(w =>
+      w.widgetId === widgetId ? { ...w, visible: true, position: maxPos + 1 } : w
+    );
+    onConfigChange(updated);
+  };
+
+  const toggleCollapse = (widgetId: string) => {
+    const updated = widgets.map(w =>
+      w.widgetId === widgetId ? { ...w, collapsed: !w.collapsed } : w
+    );
+    onConfigChange(updated);
+  };
+
+  // ── Render full-width widget component ──
+  const renderFullWidget = (instance: WidgetInstance) => {
+    const def = getWidgetDef(instance.widgetId);
+    if (!def) return null;
+
+    let content: React.ReactNode = null;
+    switch (def.component) {
+      case 'SemaphoreWidget':
+        content = <SemaphoreWidget stats={semaphoreStats} wasteRed={wasteRed} />;
+        break;
+      case 'OperationalHUD':
+        content = <OperationalHUD onFilterToggle={onFilterToggle} hasActiveFilter={hasActiveFilter} />;
+        break;
+      case 'Top5TasksWidget':
+        content = <Top5TasksWidget />;
+        break;
+      case 'LemonListWidget':
+        content = <LemonListWidget />;
+        break;
+      default:
+        return null;
+    }
+
+    return (
+      <WidgetShell
+        key={instance.widgetId}
+        definition={def}
+        collapsed={instance.collapsed}
+        isEditing={isEditing}
+        onToggleCollapse={() => toggleCollapse(instance.widgetId)}
+        onRemove={() => removeTile(instance.widgetId)}
+      >
+        {content}
+      </WidgetShell>
+    );
+  };
+
+  return (
+    <>
+      <style>{JIGGLE_CSS}</style>
+
+      {/* Full-width widgets (admin only, hidden in edit mode) */}
+      {isAdmin && !isEditing && fullWidgets.map(renderFullWidget)}
+
+      {/* Tile grid — 2 cols mobile, 3 cols tablet+ */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+        {tileWidgets.map((instance, idx) => {
+          const def = getWidgetDef(instance.widgetId);
+          if (!def) return null;
+          const data = getTileData(instance.widgetId);
+
+          return (
+            <div
+              key={instance.widgetId}
+              onClick={() => !isEditing && onTileClick(instance.widgetId)}
+              className={`
+                relative p-3.5 rounded-2xl bg-gradient-to-br ${def.gradient}
+                cursor-pointer transition-all min-h-[110px] flex flex-col justify-between
+                shadow-lg shadow-black/20 border border-white/10
+                ${isEditing ? 'tile-jiggle' : 'hover:scale-[1.03] active:scale-[0.95]'}
+              `}
+            >
+              {/* Edit mode: Remove + Move buttons */}
+              {isEditing && (
+                <div className="absolute -top-1.5 left-0 right-0 flex items-center justify-between z-10 px-0.5">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); removeTile(instance.widgetId); }}
+                    className="w-6 h-6 bg-slate-800 border-2 border-slate-600 rounded-full flex items-center justify-center hover:bg-red-600 hover:border-red-500 transition"
+                  >
+                    <X className="w-3.5 h-3.5 text-white" />
+                  </button>
+                  <div className="flex gap-1">
+                    {idx > 0 && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); moveTile(idx, idx - 1); }}
+                        className="w-6 h-6 bg-slate-800/90 border border-slate-600 rounded-full flex items-center justify-center text-white text-[10px] font-bold hover:bg-blue-600 hover:border-blue-500 transition"
+                      >◀</button>
+                    )}
+                    {idx < tileWidgets.length - 1 && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); moveTile(idx, idx + 1); }}
+                        className="w-6 h-6 bg-slate-800/90 border border-slate-600 rounded-full flex items-center justify-center text-white text-[10px] font-bold hover:bg-blue-600 hover:border-blue-500 transition"
+                      >▶</button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Badge */}
+              {!isEditing && data.badge != null && data.badge > 0 && (
+                <div className="absolute top-2 right-2 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center shadow-md">
+                  {data.badge}
+                </div>
+              )}
+
+              {/* Icon */}
+              <span className="text-3xl drop-shadow-md">{def.icon}</span>
+
+              {/* Content */}
+              <div>
+                <div className="text-[12px] font-bold text-white/90 leading-tight">{def.label}</div>
+                {data.value != null && (
+                  <div className="text-2xl font-extrabold text-white mt-0.5 leading-none">{data.value}</div>
+                )}
+                {data.subtext != null && (
+                  <div className="text-[10px] text-white/60 mt-0.5">{data.subtext}</div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Library — hidden widgets (edit mode only) */}
+      {isEditing && (
+        <WidgetLibrary widgets={widgets} onRestore={restoreTile} />
+      )}
+    </>
+  );
+}

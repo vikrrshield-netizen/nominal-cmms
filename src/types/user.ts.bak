@@ -10,7 +10,6 @@ export type UserRole =
   | 'VEDENI'       // 🏢 Martina — výkonná ředitelka, HR, finance
   | 'SUPERADMIN'   // 🛠️ Vilém — technika, BEZ financí
   | 'UDRZBA'       // 🔧 Zdeněk — stroje, sklad
-  | 'SKLADNIK'     // 📦 Skladník — sklad ND, inventura
   | 'VYROBA'       // 🏭 Pavla — zóny, priority
   | 'OPERATOR';    // 👷 Kiosk — tablet na zdi
 
@@ -40,17 +39,7 @@ export type Permission =
   | 'secretbox.view'    // Schránka důvěry
   | 'purchase.approve'  // Schvalování nákupů nad 5000 Kč
   // NOVÉ — AI
-  | 'ai.use'            // AI asistent
-  // Plánování & Rozvrhy
-  | 'schedule.manage'   // Správa opakovaných úkolů
-  // Výroba
-  | 'production.manage' // Plánování extruze & balení
-  // Admin
-  | 'admin.view'        // Čtení administrace (read-only)
-  | 'admin.manage'      // Plná správa administrace
-  // Warehouse & Shifts
-  | 'warehouse.view'    // Sklad výroby — příjem, zásoby, expedice
-  | 'shifts.view';      // Plánování směn
+  | 'ai.use';           // AI asistent
 
 // ═══════════════════════════════════════════════════════════════════
 // ROLE FLAGS (speciální módy)
@@ -121,15 +110,6 @@ export const ROLE_META: Record<UserRole, RoleMeta> = {
     badgeHex: '#d97706',
     description: 'Zóny, priority výroby',
   },
-  SKLADNIK: {
-    label: 'Skladník',
-    labelShort: 'SKL',
-    icon: '📦',
-    color: 'bg-teal-500',
-    textColor: 'text-teal-500',
-    badgeHex: '#14b8a6',
-    description: 'Sklad ND, příjem, výdej, inventura',
-  },
   OPERATOR: {
     label: 'Operátor',
     labelShort: 'OPR',
@@ -157,9 +137,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'secretbox.view',      // ✅ Schránka důvěry
     'purchase.approve',    // ✅ Schvaluje nákupy
     'ai.use',
-    'admin.view',          // ✅ Vidí administraci (read-only)
-    'warehouse.view',      // ✅ Sklad výroby
-    'shifts.view',         // ✅ Směny
   ],
 
   // 🏢 VEDENÍ (Martina) — Výkonná ředitelka
@@ -174,9 +151,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'purchase.approve',    // ✅ Schvaluje nákupy
     'weekly.modify',
     'ai.use',
-    'admin.view',          // ✅ Vidí administraci (read-only)
-    'warehouse.view',      // ✅ Sklad výroby
-    'shifts.view',         // ✅ Směny
   ],
 
   // 🛠️ SUPERADMIN (Vilém) — Technika, BEZ financí
@@ -193,12 +167,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     // purchase.approve — NE
     'weekly.modify',
     'ai.use',
-    'schedule.manage',
-    'production.manage',
-    'admin.view',          // ✅ Vidí administraci
-    'admin.manage',        // ✅ Plná správa
-    'warehouse.view',      // ✅ Sklad výroby
-    'shifts.view',         // ✅ Směny
   ],
 
   // 🔧 ÚDRŽBA (Zdeněk) — Stroje, sklad
@@ -209,10 +177,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'fleet.read',
     'report.read',
     'ai.use',
-    'schedule.manage',
-    'production.manage',
-    'warehouse.view',      // ✅ Sklad výroby
-    'shifts.view',         // ✅ Směny
   ],
 
   // 🏭 VÝROBA (Pavla) — Zóny, priority
@@ -222,18 +186,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'zone.change',
     'weekly.modify',
     'report.read',
-    'production.manage',
-    'warehouse.view',      // ✅ Sklad výroby
-    'shifts.view',         // ✅ Směny
-  ],
-
-  // 📦 SKLADNÍK — Sklad ND, inventura
-  SKLADNIK: [
-    'wo.create', 'wo.update', 'wo.read',
-    'asset.read',
-    'inv.consume', 'inv.restock', 'inv.manage', 'inv.order',
-    'report.read',
-    'schedule.manage',
   ],
 
   // 👷 OPERÁTOR (Kiosk) — Tablet na zdi
@@ -253,7 +205,6 @@ export const ROLE_FLAGS: Record<UserRole, RoleFlags> = {
   VEDENI:     { isReadOnly: false, isKiosk: false },
   SUPERADMIN: { isReadOnly: false, isKiosk: false },
   UDRZBA:     { isReadOnly: false, isKiosk: false },
-  SKLADNIK:   { isReadOnly: false, isKiosk: false },
   VYROBA:     { isReadOnly: false, isKiosk: false },
   OPERATOR:   { isReadOnly: false, isKiosk: true  },
 };
@@ -268,7 +219,6 @@ export interface AppUser {
   displayName: string;
   role: UserRole;
   plantId: string;
-  tenantId: string;  // Multi-tenant skeleton — default 'main_firm'
   pin?: string;
   isActive: boolean;
   createdAt: Date;
@@ -281,12 +231,12 @@ export interface AppUser {
 // ═══════════════════════════════════════════════════════════════════
 
 export const SAMPLE_USERS: Omit<AppUser, 'createdAt' | 'updatedAt'>[] = [
-  { uid: 'usr-milan',    email: 'pin_1111@nominal.local', displayName: 'Milan Novák',      role: 'MAJITEL',    plantId: 'kozlov', tenantId: 'main_firm', pin: '1111', isActive: true },
-  { uid: 'usr-martina',  email: 'pin_2222@nominal.local', displayName: 'Martina Nováková', role: 'VEDENI',     plantId: 'kozlov', tenantId: 'main_firm', pin: '2222', isActive: true },
-  { uid: 'usr-vilem',    email: 'pin_3333@nominal.local', displayName: 'Vilém',            role: 'SUPERADMIN', plantId: 'kozlov', tenantId: 'main_firm', pin: '3333', isActive: true },
-  { uid: 'usr-zdenek',   email: 'pin_4444@nominal.local', displayName: 'Zdeněk Mička',     role: 'UDRZBA',     plantId: 'kozlov', tenantId: 'main_firm', pin: '4444', isActive: true },
-  { uid: 'usr-pavla',    email: 'pin_5555@nominal.local', displayName: 'Pavla Drápelová',  role: 'VYROBA',     plantId: 'kozlov', tenantId: 'main_firm', pin: '5555', isActive: true },
-  { uid: 'usr-kiosk',    email: 'pin_0000@nominal.local', displayName: 'Kiosk Tablet',     role: 'OPERATOR',   plantId: 'kozlov', tenantId: 'main_firm', pin: '0000', isActive: true },
+  { uid: 'usr-milan',    email: 'pin_1111@nominal.local', displayName: 'Milan Novák',      role: 'MAJITEL',    plantId: 'kozlov', pin: '1111', isActive: true },
+  { uid: 'usr-martina',  email: 'pin_2222@nominal.local', displayName: 'Martina Nováková', role: 'VEDENI',     plantId: 'kozlov', pin: '2222', isActive: true },
+  { uid: 'usr-vilem',    email: 'pin_3333@nominal.local', displayName: 'Vilém',            role: 'SUPERADMIN', plantId: 'kozlov', pin: '3333', isActive: true },
+  { uid: 'usr-zdenek',   email: 'pin_4444@nominal.local', displayName: 'Zdeněk Mička',     role: 'UDRZBA',     plantId: 'kozlov', pin: '4444', isActive: true },
+  { uid: 'usr-pavla',    email: 'pin_5555@nominal.local', displayName: 'Pavla Drápelová',  role: 'VYROBA',     plantId: 'kozlov', pin: '5555', isActive: true },
+  { uid: 'usr-kiosk',    email: 'pin_0000@nominal.local', displayName: 'Kiosk Tablet',     role: 'OPERATOR',   plantId: 'kozlov', pin: '0000', isActive: true },
 ];
 
 // ═══════════════════════════════════════════════════════════════════
@@ -307,50 +257,4 @@ export const isReadOnlyRole = (role: UserRole): boolean => {
 
 export const isKioskRole = (role: UserRole): boolean => {
   return ROLE_FLAGS[role]?.isKiosk ?? false;
-};
-
-// ═══════════════════════════════════════════════════════════════════
-// MODULE DEFINITIONS (Feature Flags)
-// ═══════════════════════════════════════════════════════════════════
-
-export interface ModuleDefinition {
-  id: string;
-  label: string;
-  icon: string;
-  category: string;
-}
-
-export const MODULE_DEFINITIONS: ModuleDefinition[] = [
-  { id: 'fault', label: 'Nahlášení poruch', icon: '🚨', category: 'Základní' },
-  { id: 'tasks', label: 'Úkoly', icon: '📋', category: 'Základní' },
-  { id: 'map', label: 'Mapa areálu', icon: '🗺️', category: 'Základní' },
-  { id: 'calendar', label: 'Kalendář', icon: '📅', category: 'Základní' },
-  { id: 'noticeboard', label: 'Nástěnka', icon: '📌', category: 'Základní' },
-  { id: 'idea', label: 'Nápady', icon: '💡', category: 'Základní' },
-  { id: 'request', label: 'Požadavky', icon: '🔧', category: 'Základní' },
-  { id: 'academy', label: 'Akademie', icon: '📚', category: 'Základní' },
-  { id: 'inventory', label: 'Sklad ND', icon: '📦', category: 'Údržba' },
-  { id: 'revisions', label: 'Revize', icon: '🔍', category: 'Údržba' },
-  { id: 'fleet', label: 'Vozidla', icon: '🚗', category: 'Údržba' },
-  { id: 'inspections', label: 'Kontroly', icon: '✅', category: 'Údržba' },
-  { id: 'waste', label: 'Odpady', icon: '♻️', category: 'Údržba' },
-  { id: 'louparna', label: 'Loupárna', icon: '🌾', category: 'Výroba' },
-  { id: 'production', label: 'Výroba', icon: '🏭', category: 'Výroba' },
-  { id: 'warehouse', label: 'Sklad výroby', icon: '📦', category: 'Výroba' },
-  { id: 'shifts', label: 'Směny', icon: '👥', category: 'Výroba' },
-  { id: 'ai', label: 'AI Asistent', icon: '🤖', category: 'Pokročilé' },
-  { id: 'reports', label: 'Reporty', icon: '📊', category: 'Pokročilé' },
-  { id: 'admin', label: 'Administrace', icon: '⚙️', category: 'Pokročilé' },
-];
-
-const ALL_MODULE_IDS = MODULE_DEFINITIONS.map(m => m.id);
-
-export const DEFAULT_ENABLED_MODULES: Record<UserRole, string[]> = {
-  MAJITEL: ALL_MODULE_IDS,
-  VEDENI: ALL_MODULE_IDS,
-  SUPERADMIN: ALL_MODULE_IDS,
-  UDRZBA: ['fault', 'tasks', 'map', 'revisions', 'inventory', 'waste', 'fleet', 'louparna', 'inspections', 'calendar', 'ai', 'idea', 'request', 'noticeboard', 'academy', 'production', 'warehouse', 'shifts'],
-  VYROBA: ['fault', 'tasks', 'production', 'warehouse', 'shifts', 'map', 'inspections', 'calendar', 'louparna', 'waste', 'inventory', 'revisions', 'noticeboard', 'idea', 'request', 'academy'],
-  SKLADNIK: ['inventory', 'tasks', 'fault', 'map', 'noticeboard', 'idea', 'request', 'academy'],
-  OPERATOR: [],
 };

@@ -20,6 +20,7 @@ interface User {
   role: UserRole; // zachováno pro zpětnou kompatibilitu
   pin: string;
   color?: string;
+  tenantId: string; // Multi-tenant skeleton
 
   // RBAC (nové)
   roleIds: string[];
@@ -36,6 +37,7 @@ interface AuthContextType {
   isReadOnly: boolean;
   roleMeta: RoleMeta | null;
   canViewSecretBox: boolean;
+  isSandbox: boolean;
   login: (pin: string) => Promise<boolean>;
   logout: () => void;
 
@@ -71,6 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [allRoles, setAllRoles] = useState<Role[]>([]);
+  const [isSandbox, setIsSandbox] = useState(() => sessionStorage.getItem('nominal-sandbox') === 'true');
 
   // ─────────────────────────────────────────
   // Load all roles (realtime)
@@ -96,6 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const unsubscribe = onAuthChange(async (firebaseUser) => {
       if (firebaseUser) {
+        const sandboxActive = sessionStorage.getItem('nominal-sandbox') === 'true';
         try {
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           if (userDoc.exists()) {
@@ -103,10 +107,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUser({
               id: firebaseUser.uid,
               uid: firebaseUser.uid,
-              displayName: data.displayName || 'Neznámý',
-              role: data.role as UserRole, // zpětná kompatibilita
+              displayName: sandboxActive ? 'Učeň (Demo)' : (data.displayName || 'Neznámý'),
+              role: (sandboxActive ? 'UDRZBA' : data.role) as UserRole,
               pin: data.pin || '',
               color: data.color,
+              tenantId: data.tenantId || 'main_firm',
 
               // RBAC fields (s fallbackem)
               roleIds: data.roleIds || [],
@@ -118,13 +123,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUser({
               id: firebaseUser.uid,
               uid: firebaseUser.uid,
-              displayName: firebaseUser.email || 'Neznámý',
-              role: 'OPERATOR',
+              displayName: sandboxActive ? 'Učeň (Demo)' : (firebaseUser.email || 'Neznámý'),
+              role: sandboxActive ? 'UDRZBA' : 'OPERATOR',
               pin: '',
-              roleIds: ['role_operator'],
-              primaryRoleId: 'role_operator',
+              tenantId: 'main_firm',
+              roleIds: sandboxActive ? [] : ['role_operator'],
+              primaryRoleId: sandboxActive ? '' : 'role_operator',
               customPermissions: DEFAULT_CUSTOM,
-              scope: { buildings: ['D'], areas: ['*'] },
+              scope: sandboxActive ? DEFAULT_SCOPE : { buildings: ['D'], areas: ['*'] },
             });
           }
         } catch (err) {
@@ -132,13 +138,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser({
             id: firebaseUser.uid,
             uid: firebaseUser.uid,
-            displayName: firebaseUser.email || 'Neznámý',
-            role: 'OPERATOR',
+            displayName: sandboxActive ? 'Učeň (Demo)' : (firebaseUser.email || 'Neznámý'),
+            role: sandboxActive ? 'UDRZBA' : 'OPERATOR',
             pin: '',
-            roleIds: ['role_operator'],
-            primaryRoleId: 'role_operator',
+            tenantId: 'main_firm',
+            roleIds: sandboxActive ? [] : ['role_operator'],
+            primaryRoleId: sandboxActive ? '' : 'role_operator',
             customPermissions: DEFAULT_CUSTOM,
-            scope: { buildings: ['D'], areas: ['*'] },
+            scope: sandboxActive ? DEFAULT_SCOPE : { buildings: ['D'], areas: ['*'] },
           });
         }
       } else {
@@ -212,6 +219,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // ─────────────────────────────────────────
   const login = async (pin: string): Promise<boolean> => {
     try {
+      if (pin === '0000') {
+        sessionStorage.setItem('nominal-sandbox', 'true');
+        setIsSandbox(true);
+      } else {
+        sessionStorage.removeItem('nominal-sandbox');
+        setIsSandbox(false);
+      }
       await signInWithPin(pin);
       return true;
     } catch (err: unknown) {
@@ -222,6 +236,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
+      setIsSandbox(false);
+      sessionStorage.removeItem('nominal-sandbox');
       await signOut();
     } catch (err) {
       console.error('Logout failed:', err);
@@ -232,7 +248,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Zpětně kompatibilní properties
   // ─────────────────────────────────────────
   const roleMeta = user ? ROLE_META[user.role] : null;
-  const isKiosk = user?.role === 'OPERATOR';
+  const isKiosk = user?.role === 'OPERATOR' && !isSandbox;
   const isReadOnly = user?.role === 'MAJITEL';
   const canViewSecretBox = hasPermission('trustbox.read');
 
@@ -261,6 +277,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         permissions,
         allRoles,
         userRoles,
+        isSandbox,
       }}
     >
       {children}
