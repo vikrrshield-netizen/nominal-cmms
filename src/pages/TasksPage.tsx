@@ -193,74 +193,62 @@ function TaskCard({ task, onClick, onEdit, onDelete }: { task: Task; onClick: ()
   const isActive = task.status === 'in_progress';
 
   return (
-    <div className={`bg-slate-800/60 backdrop-blur-sm rounded-2xl border flex flex-col overflow-hidden ${pc.borderLeft} ${
-      isActive ? 'border-amber-500/50 ring-1 ring-amber-500/30 shadow-lg shadow-amber-500/10' : 'border-slate-700/50'
+    <div className={`bg-slate-800/60 rounded-xl border flex flex-col overflow-hidden ${pc.borderLeft} ${
+      isActive ? 'border-amber-500/50 ring-1 ring-amber-500/30' : 'border-slate-700/50'
     }`}>
       {/* Active technician bar */}
       {isActive && assignee !== '—' && (
-        <div className="px-4 py-1.5 bg-amber-500/15 border-b border-amber-500/20 flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse flex-shrink-0" />
-          <span className="text-xs font-bold text-amber-400">{assignee}</span>
-          <span className="text-[10px] text-amber-400/60 ml-auto">právě řeší</span>
+        <div className="px-2.5 py-1 bg-amber-500/15 border-b border-amber-500/20 flex items-center gap-1.5">
+          <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse flex-shrink-0" />
+          <span className="text-[10px] font-bold text-amber-400 truncate">{assignee}</span>
+          <span className="text-[9px] text-amber-400/50 ml-auto flex-shrink-0">řeší</span>
         </div>
       )}
 
       {/* CLICKABLE BODY */}
-      <button
-        onClick={onClick}
-        className="w-full p-4 text-left hover:bg-slate-700/40 transition"
-      >
-        {/* HEADER: Priority + Status */}
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <span
-              className="text-[10px] font-bold px-1.5 py-0.5 rounded"
-              style={{ background: `${pc.color}20`, color: pc.color }}
-            >
-              {task.priority}
-            </span>
-            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-lg ${sb.bg} ${sb.text}`}>
-              {sb.label}
-            </span>
-          </div>
-          <span className="text-[11px] text-slate-500">{timeAgo(task.createdAt)}</span>
+      <button onClick={onClick} className="w-full px-2.5 py-2 text-left hover:bg-slate-700/40 transition">
+        {/* HEADER: Priority + Status + Time */}
+        <div className="flex items-center gap-1.5 mb-1">
+          <span className="text-[9px] font-bold px-1 py-px rounded" style={{ background: `${pc.color}20`, color: pc.color }}>
+            {task.priority}
+          </span>
+          <span className={`text-[9px] font-bold px-1 py-px rounded ${sb.bg} ${sb.text}`}>{sb.label}</span>
+          <span className="text-[10px] text-slate-600 ml-auto">{timeAgo(task.createdAt)}</span>
         </div>
 
         {/* TITLE */}
-        <h4 className="text-sm font-semibold text-white mb-2 line-clamp-2">{task.title}</h4>
+        <h4 className="text-[13px] font-semibold text-white leading-tight mb-1 line-clamp-2">{task.title}</h4>
 
-        {/* BODY: Assignee + Asset */}
-        <div className="flex items-center gap-3 text-xs">
-          <div className="flex items-center gap-1.5">
-            <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${isActive ? 'bg-amber-500/30' : 'bg-slate-700'}`}>
-              <span className={`text-[8px] font-bold ${isActive ? 'text-amber-300' : 'text-slate-300'}`}>{initials}</span>
+        {/* META: Assignee + Asset — single dense line */}
+        <div className="flex items-center gap-2 text-[10px] text-slate-500">
+          <div className="flex items-center gap-1 min-w-0">
+            <div className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 ${isActive ? 'bg-amber-500/30' : 'bg-slate-700'}`}>
+              <span className={`text-[7px] font-bold ${isActive ? 'text-amber-300' : 'text-slate-400'}`}>{initials}</span>
             </div>
-            <span className={`truncate max-w-[120px] ${isActive ? 'text-amber-400 font-semibold' : 'text-slate-400'}`}>{assignee}</span>
+            <span className={`truncate ${isActive ? 'text-amber-400 font-medium' : ''}`}>{assignee}</span>
           </div>
           {task.assetName && (
-            <div className="flex items-center gap-1 text-slate-500">
-              <Wrench className="w-3 h-3" />
-              <span className="truncate max-w-[120px]">{task.assetName}</span>
+            <div className="flex items-center gap-0.5 min-w-0">
+              <Wrench className="w-2.5 h-2.5 flex-shrink-0" />
+              <span className="truncate">{task.assetName}</span>
             </div>
           )}
         </div>
       </button>
 
-      {/* ACTION FOOTER */}
-      <div className="border-t border-slate-700/30 px-4 py-2.5 flex items-center justify-end gap-2">
+      {/* ACTION FOOTER — icon-only buttons, 44px touch targets */}
+      <div className="border-t border-slate-700/30 px-2 py-1 flex items-center justify-end gap-1">
         <button
           onClick={(e) => { e.stopPropagation(); onEdit(); }}
-          className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 transition flex items-center gap-1.5 min-h-[32px]"
+          className="w-11 h-11 rounded-lg flex items-center justify-center bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition"
         >
-          <Edit2 className="w-3.5 h-3.5" />
-          Upravit
+          <Edit2 className="w-4 h-4" />
         </button>
         <button
           onClick={(e) => { e.stopPropagation(); onDelete(); }}
-          className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-500/10 text-red-400 hover:bg-red-500/20 transition flex items-center gap-1.5 min-h-[32px]"
+          className="w-11 h-11 rounded-lg flex items-center justify-center bg-red-500/10 text-red-400 hover:bg-red-500/20 transition"
         >
-          <Trash2 className="w-3.5 h-3.5" />
-          Smazat
+          <Trash2 className="w-4 h-4" />
         </button>
       </div>
     </div>
