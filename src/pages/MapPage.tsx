@@ -563,7 +563,7 @@ const DEMO_MACHINE_LOGS: EntityLogEntry[] = [
 // ═══════════════════════════════════════════════
 // ASSET DETAIL SHEET — Matryoshka EntityCard style
 // ═══════════════════════════════════════════════
-function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onDelete, onOpenPassport, canManage, allAssets }: {
+function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onDelete, onOpenPassport, canManage, allAssets, onSelectAsset }: {
   asset: Asset;
   onClose: () => void;
   onCreateTask: (asset: Asset) => Promise<void>;
@@ -572,11 +572,14 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onDelete, on
   onOpenPassport?: (asset: Asset) => void;
   canManage?: boolean;
   allAssets?: Asset[];
+  onSelectAsset?: (asset: Asset) => void;
 }) {
   const entity = useMemo(() => assetToEntity(asset), [asset]);
   const logs = useMemo(() => DEMO_MACHINE_LOGS.map((l) => ({ ...l, entityId: asset.id })), [asset.id]);
   const [actionLoading, setActionLoading] = useState<'report' | 'task' | 'pest' | 'empty' | null>(null);
   const [actionResult, setActionResult] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const { user: sheetUser } = useAuthContext();
 
   // ── Inline editing ──
   const [isEditing, setIsEditing] = useState(false);
@@ -599,6 +602,51 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onDelete, on
       allAssets.filter(a => a.buildingId === asset.buildingId).map(a => a.areaName || 'Ostatní')
     ));
   }, [allAssets, asset.buildingId]);
+
+  // ── Children (sub-assets) ──
+  const children = useMemo(() => {
+    if (!allAssets) return [];
+    return allAssets.filter(a => a.parentId === asset.id);
+  }, [allAssets, asset.id]);
+
+  const parentAsset = useMemo(() => {
+    if (!allAssets || !asset.parentId) return null;
+    return allAssets.find(a => a.id === asset.parentId) || null;
+  }, [allAssets, asset.parentId]);
+
+  // ── Add sub-asset form ──
+  const [showSubForm, setShowSubForm] = useState(false);
+  const [subName, setSubName] = useState('');
+  const [subCode, setSubCode] = useState('');
+  const [subSaving, setSubSaving] = useState(false);
+
+  const handleAddSubAsset = async () => {
+    if (!subName.trim()) return;
+    setSubSaving(true);
+    try {
+      await addDoc(collection(db, 'assets'), {
+        name: subName.trim(),
+        code: subCode.trim() || '',
+        buildingId: asset.buildingId,
+        areaName: asset.areaName || 'Ostatní',
+        status: 'operational',
+        category: asset.category || '',
+        parentId: asset.id,
+        isDeleted: false,
+        createdById: sheetUser?.uid || 'unknown',
+        createdByName: sheetUser?.displayName || 'Neznámý',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      showToast(`Podzařízení "${subName.trim()}" přidáno`, 'success');
+      setSubName('');
+      setSubCode('');
+      setShowSubForm(false);
+    } catch {
+      showToast('Chyba při vytváření', 'error');
+    }
+    setSubSaving(false);
+  };
 
   const handleInlineSave = async () => {
     if (!editName.trim()) return;
@@ -670,7 +718,6 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onDelete, on
   };
 
   // Quick Empty for waste bins — update asset + log to history
-  const { user: wasteUser } = useAuthContext();
   const handleQuickEmpty = async () => {
     setActionLoading('empty');
     try {
@@ -682,10 +729,10 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onDelete, on
       });
       // Log to empty_logs sub-collection for history
       await addDoc(collection(db, 'assets', asset.id, 'empty_logs'), {
-        emptiedBy: wasteUser?.displayName || 'Neznámý',
+        emptiedBy: sheetUser?.displayName || 'Neznámý',
         emptiedAt: serverTimestamp(),
-        createdById: wasteUser?.uid || '',
-        createdByName: wasteUser?.displayName || 'Neznámý',
+        createdById: sheetUser?.uid || '',
+        createdByName: sheetUser?.displayName || 'Neznámý',
       });
       showToast(`${asset.name} — označen jako vyvezený`, 'success');
       setTimeout(() => onClose(), 800);
@@ -937,6 +984,97 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onDelete, on
             {actionLoading === 'empty' ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
             Quick Empty — Vyvezeno
           </button>
+        </div>
+      )}
+
+      {/* ═══ PARENT LINK ═══ */}
+      {parentAsset && onSelectAsset && (
+        <div className="mt-4">
+          <div className="text-[11px] text-slate-500 uppercase tracking-wider mb-1.5 font-bold">Nadřazené zařízení</div>
+          <button
+            onClick={() => onSelectAsset(parentAsset)}
+            className="w-full flex items-center gap-3 p-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] transition text-left"
+          >
+            <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${(STATUS_CONFIG[parentAsset.status] || STATUS_CONFIG.idle).dot}`} />
+            <span className="text-sm text-white font-medium truncate">{parentAsset.name}</span>
+            {parentAsset.code && <span className="text-[10px] text-slate-500 font-mono ml-auto">{parentAsset.code}</span>}
+          </button>
+        </div>
+      )}
+
+      {/* ═══ CHILDREN (SUB-ASSETS) ═══ */}
+      {(children.length > 0 || canManage) && (
+        <div className="mt-4">
+          <div className="flex items-center justify-between mb-1.5">
+            <div className="text-[11px] text-slate-500 uppercase tracking-wider font-bold">
+              Podzařízení {children.length > 0 && <span className="text-slate-600">({children.length})</span>}
+            </div>
+            {canManage && !showSubForm && (
+              <button
+                onClick={() => setShowSubForm(true)}
+                className="text-[11px] text-orange-400 font-semibold hover:text-orange-300 transition flex items-center gap-1"
+              >
+                <Plus className="w-3.5 h-3.5" /> Přidat
+              </button>
+            )}
+          </div>
+
+          {/* Sub-asset inline form */}
+          {showSubForm && (
+            <div className="mb-2 bg-orange-500/5 border border-orange-500/20 rounded-xl p-3 space-y-2">
+              <input
+                type="text"
+                value={subName}
+                onChange={(e) => setSubName(e.target.value)}
+                placeholder="Název podzařízení"
+                autoFocus
+                className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-orange-500/50 transition"
+              />
+              <input
+                type="text"
+                value={subCode}
+                onChange={(e) => setSubCode(e.target.value)}
+                placeholder="Kód (volitelně)"
+                className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-orange-500/50 transition"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { setShowSubForm(false); setSubName(''); setSubCode(''); }}
+                  className="flex-1 py-2 rounded-lg bg-white/5 border border-white/10 text-slate-400 text-xs font-semibold"
+                >
+                  Zrušit
+                </button>
+                <button
+                  onClick={handleAddSubAsset}
+                  disabled={subSaving || !subName.trim()}
+                  className="flex-[2] py-2 rounded-lg bg-orange-600 text-white text-xs font-bold disabled:opacity-50 flex items-center justify-center gap-1"
+                >
+                  {subSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                  Přidat
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Children list */}
+          {children.length > 0 && (
+            <div className="space-y-1">
+              {children.map((child) => {
+                const cst = STATUS_CONFIG[child.status] || STATUS_CONFIG.idle;
+                return (
+                  <button
+                    key={child.id}
+                    onClick={() => onSelectAsset?.(child)}
+                    className="w-full flex items-center gap-3 p-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] transition text-left"
+                  >
+                    <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${cst.dot}`} />
+                    <span className="text-sm text-white font-medium truncate">{child.name}</span>
+                    {child.code && <span className="text-[10px] text-slate-500 font-mono ml-auto">{child.code}</span>}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -1819,6 +1957,7 @@ export default function MapPage() {
           onDelete={handleDeleteAsset}
           canManage={canManageAssets}
           allAssets={assets}
+          onSelectAsset={setSelectedAsset}
           onOpenPassport={(asset: Asset) => {
             const buildingName = BUILDING_META[asset.buildingId]?.name || asset.buildingId;
             openEntityModal(

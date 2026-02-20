@@ -1,9 +1,9 @@
 // src/pages/AdminPage.tsx
 // VIKRR — Asset Shield — Administrace uživatelů a nastavení
 
-import { useState } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, doc, setDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, setDoc, addDoc, updateDoc, onSnapshot, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { initializeApp, deleteApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword, signOut as firebaseSignOut } from 'firebase/auth';
 import { db, firebaseConfig } from '../lib/firebase';
@@ -40,6 +40,7 @@ interface AdminUser {
   active: boolean;
   createdAt: string;
   lastLogin?: string;
+  positionId?: string;
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -56,21 +57,6 @@ const ROLE_CONFIG: Record<UserRole, { label: string; icon: string; color: string
   OPERATOR: { label: 'Operátor', icon: '👷', color: 'bg-slate-500', description: 'Kiosk, hlášení poruch' },
 };
 
-// ═══════════════════════════════════════════════════════════════════
-// MOCK DATA
-// ═══════════════════════════════════════════════════════════════════
-
-const INITIAL_USERS: AdminUser[] = [
-  { id: 'u1', displayName: 'Milan Novák', pin: '1111', role: 'MAJITEL', email: 'milan@vikrr.cz', active: true, createdAt: '2024-01-01', lastLogin: '2026-02-12' },
-  { id: 'u2', displayName: 'Martina', pin: '2222', role: 'VEDENI', email: 'martina@vikrr.cz', active: true, createdAt: '2024-01-01', lastLogin: '2026-02-11' },
-  { id: 'u3', displayName: 'Vilém', pin: '3333', role: 'SUPERADMIN', email: 'vilem@vikrr.cz', phone: '+420 777 123 456', active: true, createdAt: '2024-01-01', lastLogin: '2026-02-12' },
-  { id: 'u4', displayName: 'Pavla Drápelová', pin: '4444', role: 'VYROBA', building: 'D', active: true, createdAt: '2024-03-15', lastLogin: '2026-02-12' },
-  { id: 'u5', displayName: 'Zdeněk Mička', pin: '5555', role: 'UDRZBA', building: 'D', active: true, createdAt: '2024-03-15', lastLogin: '2026-02-11' },
-  { id: 'u6', displayName: 'Petr Volf', pin: '6666', role: 'UDRZBA', building: 'D', active: true, createdAt: '2024-06-01', lastLogin: '2026-02-10' },
-  { id: 'u7', displayName: 'Filip Novák', pin: '7777', role: 'UDRZBA', building: 'E', active: true, createdAt: '2024-06-01', lastLogin: '2026-02-09' },
-  { id: 'u8', displayName: 'Kiosk Velín', pin: '0000', role: 'OPERATOR', building: 'D', active: true, createdAt: '2024-01-01' },
-];
-
 const BUILDINGS = [
   { id: 'A', name: 'Administrativa' },
   { id: 'B', name: 'Spojovací krček' },
@@ -86,10 +72,60 @@ const BUILDINGS = [
 
 export default function AdminPage() {
   const navigate = useNavigate();
-  const { hasPermission } = useAuthContext();
+  const { hasPermission, user: authUser } = useAuthContext();
 
-  const [users, setUsers] = useState<AdminUser[]>(INITIAL_USERS);
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [usersLoading, setUsersLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
+
+  // Load users from Firestore in real-time
+  const usersHashRef = useRef('');
+  useEffect(() => {
+    setUsersLoading(true);
+    const unsub = onSnapshot(
+      collection(db, 'users'),
+      (snap) => {
+        const loaded: AdminUser[] = snap.docs.map(d => {
+          const data = d.data();
+          return {
+            id: d.id,
+            displayName: data.displayName || '',
+            pin: data.pin || '',
+            role: data.role || 'OPERATOR',
+            email: data.email || '',
+            phone: data.phone || '',
+            building: data.buildingId || '',
+            active: data.active !== false,
+            createdAt: data.createdAt instanceof Timestamp
+              ? data.createdAt.toDate().toISOString().split('T')[0]
+              : '',
+            lastLogin: data.lastLoginAt instanceof Timestamp
+              ? data.lastLoginAt.toDate().toISOString().split('T')[0]
+              : undefined,
+            positionId: data.positionId || '',
+          };
+        }).sort((a, b) => a.displayName.localeCompare(b.displayName, 'cs'));
+
+        // Only update state if data actually changed (prevents unnecessary re-renders)
+        const hash = loaded.map(u => `${u.id}:${u.displayName}:${u.pin}:${u.role}:${u.active}:${u.building}:${u.positionId}`).join('|');
+        if (hash !== usersHashRef.current) {
+          usersHashRef.current = hash;
+          setUsers(loaded);
+          // Sync selectedUser with fresh data (prevent stale detail modal)
+          setSelectedUser(prev => {
+            if (!prev) return null;
+            return loaded.find(u => u.id === prev.id) || null;
+          });
+        }
+        setUsersLoading(false);
+      },
+      (err) => {
+        console.error('[AdminPage] Users listener FAILED:', err);
+        setUsersLoading(false);
+      }
+    );
+    return () => unsub();
+  }, []);
   const [showNewUserModal, setShowNewUserModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'users' | 'roles' | 'modules' | 'positions' | 'config' | 'audit' | 'import'>('users');
   const [filterRole, setFilterRole] = useState<UserRole | 'ALL'>('ALL');
@@ -116,24 +152,42 @@ export default function AdminPage() {
     );
   }
 
-  const filteredUsers = users.filter(u => filterRole === 'ALL' || u.role === filterRole);
+  const filteredUsers = useMemo(
+    () => users.filter(u => filterRole === 'ALL' || u.role === filterRole),
+    [users, filterRole]
+  );
 
-  const handleDeleteUser = (userId: string) => {
-    if (confirm('Opravdu smazat tohoto uživatele?')) {
+  const handleDeleteUser = useCallback(async (userId: string) => {
+    if (confirm('Opravdu deaktivovat tohoto uživatele?')) {
       const userName = users.find(u => u.id === userId)?.displayName || '';
-      setUsers(prev => prev.filter(u => u.id !== userId));
-      setSelectedUser(null);
-      showToast(`Uživatel "${userName}" smazán`, 'success');
+      try {
+        await updateDoc(doc(db, 'users', userId), {
+          active: false,
+          updatedAt: serverTimestamp(),
+          updatedBy: authUser?.uid || '',
+        });
+        setSelectedUser(null);
+        showToast(`Uživatel "${userName}" deaktivován`, 'success');
+      } catch (err) {
+        showToast(`Chyba: ${(err as Error).message}`, 'error');
+      }
     }
-  };
+  }, [users, authUser?.uid]);
 
-  const handleToggleActive = (userId: string) => {
-    const user = users.find(u => u.id === userId);
-    setUsers(prev => prev.map(u =>
-      u.id === userId ? { ...u, active: !u.active } : u
-    ));
-    showToast(`${user?.displayName || ''}: ${user?.active ? 'Deaktivován' : 'Aktivován'}`, 'success');
-  };
+  const handleToggleActive = useCallback(async (userId: string) => {
+    const targetUser = users.find(u => u.id === userId);
+    if (!targetUser) return;
+    try {
+      await updateDoc(doc(db, 'users', userId), {
+        active: !targetUser.active,
+        updatedAt: serverTimestamp(),
+        updatedBy: authUser?.uid || '',
+      });
+      showToast(`${targetUser.displayName}: ${targetUser.active ? 'Deaktivován' : 'Aktivován'}`, 'success');
+    } catch (err) {
+      showToast(`Chyba: ${(err as Error).message}`, 'error');
+    }
+  }, [users, authUser?.uid]);
 
   return (
     <div className="min-h-screen bg-[#0f172a]">
@@ -211,7 +265,13 @@ export default function AdminPage() {
         </header>
 
         <div className="px-6 space-y-6">
-          {activeTab === 'users' && (
+          {activeTab === 'users' && usersLoading && (
+            <div className="flex items-center gap-2 py-8 text-slate-500 justify-center">
+              <Loader2 className="w-5 h-5 animate-spin" /> Načítám uživatele...
+            </div>
+          )}
+
+          {activeTab === 'users' && !usersLoading && (
             <>
               {/* Filter */}
               <div className="flex gap-2 overflow-x-auto pb-2">
@@ -316,10 +376,7 @@ export default function AdminPage() {
           user={selectedUser}
           canEdit={canEdit}
           onClose={() => setSelectedUser(null)}
-          onSave={(updated) => {
-            setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
-            setSelectedUser(null);
-          }}
+          onSaved={() => setSelectedUser(null)}
           onDelete={() => handleDeleteUser(selectedUser.id)}
           onToggleActive={() => handleToggleActive(selectedUser.id)}
         />
@@ -330,10 +387,7 @@ export default function AdminPage() {
         <NewUserModal
           existingPins={users.map(u => u.pin)}
           onClose={() => setShowNewUserModal(false)}
-          onSave={(newUser) => {
-            setUsers(prev => [...prev, newUser]);
-            setShowNewUserModal(false);
-          }}
+          onCreated={() => setShowNewUserModal(false)}
         />
       )}
     </div>
@@ -344,15 +398,17 @@ export default function AdminPage() {
 // USER DETAIL MODAL
 // ═══════════════════════════════════════════════════════════════════
 
-function UserDetailModal({ user, canEdit, onClose, onSave, onDelete, onToggleActive }: {
+function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleActive }: {
   user: AdminUser;
   canEdit: boolean;
   onClose: () => void;
-  onSave: (user: AdminUser) => void;
+  onSaved: () => void;
   onDelete: () => void;
   onToggleActive: () => void;
 }) {
+  const { user: authUser } = useAuthContext();
   const [isEditing, setIsEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [showPin, setShowPin] = useState(false);
   const [formData, setFormData] = useState({
     displayName: user.displayName,
@@ -365,12 +421,29 @@ function UserDetailModal({ user, canEdit, onClose, onSave, onDelete, onToggleAct
 
   const roleCfg = ROLE_CONFIG[user.role];
 
-  const handleSave = () => {
-    onSave({
-      ...user,
-      ...formData,
-    });
-    showToast('Změny uloženy', 'success');
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await updateDoc(doc(db, 'users', user.id), {
+        displayName: formData.displayName.trim(),
+        pin: formData.pin,
+        role: formData.role,
+        email: formData.email.trim() || '',
+        phone: formData.phone.trim() || '',
+        buildingId: formData.building || '',
+        updatedAt: serverTimestamp(),
+        updatedBy: authUser?.uid || '',
+      });
+      showToast('Změny uloženy do Firestore', 'success');
+      onSaved();
+    } catch (err) {
+      const msg = (err as Error).message || 'Neznámá chyba';
+      console.error('[AdminPage] handleSave FAILED:', err);
+      console.error('[AdminPage] User ID:', user.id, '| Payload:', JSON.stringify(formData));
+      showToast(`Chyba ukládání: ${msg}`, 'error');
+      window.alert('DB Error: ' + msg);
+    }
+    setSaving(false);
   };
 
   return (
@@ -434,10 +507,18 @@ function UserDetailModal({ user, canEdit, onClose, onSave, onDelete, onToggleAct
                     <span className="text-white">{user.building}</span>
                   </div>
                 )}
-                <div className="flex justify-between py-2 border-b border-white/5">
-                  <span className="text-slate-400">Vytvořen</span>
-                  <span className="text-white">{new Date(user.createdAt).toLocaleDateString('cs-CZ')}</span>
-                </div>
+                {user.positionId && (
+                  <div className="flex justify-between py-2 border-b border-white/5">
+                    <span className="text-slate-400">Pozice</span>
+                    <span className="text-white">{user.positionId}</span>
+                  </div>
+                )}
+                {user.createdAt && (
+                  <div className="flex justify-between py-2 border-b border-white/5">
+                    <span className="text-slate-400">Vytvořen</span>
+                    <span className="text-white">{new Date(user.createdAt).toLocaleDateString('cs-CZ')}</span>
+                  </div>
+                )}
                 {user.lastLogin && (
                   <div className="flex justify-between py-2">
                     <span className="text-slate-400">Poslední přihlášení</span>
@@ -544,16 +625,18 @@ function UserDetailModal({ user, canEdit, onClose, onSave, onDelete, onToggleAct
               <div className="flex gap-2 pt-4">
                 <button
                   onClick={() => setIsEditing(false)}
-                  className="flex-1 p-3 border border-white/20 text-white rounded-xl"
+                  disabled={saving}
+                  className="flex-1 p-3 border border-white/20 text-white rounded-xl disabled:opacity-50"
                 >
                   Zrušit
                 </button>
                 <button
                   onClick={handleSave}
-                  className="flex-1 flex items-center justify-center gap-2 p-3 bg-emerald-500 text-white rounded-xl"
+                  disabled={saving}
+                  className="flex-1 flex items-center justify-center gap-2 p-3 bg-emerald-500 text-white rounded-xl disabled:opacity-50"
                 >
-                  <Save className="w-4 h-4" />
-                  Uložit
+                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  {saving ? 'Ukládám...' : 'Uložit'}
                 </button>
               </div>
             </>
@@ -568,17 +651,22 @@ function UserDetailModal({ user, canEdit, onClose, onSave, onDelete, onToggleAct
 // NEW USER MODAL
 // ═══════════════════════════════════════════════════════════════════
 
-function NewUserModal({ existingPins, onClose, onSave }: {
+function NewUserModal({ existingPins, onClose, onCreated }: {
   existingPins: string[];
   onClose: () => void;
-  onSave: (user: AdminUser) => void;
+  onCreated: () => void;
 }) {
+  const { user: authUser } = useAuthContext();
+  const tenantId = (authUser as any)?.tenantId || 'main_firm';
+  const { roles: tenantPositions } = useTenantRoles(tenantId);
+
   const [formData, setFormData] = useState({
     displayName: '',
     pin: '',
     role: 'UDRZBA' as UserRole,
     email: '',
     building: '',
+    positionId: '',
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -614,6 +702,7 @@ function NewUserModal({ existingPins, onClose, onSave }: {
         email: dummyEmail,
         phone: formData.email.trim() || '',
         buildingId: formData.building || '',
+        positionId: formData.positionId || '',
         color: '#64748b',
         active: true,
         uid: newUid,
@@ -621,18 +710,8 @@ function NewUserModal({ existingPins, onClose, onSave }: {
         updatedAt: serverTimestamp(),
       });
 
-      const newUser: AdminUser = {
-        id: newUid,
-        displayName: formData.displayName.trim(),
-        pin: formData.pin,
-        role: formData.role,
-        email: dummyEmail,
-        building: formData.building || undefined,
-        active: true,
-        createdAt: new Date().toISOString().split('T')[0],
-      };
-
-      onSave(newUser);
+      showToast(`Uživatel "${formData.displayName.trim()}" vytvořen`, 'success');
+      onCreated();
     } catch (err: unknown) {
       console.error('[AdminPage] Create user failed:', err);
       const firebaseErr = err as { code?: string };
@@ -652,15 +731,15 @@ function NewUserModal({ existingPins, onClose, onSave }: {
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-[9999] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-[#1e293b] rounded-3xl w-full max-w-lg max-h-[85vh] overflow-hidden shadow-2xl border border-white/10" onClick={e => e.stopPropagation()}>
-        <div className="p-4 border-b border-white/10 flex items-center justify-between">
+      <div className="bg-[#1e293b] rounded-3xl w-full max-w-lg max-h-[85vh] overflow-hidden shadow-2xl border border-white/10 flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="p-4 border-b border-white/10 flex items-center justify-between flex-shrink-0">
           <h2 className="text-xl font-bold text-white">Nový uživatel</h2>
           <button onClick={onClose} className="p-2 rounded-lg hover:bg-white/10">
             <X className="w-5 h-5 text-slate-400" />
           </button>
         </div>
 
-        <div className="p-4 space-y-4 overflow-y-auto max-h-[70vh]">
+        <div className="p-4 space-y-4 overflow-y-auto flex-1 min-h-0">
           <div>
             <label className="text-sm text-slate-400">Jméno *</label>
             <input
@@ -728,9 +807,25 @@ function NewUserModal({ existingPins, onClose, onSave }: {
               ))}
             </select>
           </div>
+
+          {tenantPositions.length > 0 && (
+            <div>
+              <label className="text-sm text-slate-400">Pozice</label>
+              <select
+                value={formData.positionId}
+                onChange={e => setFormData(prev => ({ ...prev, positionId: e.target.value }))}
+                className="w-full p-2 bg-white/5 border border-white/10 rounded-lg mt-1 text-white"
+              >
+                <option value="">— Bez pozice —</option>
+                {tenantPositions.map(pos => (
+                  <option key={pos.id} value={pos.id}>{pos.roleName}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
 
-        <div className="p-4 border-t border-white/10 space-y-2">
+        <div className="p-4 border-t border-white/10 space-y-2 flex-shrink-0">
           {error && (
             <div className="p-2 bg-amber-500/20 border border-amber-500/30 rounded-lg text-amber-300 text-xs text-center">
               {error}
