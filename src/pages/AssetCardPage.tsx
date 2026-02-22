@@ -25,7 +25,7 @@ import {
   Clock, Loader2, Shield, Wrench, X,
   ChevronRight, Settings, Building2, MapPin,
   Cog, PlusCircle, FileText, Filter, Printer, Edit3, Save, XCircle,
-  Calendar, Trash2,
+  Calendar, Trash2, ExternalLink,
 } from 'lucide-react';
 import MicButton from '../components/ui/MicButton';
 
@@ -135,6 +135,7 @@ export default function AssetCardPage() {
   });
   const [eventsForm, setEventsForm] = useState<AssetEvent[]>([]);
   const [repairLogForm, setRepairLogForm] = useState<RepairLogEntry[]>([]);
+  const [documentsForm, setDocumentsForm] = useState<string[]>([]);
   const tenantId = user?.tenantId ?? 'main_firm';
 
   const { revisions, loading: loadingRevisions, logRevision } = useRevisions(assetId);
@@ -290,6 +291,7 @@ export default function AssetCardPage() {
         });
         setEventsForm(data.events || []);
         setRepairLogForm(data.repairLog || []);
+        setDocumentsForm(data.documents || []);
       })
       .catch((err) => console.warn('[AssetCard] v2 load fallback:', err));
   }, [assetId, tenantId]);
@@ -308,6 +310,7 @@ export default function AssetCardPage() {
         location: editForm.location || undefined,
         events: eventsForm.filter(e => e.name.trim()),
         repairLog: repairLogForm.filter(e => e.description.trim()),
+        documents: documentsForm.filter(d => d.trim()),
       });
       const updated = await assetService.getById(tenantId, assetId);
       setAssetV2(updated);
@@ -331,6 +334,7 @@ export default function AssetCardPage() {
     });
     setEventsForm(assetV2.events || []);
     setRepairLogForm(assetV2.repairLog || []);
+    setDocumentsForm(assetV2.documents || []);
     setIsEditing(false);
   };
 
@@ -1019,6 +1023,98 @@ export default function AssetCardPage() {
                           />
                         </div>
                       </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* ═══ SEKCE 5: DOKUMENTY (Apple-style) ═══ */}
+            <div style={{ background: '#fff', borderRadius: 24, padding: 24, border: '1px solid #f1f5f9', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <h3 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8', margin: 0 }}>
+                  Dokumenty
+                </h3>
+                {isEditing && (
+                  <button
+                    onClick={() => setDocumentsForm(['', ...documentsForm])}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0' }}
+                  >
+                    <PlusCircle size={14} /> Přidat
+                  </button>
+                )}
+              </div>
+
+              {!isEditing ? (
+                /* View mode */
+                (assetV2?.documents || []).length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '32px 0', color: '#94a3b8' }}>
+                    <FileText size={32} style={{ margin: '0 auto 8px', opacity: 0.5 }} />
+                    <div style={{ fontSize: 14 }}>Žádné dokumenty</div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {(assetV2?.documents || []).map((docUrl, idx) => {
+                      const info = getDocumentInfo(docUrl);
+                      return (
+                        <a
+                          key={idx}
+                          href={docUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', background: '#f8fafc', borderRadius: 16, border: '1px solid #f1f5f9', textDecoration: 'none', cursor: 'pointer', transition: 'background 0.15s' }}
+                          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#f1f5f9'; }}
+                          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#f8fafc'; }}
+                        >
+                          {/* File type icon */}
+                          <div style={{ width: 40, height: 40, borderRadius: 12, background: info.color + '15', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <FileText size={20} style={{ color: info.color }} />
+                          </div>
+                          {/* Filename + type badge */}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 14, fontWeight: 600, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {info.name}
+                            </div>
+                            <span style={{ fontSize: 11, fontWeight: 600, padding: '1px 6px', borderRadius: 6, background: info.color + '15', color: info.color }}>
+                              {info.ext.toUpperCase() || 'ODKAZ'}
+                            </span>
+                          </div>
+                          {/* Open icon */}
+                          <ExternalLink size={16} style={{ color: '#94a3b8', flexShrink: 0 }} />
+                        </a>
+                      );
+                    })}
+                  </div>
+                )
+              ) : (
+                /* Edit mode */
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {documentsForm.length === 0 && (
+                    <div style={{ textAlign: 'center', padding: '24px 0', color: '#94a3b8', fontSize: 14 }}>
+                      Žádné dokumenty — klikněte „Přidat"
+                    </div>
+                  )}
+                  {documentsForm.map((docUrl, idx) => (
+                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ flex: 1 }}>
+                        <input
+                          type="url"
+                          value={docUrl}
+                          onChange={(e) => {
+                            const updated = [...documentsForm];
+                            updated[idx] = e.target.value;
+                            setDocumentsForm(updated);
+                          }}
+                          placeholder="https://... nebo cesta k souboru"
+                          style={{ width: '100%', minHeight: 44, padding: '0 16px', borderRadius: 12, border: '1px solid #e2e8f0', background: '#f8fafc', color: '#0f172a', fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
+                        />
+                      </div>
+                      <button
+                        onClick={() => setDocumentsForm(documentsForm.filter((_, i) => i !== idx))}
+                        style={{ width: 44, height: 44, borderRadius: 12, background: 'none', border: '1px solid #fee2e2', cursor: 'pointer', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                      >
+                        <Trash2 size={16} />
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -1800,4 +1896,22 @@ function getEventStatus(evt: { nextDate?: string; lastDate?: string }): {
     return { label: 'Splněno', color: '#16a34a', dotColor: '#22c55e', bg: '#dcfce7' };
   }
   return { label: '—', color: '#94a3b8', dotColor: '#cbd5e1', bg: '#f1f5f9' };
+}
+
+// ═══════════════════════════════════════════
+// DOCUMENT INFO HELPER
+// ═══════════════════════════════════════════
+
+function getDocumentInfo(url: string): { name: string; ext: string; color: string } {
+  // Extract filename from URL or path
+  const segments = url.split(/[/\\]/).pop()?.split('?')[0] || url;
+  const name = decodeURIComponent(segments);
+  const ext = name.includes('.') ? (name.split('.').pop()?.toLowerCase() || '') : '';
+
+  // Color by file type
+  if (ext === 'pdf') return { name, ext, color: '#ef4444' };
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'].includes(ext)) return { name, ext, color: '#8b5cf6' };
+  if (['doc', 'docx', 'odt', 'rtf'].includes(ext)) return { name, ext, color: '#2563eb' };
+  if (['xls', 'xlsx', 'csv', 'ods'].includes(ext)) return { name, ext, color: '#16a34a' };
+  return { name, ext, color: '#64748b' };
 }
