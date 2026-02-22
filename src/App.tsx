@@ -34,6 +34,7 @@ import ProductionPage from './pages/ProductionPage';
 import WarehousePage from './pages/WarehousePage';
 import ShiftPlannerPage from './pages/ShiftPlannerPage';
 import SettingsPage from './pages/SettingsPage';
+import KartotekaPage from './pages/KartotekaPage';
 
 // ═══════════════════════════════════════════════════════════════════
 // PROTECTED ROUTE WRAPPER
@@ -100,6 +101,7 @@ function ProtectedRoutes() {
       <Route path="/warehouse" element={<WarehousePage />} />
       <Route path="/shifts" element={<ShiftPlannerPage />} />
       <Route path="/settings" element={<SettingsPage />} />
+      <Route path="/kartoteka" element={<KartotekaPage />} />
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
