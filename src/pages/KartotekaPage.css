@@ -37,7 +37,6 @@
 }
 
 .kartoteka-page .k-import-btn {
-  margin-left: auto;
   min-height: 40px;
   padding: 0 14px;
   display: flex;
@@ -271,6 +270,176 @@
   color: #ef4444;
   text-align: center;
 }
+
+/* ── Add button ────────────────────────────── */
+.kartoteka-page .k-add-btn {
+  margin-left: auto;
+  min-height: 40px;
+  min-width: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  border: 1px solid #16a34a40;
+  background: #16a34a20;
+  color: #22c55e;
+  cursor: pointer;
+}
+
+.kartoteka-page .k-add-btn:hover {
+  background: #16a34a35;
+  border-color: #22c55e;
+}
+
+.kartoteka-page .k-import-btn {
+  margin-left: 0;
+}
+
+/* ── Create modal ──────────────────────────── */
+.k-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+@media (min-width: 640px) {
+  .k-modal-overlay { align-items: center; }
+}
+
+.k-modal {
+  width: 100%;
+  max-width: 440px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: #0f1f38;
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
+  border: 1px solid #1e3a5f;
+}
+
+@media (min-width: 640px) {
+  .k-modal { border-radius: 20px; }
+}
+
+.k-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #162a4a;
+}
+
+.k-modal-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.k-modal-close {
+  min-width: 36px;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid #162a4a;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+}
+
+.k-modal-close:hover { background: #162a4a; }
+
+.k-modal-body {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.k-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.k-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.k-input {
+  min-height: 44px;
+  background: #0a1628;
+  border: 1px solid #162a4a;
+  border-radius: 12px;
+  padding: 0 14px;
+  color: #e2e8f0;
+  font-size: 0.9rem;
+  outline: none;
+  width: 100%;
+}
+
+.k-input:focus {
+  border-color: #3b82f6;
+}
+
+.k-input::placeholder { color: #475569; }
+
+select.k-input {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%2364748b' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+}
+
+.k-row {
+  display: flex;
+  gap: 12px;
+}
+
+.k-modal-footer {
+  display: flex;
+  gap: 10px;
+  padding: 16px 20px;
+  border-top: 1px solid #162a4a;
+}
+
+.k-btn-cancel {
+  flex: 1;
+  min-height: 48px;
+  border-radius: 14px;
+  border: 1px solid #162a4a;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.k-btn-cancel:hover { background: #162a4a; }
+
+.k-btn-save {
+  flex: 1;
+  min-height: 48px;
+  border-radius: 14px;
+  border: none;
+  background: #3b82f6;
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.k-btn-save:hover { background: #2563eb; }
+.k-btn-save:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* ── Responsive ─────────────────────────────── */
 @media (max-width: 390px) {
