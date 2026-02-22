@@ -117,6 +117,7 @@ export default function AssetCardPage() {
   const [asset, setAsset] = useState<Asset | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loadingAsset, setLoadingAsset] = useState(true);
+  const [loadingAssetV2, setLoadingAssetV2] = useState(true);
   const [loadingTasks, setLoadingTasks] = useState(true);
   const [showFaultModal, setShowFaultModal] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
@@ -288,6 +289,21 @@ export default function AssetCardPage() {
     assetService.getById(tenantId, assetId)
       .then((data) => {
         setAssetV2(data);
+        // Pokud v1 asset nebyl nalezen, vyplnit z v2 dat (bridge)
+        setAsset((prev) => prev ?? {
+          id: data.id,
+          name: data.name,
+          code: data.code,
+          buildingId: data.location || '',
+          areaName: data.entityType || '',
+          category: data.entityType || '',
+          manufacturer: data.manufacturer,
+          model: data.model,
+          serialNumber: data.serialNumber,
+          year: data.year,
+          status: data.status,
+          mthCounter: data.mthCounter,
+        } as Asset);
         setEditForm({
           name: data.name || '', code: data.code || '', entityType: data.entityType || '',
           status: data.status || 'operational', criticality: data.criticality || 'medium',
@@ -298,8 +314,12 @@ export default function AssetCardPage() {
         setEventsForm(data.events || []);
         setRepairLogForm(data.repairLog || []);
         setDocumentsForm(data.documents || []);
+        setLoadingAssetV2(false);
       })
-      .catch((err) => console.warn('[AssetCard] v2 load fallback:', err));
+      .catch((err) => {
+        console.warn('[AssetCard] v2 load fallback:', err);
+        setLoadingAssetV2(false);
+      });
   }, [assetId, tenantId]);
 
   // ─── SAVE EDIT ───
@@ -415,7 +435,7 @@ export default function AssetCardPage() {
   }, [assetV2?.repairLog]);
 
   // ─── LOADING ───
-  if (loadingAsset) {
+  if (loadingAsset || loadingAssetV2) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-slate-500" />
