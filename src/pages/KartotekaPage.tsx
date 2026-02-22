@@ -26,7 +26,7 @@ function collectAncestorIds(assetId: string, allAssets: Asset[]): string[] {
 export default function KartotekaPage() {
   const navigate = useNavigate();
   const { user } = useAuthContext();
-  const tenantId = user?.tenantId ?? '';
+  const tenantId = user?.tenantId ?? 'main_firm';
 
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
@@ -93,7 +93,7 @@ export default function KartotekaPage() {
         tenantId,
         name: createForm.name.trim(),
         entityType: createForm.entityType.trim() || 'Zařízení',
-        code: createForm.code.trim() || undefined,
+        code: createForm.code.trim() || null,
         status: createForm.status,
         criticality: createForm.criticality,
         parentId: createForm.parentId || null,
