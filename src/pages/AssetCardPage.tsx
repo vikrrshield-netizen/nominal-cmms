@@ -17,7 +17,7 @@ import {
 import { db } from '../lib/firebase';
 import { createTask } from '../services/taskService';
 import { assetService } from '../services/assetService';
-import type { Asset as AssetV2, AssetEvent } from '../types/asset';
+import type { Asset as AssetV2, AssetEvent, RepairLogEntry } from '../types/asset';
 import { ASSET_STATUS_CONFIG, CRITICALITY_CONFIG, getStatusConfig, getCriticalityConfig } from '../types/asset';
 import { showToast } from '../components/ui/Toast';
 import {
@@ -134,6 +134,7 @@ export default function AssetCardPage() {
     serialNumber: '', year: '' as string, location: '',
   });
   const [eventsForm, setEventsForm] = useState<AssetEvent[]>([]);
+  const [repairLogForm, setRepairLogForm] = useState<RepairLogEntry[]>([]);
   const tenantId = user?.tenantId ?? 'main_firm';
 
   const { revisions, loading: loadingRevisions, logRevision } = useRevisions(assetId);
@@ -288,6 +289,7 @@ export default function AssetCardPage() {
           location: data.location || '',
         });
         setEventsForm(data.events || []);
+        setRepairLogForm(data.repairLog || []);
       })
       .catch((err) => console.warn('[AssetCard] v2 load fallback:', err));
   }, [assetId, tenantId]);
@@ -305,6 +307,7 @@ export default function AssetCardPage() {
         year: editForm.year ? Number(editForm.year) : undefined,
         location: editForm.location || undefined,
         events: eventsForm.filter(e => e.name.trim()),
+        repairLog: repairLogForm.filter(e => e.description.trim()),
       });
       const updated = await assetService.getById(tenantId, assetId);
       setAssetV2(updated);
@@ -327,6 +330,7 @@ export default function AssetCardPage() {
       location: assetV2.location || '',
     });
     setEventsForm(assetV2.events || []);
+    setRepairLogForm(assetV2.repairLog || []);
     setIsEditing(false);
   };
 
@@ -368,6 +372,12 @@ export default function AssetCardPage() {
       return dB.localeCompare(dA);
     });
   }, [assetV2?.events]);
+
+  // Sorted repair log (newest first by date)
+  const sortedRepairLog = useMemo(() => {
+    const log = assetV2?.repairLog || [];
+    return [...log].sort((a, b) => b.date.localeCompare(a.date));
+  }, [assetV2?.repairLog]);
 
   // ─── LOADING ───
   if (loadingAsset) {
@@ -847,6 +857,167 @@ export default function AssetCardPage() {
                           }}
                           placeholder="Volitelné poznámky k události"
                         />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* ═══ SEKCE 4: HISTORIE OPRAV (Apple-style) ═══ */}
+            <div style={{ background: '#fff', borderRadius: 24, padding: 24, border: '1px solid #f1f5f9', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <h3 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8', margin: 0 }}>
+                  Historie oprav
+                </h3>
+                {isEditing && (
+                  <button
+                    onClick={() => {
+                      const newEntry: RepairLogEntry = {
+                        id: crypto.randomUUID(),
+                        date: new Date().toISOString().split('T')[0],
+                        description: '',
+                      };
+                      setRepairLogForm([newEntry, ...repairLogForm]);
+                    }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0' }}
+                  >
+                    <PlusCircle size={14} /> Přidat
+                  </button>
+                )}
+              </div>
+
+              {!isEditing ? (
+                /* View mode */
+                sortedRepairLog.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '32px 0', color: '#94a3b8' }}>
+                    <Wrench size={32} style={{ margin: '0 auto 8px', opacity: 0.5 }} />
+                    <div style={{ fontSize: 14 }}>Žádné opravy</div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {sortedRepairLog.map((entry) => (
+                      <div key={entry.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 14px', background: '#f8fafc', borderRadius: 16, border: '1px solid #f1f5f9' }}>
+                        {/* Date column */}
+                        <div style={{ flexShrink: 0, minWidth: 56, textAlign: 'center' }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
+                            {new Date(entry.date).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'short' })}
+                          </div>
+                          <div style={{ fontSize: 11, color: '#94a3b8' }}>
+                            {new Date(entry.date).getFullYear()}
+                          </div>
+                        </div>
+                        {/* Content */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 15, fontWeight: 600, color: '#0f172a', marginBottom: 4 }}>{entry.description}</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            {entry.technicianName && (
+                              <span style={{ fontSize: 12, color: '#64748b', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                👤 {entry.technicianName}
+                              </span>
+                            )}
+                            {entry.parts && entry.parts.length > 0 && (
+                              <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 8, background: '#e2e8f0', color: '#64748b' }}>
+                                {entry.parts.length} {entry.parts.length === 1 ? 'díl' : entry.parts.length < 5 ? 'díly' : 'dílů'}
+                              </span>
+                            )}
+                          </div>
+                          {entry.parts && entry.parts.length > 0 && (
+                            <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>
+                              Díly: {entry.parts.join(', ')}
+                            </div>
+                          )}
+                        </div>
+                        {/* Cost */}
+                        {entry.cost != null && entry.cost > 0 && (
+                          <div style={{ flexShrink: 0, fontSize: 14, fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap' }}>
+                            {entry.cost.toLocaleString('cs-CZ')} Kč
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    {/* Total cost summary */}
+                    {sortedRepairLog.some(e => e.cost != null && e.cost > 0) && (
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '8px 14px', borderTop: '1px solid #f1f5f9' }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: '#64748b' }}>
+                          Celkem: {sortedRepairLog.reduce((sum, e) => sum + (e.cost || 0), 0).toLocaleString('cs-CZ')} Kč
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )
+              ) : (
+                /* Edit mode */
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {repairLogForm.length === 0 && (
+                    <div style={{ textAlign: 'center', padding: '24px 0', color: '#94a3b8', fontSize: 14 }}>
+                      Žádné opravy — klikněte „Přidat"
+                    </div>
+                  )}
+                  {repairLogForm.map((entry, idx) => (
+                    <div key={entry.id} style={{ padding: 16, background: '#f8fafc', borderRadius: 16, border: '1px solid #e2e8f0', position: 'relative' }}>
+                      <button
+                        onClick={() => setRepairLogForm(repairLogForm.filter((_, i) => i !== idx))}
+                        style={{ position: 'absolute', top: 12, right: 12, background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 4 }}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingRight: 32 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                          <RLField
+                            label="Datum"
+                            value={entry.date}
+                            onChange={(v) => {
+                              const updated = [...repairLogForm];
+                              updated[idx] = { ...updated[idx], date: v };
+                              setRepairLogForm(updated);
+                            }}
+                            type="date"
+                          />
+                          <RLField
+                            label="Technik"
+                            value={entry.technicianName || ''}
+                            onChange={(v) => {
+                              const updated = [...repairLogForm];
+                              updated[idx] = { ...updated[idx], technicianName: v || undefined };
+                              setRepairLogForm(updated);
+                            }}
+                            placeholder="Jméno technika"
+                          />
+                        </div>
+                        <RLField
+                          label="Popis opravy"
+                          value={entry.description}
+                          onChange={(v) => {
+                            const updated = [...repairLogForm];
+                            updated[idx] = { ...updated[idx], description: v };
+                            setRepairLogForm(updated);
+                          }}
+                          placeholder="Co bylo opraveno"
+                        />
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                          <RLField
+                            label="Náklady (Kč)"
+                            value={entry.cost != null ? String(entry.cost) : ''}
+                            onChange={(v) => {
+                              const updated = [...repairLogForm];
+                              updated[idx] = { ...updated[idx], cost: v ? Number(v) : undefined };
+                              setRepairLogForm(updated);
+                            }}
+                            type="number"
+                            placeholder="0"
+                          />
+                          <RLField
+                            label="Použité díly"
+                            value={entry.parts ? entry.parts.join(', ') : ''}
+                            onChange={(v) => {
+                              const updated = [...repairLogForm];
+                              updated[idx] = { ...updated[idx], parts: v ? v.split(',').map(s => s.trim()).filter(Boolean) : undefined };
+                              setRepairLogForm(updated);
+                            }}
+                            placeholder="díl1, díl2, ..."
+                          />
+                        </div>
                       </div>
                     </div>
                   ))}
