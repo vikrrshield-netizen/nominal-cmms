@@ -36,6 +36,28 @@
   background: #162a4a;
 }
 
+.kartoteka-page .k-import-btn {
+  margin-left: auto;
+  min-height: 40px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 12px;
+  border: 1px solid #1e3a5f;
+  background: #162a4a;
+  color: #3b82f6;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.kartoteka-page .k-import-btn:hover {
+  background: #1e3a5f;
+  border-color: #3b82f6;
+}
+
 .kartoteka-page .k-title {
   font-size: 1.25rem;
   font-weight: 700;

@@ -37,11 +37,16 @@ export type SchemaDefinition = Record<string, FieldRule>;
 
 export const ASSET_SCHEMA: SchemaDefinition = {
   name: { required: true, type: 'string', maxLength: 200 },
-  code: { type: 'string', maxLength: 20 },
-  buildingId: { required: true, type: 'string', enum: ['A', 'B', 'C', 'D', 'E', 'L'] },
-  areaName: { type: 'string', maxLength: 100 },
-  status: { type: 'string', enum: ['operational', 'maintenance', 'breakdown', 'offline'] },
-  category: { type: 'string' },
+  code: { type: 'string', maxLength: 30 },
+  entityType: { type: 'string', maxLength: 50 },
+  status: { type: 'string', enum: ['operational', 'maintenance', 'broken', 'stopped'] },
+  criticality: { type: 'string', enum: ['low', 'medium', 'high', 'critical'] },
+  parentName: { type: 'string', maxLength: 200 },
+  manufacturer: { type: 'string', maxLength: 100 },
+  model: { type: 'string', maxLength: 100 },
+  serialNumber: { type: 'string', maxLength: 60 },
+  year: { type: 'number', minValue: 1900, maxValue: 2100 },
+  location: { type: 'string', maxLength: 200 },
 };
 
 export const INVENTORY_SCHEMA: SchemaDefinition = {

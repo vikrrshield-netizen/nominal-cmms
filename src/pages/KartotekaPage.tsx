@@ -1,10 +1,12 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Building2, Search } from 'lucide-react';
+import { ArrowLeft, Building2, Search, Upload } from 'lucide-react';
 import { useAuthContext } from '../context/AuthContext';
 import { assetService } from '../services/assetService';
+import { importAssets } from '../utils/importers/importAssets';
 import type { Asset } from '../types/asset';
 import AssetTreeNode from '../components/AssetTreeNode';
+import ImportModal from '../components/ui/ImportModal';
 import './KartotekaPage.css';
 
 type FilterKey = 'all' | 'broken' | 'maintenance' | 'stopped' | 'operational';
@@ -29,6 +31,7 @@ export default function KartotekaPage() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterKey>('all');
+  const [showImport, setShowImport] = useState(false);
 
   useEffect(() => {
     if (!tenantId) return;
@@ -48,6 +51,26 @@ export default function KartotekaPage() {
       });
     return () => { cancelled = true; };
   }, [tenantId]);
+
+  // Reload assets after import
+  const reloadAssets = () => {
+    if (!tenantId) return;
+    setLoading(true);
+    assetService.getAll(tenantId)
+      .then(setAssets)
+      .catch((err) => setError(String(err)))
+      .finally(() => setLoading(false));
+  };
+
+  // Handle Excel import via ImportModal
+  const handleImport = async (rows: Record<string, unknown>[]) => {
+    const result = await importAssets(rows, tenantId);
+    // Reload tree after successful import
+    if (result.imported > 0) {
+      reloadAssets();
+    }
+    return result;
+  };
 
   const counts = useMemo(() => ({
     total: assets.length,
@@ -118,6 +141,10 @@ export default function KartotekaPage() {
         </button>
         <Building2 size={22} style={{ color: '#3b82f6' }} />
         <span className="k-title">Mapa areálu</span>
+        <button className="k-import-btn" onClick={() => setShowImport(true)}>
+          <Upload size={16} />
+          <span>Import</span>
+        </button>
       </div>
 
       <div className="k-summary">
@@ -198,6 +225,15 @@ export default function KartotekaPage() {
             ))
           )}
         </div>
+      )}
+
+      {/* Excel Import Modal */}
+      {showImport && (
+        <ImportModal
+          title="Import zařízení z Excelu"
+          onClose={() => setShowImport(false)}
+          onImport={handleImport}
+        />
       )}
     </div>
   );
