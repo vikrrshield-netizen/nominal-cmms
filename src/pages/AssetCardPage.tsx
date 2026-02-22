@@ -328,12 +328,12 @@ export default function AssetCardPage() {
     setEditSaving(true);
     try {
       await assetService.update(tenantId, assetId, {
-        name: editForm.name, code: editForm.code || undefined,
+        name: editForm.name, code: editForm.code || null,
         entityType: editForm.entityType, status: editForm.status,
-        criticality: editForm.criticality, manufacturer: editForm.manufacturer || undefined,
-        model: editForm.model || undefined, serialNumber: editForm.serialNumber || undefined,
-        year: editForm.year ? Number(editForm.year) : undefined,
-        location: editForm.location || undefined,
+        criticality: editForm.criticality, manufacturer: editForm.manufacturer || null,
+        model: editForm.model || null, serialNumber: editForm.serialNumber || null,
+        year: editForm.year ? Number(editForm.year) : null,
+        location: editForm.location || null,
         events: eventsForm.filter(e => e.name.trim()),
         repairLog: repairLogForm.filter(e => e.description.trim()),
         documents: documentsForm.filter(d => d.trim()),
@@ -922,7 +922,7 @@ export default function AssetCardPage() {
                             value={evt.lastDate || ''}
                             onChange={(v) => {
                               const updated = [...eventsForm];
-                              updated[idx] = { ...updated[idx], lastDate: v || undefined };
+                              updated[idx] = { ...updated[idx], lastDate: v || '' };
                               setEventsForm(updated);
                             }}
                             type="date"
@@ -932,7 +932,7 @@ export default function AssetCardPage() {
                             value={evt.nextDate || ''}
                             onChange={(v) => {
                               const updated = [...eventsForm];
-                              updated[idx] = { ...updated[idx], nextDate: v || undefined };
+                              updated[idx] = { ...updated[idx], nextDate: v || '' };
                               setEventsForm(updated);
                             }}
                             type="date"
@@ -943,7 +943,7 @@ export default function AssetCardPage() {
                           value={evt.instructions || ''}
                           onChange={(v) => {
                             const updated = [...eventsForm];
-                            updated[idx] = { ...updated[idx], instructions: v || undefined };
+                            updated[idx] = { ...updated[idx], instructions: v || '' };
                             setEventsForm(updated);
                           }}
                           placeholder="Volitelné poznámky k události"
@@ -1070,7 +1070,7 @@ export default function AssetCardPage() {
                             value={entry.technicianName || ''}
                             onChange={(v) => {
                               const updated = [...repairLogForm];
-                              updated[idx] = { ...updated[idx], technicianName: v || undefined };
+                              updated[idx] = { ...updated[idx], technicianName: v || '' };
                               setRepairLogForm(updated);
                             }}
                             placeholder="Jméno technika"
@@ -1558,15 +1558,15 @@ function FaultModal({ asset, user, onClose, onCreated }: {
     try {
       await createTask({
         title: title.trim(),
-        description: description.trim() || undefined,
+        description: description.trim() || '',
         priority: priority as 'P1' | 'P2' | 'P3' | 'P4',
         type: 'corrective',
         source: 'web',
         assetId: asset.id,
         assetName: asset.name,
         buildingId: asset.buildingId,
-        assigneeId: assignee || undefined,
-        assigneeName: ASSIGNEE_OPTIONS.find(a => a.id === assignee)?.name || undefined,
+        assigneeId: assignee || '',
+        assigneeName: ASSIGNEE_OPTIONS.find(a => a.id === assignee)?.name || '',
         createdById: user?.id || 'unknown',
         createdByName: user?.displayName || 'Neznámý',
       });
@@ -1685,7 +1685,7 @@ function TaskModal({ asset, user, onClose, onCreated }: {
     try {
       await createTask({
         title: title.trim(),
-        description: description.trim() || undefined,
+        description: description.trim() || '',
         priority: priority as 'P1' | 'P2' | 'P3' | 'P4',
         type: taskType,
         source: 'web',
