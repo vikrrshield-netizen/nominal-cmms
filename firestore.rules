@@ -145,16 +145,11 @@ service cloud.firestore {
     // TENANT ASSETS — v2 tenant-aware asset tree
     // ═══════════════════════════════════════════
     match /tenants/{tenantId}/assets/{assetId} {
-      allow read: if isAnyRole();
+      allow read: if isAuth();
 
-      allow create: if (isManagement() || isTechnician())
-        && hasTimestamp();
+      allow create: if isAuth();
 
-      allow update: if isAuth() && (
-        isManagement()
-        || isTechnician()
-        || (isOperator() && isSoftDelete())
-      ) && hasTimestamp();
+      allow update: if isAuth();
 
       allow delete: if isSuperAdmin();
     }
