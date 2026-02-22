@@ -17,7 +17,7 @@ import {
 import { db } from '../lib/firebase';
 import { createTask } from '../services/taskService';
 import { assetService } from '../services/assetService';
-import type { Asset as AssetV2 } from '../types/asset';
+import type { Asset as AssetV2, AssetEvent } from '../types/asset';
 import { ASSET_STATUS_CONFIG, CRITICALITY_CONFIG, getStatusConfig, getCriticalityConfig } from '../types/asset';
 import { showToast } from '../components/ui/Toast';
 import {
@@ -25,6 +25,7 @@ import {
   Clock, Loader2, Shield, Wrench, X,
   ChevronRight, Settings, Building2, MapPin,
   Cog, PlusCircle, FileText, Filter, Printer, Edit3, Save, XCircle,
+  Calendar, Trash2,
 } from 'lucide-react';
 import MicButton from '../components/ui/MicButton';
 
@@ -132,6 +133,7 @@ export default function AssetCardPage() {
     criticality: 'medium' as const, manufacturer: '', model: '',
     serialNumber: '', year: '' as string, location: '',
   });
+  const [eventsForm, setEventsForm] = useState<AssetEvent[]>([]);
   const tenantId = user?.tenantId ?? 'main_firm';
 
   const { revisions, loading: loadingRevisions, logRevision } = useRevisions(assetId);
@@ -285,6 +287,7 @@ export default function AssetCardPage() {
           serialNumber: data.serialNumber || '', year: data.year ? String(data.year) : '',
           location: data.location || '',
         });
+        setEventsForm(data.events || []);
       })
       .catch((err) => console.warn('[AssetCard] v2 load fallback:', err));
   }, [assetId, tenantId]);
@@ -301,6 +304,7 @@ export default function AssetCardPage() {
         model: editForm.model || undefined, serialNumber: editForm.serialNumber || undefined,
         year: editForm.year ? Number(editForm.year) : undefined,
         location: editForm.location || undefined,
+        events: eventsForm.filter(e => e.name.trim()),
       });
       const updated = await assetService.getById(tenantId, assetId);
       setAssetV2(updated);
@@ -322,6 +326,7 @@ export default function AssetCardPage() {
       serialNumber: assetV2.serialNumber || '', year: assetV2.year ? String(assetV2.year) : '',
       location: assetV2.location || '',
     });
+    setEventsForm(assetV2.events || []);
     setIsEditing(false);
   };
 
@@ -353,6 +358,16 @@ export default function AssetCardPage() {
     () => revisions.filter((r) => r.status === 'expiring'),
     [revisions]
   );
+
+  // Sorted events (newest first by nextDate or lastDate)
+  const sortedEvents = useMemo(() => {
+    const events = assetV2?.events || [];
+    return [...events].sort((a, b) => {
+      const dA = a.nextDate || a.lastDate || '';
+      const dB = b.nextDate || b.lastDate || '';
+      return dB.localeCompare(dA);
+    });
+  }, [assetV2?.events]);
 
   // ─── LOADING ───
   if (loadingAsset) {
@@ -678,6 +693,163 @@ export default function AssetCardPage() {
                   <RLField label="Sériové číslo" value={editForm.serialNumber} onChange={(v) => setEditForm({ ...editForm, serialNumber: v })} />
                   <RLField label="Rok výroby" value={editForm.year} onChange={(v) => setEditForm({ ...editForm, year: v })} type="number" placeholder="2024" />
                   <RLField label="Lokace" value={editForm.location} onChange={(v) => setEditForm({ ...editForm, location: v })} placeholder="Budova D / Hala 1" />
+                </div>
+              )}
+            </div>
+
+            {/* ═══ SEKCE 3: UDÁLOSTI (Apple-style) ═══ */}
+            <div style={{ background: '#fff', borderRadius: 24, padding: 24, border: '1px solid #f1f5f9', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <h3 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8', margin: 0 }}>
+                  Události
+                </h3>
+                {isEditing && (
+                  <button
+                    onClick={() => {
+                      const newEvt: AssetEvent = { id: crypto.randomUUID(), name: '', eventType: 'kontrola' };
+                      setEventsForm([newEvt, ...eventsForm]);
+                    }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0' }}
+                  >
+                    <PlusCircle size={14} /> Přidat
+                  </button>
+                )}
+              </div>
+
+              {!isEditing ? (
+                /* View mode */
+                sortedEvents.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '32px 0', color: '#94a3b8' }}>
+                    <Calendar size={32} style={{ margin: '0 auto 8px', opacity: 0.5 }} />
+                    <div style={{ fontSize: 14 }}>Žádné události</div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {sortedEvents.map((evt) => {
+                      const evtSt = getEventStatus(evt);
+                      return (
+                        <div key={evt.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', background: '#f8fafc', borderRadius: 16, border: '1px solid #f1f5f9' }}>
+                          <div style={{ width: 10, height: 10, borderRadius: '50%', background: evtSt.dotColor, flexShrink: 0 }} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 15, fontWeight: 600, color: '#0f172a', marginBottom: 2 }}>{evt.name}</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 8, background: '#e2e8f0', color: '#64748b' }}>{evt.eventType}</span>
+                              {evt.nextDate && (
+                                <span style={{ fontSize: 12, color: '#94a3b8' }}>
+                                  Příští: {new Date(evt.nextDate).toLocaleDateString('cs-CZ')}
+                                </span>
+                              )}
+                              {evt.lastDate && (
+                                <span style={{ fontSize: 12, color: '#94a3b8' }}>
+                                  Poslední: {new Date(evt.lastDate).toLocaleDateString('cs-CZ')}
+                                </span>
+                              )}
+                            </div>
+                            {evt.frequencyDays && (
+                              <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>
+                                Frekvence: každých {evt.frequencyDays} dní
+                              </div>
+                            )}
+                          </div>
+                          <span style={{ fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 12, background: evtSt.bg, color: evtSt.color, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                            {evtSt.label}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )
+              ) : (
+                /* Edit mode */
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {eventsForm.length === 0 && (
+                    <div style={{ textAlign: 'center', padding: '24px 0', color: '#94a3b8', fontSize: 14 }}>
+                      Žádné události — klikněte „Přidat"
+                    </div>
+                  )}
+                  {eventsForm.map((evt, idx) => (
+                    <div key={evt.id} style={{ padding: 16, background: '#f8fafc', borderRadius: 16, border: '1px solid #e2e8f0', position: 'relative' }}>
+                      <button
+                        onClick={() => setEventsForm(eventsForm.filter((_, i) => i !== idx))}
+                        style={{ position: 'absolute', top: 12, right: 12, background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 4 }}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingRight: 32 }}>
+                        <RLField
+                          label="Název události"
+                          value={evt.name}
+                          onChange={(v) => {
+                            const updated = [...eventsForm];
+                            updated[idx] = { ...updated[idx], name: v };
+                            setEventsForm(updated);
+                          }}
+                          placeholder="např. Kontrola elektriky"
+                        />
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                          <RLSelect
+                            label="Typ"
+                            value={evt.eventType}
+                            options={[
+                              { value: 'kontrola', label: 'Kontrola' },
+                              { value: 'revize', label: 'Revize' },
+                              { value: 'udrzba', label: 'Údržba' },
+                              { value: 'kalibrace', label: 'Kalibrace' },
+                              { value: 'jine', label: 'Jiné' },
+                            ]}
+                            onChange={(v) => {
+                              const updated = [...eventsForm];
+                              updated[idx] = { ...updated[idx], eventType: v };
+                              setEventsForm(updated);
+                            }}
+                          />
+                          <RLField
+                            label="Frekvence (dny)"
+                            value={evt.frequencyDays ? String(evt.frequencyDays) : ''}
+                            onChange={(v) => {
+                              const updated = [...eventsForm];
+                              updated[idx] = { ...updated[idx], frequencyDays: v ? Number(v) : undefined };
+                              setEventsForm(updated);
+                            }}
+                            type="number"
+                            placeholder="365"
+                          />
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                          <RLField
+                            label="Poslední datum"
+                            value={evt.lastDate || ''}
+                            onChange={(v) => {
+                              const updated = [...eventsForm];
+                              updated[idx] = { ...updated[idx], lastDate: v || undefined };
+                              setEventsForm(updated);
+                            }}
+                            type="date"
+                          />
+                          <RLField
+                            label="Příští datum"
+                            value={evt.nextDate || ''}
+                            onChange={(v) => {
+                              const updated = [...eventsForm];
+                              updated[idx] = { ...updated[idx], nextDate: v || undefined };
+                              setEventsForm(updated);
+                            }}
+                            type="date"
+                          />
+                        </div>
+                        <RLField
+                          label="Pokyny"
+                          value={evt.instructions || ''}
+                          onChange={(v) => {
+                            const updated = [...eventsForm];
+                            updated[idx] = { ...updated[idx], instructions: v || undefined };
+                            setEventsForm(updated);
+                          }}
+                          placeholder="Volitelné poznámky k události"
+                        />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -1437,4 +1609,24 @@ function RLSelect({ label, value, options, onChange }: {
       </select>
     </div>
   );
+}
+
+// ═══════════════════════════════════════════
+// EVENT STATUS HELPER
+// ═══════════════════════════════════════════
+
+function getEventStatus(evt: { nextDate?: string; lastDate?: string }): {
+  label: string; color: string; dotColor: string; bg: string;
+} {
+  const today = new Date().toISOString().split('T')[0];
+  if (evt.nextDate) {
+    if (evt.nextDate <= today) {
+      return { label: 'Nesplněno', color: '#dc2626', dotColor: '#ef4444', bg: '#fee2e2' };
+    }
+    return { label: 'Naplánováno', color: '#2563eb', dotColor: '#3b82f6', bg: '#dbeafe' };
+  }
+  if (evt.lastDate) {
+    return { label: 'Splněno', color: '#16a34a', dotColor: '#22c55e', bg: '#dcfce7' };
+  }
+  return { label: '—', color: '#94a3b8', dotColor: '#cbd5e1', bg: '#f1f5f9' };
 }
