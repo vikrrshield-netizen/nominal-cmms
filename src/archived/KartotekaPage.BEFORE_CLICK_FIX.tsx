@@ -7,7 +7,7 @@ import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Building2, Search, Upload, Plus, X,
-  ChevronRight, ChevronDown, FileText, Loader2, Pencil,
+  ChevronRight, ChevronDown, FileText, Loader2,
 } from 'lucide-react';
 import { useAuthContext } from '../context/AuthContext';
 import { assetService } from '../services/assetService';
@@ -149,15 +149,6 @@ function TreeNode({ asset, allAssets, depth, expanded, onToggle, onDetail, onAdd
           <span className="k-tree-childcount">{children.length}</span>
         )}
 
-        {/* Action: Edit (navigate to detail) */}
-        <button
-          className="k-tree-action k-tree-action-edit"
-          onClick={(e) => { e.stopPropagation(); onDetail(asset); }}
-          title="Upravit"
-        >
-          <Pencil size={14} />
-        </button>
-
         {/* Action: Add child */}
         <button
           className="k-tree-action k-tree-action-add"
@@ -226,11 +217,9 @@ function RootCard({ asset, allAssets, expanded, onToggle, onDetail, onAddChild }
       {/* Card */}
       <div
         className="k-root-card"
-        onClick={() => onDetail(asset)}
         style={{
           background: `linear-gradient(145deg, ${color}12, ${color}04)`,
           borderColor: `${color}25`,
-          cursor: 'pointer',
         }}
       >
         {/* Status dot (top-right) */}
@@ -261,15 +250,7 @@ function RootCard({ asset, allAssets, expanded, onToggle, onDetail, onAddChild }
           <div className="k-root-actions">
             <button
               className="k-root-action-btn"
-              onClick={(e) => { e.stopPropagation(); onDetail(asset); }}
-              title="Upravit"
-              style={{ color: '#f59e0b', borderColor: '#f59e0b30' }}
-            >
-              <Pencil size={16} />
-            </button>
-            <button
-              className="k-root-action-btn"
-              onClick={(e) => { e.stopPropagation(); onAddChild(asset.id); }}
+              onClick={() => onAddChild(asset.id)}
               title="Přidat potomka"
               style={{ color: '#22c55e', borderColor: '#22c55e30' }}
             >
@@ -277,7 +258,7 @@ function RootCard({ asset, allAssets, expanded, onToggle, onDetail, onAddChild }
             </button>
             <button
               className="k-root-action-btn"
-              onClick={(e) => { e.stopPropagation(); onDetail(asset); }}
+              onClick={() => onDetail(asset)}
               title="Rodný list"
               style={{ color: '#3b82f6', borderColor: '#3b82f630' }}
             >
@@ -315,7 +296,7 @@ function RootCard({ asset, allAssets, expanded, onToggle, onDetail, onAddChild }
 
         {/* Expand toggle bar */}
         {hasChildren && (
-          <button className="k-root-expand" onClick={(e) => { e.stopPropagation(); onToggle(asset.id); }}>
+          <button className="k-root-expand" onClick={() => onToggle(asset.id)}>
             {isExpanded ? (
               <>
                 <ChevronDown size={16} />
@@ -456,8 +437,8 @@ export default function KartotekaPage() {
   };
 
   const openCreateModal = (parentId: string | null) => {
-    resetCreateForm();           // FIRST: reset form (sets parentId=null)
-    setCreateParentId(parentId); // THEN: set correct parentId
+    setCreateParentId(parentId);
+    resetCreateForm();
     setShowCreate(true);
   };
 
