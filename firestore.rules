@@ -142,6 +142,24 @@ service cloud.firestore {
     }
 
     // ═══════════════════════════════════════════
+    // TENANT ASSETS — v2 tenant-aware asset tree
+    // ═══════════════════════════════════════════
+    match /tenants/{tenantId}/assets/{assetId} {
+      allow read: if isAnyRole();
+
+      allow create: if (isManagement() || isTechnician())
+        && hasTimestamp();
+
+      allow update: if isAuth() && (
+        isManagement()
+        || isTechnician()
+        || (isOperator() && isSoftDelete())
+      ) && hasTimestamp();
+
+      allow delete: if isSuperAdmin();
+    }
+
+    // ═══════════════════════════════════════════
     // STATS_AGGREGATES — agregovaná statistika
     // ═══════════════════════════════════════════
     match /stats_aggregates/{docId} {
