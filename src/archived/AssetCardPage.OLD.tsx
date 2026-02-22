@@ -16,15 +16,11 @@ import {
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { createTask } from '../services/taskService';
-import { assetService } from '../services/assetService';
-import type { Asset as AssetV2 } from '../types/asset';
-import { ASSET_STATUS_CONFIG, CRITICALITY_CONFIG, getStatusConfig, getCriticalityConfig } from '../types/asset';
-import { showToast } from '../components/ui/Toast';
 import {
   AlertTriangle, ArrowLeft, CheckCircle2,
   Clock, Loader2, Shield, Wrench, X,
   ChevronRight, Settings, Building2, MapPin,
-  Cog, PlusCircle, FileText, Filter, Printer, Edit3, Save, XCircle,
+  Cog, PlusCircle, FileText, Filter, Printer,
 } from 'lucide-react';
 import MicButton from '../components/ui/MicButton';
 
@@ -122,17 +118,6 @@ export default function AssetCardPage() {
   const [activeTab, setActiveTab] = useState<'info' | 'tasks' | 'revisions'>('info');
   const [stanoviste, setStanoviste] = useState('Expedice');
   const [prefilterSaving, setPrefilterSaving] = useState(false);
-
-  // ─── V2 Rodný list state ───
-  const [assetV2, setAssetV2] = useState<AssetV2 | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editSaving, setEditSaving] = useState(false);
-  const [editForm, setEditForm] = useState({
-    name: '', code: '', entityType: '', status: 'operational' as const,
-    criticality: 'medium' as const, manufacturer: '', model: '',
-    serialNumber: '', year: '' as string, location: '',
-  });
-  const tenantId = user?.tenantId ?? 'main_firm';
 
   const { revisions, loading: loadingRevisions, logRevision } = useRevisions(assetId);
 
@@ -271,59 +256,6 @@ export default function AssetCardPage() {
     };
     fetchAsset();
   }, [assetId]);
-
-  // ─── LOAD ASSET V2 (tenant-aware) ───
-  useEffect(() => {
-    if (!assetId || !tenantId) return;
-    assetService.getById(tenantId, assetId)
-      .then((data) => {
-        setAssetV2(data);
-        setEditForm({
-          name: data.name || '', code: data.code || '', entityType: data.entityType || '',
-          status: data.status || 'operational', criticality: data.criticality || 'medium',
-          manufacturer: data.manufacturer || '', model: data.model || '',
-          serialNumber: data.serialNumber || '', year: data.year ? String(data.year) : '',
-          location: data.location || '',
-        });
-      })
-      .catch((err) => console.warn('[AssetCard] v2 load fallback:', err));
-  }, [assetId, tenantId]);
-
-  // ─── SAVE EDIT ───
-  const handleSaveEdit = async () => {
-    if (!assetV2 || !assetId) return;
-    setEditSaving(true);
-    try {
-      await assetService.update(tenantId, assetId, {
-        name: editForm.name, code: editForm.code || undefined,
-        entityType: editForm.entityType, status: editForm.status,
-        criticality: editForm.criticality, manufacturer: editForm.manufacturer || undefined,
-        model: editForm.model || undefined, serialNumber: editForm.serialNumber || undefined,
-        year: editForm.year ? Number(editForm.year) : undefined,
-        location: editForm.location || undefined,
-      });
-      const updated = await assetService.getById(tenantId, assetId);
-      setAssetV2(updated);
-      setIsEditing(false);
-      showToast('Uloženo', 'success');
-    } catch (err) {
-      console.error('[AssetCard] save error:', err);
-      showToast('Chyba při ukládání', 'error');
-    }
-    setEditSaving(false);
-  };
-
-  const handleCancelEdit = () => {
-    if (!assetV2) return;
-    setEditForm({
-      name: assetV2.name || '', code: assetV2.code || '', entityType: assetV2.entityType || '',
-      status: assetV2.status || 'operational', criticality: assetV2.criticality || 'medium',
-      manufacturer: assetV2.manufacturer || '', model: assetV2.model || '',
-      serialNumber: assetV2.serialNumber || '', year: assetV2.year ? String(assetV2.year) : '',
-      location: assetV2.location || '',
-    });
-    setIsEditing(false);
-  };
 
   // ─── LOAD TASKS ───
   useEffect(() => {
@@ -471,15 +403,11 @@ export default function AssetCardPage() {
         <div className="flex gap-2 mb-2">
           {canEditAsset && (
             <button
-              onClick={() => { setIsEditing(!isEditing); setActiveTab('info'); }}
-              className={`flex-1 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition active:scale-[0.97] min-h-[48px] ${
-                isEditing
-                  ? 'bg-blue-500/15 border border-blue-500/30 text-blue-400'
-                  : 'bg-slate-500/15 border border-slate-500/30 text-slate-300 hover:bg-slate-500/25'
-              }`}
+              onClick={() => navigate(`/map`)}
+              className="flex-1 py-3 bg-slate-500/15 border border-slate-500/30 text-slate-300 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-500/25 transition active:scale-[0.97] min-h-[48px]"
             >
-              <Edit3 className="w-5 h-5" />
-              {isEditing ? 'Edituji…' : 'Upravit'}
+              <Settings className="w-5 h-5" />
+              Upravit
             </button>
           )}
           {canCreateTask && (
@@ -565,154 +493,25 @@ export default function AssetCardPage() {
         {/* ═══ TAB: INFO ═══ */}
         {activeTab === 'info' && (
           <div className="space-y-4">
-            {/* ═══ SEKCE 1: IDENTITY CARD (Apple-style) ═══ */}
-            <div style={{ background: '#fff', borderRadius: 24, padding: 24, border: '1px solid #f1f5f9', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
-                <h3 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8', margin: 0 }}>Identifikace</h3>
-                {canEditAsset && !isEditing && (
-                  <button
-                    onClick={() => setIsEditing(true)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0' }}
-                  >
-                    <Edit3 size={14} /> Upravit
-                  </button>
-                )}
-              </div>
-
-              {!isEditing ? (
-                /* View mode */
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                    {assetV2?.image ? (
-                      <img src={assetV2.image} alt="" style={{ width: 56, height: 56, borderRadius: 16, objectFit: 'cover', background: '#f1f5f9' }} />
-                    ) : (
-                      <div style={{ width: 56, height: 56, borderRadius: 16, background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Cog size={24} style={{ color: '#94a3b8' }} />
-                      </div>
-                    )}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 18, fontWeight: 700, color: '#0f172a', lineHeight: 1.3 }}>{assetV2?.name || asset.name}</div>
-                      {(assetV2?.code || asset.code) && (
-                        <div style={{ fontSize: 13, color: '#94a3b8', fontFamily: 'monospace', marginTop: 2 }}>{assetV2?.code || asset.code}</div>
-                      )}
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
-                    {assetV2?.entityType && (
-                      <span style={{ fontSize: 12, fontWeight: 600, padding: '4px 12px', borderRadius: 20, background: '#f1f5f9', color: '#64748b' }}>
-                        {assetV2.entityType}
-                      </span>
-                    )}
-                    <span style={{
-                      fontSize: 12, fontWeight: 600, padding: '4px 12px', borderRadius: 20,
-                      background: (getStatusConfig(assetV2?.status || asset.status as any).color === 'bg-green-500' ? '#dcfce7' : getStatusConfig(assetV2?.status || asset.status as any).color === 'bg-amber-500' ? '#fef3c7' : getStatusConfig(assetV2?.status || asset.status as any).color === 'bg-red-500' ? '#fee2e2' : '#f1f5f9'),
-                      color: (assetV2?.status || asset.status) === 'operational' ? '#16a34a' : (assetV2?.status || asset.status) === 'maintenance' ? '#d97706' : (assetV2?.status || asset.status) === 'broken' ? '#dc2626' : '#64748b',
-                      display: 'flex', alignItems: 'center', gap: 6,
-                    }}>
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: (assetV2?.status || asset.status) === 'operational' ? '#22c55e' : (assetV2?.status || asset.status) === 'maintenance' ? '#eab308' : (assetV2?.status || asset.status) === 'broken' ? '#ef4444' : '#6b7280' }} />
-                      {getStatusConfig(assetV2?.status || asset.status as any).label}
-                    </span>
-                    {assetV2?.criticality && (
-                      <span style={{
-                        fontSize: 12, fontWeight: 600, padding: '4px 12px', borderRadius: 20,
-                        background: assetV2.criticality === 'critical' ? '#fee2e2' : assetV2.criticality === 'high' ? '#ffedd5' : assetV2.criticality === 'medium' ? '#dbeafe' : '#f1f5f9',
-                        color: assetV2.criticality === 'critical' ? '#dc2626' : assetV2.criticality === 'high' ? '#ea580c' : assetV2.criticality === 'medium' ? '#2563eb' : '#64748b',
-                      }}>
-                        {getCriticalityConfig(assetV2.criticality).label}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                /* Edit mode */
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <RLField label="Název" value={editForm.name} onChange={(v) => setEditForm({ ...editForm, name: v })} />
-                  <RLField label="Kód" value={editForm.code} onChange={(v) => setEditForm({ ...editForm, code: v })} placeholder="např. AST-001" />
-                  <RLField label="Typ entity" value={editForm.entityType} onChange={(v) => setEditForm({ ...editForm, entityType: v })} placeholder="např. Stroj, Budova, Místnost" />
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                    <RLSelect
-                      label="Stav"
-                      value={editForm.status}
-                      options={[
-                        { value: 'operational', label: '✅ V provozu' },
-                        { value: 'maintenance', label: '🔧 Údržba' },
-                        { value: 'broken', label: '❌ Porucha' },
-                        { value: 'stopped', label: '⏸️ Zastaveno' },
-                      ]}
-                      onChange={(v) => setEditForm({ ...editForm, status: v as any })}
-                    />
-                    <RLSelect
-                      label="Kritičnost"
-                      value={editForm.criticality}
-                      options={[
-                        { value: 'low', label: '🟢 Nízká' },
-                        { value: 'medium', label: '🔵 Střední' },
-                        { value: 'high', label: '🟠 Vysoká' },
-                        { value: 'critical', label: '🔴 Kritická' },
-                      ]}
-                      onChange={(v) => setEditForm({ ...editForm, criticality: v as any })}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* ═══ SEKCE 2: TECHNICAL SHEET (Apple-style) ═══ */}
-            <div style={{ background: '#fff', borderRadius: 24, padding: 24, border: '1px solid #f1f5f9', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-              <h3 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8', margin: '0 0 16px 0' }}>Technický list</h3>
-              {!isEditing ? (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <RLReadField label="Výrobce" value={assetV2?.manufacturer || asset.manufacturer} />
-                  <RLReadField label="Model" value={assetV2?.model || asset.model} />
-                  <RLReadField label="Sériové číslo" value={assetV2?.serialNumber || asset.serialNumber} />
-                  <RLReadField label="Rok výroby" value={assetV2?.year ? String(assetV2.year) : asset.year ? String(asset.year) : undefined} />
-                  <RLReadField label="Lokace" value={assetV2?.location} />
-                  {(assetV2?.mthCounter != null || asset.mthCounter != null) && (
-                    <RLReadField label="Motohodiny" value={`${(assetV2?.mthCounter ?? asset.mthCounter ?? 0).toLocaleString('cs-CZ')} Mth`} />
-                  )}
-                </div>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <RLField label="Výrobce" value={editForm.manufacturer} onChange={(v) => setEditForm({ ...editForm, manufacturer: v })} />
-                  <RLField label="Model" value={editForm.model} onChange={(v) => setEditForm({ ...editForm, model: v })} />
-                  <RLField label="Sériové číslo" value={editForm.serialNumber} onChange={(v) => setEditForm({ ...editForm, serialNumber: v })} />
-                  <RLField label="Rok výroby" value={editForm.year} onChange={(v) => setEditForm({ ...editForm, year: v })} type="number" placeholder="2024" />
-                  <RLField label="Lokace" value={editForm.location} onChange={(v) => setEditForm({ ...editForm, location: v })} placeholder="Budova D / Hala 1" />
-                </div>
-              )}
-            </div>
-
-            {/* ═══ EDIT FOOTER ═══ */}
-            {isEditing && (
-              <div style={{ display: 'flex', gap: 12 }}>
-                <button
-                  onClick={handleCancelEdit}
-                  style={{ flex: 1, minHeight: 48, borderRadius: 16, border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', fontWeight: 700, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-                >
-                  <XCircle size={18} /> Zrušit
-                </button>
-                <button
-                  onClick={handleSaveEdit}
-                  disabled={editSaving || !editForm.name.trim()}
-                  style={{ flex: 1, minHeight: 48, borderRadius: 16, border: 'none', background: '#3b82f6', color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: editSaving || !editForm.name.trim() ? 0.5 : 1 }}
-                >
-                  {editSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />} Uložit
-                </button>
-              </div>
-            )}
-
-            {/* Legacy info (Budova, Místnost — from old model) */}
+            {/* Basic Info — glassmorphism cards */}
             <div className="bg-slate-800/40 rounded-2xl p-4 border border-slate-700/30">
-              <h3 className="text-xs text-slate-500 uppercase font-bold mb-3">Umístění (legacy)</h3>
+              <h3 className="text-xs text-slate-500 uppercase font-bold mb-3">Rodný list</h3>
               <div className="grid grid-cols-2 gap-3">
                 <InfoBox label="Budova" value={buildingName} icon={<Building2 className="w-3.5 h-3.5 text-slate-500" />} />
                 <InfoBox label="Místnost" value={asset.areaName || '—'} icon={<MapPin className="w-3.5 h-3.5 text-slate-500" />} />
+                {asset.manufacturer && <InfoBox label="Výrobce" value={asset.manufacturer} />}
+                {asset.model && <InfoBox label="Model" value={asset.model} />}
+                {asset.serialNumber && <InfoBox label="Sériové č." value={asset.serialNumber} />}
+                {asset.year && <InfoBox label="Rok výroby" value={String(asset.year)} />}
                 {asset.mthCounter != null && (
                   <InfoBox
                     label="Motohodiny"
                     value={`${asset.mthCounter.toLocaleString('cs-CZ')} Mth`}
                     highlight={asset.mthCounter > 3000 ? 'amber' : undefined}
                   />
+                )}
+                {asset.category && (
+                  <InfoBox label="Kategorie" value={asset.category} />
                 )}
               </div>
             </div>
@@ -1386,55 +1185,6 @@ function ModalShell({ title, icon, onClose, children }: {
           {children}
         </div>
       </div>
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════
-// RODNÝ LIST — Apple-style field helpers
-// ═══════════════════════════════════════════
-
-function RLReadField({ label, value }: { label: string; value?: string | null }) {
-  return (
-    <div style={{ padding: '10px 0' }}>
-      <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#94a3b8', marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 15, fontWeight: 500, color: value ? '#0f172a' : '#cbd5e1' }}>{value || '—'}</div>
-    </div>
-  );
-}
-
-function RLField({ label, value, onChange, type = 'text', placeholder }: {
-  label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string;
-}) {
-  return (
-    <div>
-      <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#94a3b8', marginBottom: 6 }}>{label}</div>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        style={{ width: '100%', minHeight: 44, padding: '0 16px', borderRadius: 12, border: '1px solid #e2e8f0', background: '#f8fafc', color: '#0f172a', fontSize: 15, outline: 'none', boxSizing: 'border-box' }}
-      />
-    </div>
-  );
-}
-
-function RLSelect({ label, value, options, onChange }: {
-  label: string; value: string; options: { value: string; label: string }[]; onChange: (v: string) => void;
-}) {
-  return (
-    <div>
-      <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#94a3b8', marginBottom: 6 }}>{label}</div>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        style={{ width: '100%', minHeight: 44, padding: '0 16px', borderRadius: 12, border: '1px solid #e2e8f0', background: '#f8fafc', color: '#0f172a', fontSize: 15, outline: 'none', appearance: 'auto' as any, boxSizing: 'border-box' }}
-      >
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>{o.label}</option>
-        ))}
-      </select>
     </div>
   );
 }
