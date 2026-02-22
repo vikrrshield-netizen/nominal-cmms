@@ -343,7 +343,7 @@ function FullDashboard() {
   // Tile click → navigate or open modal
   const handleTileClick = (tileId: string) => {
     const routes: Record<string, string> = {
-      tasks: '/tasks', map: '/map', revisions: '/revisions',
+      tasks: '/tasks', map: '/kartoteka', revisions: '/revisions',
       inventory: '/inventory', waste: '/waste', fleet: '/fleet', louparna: '/louparna',
       inspections: '/inspections', calendar: '/calendar', reports: '/reports', admin: '/admin',
       noticeboard: '/noticeboard', academy: '/academy',
