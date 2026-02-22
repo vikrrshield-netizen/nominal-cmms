@@ -25,9 +25,10 @@ import {
   Clock, Loader2, Shield, Wrench, X,
   ChevronRight, Settings, Building2, MapPin,
   Cog, PlusCircle, FileText, Filter, Printer, Edit3, Save, XCircle,
-  Calendar, Trash2, ExternalLink,
+  Calendar, Trash2, ExternalLink, Download, Table,
 } from 'lucide-react';
 import MicButton from '../components/ui/MicButton';
+import { exportAssetCardPDF, exportAssetCardXLSX } from '../utils/exportAssetCard';
 
 // ═══════════════════════════════════════════
 // TYPES
@@ -118,6 +119,7 @@ export default function AssetCardPage() {
   const [loadingAsset, setLoadingAsset] = useState(true);
   const [loadingTasks, setLoadingTasks] = useState(true);
   const [showFaultModal, setShowFaultModal] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showRevisionModal, setShowRevisionModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'info' | 'tasks' | 'revisions'>('info');
@@ -338,6 +340,31 @@ export default function AssetCardPage() {
     setIsEditing(false);
   };
 
+  // ─── EXPORT HANDLERS ───
+  const handleExportPDF = async () => {
+    if (!assetV2) return;
+    setShowExportMenu(false);
+    try {
+      await exportAssetCardPDF(assetV2);
+      showToast('PDF exportováno', 'success');
+    } catch (err) {
+      console.error('[AssetCard] PDF export error:', err);
+      showToast('Chyba při exportu PDF', 'error');
+    }
+  };
+
+  const handleExportXLSX = async () => {
+    if (!assetV2) return;
+    setShowExportMenu(false);
+    try {
+      await exportAssetCardXLSX(assetV2);
+      showToast('Excel exportován', 'success');
+    } catch (err) {
+      console.error('[AssetCard] XLSX export error:', err);
+      showToast('Chyba při exportu Excel', 'error');
+    }
+  };
+
   // ─── LOAD TASKS ───
   useEffect(() => {
     if (!assetId) return;
@@ -527,6 +554,42 @@ export default function AssetCardPage() {
             <FileText className="w-5 h-5" />
             Pasport
           </button>
+          {/* Export dropdown */}
+          <div className="relative" style={{ flex: '0 0 auto' }}>
+            <button
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              className="py-3 px-4 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-500/25 transition active:scale-[0.97] min-h-[48px]"
+            >
+              <Download className="w-5 h-5" />
+            </button>
+            {showExportMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowExportMenu(false)} />
+                <div
+                  className="absolute right-0 top-full mt-2 z-50 rounded-xl shadow-lg overflow-hidden"
+                  style={{ background: '#1e293b', border: '1px solid #334155', minWidth: '180px' }}
+                >
+                  <button
+                    onClick={handleExportPDF}
+                    className="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-white/5 transition"
+                    style={{ color: '#e2e8f0', fontSize: '0.9rem' }}
+                  >
+                    <FileText className="w-4 h-4" style={{ color: '#ef4444' }} />
+                    PDF export
+                  </button>
+                  <div style={{ height: '1px', background: '#334155' }} />
+                  <button
+                    onClick={handleExportXLSX}
+                    className="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-white/5 transition"
+                    style={{ color: '#e2e8f0', fontSize: '0.9rem' }}
+                  >
+                    <Table className="w-4 h-4" style={{ color: '#22c55e' }} />
+                    Excel export
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
         {/* Secondary Action Buttons */}
         <div className="flex gap-2 mb-4">
