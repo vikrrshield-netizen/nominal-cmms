@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { SAMPLE_ASSETS } from '../data/sampleAssets';
 import { ASSET_STATUS_CONFIG, ASSET_CATEGORY_CONFIG, CRITICALITY_CONFIG } from '../types/asset';
-import type { Asset, AssetStatus } from '../types/asset';
+import type { Asset, AssetStatus, AssetCriticality } from '../types/asset';
 
 interface AssetListProps {
   filterRoomId?: string | null;
@@ -21,7 +21,7 @@ export const AssetList = ({ filterRoomId, filterBuildingId, onAssetSelect }: Ass
       const query = searchQuery.toLowerCase();
       return (
         asset.name.toLowerCase().includes(query) ||
-        asset.code.toLowerCase().includes(query) ||
+        asset.code?.toLowerCase().includes(query) ||
         asset.manufacturer?.toLowerCase().includes(query)
       );
     }
@@ -99,9 +99,9 @@ export const AssetList = ({ filterRoomId, filterBuildingId, onAssetSelect }: Ass
           </div>
         ) : (
           filteredAssets.map((asset) => {
-            const statusConfig = ASSET_STATUS_CONFIG[asset.status];
-            const categoryConfig = ASSET_CATEGORY_CONFIG[asset.category];
-            const criticalityConfig = CRITICALITY_CONFIG[asset.criticality];
+            const statusConfig = ASSET_STATUS_CONFIG[asset.status as AssetStatus];
+            const categoryConfig = ASSET_CATEGORY_CONFIG[asset.category || 'other'];
+            const criticalityConfig = CRITICALITY_CONFIG[asset.criticality as AssetCriticality];
             
             return (
               <button

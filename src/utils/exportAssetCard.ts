@@ -5,7 +5,7 @@
 // PDF: jsPDF + jspdf-autotable
 // Excel: SheetJS (xlsx) + file-saver
 
-import type { Asset, AssetEvent, RepairLogEntry } from '../types/asset';
+import type { Asset, AssetEvent } from '../types/asset';
 import { ASSET_STATUS_CONFIG, CRITICALITY_CONFIG } from '../types/asset';
 
 // ═══════════════════════════════════════════
@@ -49,7 +49,6 @@ export async function exportAssetCardPDF(asset: Asset): Promise<string> {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 15;
-  const contentWidth = pageWidth - margin * 2;
   let y = margin;
 
   // Colors

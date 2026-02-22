@@ -69,7 +69,24 @@ export interface Asset {
   documents?: string[];
   createdAt?: string;
   updatedAt?: string;
+  // Legacy fields (backward compat — used by AssetList, AssetDetail, sampleAssets)
+  category?: string;
+  roomId?: string;
+  buildingId?: string;
 }
+
+// Legacy category config (backward compat)
+export type AssetCategory = 'extruder' | 'mixer' | 'packer' | 'compressor' | 'boiler' | 'forklift' | 'agri' | 'other';
+export const ASSET_CATEGORY_CONFIG: Record<string, { label: string; icon: string }> = {
+  extruder:   { label: 'Extruder',    icon: '🏭' },
+  mixer:      { label: 'Míchačka',    icon: '🔄' },
+  packer:     { label: 'Balička',     icon: '📦' },
+  compressor: { label: 'Kompresor',   icon: '💨' },
+  boiler:     { label: 'Kotel',       icon: '🔥' },
+  forklift:   { label: 'VZV',         icon: '🚜' },
+  agri:       { label: 'Zemědělská',  icon: '🌾' },
+  other:      { label: 'Ostatní',     icon: '⚙️' },
+};
 export const getStatusConfig = (status: AssetStatus) =>
   ASSET_STATUS_CONFIG[status] ?? ASSET_STATUS_CONFIG.operational;
 export const getCriticalityConfig = (criticality: AssetCriticality) =>

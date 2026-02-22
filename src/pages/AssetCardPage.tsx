@@ -17,8 +17,8 @@ import {
 import { db } from '../lib/firebase';
 import { createTask } from '../services/taskService';
 import { assetService } from '../services/assetService';
-import type { Asset as AssetV2, AssetEvent, RepairLogEntry } from '../types/asset';
-import { ASSET_STATUS_CONFIG, CRITICALITY_CONFIG, getStatusConfig, getCriticalityConfig } from '../types/asset';
+import type { Asset as AssetV2, AssetEvent, RepairLogEntry, AssetStatus, AssetCriticality } from '../types/asset';
+import { getStatusConfig, getCriticalityConfig } from '../types/asset';
 import { showToast } from '../components/ui/Toast';
 import {
   AlertTriangle, ArrowLeft, CheckCircle2,
@@ -130,10 +130,14 @@ export default function AssetCardPage() {
   const [assetV2, setAssetV2] = useState<AssetV2 | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
-  const [editForm, setEditForm] = useState({
-    name: '', code: '', entityType: '', status: 'operational' as const,
-    criticality: 'medium' as const, manufacturer: '', model: '',
-    serialNumber: '', year: '' as string, location: '',
+  const [editForm, setEditForm] = useState<{
+    name: string; code: string; entityType: string; status: AssetStatus;
+    criticality: AssetCriticality; manufacturer: string; model: string;
+    serialNumber: string; year: string; location: string;
+  }>({
+    name: '', code: '', entityType: '', status: 'operational',
+    criticality: 'medium', manufacturer: '', model: '',
+    serialNumber: '', year: '', location: '',
   });
   const [eventsForm, setEventsForm] = useState<AssetEvent[]>([]);
   const [repairLogForm, setRepairLogForm] = useState<RepairLogEntry[]>([]);

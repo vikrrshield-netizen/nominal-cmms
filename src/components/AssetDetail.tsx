@@ -10,7 +10,7 @@ interface AssetDetailProps {
 
 export const AssetDetail = ({ asset, onClose, onReportIssue }: AssetDetailProps) => {
   const statusConfig = ASSET_STATUS_CONFIG[asset.status];
-  const categoryConfig = ASSET_CATEGORY_CONFIG[asset.category];
+  const categoryConfig = ASSET_CATEGORY_CONFIG[asset.category || 'other'];
   const criticalityConfig = CRITICALITY_CONFIG[asset.criticality];
   const room = ROOMS.find(r => r.id === asset.roomId);
   const building = BUILDINGS.find(b => b.id === asset.buildingId);

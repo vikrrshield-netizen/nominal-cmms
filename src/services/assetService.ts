@@ -12,7 +12,6 @@ import {
   deleteDoc,
   query,
   where,
-  orderBy,
   Timestamp,
 } from 'firebase/firestore';
 import type { Asset, AssetStatus } from '../types/asset';
