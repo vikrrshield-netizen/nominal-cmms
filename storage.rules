@@ -32,11 +32,17 @@ service firebase.storage {
       allow write: if isSignedIn() && request.auth.uid == userId;
     }
     
+    // Fault report photos
+    match /fault_photos/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
     // Temporary uploads
     match /temp/{userId}/{allPaths=**} {
       allow read, write: if isSignedIn() && request.auth.uid == userId;
     }
-    
+
     // Deny everything else
     match /{allPaths=**} {
       allow read, write: if false;

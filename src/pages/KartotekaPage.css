@@ -547,6 +547,13 @@
   background: rgba(59, 130, 246, 0.15);
 }
 
+.k-tree-action-delete {
+  color: #ef4444;
+}
+.k-tree-action-delete:hover {
+  background: rgba(239, 68, 68, 0.15);
+}
+
 /* Nested children container */
 .k-tree-children {
   /* no extra styling needed — indentation handled by paddingLeft */

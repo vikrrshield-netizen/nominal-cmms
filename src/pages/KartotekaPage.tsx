@@ -7,7 +7,7 @@ import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Building2, Search, Upload, Plus, X,
-  ChevronRight, ChevronDown, FileText, Loader2, Pencil,
+  ChevronRight, ChevronDown, FileText, Loader2, Pencil, Trash2,
 } from 'lucide-react';
 import { useAuthContext } from '../context/AuthContext';
 import { assetService } from '../services/assetService';
@@ -101,9 +101,10 @@ interface TreeNodeProps {
   onToggle: (id: string) => void;
   onDetail: (asset: Asset) => void;
   onAddChild: (parentId: string) => void;
+  onDelete: (asset: Asset) => void;
 }
 
-function TreeNode({ asset, allAssets, depth, expanded, onToggle, onDetail, onAddChild }: TreeNodeProps) {
+function TreeNode({ asset, allAssets, depth, expanded, onToggle, onDetail, onAddChild, onDelete }: TreeNodeProps) {
   const children = allAssets
     .filter((a) => a.parentId === asset.id)
     .sort((a, b) => a.name.localeCompare(b.name, 'cs'));
@@ -175,6 +176,15 @@ function TreeNode({ asset, allAssets, depth, expanded, onToggle, onDetail, onAdd
         >
           <FileText size={14} />
         </button>
+
+        {/* Action: Delete */}
+        <button
+          className="k-tree-action k-tree-action-delete"
+          onClick={(e) => { e.stopPropagation(); onDelete(asset); }}
+          title="Smazat"
+        >
+          <Trash2 size={14} />
+        </button>
       </div>
 
       {/* Children (recursive) */}
@@ -190,6 +200,7 @@ function TreeNode({ asset, allAssets, depth, expanded, onToggle, onDetail, onAdd
               onToggle={onToggle}
               onDetail={onDetail}
               onAddChild={onAddChild}
+              onDelete={onDelete}
             />
           ))}
         </div>
@@ -208,9 +219,10 @@ interface RootCardProps {
   onToggle: (id: string) => void;
   onDetail: (asset: Asset) => void;
   onAddChild: (parentId: string) => void;
+  onDelete: (asset: Asset) => void;
 }
 
-function RootCard({ asset, allAssets, expanded, onToggle, onDetail, onAddChild }: RootCardProps) {
+function RootCard({ asset, allAssets, expanded, onToggle, onDetail, onAddChild, onDelete }: RootCardProps) {
   const color = getEntityColor(asset.entityType);
   const children = allAssets
     .filter((a) => a.parentId === asset.id)
@@ -283,6 +295,14 @@ function RootCard({ asset, allAssets, expanded, onToggle, onDetail, onAddChild }
             >
               <FileText size={16} />
             </button>
+            <button
+              className="k-root-action-btn"
+              onClick={(e) => { e.stopPropagation(); onDelete(asset); }}
+              title="Smazat"
+              style={{ color: '#ef4444', borderColor: '#ef444430' }}
+            >
+              <Trash2 size={16} />
+            </button>
           </div>
         </div>
 
@@ -344,6 +364,7 @@ function RootCard({ asset, allAssets, expanded, onToggle, onDetail, onAddChild }
               onToggle={onToggle}
               onDetail={onDetail}
               onAddChild={onAddChild}
+              onDelete={onDelete}
             />
           ))}
         </div>
@@ -370,6 +391,9 @@ export default function KartotekaPage() {
   const [filter, setFilter] = useState<FilterKey>('all');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [showImport, setShowImport] = useState(false);
+
+  // ── Delete state ───
+  const [deleteTarget, setDeleteTarget] = useState<Asset | null>(null);
 
   // ── Create modal state ───
   const [showCreate, setShowCreate] = useState(false);
@@ -460,6 +484,29 @@ export default function KartotekaPage() {
     setCreateParentId(parentId); // THEN: set correct parentId
     setShowCreate(true);
   };
+
+  // ── Delete handler ───
+  const handleDelete = useCallback((asset: Asset) => {
+    const childCount = assets.filter((a) => a.parentId === asset.id).length;
+    if (childCount > 0) {
+      showToast(`Nelze smazat — má ${childCount} potomků. Nejdřív smaž potomky.`, 'error');
+      return;
+    }
+    setDeleteTarget(asset);
+  }, [assets]);
+
+  const confirmDelete = useCallback(async () => {
+    if (!deleteTarget || !tenantId) return;
+    try {
+      await assetService.delete(tenantId, deleteTarget.id);
+      showToast(`Smazáno: ${deleteTarget.name}`, 'success');
+      setDeleteTarget(null);
+      reloadAssets();
+    } catch (err) {
+      console.error('[Kartoteka] delete error:', err);
+      showToast('Chyba při mazání', 'error');
+    }
+  }, [deleteTarget, tenantId, reloadAssets]);
 
   // ── Toggle expand/collapse ───
   const handleToggle = useCallback((id: string) => {
@@ -670,6 +717,7 @@ export default function KartotekaPage() {
                   onToggle={handleToggle}
                   onDetail={handleDetail}
                   onAddChild={openCreateModal}
+                  onDelete={handleDelete}
                 />
               ))}
             </div>
@@ -684,6 +732,38 @@ export default function KartotekaPage() {
           onClose={() => setShowImport(false)}
           onImport={handleImport}
         />
+      )}
+
+      {/* ── Delete Confirm Modal ── */}
+      {deleteTarget && (
+        <div className="k-modal-overlay" onClick={() => setDeleteTarget(null)}>
+          <div className="k-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 380 }}>
+            <div className="k-modal-header">
+              <h2 className="k-modal-title">🗑️ Smazat položku?</h2>
+              <button className="k-modal-close" onClick={() => setDeleteTarget(null)}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="k-modal-body">
+              <p style={{ color: '#94a3b8', fontSize: '0.9rem', lineHeight: 1.5, margin: 0 }}>
+                Opravdu chcete smazat <strong style={{ color: '#f1f5f9' }}>{deleteTarget.name}</strong>?
+                Tato akce je nevratná.
+              </p>
+            </div>
+            <div className="k-modal-footer">
+              <button className="k-btn-cancel" onClick={() => setDeleteTarget(null)}>
+                Zrušit
+              </button>
+              <button
+                className="k-btn-save"
+                style={{ background: '#ef4444' }}
+                onClick={confirmDelete}
+              >
+                Smazat
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── Create Asset Modal ── */}
