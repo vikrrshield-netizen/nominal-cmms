@@ -14,6 +14,7 @@ import BuildingInspectionPage from './pages/BuildingInspectionPage';
 import TasksPage from './pages/TasksPage';
 import InventoryPage from './pages/InventoryPage';
 import FleetPage from './pages/FleetPage';
+import GearboxesPage from './pages/GearboxesPage';
 import RevisionsPage from './pages/RevisionsPage';
 import AssetCardPage from './pages/AssetCardPage';
 import CalendarPage from './pages/CalendarPage';
@@ -80,6 +81,7 @@ function ProtectedRoutes() {
       <Route path="/tasks" element={<TasksPage />} />
       <Route path="/inventory" element={<InventoryPage />} />
       <Route path="/fleet" element={<FleetPage />} />
+      <Route path="/gearboxes" element={<GearboxesPage />} />
       <Route path="/revisions" element={<RevisionsPage />} />
       <Route path="/asset/:assetId" element={<AssetCardPage />} />
       <Route path="/calendar" element={<CalendarPage />} />
