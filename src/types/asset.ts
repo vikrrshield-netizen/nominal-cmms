@@ -67,12 +67,24 @@ export interface Asset {
   notes?: string;
   image?: string;
   documents?: string[];
+  isDeleted?: boolean;
   createdAt?: string;
   updatedAt?: string;
   // Legacy fields (backward compat — used by AssetList, AssetDetail, sampleAssets)
   category?: string;
   roomId?: string;
   buildingId?: string;
+  floor?: string;
+  areaName?: string;
+  gearboxStatus?: 'in_stock' | 'installed' | 'service';
+  currentExtruderId?: string | null;
+  currentExtruderName?: string | null;
+  inventoryItemId?: string | null;
+  lastTemperatureC?: number | null;
+  lastTemperatureAt?: string | null;
+  lastGearboxPhotoUrl?: string | null;
+  gearboxWarningTemperatureC?: number | null;
+  gearboxCriticalTemperatureC?: number | null;
 }
 
 // Legacy category config (backward compat)

@@ -5,8 +5,13 @@ import type { WorkLog } from '../types/workLog';
 const COLLECTION = 'workLogs';
 
 export const addWorkLog = async (input: Omit<WorkLog, 'id' | 'createdAt'>): Promise<string> => {
+  const cleanInput = Object.fromEntries(
+    Object.entries(input)
+      .filter(([, value]) => value !== undefined)
+      .map(([key, value]) => [key, value instanceof Date ? Timestamp.fromDate(value) : value])
+  );
   const docRef = await addDoc(collection(db, COLLECTION), {
-    ...input,
+    ...cleanInput,
     createdAt: serverTimestamp(),
   });
   return docRef.id;

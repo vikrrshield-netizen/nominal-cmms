@@ -23,6 +23,8 @@ export type Permission =
   | 'wo.create' | 'wo.update' | 'wo.delete' | 'wo.read' | 'wo.approve' | 'wo.close' | 'wo.plan' | 'wo.assign'
   // Assets
   | 'asset.create' | 'asset.update' | 'asset.delete' | 'asset.read'
+  // Gearboxes
+  | 'gearbox.temperature.write' | 'gearbox.manage'
   // Inventory
   | 'inv.consume' | 'inv.restock' | 'inv.manage' | 'inv.approve' | 'inv.order'
   // Fleet
@@ -183,6 +185,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   SUPERADMIN: [
     'wo.create', 'wo.update', 'wo.delete', 'wo.read', 'wo.approve', 'wo.close', 'wo.plan', 'wo.assign',
     'asset.create', 'asset.update', 'asset.delete', 'asset.read',
+    'gearbox.temperature.write', 'gearbox.manage',
     'inv.consume', 'inv.restock', 'inv.manage', 'inv.order',
     'fleet.manage', 'fleet.read',
     'user.manage', 'user.read',
@@ -205,6 +208,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   UDRZBA: [
     'wo.create', 'wo.update', 'wo.read', 'wo.close',
     'asset.read', 'asset.update',
+    'gearbox.temperature.write', 'gearbox.manage',
     'inv.consume', 'inv.restock',
     'fleet.read',
     'report.read',
@@ -219,6 +223,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   VYROBA: [
     'wo.create', 'wo.read', 'wo.approve', 'wo.plan',
     'asset.read',
+    'gearbox.temperature.write',
     'zone.change',
     'weekly.modify',
     'report.read',
@@ -241,6 +246,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'wo.create',  // Nahlásit poruchu
     'wo.read',
     'asset.read',
+    'gearbox.temperature.write',
   ],
 };
 

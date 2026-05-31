@@ -32,6 +32,9 @@ export interface CreateTaskInput {
   type: TaskType;
   priority: TaskPriority;
   source?: TaskSource;
+  sourceRefType?: 'inspection_log' | 'manual' | 'asset' | 'work_log';
+  sourceRefId?: string;
+  inspectionLogId?: string;
   assetId?: string;
   assetName?: string;
   buildingId?: string;
@@ -113,6 +116,9 @@ export async function createTask(input: CreateTaskInput): Promise<string> {
 
   // Optional fields — only include if defined (Firestore rejects undefined)
   if (input.description) taskData.description = input.description;
+  if (input.sourceRefType) taskData.sourceRefType = input.sourceRefType;
+  if (input.sourceRefId) taskData.sourceRefId = input.sourceRefId;
+  if (input.inspectionLogId) taskData.inspectionLogId = input.inspectionLogId;
   if (input.assetId) taskData.assetId = input.assetId;
   if (input.assetName) taskData.assetName = input.assetName;
   if (input.buildingId) taskData.buildingId = input.buildingId;
