@@ -1,4 +1,4 @@
-import { collection, addDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp, limit } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import type { WorkLog } from '../types/workLog';
 
@@ -33,6 +33,30 @@ export const subscribeToWorkLogs = (
       ...doc.data(),
       createdAt: doc.data().createdAt instanceof Timestamp ? doc.data().createdAt.toDate() : new Date(),
     } as WorkLog));
+    callback(logs);
+  });
+};
+export const subscribeToRecentWorkLogs = (
+  callback: (logs: WorkLog[]) => void,
+  maxItems = 100
+): (() => void) => {
+  const q = query(
+    collection(db, COLLECTION),
+    orderBy('createdAt', 'desc'),
+    limit(maxItems)
+  );
+
+  return onSnapshot(q, (snapshot) => {
+    const logs: WorkLog[] = snapshot.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(),
+        performedAt: data.performedAt instanceof Timestamp ? data.performedAt.toDate() : undefined,
+        updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : undefined,
+      } as WorkLog;
+    });
     callback(logs);
   });
 };

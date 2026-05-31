@@ -19,6 +19,7 @@ import {
 import { useAuthContext } from '../context/AuthContext';
 import { assetService } from '../services/assetService';
 import { getGearboxStatus, getGearboxStatusLabel, isGearboxAsset, setGearboxStockStatus } from '../services/gearboxService';
+import { subscribeToRecentWorkLogs } from '../services/workLogService';
 import type { Asset } from '../types/asset';
 import type { GearboxStatus } from '../types/gearbox';
 import type { WorkLog } from '../types/workLog';
@@ -170,6 +171,7 @@ export default function GearboxesPage() {
   const canReportProblem = hasPermission('wo.create');
   const tenantId = user?.tenantId || 'main_firm';
   const [assets, setAssets] = useState<Asset[]>([]);
+  const [logs, setLogs] = useState<WorkLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<GearboxFilter>('all');
@@ -188,8 +190,11 @@ export default function GearboxesPage() {
       .finally(() => {
         if (alive) setLoading(false);
       });
+
+    const unsub = subscribeToRecentWorkLogs(setLogs, 500);
     return () => {
       alive = false;
+      unsub();
     };
   }, [tenantId]);
 
@@ -358,7 +363,7 @@ export default function GearboxesPage() {
             <GearboxCard
               key={asset.id}
               asset={asset}
-              logs={[]}
+              logs={relatedLogsForGearbox(asset, logs)}
               onOpen={() => navigate(`/asset/${asset.id}`, { state: { from: '/gearboxes' } })}
               onWorkLog={() => navigate('/work-diary?new=1')}
               canRepair={canLogRepair}
