@@ -491,6 +491,13 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
     }
 
+    // SHIFT_NOTES — předání směny z kiosku
+    match /shiftNotes/{docId} {
+      allow read: if hasPermission('shifts.view') || isOperator();
+      allow create: if (hasPermission('shifts.view') || isOperator()) && hasTimestamp();
+      allow update: if hasPermission('shifts.view') && hasTimestamp();
+      allow delete: if isSuperAdmin();
+    }
     // ═══════════════════════════════════════════
     // CATCH-ALL — deny everything else
     // ═══════════════════════════════════════════
