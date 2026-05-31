@@ -2,15 +2,15 @@
 // Nominal CMMS — Shift Planner: Weekly technician assignment
 
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import {
-  collection, doc, setDoc, onSnapshot, serverTimestamp, Timestamp,
+  collection, doc, setDoc, onSnapshot, serverTimestamp, Timestamp, query, orderBy, limit,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
 import {
   ArrowLeft, Loader2, ChevronLeft, ChevronRight,
-  Users, Sun, Sunset, Moon, Save,
+  Users, Sun, Sunset, Moon, Save, ClipboardList, AlertTriangle,
 } from 'lucide-react';
 import { showToast } from '../components/ui/Toast';
 
@@ -32,6 +32,14 @@ interface SimpleUser {
   id: string;
   displayName: string;
   role: string;
+}
+
+interface ShiftNote {
+  id: string;
+  text: string;
+  author: string;
+  priority: 'normal' | 'important';
+  createdAt: Date;
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -82,6 +90,15 @@ function formatWeekRange(monday: Date): string {
 // HOOKS
 // ═══════════════════════════════════════════════════════════════════
 
+function formatShiftNoteDate(date: Date): string {
+  return date.toLocaleString('cs-CZ', {
+    day: 'numeric',
+    month: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 function useTechnicians() {
   const [users, setUsers] = useState<SimpleUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -129,8 +146,44 @@ function useWeekPlan(weekId: string) {
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════
 
+function useShiftNotes() {
+  const [notes, setNotes] = useState<ShiftNote[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const notesQuery = query(collection(db, 'shiftNotes'), orderBy('createdAt', 'desc'), limit(20));
+    const unsub = onSnapshot(notesQuery, (snap) => {
+      setNotes(
+        snap.docs.map((docSnap) => {
+          const data = docSnap.data();
+          const createdAt = data.createdAt instanceof Timestamp
+            ? data.createdAt.toDate()
+            : data.createdAt?.toDate
+              ? data.createdAt.toDate()
+              : new Date();
+          return {
+            id: docSnap.id,
+            text: String(data.text || ''),
+            author: String(data.author || 'Kiosk'),
+            priority: data.priority === 'important' ? 'important' : 'normal',
+            createdAt,
+          };
+        })
+      );
+      setLoading(false);
+    }, () => {
+      setNotes([]);
+      setLoading(false);
+    });
+
+    return () => unsub();
+  }, []);
+
+  return { notes, loading };
+}
+
 export default function ShiftPlannerPage() {
-  const navigate = useNavigate();
+  const goBack = useBackNavigation('/');
   const { user, hasPermission } = useAuthContext();
   const canView = hasPermission('shifts.view');
 
@@ -139,6 +192,7 @@ export default function ShiftPlannerPage() {
 
   const { users: technicians, loading: loadingUsers } = useTechnicians();
   const { plan, loading: loadingPlan } = useWeekPlan(weekId);
+  const { notes: shiftNotes, loading: loadingShiftNotes } = useShiftNotes();
 
   // Local editable state
   const [assignments, setAssignments] = useState<Record<string, Record<string, ShiftType>>>({});
@@ -208,13 +262,15 @@ export default function ShiftPlannerPage() {
           <Users className="w-16 h-16 text-red-400 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-white mb-2">Přístup odepřen</h2>
           <p className="text-slate-400 mb-4">Nemáte oprávnění pro Plánování směn</p>
-          <button onClick={() => navigate('/')} className="px-6 py-2 bg-slate-700 text-white rounded-xl hover:bg-slate-600">Zpět</button>
+          <button onClick={() => goBack()} className="px-6 py-2 bg-slate-700 text-white rounded-xl hover:bg-slate-600">Zpět</button>
         </div>
       </div>
     );
   }
 
   const loading = loadingUsers || loadingPlan;
+  const latestShiftNote = shiftNotes[0];
+  const importantShiftNotes = shiftNotes.filter(note => note.priority === 'important').slice(0, 3);
 
   // Determine today's column highlight
   const today = new Date();
@@ -228,7 +284,7 @@ export default function ShiftPlannerPage() {
       <div className="bg-slate-800/80 backdrop-blur-sm border-b border-slate-700/50 px-4 py-4 sticky top-0 z-20">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
-            <button onClick={() => navigate('/')} className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition">
+            <button onClick={() => goBack()} className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition">
               <ArrowLeft className="w-5 h-5 text-slate-400" />
             </button>
             <div>
@@ -263,6 +319,74 @@ export default function ShiftPlannerPage() {
             Zpět na aktuální týden
           </button>
         )}
+      </div>
+
+      {/* Shift handover overview */}
+      <div className="max-w-3xl mx-auto px-4 pt-4">
+        <div className="rounded-2xl border border-indigo-500/25 bg-indigo-500/10 p-4">
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <div className="flex items-start gap-3">
+              <div className="w-11 h-11 rounded-xl bg-indigo-500/15 border border-indigo-400/30 flex items-center justify-center flex-shrink-0">
+                <ClipboardList className="w-5 h-5 text-indigo-200" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-white">Předání směny</h2>
+                <p className="text-sm text-indigo-100/80">Poslední zprávy z kiosku pro další směnu.</p>
+              </div>
+            </div>
+            {importantShiftNotes.length > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-red-500/20 border border-red-400/30 px-2 py-1 text-xs font-bold text-red-100">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                {importantShiftNotes.length}
+              </span>
+            )}
+          </div>
+
+          {loadingShiftNotes ? (
+            <div className="flex items-center gap-2 text-sm text-slate-300">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Načítám předání...
+            </div>
+          ) : shiftNotes.length === 0 ? (
+            <div className="rounded-xl border border-white/10 bg-slate-950/40 p-4 text-sm text-slate-400">
+              Zatím není zapsané žádné předání směny.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {latestShiftNote && (
+                <div className={`rounded-xl border p-4 ${latestShiftNote.priority === 'important' ? 'border-red-400/30 bg-red-500/10' : 'border-white/10 bg-slate-950/40'}`}>
+                  <div className="flex items-center justify-between gap-3 mb-1">
+                    <span className="text-sm font-bold text-white">{latestShiftNote.author}</span>
+                    <span className="text-xs text-slate-300">{formatShiftNoteDate(latestShiftNote.createdAt)}</span>
+                  </div>
+                  <p className="text-base text-slate-100 leading-snug">{latestShiftNote.text}</p>
+                  {latestShiftNote.priority === 'important' && (
+                    <span className="mt-2 inline-block rounded-full bg-red-500/20 px-2 py-1 text-xs font-bold text-red-100">Důležité</span>
+                  )}
+                </div>
+              )}
+
+              {shiftNotes.length > 1 && (
+                <details className="group">
+                  <summary className="cursor-pointer list-none rounded-xl border border-white/10 bg-slate-950/30 px-4 py-3 text-sm font-bold text-slate-200">
+                    Starší předání ({shiftNotes.length - 1})
+                  </summary>
+                  <div className="mt-2 space-y-2">
+                    {shiftNotes.slice(1).map(note => (
+                      <div key={note.id} className={`rounded-xl border p-3 ${note.priority === 'important' ? 'border-red-400/25 bg-red-500/10' : 'border-white/10 bg-slate-950/30'}`}>
+                        <div className="flex items-center justify-between gap-3 mb-1">
+                          <span className="text-xs font-bold text-white">{note.author}</span>
+                          <span className="text-xs text-slate-400">{formatShiftNoteDate(note.createdAt)}</span>
+                        </div>
+                        <p className="text-sm text-slate-200">{note.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Shift legend */}
