@@ -2,14 +2,16 @@
 // VIKRR — Asset Shield — Karta stroje / zařízení
 
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuthContext } from '../context/AuthContext';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import {
   useRevisions,
   TYPE_CONFIG as REV_TYPE,
   formatRevisionDate,
   daysUntilRevision,
 } from '../hooks/useRevisions';
+import { MAINTENANCE_EMPLOYEE_ROLES, useEmployeeDirectory } from '../hooks/useEmployeeDirectory';
 import {
   doc, getDoc, collection, query, where, orderBy, limit, onSnapshot,
   Timestamp,
@@ -25,10 +27,26 @@ import {
   Clock, Loader2, Shield, Wrench, X,
   ChevronRight, Settings, Building2, MapPin,
   Cog, PlusCircle, FileText, Filter, Printer, Edit3, Save, XCircle,
-  Calendar, Trash2, ExternalLink, Download, Table,
+  Calendar, Trash2, ExternalLink, Download, Table, Search,
+  Thermometer, Camera, PackageCheck, Link2,
 } from 'lucide-react';
 import MicButton from '../components/ui/MicButton';
 import { exportAssetCardPDF, exportAssetCardXLSX } from '../utils/exportAssetCard';
+import {
+  addGearboxTemperatureLog,
+  assignGearboxToExtruder,
+  getGearboxStatusLabel,
+  isExtruderAsset,
+  isGearboxAsset,
+  returnGearboxToStock,
+  subscribeGearboxInstallationEvents,
+  subscribeGearboxTemperatureLogs,
+} from '../services/gearboxService';
+import type { GearboxInstallationEvent, GearboxTemperatureLog } from '../types/gearbox';
+import { subscribeToRecentWorkLogs } from '../services/workLogService';
+import GearboxRepairModal from '../components/gearbox/GearboxRepairModal';
+import GearboxProblemModal from '../components/gearbox/GearboxProblemModal';
+import type { WorkLog } from '../types/workLog';
 
 // ═══════════════════════════════════════════
 // TYPES
@@ -40,6 +58,8 @@ interface Asset {
   code?: string;
   buildingId: string;
   areaName: string;
+  entityType?: string;
+  location?: string;
   floorId?: string;
   category?: string;
   manufacturer?: string;
@@ -103,15 +123,100 @@ const CATEGORY_ICONS: Record<string, { icon: typeof Wrench; color: string }> = {
   conveyor:   { icon: Cog, color: '#6366f1' },
   hvac:       { icon: Cog, color: '#0ea5e9' },
   electrical: { icon: Cog, color: '#f59e0b' },
+  gearbox:    { icon: Cog, color: '#8b5cf6' },
 };
+
+function getGearboxTemperatureState(asset: Partial<AssetV2> | null | undefined, temperature?: number | null) {
+  const value = typeof temperature === 'number' ? temperature : null;
+  const warning = asset?.gearboxWarningTemperatureC ?? 70;
+  const critical = asset?.gearboxCriticalTemperatureC ?? 85;
+  if (value == null) return { label: 'Bez měření', color: '#64748b', background: '#f8fafc', border: '#e2e8f0' };
+  if (value >= critical) return { label: 'Kritická teplota', color: '#b91c1c', background: '#fee2e2', border: '#fecaca' };
+  if (value >= warning) return { label: 'Varování', color: '#b45309', background: '#fef3c7', border: '#fde68a' };
+  return { label: 'V pořádku', color: '#047857', background: '#d1fae5', border: '#a7f3d0' };
+}
+
+function clampTemperature(value: number) {
+  return Math.max(20, Math.min(120, Math.round(value)));
+}
+
+function toDateOrNull(value: unknown): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  if (value instanceof Timestamp) return value.toDate();
+  if (typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') {
+    const date = value.toDate();
+    return date instanceof Date && !Number.isNaN(date.getTime()) ? date : null;
+  }
+  if (typeof value === 'string' || typeof value === 'number') {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  return null;
+}
+
+function formatHistoryDate(value: unknown): string {
+  const date = toDateOrNull(value);
+  return date ? date.toLocaleDateString('cs-CZ') : 'Bez data';
+}
+
+function historyTime(value: unknown): number {
+  return toDateOrNull(value)?.getTime() ?? 0;
+}
+
+function normalizeText(value: unknown): string {
+  return String(value ?? '').toLowerCase();
+}
 
 // ═══════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════
 
+function normalizeLookup(value: unknown): string {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function isRoomLikeAsset(asset: Asset): boolean {
+  const type = normalizeLookup(`${asset.entityType || ''} ${asset.category || ''}`);
+  return type.includes('mistnost') || type.includes('room');
+}
+
+function assetLocationAliases(asset: Asset): Set<string> {
+  const aliases = new Set<string>();
+  const building = normalizeLookup(String(asset.buildingId || '').replace(/^budova\s+/i, ''));
+  const roomSource = asset.areaName || (isRoomLikeAsset(asset) ? asset.name : '') || asset.location || '';
+  const room = normalizeLookup(roomSource);
+  const fullLocation = normalizeLookup(asset.location);
+
+  [room, fullLocation].filter(Boolean).forEach((value) => aliases.add(value));
+  if (building && room) {
+    aliases.add(`${building} ${room}`);
+    aliases.add(`budova ${building} ${room}`);
+  }
+  if (!room && building) {
+    aliases.add(building);
+    aliases.add(`budova ${building}`);
+  }
+  return aliases;
+}
+
+function logLocationFitsAsset(log: WorkLog, asset: Asset): boolean {
+  const logLocation = normalizeLookup(log.location);
+  if (!logLocation) return true;
+  return assetLocationAliases(asset).has(logLocation);
+}
+
 export default function AssetCardPage() {
   const { assetId } = useParams<{ assetId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user, hasPermission } = useAuthContext();
 
   const [asset, setAsset] = useState<Asset | null>(null);
@@ -123,9 +228,35 @@ export default function AssetCardPage() {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showRevisionModal, setShowRevisionModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<'info' | 'tasks' | 'revisions'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'history' | 'tasks' | 'revisions'>('history');
   const [stanoviste, setStanoviste] = useState('Expedice');
   const [prefilterSaving, setPrefilterSaving] = useState(false);
+  const [historySearch, setHistorySearch] = useState('');
+  const [historyType, setHistoryType] = useState<'all' | 'work' | 'repair' | 'event' | 'task' | 'revision'>('all');
+  const [allAssetsV2, setAllAssetsV2] = useState<AssetV2[]>([]);
+  const [workLogs, setWorkLogs] = useState<WorkLog[]>([]);
+  const [gearboxTemperatures, setGearboxTemperatures] = useState<GearboxTemperatureLog[]>([]);
+  const [gearboxEvents, setGearboxEvents] = useState<GearboxInstallationEvent[]>([]);
+  const [showGearboxAssign, setShowGearboxAssign] = useState(false);
+  const [repairOpen, setRepairOpen] = useState(false);
+  const [problemOpen, setProblemOpen] = useState(false);
+  const [showGearboxTemperature, setShowGearboxTemperature] = useState(false);
+  const [gearboxActionSaving, setGearboxActionSaving] = useState(false);
+  const [linkedToForm, setLinkedToForm] = useState<string[]>([]);
+  const [relationSearch, setRelationSearch] = useState('');
+  const navigationState = (location.state as { from?: string; backStack?: string[] } | null) || {};
+  const returnTo = navigationState.from || '/kartoteka';
+  const backStack = navigationState.backStack || [];
+  const goBackByHistory = useBackNavigation('/kartoteka');
+  const currentPath = `${location.pathname}${location.search}`;
+  const goBackOneStep = () => {
+    const previous = backStack[backStack.length - 1];
+    if (previous) {
+      navigate(previous, { state: { from: returnTo, backStack: backStack.slice(0, -1) } });
+      return;
+    }
+    goBackByHistory(returnTo);
+  };
 
   // ─── V2 Rodný list state ───
   const [assetV2, setAssetV2] = useState<AssetV2 | null>(null);
@@ -135,10 +266,12 @@ export default function AssetCardPage() {
     name: string; code: string; entityType: string; status: AssetStatus;
     criticality: AssetCriticality; manufacturer: string; model: string;
     serialNumber: string; year: string; location: string;
+    gearboxWarningTemperatureC: string; gearboxCriticalTemperatureC: string;
   }>({
     name: '', code: '', entityType: '', status: 'operational',
     criticality: 'medium', manufacturer: '', model: '',
     serialNumber: '', year: '', location: '',
+    gearboxWarningTemperatureC: '70', gearboxCriticalTemperatureC: '85',
   });
   const [eventsForm, setEventsForm] = useState<AssetEvent[]>([]);
   const [repairLogForm, setRepairLogForm] = useState<RepairLogEntry[]>([]);
@@ -149,6 +282,62 @@ export default function AssetCardPage() {
 
   const canCreateTask = hasPermission('tasks.create');
   const canEditAsset = hasPermission('assets.edit');
+  const canAssignGearbox = hasPermission('asset.update');
+  const canReportGearboxProblem = hasPermission('wo.create');
+  const isGearbox = isGearboxAsset(assetV2) || isGearboxAsset(asset ? {
+    name: asset.name,
+    code: asset.code,
+    category: asset.category,
+  } as Partial<AssetV2> : null);
+  const extruderOptions = useMemo(
+    () => allAssetsV2.filter((item) => item.id !== assetId && isExtruderAsset(item)),
+    [allAssetsV2, assetId]
+  );
+
+  // Deep-link akce z dashboardu: ?action=temp|assign otevře příslušný modal převodovky
+  useEffect(() => {
+    const action = searchParams.get('action');
+    if (!action || !isGearbox) return;
+    if (action === 'temp') setShowGearboxTemperature(true);
+    else if (action === 'assign' && canAssignGearbox) setShowGearboxAssign(true);
+    if (action === 'temp' || action === 'assign') {
+      const next = new URLSearchParams(searchParams);
+      next.delete('action');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, isGearbox, canAssignGearbox, setSearchParams]);
+  const linkedAssetIds = useMemo(() => {
+    const ids = new Set(assetV2?.linkedTo || []);
+    allAssetsV2.forEach((item) => {
+      if (item.linkedTo?.includes(assetId || '')) ids.add(item.id);
+    });
+    return Array.from(ids).filter((id) => id && id !== assetId);
+  }, [allAssetsV2, assetId, assetV2?.linkedTo]);
+  const linkedAssets = useMemo(
+    () => linkedAssetIds
+      .map((id) => allAssetsV2.find((item) => item.id === id))
+      .filter(Boolean) as AssetV2[],
+    [allAssetsV2, linkedAssetIds]
+  );
+  const relationOptions = useMemo(() => {
+    const q = relationSearch.trim().toLowerCase();
+    const selected = new Set(linkedToForm);
+    return allAssetsV2
+      .filter((item) => item.id !== assetId && !selected.has(item.id) && !item.isDeleted)
+      .filter((item) => {
+        const text = [
+          item.name,
+          item.code,
+          item.entityType,
+          item.buildingId ? `Budova ${item.buildingId}` : '',
+          item.areaName,
+          item.location,
+        ].filter(Boolean).join(' ').toLowerCase();
+        return !q || text.includes(q);
+      })
+      .sort((a, b) => a.name.localeCompare(b.name, 'cs'))
+      .slice(0, 8);
+  }, [allAssetsV2, assetId, linkedToForm, relationSearch]);
 
   // ─── PRINT ASSET PASSPORT ───
   const printAssetPassport = () => {
@@ -310,10 +499,13 @@ export default function AssetCardPage() {
           manufacturer: data.manufacturer || '', model: data.model || '',
           serialNumber: data.serialNumber || '', year: data.year ? String(data.year) : '',
           location: data.location || '',
+          gearboxWarningTemperatureC: String(data.gearboxWarningTemperatureC ?? 70),
+          gearboxCriticalTemperatureC: String(data.gearboxCriticalTemperatureC ?? 85),
         });
         setEventsForm(data.events || []);
         setRepairLogForm(data.repairLog || []);
         setDocumentsForm(data.documents || []);
+        setLinkedToForm(data.linkedTo || []);
         setLoadingAssetV2(false);
       })
       .catch((err) => {
@@ -321,6 +513,52 @@ export default function AssetCardPage() {
         setLoadingAssetV2(false);
       });
   }, [assetId, tenantId]);
+
+  useEffect(() => {
+    if (!tenantId) return;
+    assetService.getAll(tenantId)
+      .then(setAllAssetsV2)
+      .catch((err) => console.warn('[AssetCard] gearbox asset list:', err));
+  }, [tenantId]);
+
+  useEffect(() => {
+    if (!assetId || !isGearbox) return;
+    const unsubTemp = subscribeGearboxTemperatureLogs(assetId, setGearboxTemperatures);
+    const unsubEvents = subscribeGearboxInstallationEvents(assetId, setGearboxEvents);
+    return () => {
+      unsubTemp();
+      unsubEvents();
+    };
+  }, [assetId, isGearbox]);
+
+  const refreshAssetV2 = async () => {
+    if (!assetId) return;
+    const updated = await assetService.getById(tenantId, assetId);
+    setAssetV2(updated);
+    setAsset((prev) => prev ? {
+      ...prev,
+      name: updated.name,
+      code: updated.code,
+      areaName: updated.areaName || prev.areaName,
+      buildingId: updated.buildingId || prev.buildingId,
+      category: updated.category || updated.entityType || prev.category,
+      status: updated.status,
+    } : prev);
+  };
+
+  const handleReturnGearboxToStock = async () => {
+    if (!assetV2) return;
+    setGearboxActionSaving(true);
+    try {
+      await returnGearboxToStock({ tenantId, gearbox: assetV2, user });
+      await refreshAssetV2();
+      showToast('Převodovka vrácena do skladu', 'success');
+    } catch (err) {
+      console.error('[Gearbox] return to stock:', err);
+      showToast('Nepodařilo se vrátit převodovku do skladu', 'error');
+    }
+    setGearboxActionSaving(false);
+  };
 
   // ─── SAVE EDIT ───
   const handleSaveEdit = async () => {
@@ -334,13 +572,29 @@ export default function AssetCardPage() {
         model: editForm.model || null, serialNumber: editForm.serialNumber || null,
         year: editForm.year ? Number(editForm.year) : null,
         location: editForm.location || null,
+        gearboxWarningTemperatureC: editForm.gearboxWarningTemperatureC ? Number(editForm.gearboxWarningTemperatureC) : null,
+        gearboxCriticalTemperatureC: editForm.gearboxCriticalTemperatureC ? Number(editForm.gearboxCriticalTemperatureC) : null,
         events: eventsForm.filter(e => e.name.trim()),
         repairLog: repairLogForm.filter(e => e.description.trim()),
         documents: documentsForm.filter(d => d.trim()),
+        linkedTo: linkedToForm.filter((id) => id && id !== assetId),
       });
       const updated = await assetService.getById(tenantId, assetId);
       setAssetV2(updated);
+      setAsset((prev) => prev ? {
+        ...prev,
+        name: updated.name,
+        code: updated.code,
+        areaName: updated.areaName || prev.areaName,
+        buildingId: updated.buildingId || prev.buildingId,
+        category: updated.category || updated.entityType || prev.category,
+        status: updated.status,
+      } : prev);
       setIsEditing(false);
+      setActiveTab('history');
+      window.requestAnimationFrame(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
       showToast('Uloženo', 'success');
     } catch (err) {
       console.error('[AssetCard] save error:', err);
@@ -357,11 +611,14 @@ export default function AssetCardPage() {
       manufacturer: assetV2.manufacturer || '', model: assetV2.model || '',
       serialNumber: assetV2.serialNumber || '', year: assetV2.year ? String(assetV2.year) : '',
       location: assetV2.location || '',
+      gearboxWarningTemperatureC: String(assetV2.gearboxWarningTemperatureC ?? 70),
+      gearboxCriticalTemperatureC: String(assetV2.gearboxCriticalTemperatureC ?? 85),
     });
     setEventsForm(assetV2.events || []);
-    setRepairLogForm(assetV2.repairLog || []);
-    setDocumentsForm(assetV2.documents || []);
-    setIsEditing(false);
+      setRepairLogForm(assetV2.repairLog || []);
+      setDocumentsForm(assetV2.documents || []);
+      setLinkedToForm(assetV2.linkedTo || []);
+      setIsEditing(false);
   };
 
   // ─── EXPORT HANDLERS ───
@@ -408,6 +665,32 @@ export default function AssetCardPage() {
     return () => unsub();
   }, [assetId]);
 
+  // ─── LOAD WORK DIARY HISTORY ───
+  useEffect(() => {
+    if (!assetId || !asset) return;
+    const assetName = normalizeLookup(asset.name);
+    const roomCard = isRoomLikeAsset(asset);
+    const relatedIds = new Set(linkedAssetIds);
+    const relatedNames = new Set(linkedAssets.map((item) => normalizeLookup(item.name)).filter(Boolean));
+
+    return subscribeToRecentWorkLogs((logs) => {
+      setWorkLogs(
+        logs.filter((log) => {
+          if (log.assetId === assetId) return true;
+          if (log.assetId && relatedIds.has(log.assetId)) return true;
+          if (log.assetId) return false;
+
+          const logAssetName = normalizeLookup(log.assetName);
+          const locationFits = logLocationFitsAsset(log, asset);
+          if (assetName && logAssetName === assetName && locationFits) return true;
+          if (logAssetName && relatedNames.has(logAssetName) && locationFits) return true;
+          if (roomCard && locationFits) return true;
+          return false;
+        })
+      );
+    }, 300);
+  }, [asset, assetId, linkedAssetIds, linkedAssets]);
+
   // Revision alerts
   const expiredRevisions = useMemo(
     () => revisions.filter((r) => r.status === 'expired'),
@@ -434,6 +717,113 @@ export default function AssetCardPage() {
     return [...log].sort((a, b) => b.date.localeCompare(a.date));
   }, [assetV2?.repairLog]);
 
+  const historyItems = useMemo(() => {
+    const repairItems = sortedRepairLog.map((entry) => {
+      const partsText = entry.parts?.length ? `Dily: ${entry.parts.join(', ')}` : '';
+      const costText = entry.cost ? `${entry.cost.toLocaleString('cs-CZ')} Kc` : '';
+      return {
+        id: `repair-${entry.id}`,
+        type: 'repair' as const,
+        typeLabel: 'Oprava',
+        title: entry.description || 'Oprava bez popisu',
+        detail: [entry.technicianName, partsText, costText].filter(Boolean).join(' | '),
+        dateValue: entry.date,
+        time: historyTime(entry.date),
+        color: '#f97316',
+      };
+    });
+
+    const eventItems = sortedEvents.map((evt) => ({
+      id: `event-${evt.id}`,
+      type: 'event' as const,
+      typeLabel: 'Udalost',
+      title: evt.name || 'Udalost bez nazvu',
+      detail: [evt.eventType, evt.instructions, evt.lastDate ? `Posledni: ${formatHistoryDate(evt.lastDate)}` : '', evt.nextDate ? `Pristi: ${formatHistoryDate(evt.nextDate)}` : ''].filter(Boolean).join(' | '),
+      dateValue: evt.nextDate || evt.lastDate,
+      time: historyTime(evt.nextDate || evt.lastDate),
+      color: '#3b82f6',
+    }));
+
+    const taskItems = tasks.map((task) => ({
+      id: `task-${task.id}`,
+      type: 'task' as const,
+      typeLabel: 'Ukol',
+      title: task.title || 'Ukol bez nazvu',
+      detail: [task.priority, task.status, task.assignedToName ? `Resi: ${task.assignedToName}` : ''].filter(Boolean).join(' | '),
+      dateValue: task.createdAt,
+      time: historyTime(task.createdAt),
+      color: '#22c55e',
+    }));
+
+    const workLogItems = workLogs.map((log) => {
+      const minutes = log.hoursWorked ? Math.round(log.hoursWorked * 60) : 0;
+      const workers = Array.isArray(log.workerNames) && log.workerNames.length
+        ? log.workerNames.join(', ')
+        : log.userName;
+      return {
+        id: `work-${log.id}`,
+        type: 'work' as const,
+        typeLabel: 'Deník',
+        title: log.taskTitle || log.assetName || 'Zápis práce',
+        detail: [workers, minutes ? `${minutes} min` : '', log.location, log.content].filter(Boolean).join(' | '),
+        dateValue: log.performedAt || log.createdAt,
+        time: historyTime(log.performedAt || log.createdAt),
+        color: '#14b8a6',
+        linkWarning: log.assetId ? '' : 'Napojeno podle textu. Pro audit je lepsi otevrit denik praci a napojit zapis na kartu.',
+      };
+    });
+
+    const revisionItems = revisions.map((rev: any) => ({
+      id: `revision-${rev.id}`,
+      type: 'revision' as const,
+      typeLabel: 'Revize',
+      title: rev.title || 'Revize bez nazvu',
+      detail: [rev.status, rev.revisionCompany, rev.certificateNumber].filter(Boolean).join(' | '),
+      dateValue: rev.nextRevisionDate || rev.lastRevisionDate,
+      time: historyTime(rev.nextRevisionDate || rev.lastRevisionDate),
+      color: rev.status === 'expired' ? '#ef4444' : rev.status === 'expiring' ? '#f59e0b' : '#14b8a6',
+    }));
+
+    const gearboxTemperatureItems = gearboxTemperatures.map((log) => ({
+      id: `gearbox-temp-${log.id}`,
+      type: 'event' as const,
+      typeLabel: 'Teplota',
+      title: `${log.temperatureC} °C`,
+      detail: [log.extruderName ? `Extruder: ${log.extruderName}` : '', log.userName, log.note, log.photoUrl ? 'Fotka priložena' : ''].filter(Boolean).join(' | '),
+      dateValue: log.measuredAt,
+      time: historyTime(log.measuredAt),
+      color: '#0ea5e9',
+    }));
+
+    const gearboxEventItems = gearboxEvents.map((evt) => {
+      const title =
+        evt.action === 'installed' ? `Namontováno na ${evt.extruderName || 'extruder'}`
+          : evt.action === 'service' ? 'Označeno: v opravě'
+            : evt.action === 'ready_for_stock' ? 'Označeno: připravená ve skladu'
+              : 'Vráceno do skladu';
+      const color =
+        evt.action === 'installed' ? '#8b5cf6'
+          : evt.action === 'service' ? '#f59e0b'
+            : '#22c55e';
+      return {
+        id: `gearbox-event-${evt.id}`,
+        type: 'event' as const,
+        typeLabel: 'Přesun',
+        title,
+        detail: [evt.previousExtruderName ? `Předtím: ${evt.previousExtruderName}` : '', evt.userName, evt.note].filter(Boolean).join(' | '),
+        dateValue: evt.performedAt,
+        time: historyTime(evt.performedAt),
+        color,
+      };
+    });
+
+    const q = normalizeText(historySearch.trim());
+    return [...workLogItems, ...repairItems, ...eventItems, ...gearboxTemperatureItems, ...gearboxEventItems, ...taskItems, ...revisionItems]
+      .filter((item) => historyType === 'all' || item.type === historyType)
+      .filter((item) => !q || normalizeText(`${item.typeLabel} ${item.title} ${item.detail} ${formatHistoryDate(item.dateValue)}`).includes(q))
+      .sort((a, b) => b.time - a.time);
+  }, [gearboxEvents, gearboxTemperatures, historySearch, historyType, revisions, sortedEvents, sortedRepairLog, tasks, workLogs]);
+
   // ─── LOADING ───
   if (loadingAsset || loadingAssetV2) {
     return (
@@ -448,7 +838,7 @@ export default function AssetCardPage() {
       <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center gap-4">
         <Settings className="w-16 h-16 text-slate-600" />
         <h2 className="text-xl font-bold text-slate-400">Zařízení nenalezeno</h2>
-        <button onClick={() => navigate(-1)} className="text-blue-400 font-medium">
+        <button onClick={goBackOneStep} className="text-blue-400 font-medium">
           ← Zpět
         </button>
       </div>
@@ -485,12 +875,12 @@ export default function AssetCardPage() {
             Dashboard
           </button>
           <ChevronRight className="w-4 h-4 text-slate-600" />
-          <button onClick={() => navigate('/map')} className="hover:text-blue-400 transition">
-            Mapa
+          <button onClick={() => navigate('/kartoteka')} className="hover:text-blue-400 transition">
+            Kartotéka
           </button>
           <ChevronRight className="w-4 h-4 text-slate-600" />
           <button
-            onClick={() => navigate('/map')}
+            onClick={() => navigate('/kartoteka')}
             className="hover:text-blue-400 transition flex items-center gap-1"
           >
             <Building2 className="w-3.5 h-3.5" />
@@ -512,7 +902,7 @@ export default function AssetCardPage() {
         {/* Header */}
         <div className="flex items-center gap-4 mb-4">
           <button
-            onClick={() => navigate(-1)}
+            onClick={goBackOneStep}
             className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white transition flex-shrink-0"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -576,7 +966,7 @@ export default function AssetCardPage() {
             className="flex-1 py-3 bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-indigo-500/25 transition active:scale-[0.97] min-h-[48px]"
           >
             <FileText className="w-5 h-5" />
-            Pasport
+            Detaily
           </button>
           {/* Export dropdown */}
           <div className="relative" style={{ flex: '0 0 auto' }}>
@@ -635,6 +1025,35 @@ export default function AssetCardPage() {
               Zapsat revizi
             </button>
           )}
+          {isGearbox && canEditAsset && (
+            <button
+              onClick={() => setShowGearboxTemperature(true)}
+              className="flex-1 py-3 bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-cyan-500/25 transition active:scale-[0.97] min-h-[48px]"
+            >
+              <Thermometer className="w-5 h-5" />
+              Teplota
+            </button>
+          )}
+          {isGearbox && canAssignGearbox && (
+            <button
+              onClick={() => setShowGearboxAssign(true)}
+              disabled={gearboxActionSaving}
+              className="flex-1 py-3 bg-violet-500/15 border border-violet-500/30 text-violet-300 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-violet-500/25 transition active:scale-[0.97] min-h-[48px] disabled:opacity-50"
+            >
+              <Cog className="w-5 h-5" />
+              Přiřadit
+            </button>
+          )}
+          {isGearbox && canAssignGearbox && assetV2?.currentExtruderId && (
+            <button
+              onClick={handleReturnGearboxToStock}
+              disabled={gearboxActionSaving}
+              className="flex-1 py-3 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-500/25 transition active:scale-[0.97] min-h-[48px] disabled:opacity-50"
+            >
+              <PackageCheck className="w-5 h-5" />
+              Sklad
+            </button>
+          )}
           {asset.category === 'extruder' && canCreateTask && (
             <button
               onClick={handlePrefilterChange}
@@ -657,7 +1076,8 @@ export default function AssetCardPage() {
         {/* Tabs */}
         <div className="flex gap-1 mb-4 border-b border-white/10 pb-2">
           {([
-            { key: 'info' as const, label: 'Pasport' },
+            { key: 'history' as const, label: `Historie (${historyItems.length})` },
+            { key: 'info' as const, label: 'Detaily' },
             { key: 'tasks' as const, label: `Úkoly (${tasks.length})` },
             { key: 'revisions' as const, label: `Revize (${revisions.length})`, alert: expiredRevisions.length > 0 },
           ]).map((tab) => (
@@ -714,11 +1134,6 @@ export default function AssetCardPage() {
                     </div>
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
-                    {assetV2?.entityType && (
-                      <span style={{ fontSize: 12, fontWeight: 600, padding: '4px 12px', borderRadius: 20, background: '#f1f5f9', color: '#64748b' }}>
-                        {assetV2.entityType}
-                      </span>
-                    )}
                     <span style={{
                       fontSize: 12, fontWeight: 600, padding: '4px 12px', borderRadius: 20,
                       background: (getStatusConfig(assetV2?.status || asset.status as any).color === 'bg-green-500' ? '#dcfce7' : getStatusConfig(assetV2?.status || asset.status as any).color === 'bg-amber-500' ? '#fef3c7' : getStatusConfig(assetV2?.status || asset.status as any).color === 'bg-red-500' ? '#fee2e2' : '#f1f5f9'),
@@ -744,7 +1159,7 @@ export default function AssetCardPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   <RLField label="Název" value={editForm.name} onChange={(v) => setEditForm({ ...editForm, name: v })} />
                   <RLField label="Kód" value={editForm.code} onChange={(v) => setEditForm({ ...editForm, code: v })} placeholder="např. AST-001" />
-                  <RLField label="Typ entity" value={editForm.entityType} onChange={(v) => setEditForm({ ...editForm, entityType: v })} placeholder="např. Stroj, Budova, Místnost" />
+                  <RLField label="Druh položky" value={editForm.entityType} onChange={(v) => setEditForm({ ...editForm, entityType: v })} placeholder="např. Stroj, Budova, Místnost" />
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                     <RLSelect
                       label="Stav"
@@ -769,9 +1184,226 @@ export default function AssetCardPage() {
                       onChange={(v) => setEditForm({ ...editForm, criticality: v as any })}
                     />
                   </div>
+                  {isGearbox && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                      <RLField
+                        label="Varování od °C"
+                        type="number"
+                        value={editForm.gearboxWarningTemperatureC}
+                        onChange={(v) => setEditForm({ ...editForm, gearboxWarningTemperatureC: v })}
+                        placeholder="70"
+                      />
+                      <RLField
+                        label="Kritická od °C"
+                        type="number"
+                        value={editForm.gearboxCriticalTemperatureC}
+                        onChange={(v) => setEditForm({ ...editForm, gearboxCriticalTemperatureC: v })}
+                        placeholder="85"
+                      />
+                    </div>
+                  )}
                 </div>
               )}
             </div>
+
+            <div style={{ background: '#fff', borderRadius: 24, padding: 24, border: '1px solid #f1f5f9', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 16 }}>
+                <div>
+                  <h3 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8', margin: 0 }}>Přiřazeno k</h3>
+                  <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>Vazby na související místnosti, stroje nebo zařízení</div>
+                </div>
+                <Link2 size={20} style={{ color: '#64748b' }} />
+              </div>
+
+              {!isEditing ? (
+                linkedAssets.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '24px 0', color: '#94a3b8', fontSize: 14 }}>
+                    Zatím není přiřazeno k jiné kartě
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {linkedAssets.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => navigate(`/asset/${item.id}`, {
+                          state: {
+                            from: returnTo,
+                            backStack: [...backStack, currentPath],
+                          },
+                        })}
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', background: '#f8fafc', borderRadius: 16, border: '1px solid #f1f5f9', cursor: 'pointer', textAlign: 'left' }}
+                      >
+                        <div style={{ width: 36, height: 36, borderRadius: 12, background: '#dbeafe', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <Link2 size={17} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</div>
+                          <div style={{ fontSize: 12, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {[item.code, item.entityType, item.buildingId ? `Budova ${item.buildingId}` : '', item.areaName || item.location].filter(Boolean).join(' - ')}
+                          </div>
+                        </div>
+                        <ChevronRight size={16} style={{ color: '#94a3b8', flexShrink: 0 }} />
+                      </button>
+                    ))}
+                  </div>
+                )
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <label style={{ display: 'block' }}>
+                    <span style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>Najít kartu a přiřadit</span>
+                    <input
+                      value={relationSearch}
+                      onChange={(e) => setRelationSearch(e.target.value)}
+                      placeholder="např. extruder, kotelna, převodovka..."
+                      style={{ width: '100%', minHeight: 44, padding: '0 14px', borderRadius: 12, border: '1px solid #e2e8f0', background: '#f8fafc', color: '#0f172a', fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
+                    />
+                  </label>
+                  {relationOptions.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 260, overflowY: 'auto' }}>
+                      {relationOptions.map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => {
+                            setLinkedToForm((current) => Array.from(new Set([...current, item.id])));
+                            setRelationSearch('');
+                          }}
+                          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0', cursor: 'pointer', textAlign: 'left' }}
+                        >
+                          <PlusCircle size={16} style={{ color: '#2563eb', flexShrink: 0 }} />
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</div>
+                            <div style={{ fontSize: 11, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {[item.code, item.entityType, item.buildingId ? `Budova ${item.buildingId}` : '', item.areaName || item.location].filter(Boolean).join(' - ')}
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {linkedToForm.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingTop: 6 }}>
+                      {linkedToForm.map((linkedId) => {
+                        const item = allAssetsV2.find((candidate) => candidate.id === linkedId);
+                        return (
+                          <div key={linkedId} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, background: '#eff6ff', border: '1px solid #bfdbfe' }}>
+                            <Link2 size={16} style={{ color: '#2563eb', flexShrink: 0 }} />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item?.name || linkedId}</div>
+                              <div style={{ fontSize: 11, color: '#64748b' }}>{item ? [item.code, item.entityType].filter(Boolean).join(' - ') : 'Uložená vazba'}</div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setLinkedToForm((current) => current.filter((id) => id !== linkedId))}
+                              style={{ width: 32, height: 32, borderRadius: 10, border: '1px solid #fecaca', background: '#fff', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                            >
+                              <X size={15} />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {isGearbox && assetV2 && (
+              <div style={{ background: '#fff', borderRadius: 24, padding: 24, border: '1px solid #bae6fd', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+                {(() => {
+                  const tempState = getGearboxTemperatureState(assetV2, assetV2.lastTemperatureC);
+                  return (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 16 }}>
+                  <div>
+                    <h3 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#0369a1', margin: 0 }}>Převodovka</h3>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', marginTop: 6 }}>{getGearboxStatusLabel(assetV2)}</div>
+                    <div style={{ fontSize: 14, color: '#64748b', marginTop: 4 }}>
+                      {assetV2.currentExtruderName ? `Aktuálně v extruderu: ${assetV2.currentExtruderName}` : 'Aktuálně ve skladu ND'}
+                    </div>
+                    <div style={{ fontSize: 12, color: '#64748b', marginTop: 8 }}>
+                      Limity: varování od {assetV2.gearboxWarningTemperatureC ?? 70} °C, kritická od {assetV2.gearboxCriticalTemperatureC ?? 85} °C
+                    </div>
+                  </div>
+                  {assetV2.lastTemperatureC != null && (
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: 28, fontWeight: 800, color: tempState.color }}>{assetV2.lastTemperatureC} °C</div>
+                      <div style={{ display: 'inline-flex', marginTop: 4, padding: '4px 8px', borderRadius: 999, fontSize: 11, fontWeight: 800, color: tempState.color, background: tempState.background, border: `1px solid ${tempState.border}` }}>
+                        {tempState.label}
+                      </div>
+                      <div style={{ fontSize: 11, color: '#64748b' }}>{assetV2.lastTemperatureAt ? formatHistoryDate(assetV2.lastTemperatureAt) : 'poslední teplota'}</div>
+                    </div>
+                  )}
+                </div>
+                  );
+                })()}
+                <div style={{ display: 'grid', gridTemplateColumns: canAssignGearbox ? 'repeat(3, minmax(0, 1fr))' : '1fr', gap: 8 }}>
+                  {canAssignGearbox && (
+                  <button type="button" onClick={() => setShowGearboxAssign(true)} style={{ minHeight: 44, borderRadius: 14, border: '1px solid #ddd6fe', background: '#f5f3ff', color: '#6d28d9', fontWeight: 700 }}>
+                    Přiřadit k extruderu
+                  </button>
+                  )}
+                  <button type="button" onClick={() => setShowGearboxTemperature(true)} style={{ minHeight: 44, borderRadius: 14, border: '1px solid #bae6fd', background: '#f0f9ff', color: '#0369a1', fontWeight: 700 }}>
+                    Zapsat teplotu
+                  </button>
+                  {canAssignGearbox && (
+                  <button type="button" onClick={handleReturnGearboxToStock} disabled={!assetV2.currentExtruderId || gearboxActionSaving} style={{ minHeight: 44, borderRadius: 14, border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#15803d', fontWeight: 700, opacity: !assetV2.currentExtruderId ? 0.55 : 1 }}>
+                    Vrátit do skladu
+                  </button>
+                  )}
+                </div>
+                {canReportGearboxProblem && (
+                  <button
+                    type="button"
+                    onClick={() => setProblemOpen(true)}
+                    style={{ marginTop: 8, minHeight: 44, width: '100%', borderRadius: 14, border: '1px solid #fecaca', background: '#fef2f2', color: '#b91c1c', fontWeight: 700 }}
+                  >
+                    Nahlásit problém
+                  </button>
+                )}
+                {canAssignGearbox && (
+                  <button
+                    type="button"
+                    onClick={() => setRepairOpen(true)}
+                    style={{ marginTop: 8, minHeight: 44, width: '100%', borderRadius: 14, border: '1px solid #fcd34d', background: '#fffbeb', color: '#b45309', fontWeight: 700 }}
+                  >
+                    Zapsat opravu
+                  </button>
+                )}
+                {gearboxTemperatures.length > 0 && (
+                  <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {gearboxTemperatures.slice(0, 3).map((log) => (
+                      <div key={log.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: 12, borderRadius: 14, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                        <div>
+                          <div style={{ fontWeight: 700, color: '#0f172a' }}>{log.temperatureC} °C</div>
+                          <div style={{ fontSize: 12, color: '#64748b' }}>{formatHistoryDate(log.measuredAt)} · {log.userName}</div>
+                          {log.note && <div style={{ fontSize: 12, color: '#475569', marginTop: 3 }}>{log.note}</div>}
+                        </div>
+                        {log.photoUrl && <a href={log.photoUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#0284c7', fontWeight: 700, fontSize: 12 }}>Foto</a>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {repairOpen && assetV2 && (
+              <GearboxRepairModal
+                asset={assetV2}
+                user={user}
+                onClose={() => setRepairOpen(false)}
+                onSaved={() => { setRepairOpen(false); setActiveTab('history'); }}
+              />
+            )}
+
+            {problemOpen && assetV2 && (
+              <GearboxProblemModal
+                asset={assetV2}
+                user={user}
+                onClose={() => setProblemOpen(false)}
+                onSaved={() => { setProblemOpen(false); setActiveTab('tasks'); }}
+              />
+            )}
 
             {/* ═══ SEKCE 2: TECHNICAL SHEET (Apple-style) ═══ */}
             <div style={{ background: '#fff', borderRadius: 24, padding: 24, border: '1px solid #f1f5f9', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
@@ -1357,6 +1989,84 @@ export default function AssetCardPage() {
         )}
 
         {/* ═══ TAB: TASKS ═══ */}
+        {activeTab === 'history' && (
+          <div className="space-y-3">
+            <div className="bg-slate-800/40 rounded-2xl p-4 border border-slate-700/30">
+              <div className="flex items-center gap-2 bg-slate-900/70 border border-white/10 rounded-xl px-3 mb-3">
+                <Search className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                <input
+                  value={historySearch}
+                  onChange={(e) => setHistorySearch(e.target.value)}
+                  placeholder="Hledat v historii: filtr, lozisko, jmeno technika..."
+                  className="w-full bg-transparent py-3 text-sm text-white placeholder-slate-600 outline-none"
+                />
+                {historySearch && (
+                  <button onClick={() => setHistorySearch('')} className="text-slate-500 hover:text-white">
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-1">
+                {([
+                  { key: 'all', label: 'Vse' },
+                  { key: 'work', label: 'Denik' },
+                  { key: 'repair', label: 'Opravy' },
+                  { key: 'event', label: 'Udalosti' },
+                  { key: 'task', label: 'Ukoly' },
+                  { key: 'revision', label: 'Revize' },
+                ] as const).map((item) => (
+                  <button
+                    key={item.key}
+                    onClick={() => setHistoryType(item.key)}
+                    className={`min-h-[40px] rounded-lg text-[11px] font-bold border transition ${
+                      historyType === item.key
+                        ? 'bg-orange-500/20 text-orange-300 border-orange-500/30'
+                        : 'bg-white/5 text-slate-500 border-white/10'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {historyItems.length === 0 ? (
+              <div className="text-center py-16 bg-slate-800/30 border border-slate-700/30 rounded-2xl">
+                <Clock className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                <p className="text-slate-500">Nic jsem v historii nenasel</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {historyItems.map((item) => (
+                  <div key={item.id} className="bg-slate-800/40 rounded-xl border border-slate-700/30 p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0" style={{ background: item.color }} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full" style={{ background: `${item.color}22`, color: item.color }}>
+                            {item.typeLabel}
+                          </span>
+                          <span className="text-[11px] text-slate-500">{formatHistoryDate(item.dateValue)}</span>
+                        </div>
+                        <div className="text-sm font-semibold text-white leading-snug">{item.title}</div>
+                        {item.detail && (
+                          <div className="text-xs text-slate-400 mt-1 leading-relaxed">{item.detail}</div>
+                        )}
+                        {'linkWarning' in item && item.linkWarning && (
+                          <div className="mt-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-[11px] font-semibold text-amber-200">
+                            {item.linkWarning}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {activeTab === 'tasks' && (
           <>
             {loadingTasks ? (
@@ -1509,6 +2219,51 @@ export default function AssetCardPage() {
           onLog={logRevision}
         />
       )}
+
+      {showGearboxAssign && assetV2 && (
+        <GearboxAssignModal
+          gearbox={assetV2}
+          extruders={extruderOptions}
+          saving={gearboxActionSaving}
+          onClose={() => setShowGearboxAssign(false)}
+          onAssign={async (extruder, note) => {
+            setGearboxActionSaving(true);
+            try {
+              await assignGearboxToExtruder({ tenantId, gearbox: assetV2, extruder, user, note });
+              await refreshAssetV2();
+              setShowGearboxAssign(false);
+              showToast('Převodovka přiřazena k extruderu', 'success');
+            } catch (err) {
+              console.error('[Gearbox] assign:', err);
+              showToast('Nepodařilo se přiřadit převodovku', 'error');
+            }
+            setGearboxActionSaving(false);
+          }}
+        />
+      )}
+
+      {showGearboxTemperature && assetV2 && (
+        <GearboxTemperatureModal
+          gearbox={assetV2}
+          user={user}
+          saving={gearboxActionSaving}
+          onClose={() => setShowGearboxTemperature(false)}
+          onSave={async ({ temperatureC, measuredAt, note, photoFile }) => {
+            setGearboxActionSaving(true);
+            try {
+              await addGearboxTemperatureLog({ tenantId, gearbox: assetV2, user, temperatureC, measuredAt, note, photoFile });
+              await refreshAssetV2();
+              setShowGearboxTemperature(false);
+              setActiveTab('history');
+              showToast('Teplota převodovky zapsána', 'success');
+            } catch (err) {
+              console.error('[Gearbox] temperature:', err);
+              showToast('Nepodařilo se zapsat teplotu', 'error');
+            }
+            setGearboxActionSaving(false);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -1536,13 +2291,6 @@ function InfoBox({ label, value, icon, highlight }: {
 // FAULT MODAL (Nahlásit poruchu — dark theme)
 // ═══════════════════════════════════════════
 
-const ASSIGNEE_OPTIONS = [
-  { id: 'filip', name: 'Filip Novák' },
-  { id: 'zdenek', name: 'Zdeněk Mička' },
-  { id: 'petr', name: 'Petr Volf' },
-  { id: 'udrzba', name: 'Údržba (tým)' },
-];
-
 function FaultModal({ asset, user, onClose, onCreated }: {
   asset: Asset; user: any; onClose: () => void; onCreated: () => void;
 }) {
@@ -1551,6 +2299,11 @@ function FaultModal({ asset, user, onClose, onCreated }: {
   const [priority, setPriority] = useState('P2');
   const [assignee, setAssignee] = useState('');
   const [saving, setSaving] = useState(false);
+  const assignees = useEmployeeDirectory({
+    tenantId: user?.tenantId || 'main_firm',
+    roles: MAINTENANCE_EMPLOYEE_ROLES,
+  });
+  const selectedAssignee = assignees.find((item) => item.id === assignee);
 
   const handleSubmit = async () => {
     if (!title.trim()) return;
@@ -1566,7 +2319,8 @@ function FaultModal({ asset, user, onClose, onCreated }: {
         assetName: asset.name,
         buildingId: asset.buildingId,
         assigneeId: assignee || '',
-        assigneeName: ASSIGNEE_OPTIONS.find(a => a.id === assignee)?.name || '',
+        assigneeName: selectedAssignee?.displayName || '',
+        assignedWorkerNames: selectedAssignee ? [selectedAssignee.displayName] : undefined,
         createdById: user?.id || 'unknown',
         createdByName: user?.displayName || 'Neznámý',
       });
@@ -1632,8 +2386,13 @@ function FaultModal({ asset, user, onClose, onCreated }: {
 
       <div className="mb-4">
         <div className="text-sm font-medium text-slate-400 mb-2">Přiřadit řešitele</div>
-        <div className="grid grid-cols-2 gap-2">
-          {ASSIGNEE_OPTIONS.map((a) => (
+        {assignees.length === 0 ? (
+          <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-400">
+            V administraci zatím není aktivní pracovník údržby.
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            {assignees.map((a) => (
             <button
               key={a.id}
               onClick={() => setAssignee(assignee === a.id ? '' : a.id)}
@@ -1646,12 +2405,13 @@ function FaultModal({ asset, user, onClose, onCreated }: {
               <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
                 assignee === a.id ? 'bg-blue-500/30 text-blue-300' : 'bg-slate-600 text-slate-400'
               }`}>
-                {a.name.split(' ').map(w => w[0]).join('')}
+                {a.displayName.split(' ').map(w => w[0]).join('')}
               </div>
-              {a.name}
+              {a.displayName}
             </button>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <button
@@ -1870,6 +2630,190 @@ function RevisionLogModal({ revisions, onClose, onLog }: {
 // ═══════════════════════════════════════════
 // MODAL SHELL (sdílený wrapper — dark glassmorphism)
 // ═══════════════════════════════════════════
+
+function GearboxAssignModal({ gearbox, extruders, saving, onClose, onAssign }: {
+  gearbox: AssetV2;
+  extruders: AssetV2[];
+  saving: boolean;
+  onClose: () => void;
+  onAssign: (extruder: AssetV2, note: string) => Promise<void>;
+}) {
+  const [extruderId, setExtruderId] = useState(gearbox.currentExtruderId || extruders[0]?.id || '');
+  const [note, setNote] = useState('');
+  const selected = extruders.find((item) => item.id === extruderId);
+
+  return (
+    <ModalShell title="Přiřadit převodovku" icon={<Cog className="w-5 h-5 text-violet-300" />} onClose={onClose}>
+      <div className="space-y-3">
+        <div className="rounded-xl bg-white/5 border border-white/10 p-3">
+          <div className="text-xs text-slate-500">Převodovka</div>
+          <div className="font-bold text-white">{gearbox.name}</div>
+          <div className="text-xs text-slate-400 mt-1">Nyní: {gearbox.currentExtruderName || 'Sklad ND'}</div>
+        </div>
+        <label className="block">
+          <div className="text-sm font-medium text-slate-400 mb-2">Extruder</div>
+          <select
+            value={extruderId}
+            onChange={(e) => setExtruderId(e.target.value)}
+            className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-violet-400"
+            style={{ appearance: 'auto' }}
+          >
+            {extruders.length === 0 && <option value="" className="bg-slate-800">Žádný extruder v kartotéce</option>}
+            {extruders.map((item) => (
+              <option key={item.id} value={item.id} className="bg-slate-800">
+                {item.name}{item.code ? ` (${item.code})` : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block">
+          <div className="text-sm font-medium text-slate-400 mb-2">Poznámka</div>
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            rows={3}
+            placeholder="např. výměna po servisu, preventivní přesun..."
+            className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-violet-400"
+          />
+        </label>
+        <button
+          onClick={() => selected && onAssign(selected, note.trim())}
+          disabled={!selected || saving}
+          className="w-full py-3.5 bg-violet-600 text-white rounded-xl font-bold disabled:opacity-50 flex items-center justify-center gap-2"
+        >
+          {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Cog className="w-5 h-5" />}
+          Přiřadit k extruderu
+        </button>
+      </div>
+    </ModalShell>
+  );
+}
+
+function GearboxTemperatureModal({ gearbox, user, saving, onClose, onSave }: {
+  gearbox: AssetV2;
+  user: { displayName?: string } | null;
+  saving: boolean;
+  onClose: () => void;
+  onSave: (input: { temperatureC: number; measuredAt: Date; note: string; photoFile?: File | null }) => Promise<void>;
+}) {
+  const [temperature, setTemperature] = useState(String(clampTemperature(gearbox.lastTemperatureC ?? 60)));
+  const [measuredAt, setMeasuredAt] = useState(() => {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    return now.toISOString().slice(0, 16);
+  });
+  const [note, setNote] = useState('');
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState('');
+  const rawTemperatureNumber = Number(String(temperature).replace(',', '.'));
+  const temperatureNumber = clampTemperature(Number.isFinite(rawTemperatureNumber) ? rawTemperatureNumber : 60);
+  const tempState = getGearboxTemperatureState(gearbox, temperatureNumber);
+  const setTemperatureValue = (value: number) => setTemperature(String(clampTemperature(value)));
+
+  return (
+    <ModalShell title="Záznam teploty" icon={<Thermometer className="w-5 h-5 text-cyan-300" />} onClose={onClose}>
+      <div className="space-y-3">
+        <div className="rounded-xl bg-white/5 border border-white/10 p-3">
+          <div className="text-xs text-slate-500">Převodovka</div>
+          <div className="font-bold text-white">{gearbox.name}</div>
+          <div className="text-xs text-slate-400 mt-1">{gearbox.currentExtruderName || 'Sklad ND'} · {user?.displayName || 'Neznámý'}</div>
+        </div>
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-sm font-medium text-slate-400">Teplota převodovky</div>
+              <div className="mt-1 text-4xl font-black text-white">{temperatureNumber} °C</div>
+              <div className="mt-1 text-xs text-slate-400">
+                Limity: varování {gearbox.gearboxWarningTemperatureC ?? 70} °C, kritická {gearbox.gearboxCriticalTemperatureC ?? 85} °C
+              </div>
+            </div>
+            <span
+              className="rounded-full border px-3 py-1 text-xs font-black"
+              style={{ color: tempState.color, background: tempState.background, borderColor: tempState.border }}
+            >
+              {tempState.label}
+            </span>
+          </div>
+          <input
+            type="range"
+            min="20"
+            max="120"
+            step="1"
+            value={temperatureNumber}
+            onChange={(e) => setTemperatureValue(Number(e.target.value))}
+            className="mt-4 w-full accent-cyan-400"
+          />
+          <div className="mt-3 grid grid-cols-4 gap-2">
+            {[-5, -1, 1, 5].map((delta) => (
+              <button
+                key={delta}
+                type="button"
+                onClick={() => setTemperatureValue(temperatureNumber + delta)}
+                className="rounded-xl border border-white/10 bg-slate-900 px-3 py-3 text-sm font-black text-white"
+              >
+                {delta > 0 ? `+${delta}` : delta}
+              </button>
+            ))}
+          </div>
+          <div className="mt-2 grid grid-cols-4 gap-2">
+            {[50, 60, 70, 80].map((value) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setTemperatureValue(value)}
+                className="rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-3 text-sm font-black text-cyan-100"
+              >
+                {value} °C
+              </button>
+            ))}
+          </div>
+        </div>
+        <label className="block">
+          <div className="text-sm font-medium text-slate-400 mb-2">Datum a čas měření</div>
+          <input
+            type="datetime-local"
+            value={measuredAt}
+            onChange={(e) => setMeasuredAt(e.target.value)}
+            className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-cyan-400"
+          />
+        </label>
+        <label className="block">
+          <div className="text-sm font-medium text-slate-400 mb-2">Poznámka</div>
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            rows={3}
+            placeholder="např. opsáno z papíru u extruderu, kontrola bez závad..."
+            className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-cyan-400"
+          />
+        </label>
+        <label className="block">
+          <div className="text-sm font-medium text-slate-400 mb-2">Fotka kontroly</div>
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={(e) => {
+              const file = e.target.files?.[0] || null;
+              setPhotoFile(file);
+              setPhotoPreview(file ? URL.createObjectURL(file) : '');
+            }}
+            className="w-full text-sm text-slate-300 file:mr-3 file:rounded-lg file:border-0 file:bg-cyan-500 file:px-3 file:py-2 file:text-white"
+          />
+          {photoPreview && <img src={photoPreview} alt="Náhled" className="mt-3 h-28 rounded-xl object-cover border border-white/10" />}
+        </label>
+        <button
+          onClick={() => onSave({ temperatureC: temperatureNumber, measuredAt: new Date(measuredAt), note: note.trim(), photoFile })}
+          disabled={!measuredAt || saving}
+          className="w-full py-3.5 bg-cyan-600 text-white rounded-xl font-bold disabled:opacity-50 flex items-center justify-center gap-2"
+        >
+          {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : photoFile ? <Camera className="w-5 h-5" /> : <Thermometer className="w-5 h-5" />}
+          Uložit záznam
+        </button>
+      </div>
+    </ModalShell>
+  );
+}
 
 function ModalShell({ title, icon, onClose, children }: {
   title: string; icon: React.ReactNode; onClose: () => void; children: React.ReactNode;
