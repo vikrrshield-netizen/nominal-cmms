@@ -12,7 +12,7 @@ import appConfig from '../appConfig';
 import {
   EntityCardCompact,
   computeEntityStatus, getFieldSemaphore,
-  type Entity, type Blueprint, type EntityLogEntry,
+  type Entity, type Blueprint, type BlueprintField, type EntityLogEntry,
 } from '../components/EntityCard';
 import {
   ArrowLeft, X, Loader2, Car, Send, Clock, Plus,
@@ -30,6 +30,19 @@ import MicButton from '../components/ui/MicButton';
 
 let toastId = 0;
 interface ToastItem { id: number; text: string; type: 'success' | 'info' | 'error' }
+
+const VEHICLE_FALLBACK_FIELDS: BlueprintField[] = [
+  { key: 'registration', label: 'SPZ', type: 'text', required: false },
+  { key: 'stk_date', label: 'STK platnost', type: 'date', required: false },
+  { key: 'insurance_date', label: 'Pojištění do', type: 'date', required: false },
+  { key: 'oil_hours', label: 'Motohodiny od výměny oleje', type: 'number', required: false, unit: 'Mth' },
+  { key: 'oil_limit', label: 'Limit oleje', type: 'number', required: false, unit: 'Mth' },
+  { key: 'oil_type', label: 'Typ oleje', type: 'text', required: false },
+  { key: 'tachometer', label: 'Tachometr', type: 'number', required: false },
+  { key: 'fuel_type', label: 'Palivo', type: 'text', required: false },
+  { key: 'year', label: 'Rok výroby', type: 'number', required: false },
+  { key: 'assigned_to', label: 'Přiřazeno', type: 'text', required: false },
+];
 
 function useToast() {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
@@ -300,6 +313,15 @@ function VehicleDetailModal({ entity, blueprint, onClose, toast }: {
   const [showAddField, setShowAddField] = useState(false);
   const [newFieldKey, setNewFieldKey] = useState('');
   const [newFieldValue, setNewFieldValue] = useState('');
+  const detailFields = useMemo(() => {
+    const blueprintFields = blueprint?.fields || [];
+    const existing = new Set(blueprintFields.map((field) => field.key));
+    const fallback = VEHICLE_FALLBACK_FIELDS.filter((field) => {
+      const value = entity.data?.[field.key];
+      return !existing.has(field.key) && value !== undefined && value !== '';
+    });
+    return [...blueprintFields, ...fallback];
+  }, [blueprint?.fields, entity.data]);
 
   const startEdit = (fieldKey: string, currentValue: string) => {
     setEditingField(fieldKey);
@@ -310,8 +332,17 @@ function VehicleDetailModal({ entity, blueprint, onClose, toast }: {
     if (!canManageFleet) return;
     setSaving(true);
     try {
+      const field = detailFields.find((item) => item.key === fieldKey);
+      if (field?.type === 'number' && editValue.trim() !== '' && Number.isNaN(Number(editValue))) {
+        toast('Zadej platné číslo.', 'error');
+        setSaving(false);
+        return;
+      }
+      const value = field?.type === 'number'
+        ? (editValue.trim() === '' ? null : Number(editValue))
+        : editValue;
       await updateDoc(doc(db, 'entities', entity.id), {
-        [`data.${fieldKey}`]: editValue,
+        [`data.${fieldKey}`]: value,
         updatedAt: serverTimestamp(),
       });
       toast(`${fieldKey === 'stk_date' ? 'STK' : fieldKey} aktualizováno`);
@@ -427,7 +458,7 @@ function VehicleDetailModal({ entity, blueprint, onClose, toast }: {
             <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
               <h3 className="text-xs text-slate-500 uppercase font-bold mb-3">Rodný list</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {blueprint.fields
+                {detailFields
                   .filter((f) => f.type !== 'photo' && entity.data?.[f.key] !== undefined && entity.data?.[f.key] !== '')
                   .map((f) => {
                     const val = entity.data?.[f.key];
