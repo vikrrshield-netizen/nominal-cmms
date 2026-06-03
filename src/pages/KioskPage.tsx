@@ -11,6 +11,7 @@ import {
   ChevronRight,
   ClipboardList,
   Camera,
+  Factory,
   Filter,
   HelpCircle,
   Heart,
@@ -71,6 +72,18 @@ interface KioskTodayAction {
   title: string;
   detail: string;
   tone: 'red' | 'amber' | 'violet';
+}
+
+interface KioskProductionPlan {
+  id: string;
+  planDate: string;
+  productionArea: string;
+  productionAreaLabel: string;
+  machineName: string;
+  rawMaterial: string;
+  targetWeight: number;
+  note: string;
+  status: 'planned' | 'running' | 'done';
 }
 
 const QUICK_BREAKDOWNS: QuickOption[] = [
@@ -235,6 +248,13 @@ const PREFILTER_OVERDUE_DAYS = 7;
 
 const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
 
+const localDateKey = (date: Date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
 const parseAssetDate = (value: unknown) => {
   if (!value) return null;
   if (value instanceof Date) return value;
@@ -301,6 +321,7 @@ export default function KioskPage() {
   const canUseGearboxKiosk = hasPermission('gearbox.temperature.write') || hasPermission('gearbox.manage') || hasPermission('asset.update');
   const canUsePrefilterKiosk = canUseGearboxKiosk;
   const canUseDataloggerKiosk = hasPermission('datalogger.temperature.write') || hasPermission('datalogger.read') || hasPermission('datalogger.manage');
+  const canViewProductionPlan = hasPermission('production.read') || hasPermission('production.manage');
 
   const [activeView, setActiveView] = useState<ViewState>('MENU');
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -334,6 +355,7 @@ export default function KioskPage() {
 
   const [shiftNotes, setShiftNotes] = useState<ShiftNote[]>([]);
   const [prefilterLogs, setPrefilterLogs] = useState<PrefilterLog[]>([]);
+  const [productionPlans, setProductionPlans] = useState<KioskProductionPlan[]>([]);
   const [handoverText, setHandoverText] = useState('');
   const [handoverPriority, setHandoverPriority] = useState<'normal' | 'important'>('normal');
   const [handoverShift, setHandoverShift] = useState<'morning' | 'afternoon'>('morning');
@@ -465,6 +487,35 @@ export default function KioskPage() {
     );
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!canViewProductionPlan) {
+      setProductionPlans([]);
+      return;
+    }
+    const productionQuery = query(collection(db, 'production_extrusion'), orderBy('createdAt', 'desc'), limit(80));
+    const unsubscribe = onSnapshot(
+      productionQuery,
+      (snapshot) => {
+        setProductionPlans(snapshot.docs.map((document) => {
+          const data = document.data();
+          return {
+            id: document.id,
+            planDate: data.planDate || '',
+            productionArea: data.productionArea || 'extrudovna_i',
+            productionAreaLabel: data.productionAreaLabel || (data.productionArea === 'extrudovna_ii' ? 'Extrudovna II' : 'Extrudovna I'),
+            machineName: data.machineName || 'Extruder',
+            rawMaterial: data.rawMaterial || '',
+            targetWeight: Number(data.targetWeight || 0),
+            note: data.note || '',
+            status: data.status || 'planned',
+          } as KioskProductionPlan;
+        }));
+      },
+      () => setProductionPlans([]),
+    );
+    return () => unsubscribe();
+  }, [canViewProductionPlan]);
 
   const equipmentAssets = useMemo(() => {
     return assets
@@ -603,6 +654,29 @@ export default function KioskPage() {
 
     return [...gearboxActions, ...overduePrefilters, ...warningPrefilters];
   }, [assets, canUseGearboxKiosk, canUsePrefilterKiosk, gearboxTemperatureAlerts.missing, prefilterAlerts.overdue, prefilterAlerts.warning]);
+
+  const todayProductionPlans = useMemo(() => {
+    const today = localDateKey(currentTime);
+    return productionPlans
+      .filter((plan) => (plan.planDate || today) === today)
+      .filter((plan) => plan.status !== 'done')
+      .sort((a, b) => {
+        const area = a.productionArea.localeCompare(b.productionArea, 'cs');
+        if (area !== 0) return area;
+        return a.machineName.localeCompare(b.machineName, 'cs');
+      });
+  }, [currentTime, productionPlans]);
+
+  const productionPlansByArea = useMemo(() => {
+    const groups = new Map<string, KioskProductionPlan[]>();
+    for (const plan of todayProductionPlans) {
+      const key = plan.productionAreaLabel || 'Extrudovna';
+      groups.set(key, [...(groups.get(key) || []), plan]);
+    }
+    return ['Extrudovna I', 'Extrudovna II']
+      .map((label) => ({ label, plans: groups.get(label) || [] }))
+      .filter((group) => group.plans.length > 0);
+  }, [todayProductionPlans]);
 
   const filteredAssets = useMemo(() => {
     const queryText = normalize(assetSearch);
@@ -1472,6 +1546,59 @@ export default function KioskPage() {
           <MenuButton icon={<ShieldCheck className="w-12 h-12" />} label="Schránka důvěry" color="bg-purple-700 hover:bg-purple-600" onClick={() => setActiveView('MESSAGE')} />
         </div>
       </div>
+      {canViewProductionPlan && (
+        <section className="rounded-2xl border border-white/10 bg-slate-900/55 p-3">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Factory className="h-5 w-5 text-emerald-200" />
+              <div>
+                <div className="text-base font-black text-white">Plán výroby dnes</div>
+                <div className="text-sm font-bold text-slate-300">Extrudovna I: 1, 2 · Extrudovna II: 3, 4</div>
+              </div>
+            </div>
+            <span className="rounded-xl bg-emerald-500/15 px-3 py-1 text-sm font-black text-emerald-100">
+              {todayProductionPlans.length}
+            </span>
+          </div>
+
+          {todayProductionPlans.length === 0 ? (
+            <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-sm font-bold text-slate-300">
+              Na dnes není zadaný plán extruze.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+              {productionPlansByArea.map((group) => (
+                <div key={group.label} className="rounded-xl border border-emerald-300/25 bg-emerald-500/10 p-3">
+                  <div className="mb-2 text-sm font-black text-emerald-100">{group.label}</div>
+                  <div className="space-y-2">
+                    {group.plans.map((plan) => (
+                      <div key={plan.id} className="rounded-lg bg-slate-950/60 p-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-black text-white">{plan.machineName}</div>
+                            <div className="mt-0.5 text-sm font-bold text-slate-200">{plan.rawMaterial || 'Bez suroviny'}</div>
+                          </div>
+                          <span className="shrink-0 rounded-lg bg-white/10 px-2 py-1 text-xs font-black text-slate-100">
+                            {plan.status === 'running' ? 'Probíhá' : 'Plán'}
+                          </span>
+                        </div>
+                        {plan.targetWeight > 0 && (
+                          <div className="mt-1 text-sm font-bold text-slate-300">{plan.targetWeight} kg</div>
+                        )}
+                        {plan.note && (
+                          <div className="mt-2 rounded-lg border border-white/10 bg-white/5 p-2 text-sm font-bold text-slate-200">
+                            {plan.note}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
       <section className="rounded-2xl border border-white/10 bg-slate-900/55 p-2">
         <button
           type="button"

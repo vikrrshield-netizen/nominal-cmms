@@ -99,6 +99,7 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     module: 'production',
     label: 'Výroba',
     permissions: [
+      { key: 'production.read', label: 'Číst', description: 'Zobrazit plán výroby v kiosku' },
       { key: 'production.manage', label: 'Spravovat', description: 'Plánování extruze a balení' },
     ],
   },

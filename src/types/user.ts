@@ -50,6 +50,7 @@ export type Permission =
   // Plánování & Rozvrhy
   | 'schedule.manage'   // Správa opakovaných úkolů
   // Výroba
+  | 'production.read'   // Čtení plánu výroby pro kiosk
   | 'production.manage' // Plánování extruze & balení
   // Admin
   | 'admin.view'        // Čtení administrace (read-only)
@@ -255,6 +256,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'wo.create',  // Nahlásit poruchu
     'wo.read',
     'asset.read',
+    'production.read',
     'gearbox.temperature.write',
   ],
 };

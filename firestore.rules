@@ -167,7 +167,8 @@ service cloud.firestore {
         && permission in [
           'wo.create',
           'wo.read',
-          'asset.read'
+          'asset.read',
+          'production.read'
         ]
       );
     }
@@ -745,14 +746,14 @@ service cloud.firestore {
     }
 
     match /production_extrusion/{docId} {
-      allow read: if hasPermission('production.manage') || hasPermission('report.read');
+      allow read: if hasPermission('production.read') || hasPermission('production.manage') || hasPermission('report.read');
       allow create: if hasPermission('production.manage') && hasTimestamp();
       allow update: if hasPermission('production.manage') && hasTimestamp();
       allow delete: if isSuperAdmin();
     }
 
     match /production_packaging/{docId} {
-      allow read: if hasPermission('production.manage') || hasPermission('report.read');
+      allow read: if hasPermission('production.read') || hasPermission('production.manage') || hasPermission('report.read');
       allow create: if hasPermission('production.manage') && hasTimestamp();
       allow update: if hasPermission('production.manage') && hasTimestamp();
       allow delete: if isSuperAdmin();

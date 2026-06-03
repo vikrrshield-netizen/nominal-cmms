@@ -949,6 +949,7 @@ function PermissionOverrideEditor({
     fleet: 'fleet.read',
     hvac: 'hvac.read',
     reports: 'report.read',
+    production: 'production.read',
     warehouse: 'warehouse.view',
     shifts: 'shifts.view',
     admin: 'admin.view',

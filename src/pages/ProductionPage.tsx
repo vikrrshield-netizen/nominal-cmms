@@ -21,6 +21,7 @@ import MicButton from '../components/ui/MicButton';
 // ═══════════════════════════════════════════════════════════════════
 
 type ActiveTab = 'extrusion' | 'packaging';
+type ExtrusionArea = 'extrudovna_i' | 'extrudovna_ii';
 
 // -- Extrusion --
 type ExtrusionStatus = 'planned' | 'running' | 'done';
@@ -29,8 +30,12 @@ interface ExtrusionBatch {
   batchId: string;
   rawMaterial: string;
   targetWeight: number;
+  planDate: string;
+  productionArea: ExtrusionArea;
+  productionAreaLabel: string;
   machineId: string;
   machineName: string;
+  note: string;
   status: ExtrusionStatus;
   shiftLog: string;
   startedAt: Date | null;
@@ -81,6 +86,13 @@ const PACKAGING_TYPES = [
   'Krabice 1kg', 'Multipack 6ks', 'Big Bag 25kg',
 ];
 
+const EXTRUSION_LINES: { number: number; area: ExtrusionArea; areaLabel: string; label: string }[] = [
+  { number: 1, area: 'extrudovna_i', areaLabel: 'Extrudovna I', label: 'Extruder 1' },
+  { number: 2, area: 'extrudovna_i', areaLabel: 'Extrudovna I', label: 'Extruder 2' },
+  { number: 3, area: 'extrudovna_ii', areaLabel: 'Extrudovna II', label: 'Extruder 3' },
+  { number: 4, area: 'extrudovna_ii', areaLabel: 'Extrudovna II', label: 'Extruder 4' },
+];
+
 // ═══════════════════════════════════════════════════════════════════
 // HOOKS
 // ═══════════════════════════════════════════════════════════════════
@@ -98,8 +110,12 @@ function useExtrusionBatches() {
           batchId: data.batchId || '',
           rawMaterial: data.rawMaterial || '',
           targetWeight: data.targetWeight || 0,
+          planDate: data.planDate || '',
+          productionArea: data.productionArea || 'extrudovna_i',
+          productionAreaLabel: data.productionAreaLabel || (data.productionArea === 'extrudovna_ii' ? 'Extrudovna II' : 'Extrudovna I'),
           machineId: data.machineId || '',
           machineName: data.machineName || '',
+          note: data.note || '',
           status: data.status || 'planned',
           shiftLog: data.shiftLog || '',
           startedAt: data.startedAt instanceof Timestamp ? data.startedAt.toDate() : null,
@@ -201,6 +217,27 @@ function formatDate(d: Date): string {
   return d.toLocaleDateString('cs-CZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
+function localDateKey(date = new Date()): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function normalizeText(value: unknown): string {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function extruderNumberFromAsset(asset: SimpleAsset): number {
+  const text = normalizeText(`${asset.name} ${asset.code || ''}`);
+  const match = text.match(/extruder\s*(\d+)/) || text.match(/\bex\s*(\d+)\b/);
+  return match?.[1] ? Number(match[1]) : 0;
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════
@@ -215,7 +252,14 @@ export default function ProductionPage() {
   // Extrusion
   const { batches, loading: loadingBatches } = useExtrusionBatches();
   const [showNewBatch, setShowNewBatch] = useState(false);
-  const [batchForm, setBatchForm] = useState({ rawMaterial: '', targetWeight: '', machineId: '', machineName: '' });
+  const [batchForm, setBatchForm] = useState({
+    planDate: localDateKey(),
+    productionArea: 'extrudovna_i' as ExtrusionArea,
+    extruderNumber: '1',
+    rawMaterial: '',
+    targetWeight: '',
+    note: '',
+  });
   const [batchSaving, setBatchSaving] = useState(false);
   const [shiftLogId, setShiftLogId] = useState<string | null>(null);
   const [shiftLogText, setShiftLogText] = useState('');
@@ -237,6 +281,26 @@ export default function ProductionPage() {
   const extruderOptions = extruderAssets.length > 0 ? extruderAssets : allAssets;
   const packagingOptions = packagingAssets.length > 0 ? packagingAssets : allAssets;
 
+  const extrusionLineOptions = useMemo(() => EXTRUSION_LINES.map((line) => {
+    const asset = extruderOptions.find((candidate) => extruderNumberFromAsset(candidate) === line.number);
+    return {
+      ...line,
+      assetId: asset?.id || `extruder-${line.number}`,
+      assetName: asset?.name || line.label,
+    };
+  }), [extruderOptions]);
+
+  const visibleExtrusionLines = useMemo(
+    () => extrusionLineOptions.filter((line) => line.area === batchForm.productionArea),
+    [batchForm.productionArea, extrusionLineOptions],
+  );
+
+  useEffect(() => {
+    if (!visibleExtrusionLines.some((line) => String(line.number) === batchForm.extruderNumber)) {
+      setBatchForm((prev) => ({ ...prev, extruderNumber: String(visibleExtrusionLines[0]?.number || 1) }));
+    }
+  }, [batchForm.extruderNumber, visibleExtrusionLines]);
+
   // Stats
   const extrusionStats = useMemo(() => ({
     total: batches.length,
@@ -255,42 +319,48 @@ export default function ProductionPage() {
   // ── Extrusion actions ──
   const createBatch = async () => {
     if (!batchForm.rawMaterial || !batchForm.targetWeight) return;
+    const selectedLine = extrusionLineOptions.find((line) => String(line.number) === batchForm.extruderNumber) || extrusionLineOptions[0];
     setBatchSaving(true);
     try {
       await addDoc(collection(db, 'production_extrusion'), {
         batchId: generateBatchId(),
+        planDate: batchForm.planDate || localDateKey(),
+        productionArea: selectedLine?.area || batchForm.productionArea,
+        productionAreaLabel: selectedLine?.areaLabel || (batchForm.productionArea === 'extrudovna_ii' ? 'Extrudovna II' : 'Extrudovna I'),
         rawMaterial: batchForm.rawMaterial,
         targetWeight: Number(batchForm.targetWeight),
-        machineId: batchForm.machineId,
-        machineName: batchForm.machineName,
+        machineId: selectedLine?.assetId || `extruder-${batchForm.extruderNumber}`,
+        machineName: selectedLine?.assetName || `Extruder ${batchForm.extruderNumber}`,
+        note: batchForm.note.trim(),
         status: 'planned',
         shiftLog: '',
         startedAt: null,
         completedAt: null,
         createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
         createdById: user?.uid || user?.id || '',
         createdByName: user?.displayName || 'Neznámý',
       });
       setShowNewBatch(false);
-      setBatchForm({ rawMaterial: '', targetWeight: '', machineId: '', machineName: '' });
+      setBatchForm({ planDate: localDateKey(), productionArea: 'extrudovna_i', extruderNumber: '1', rawMaterial: '', targetWeight: '', note: '' });
       showToast('Dávka vytvořena', 'success');
     } catch { showToast('Chyba při vytváření', 'error'); }
     setBatchSaving(false);
   };
 
   const startBatch = async (id: string) => {
-    await updateDoc(doc(db, 'production_extrusion', id), { status: 'running', startedAt: serverTimestamp() });
+    await updateDoc(doc(db, 'production_extrusion', id), { status: 'running', startedAt: serverTimestamp(), updatedAt: serverTimestamp() });
     showToast('Extruze spuštěna', 'success');
   };
 
   const stopBatch = async (id: string) => {
-    await updateDoc(doc(db, 'production_extrusion', id), { status: 'done', completedAt: serverTimestamp() });
+    await updateDoc(doc(db, 'production_extrusion', id), { status: 'done', completedAt: serverTimestamp(), updatedAt: serverTimestamp() });
     showToast('Extruze dokončena', 'success');
   };
 
   const saveShiftLog = async () => {
     if (!shiftLogId || !shiftLogText.trim()) return;
-    await updateDoc(doc(db, 'production_extrusion', shiftLogId), { shiftLog: shiftLogText.trim() });
+    await updateDoc(doc(db, 'production_extrusion', shiftLogId), { shiftLog: shiftLogText.trim(), updatedAt: serverTimestamp() });
     setShiftLogId(null);
     setShiftLogText('');
     showToast('Směnový záznam uložen', 'success');
@@ -312,6 +382,7 @@ export default function ProductionPage() {
         startedAt: null,
         completedAt: null,
         createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
         createdById: user?.uid || user?.id || '',
         createdByName: user?.displayName || 'Neznámý',
       });
@@ -323,12 +394,12 @@ export default function ProductionPage() {
   };
 
   const startOrder = async (id: string) => {
-    await updateDoc(doc(db, 'production_packaging', id), { status: 'running', startedAt: serverTimestamp() });
+    await updateDoc(doc(db, 'production_packaging', id), { status: 'running', startedAt: serverTimestamp(), updatedAt: serverTimestamp() });
     showToast('Balení spuštěno', 'success');
   };
 
   const stopOrder = async (id: string) => {
-    await updateDoc(doc(db, 'production_packaging', id), { status: 'done', completedAt: serverTimestamp() });
+    await updateDoc(doc(db, 'production_packaging', id), { status: 'done', completedAt: serverTimestamp(), updatedAt: serverTimestamp() });
     showToast('Balení dokončeno', 'success');
   };
 
@@ -481,6 +552,10 @@ export default function ProductionPage() {
 
                   {/* Card body */}
                   <div className="px-4 py-3">
+                    <div className="mb-3 flex flex-wrap items-center gap-2 text-xs font-bold text-slate-300">
+                      <span className="rounded-full bg-white/5 px-2.5 py-1">{batch.productionAreaLabel}</span>
+                      <span className="rounded-full bg-white/5 px-2.5 py-1">{batch.planDate || 'Bez data'}</span>
+                    </div>
                     <div className="grid grid-cols-3 gap-3 mb-3">
                       <div>
                         <div className="text-[10px] text-slate-500 uppercase">Surovina</div>
@@ -495,6 +570,13 @@ export default function ProductionPage() {
                         <div className="text-sm font-medium text-white">{batch.machineName || '—'}</div>
                       </div>
                     </div>
+
+                    {batch.note && (
+                      <div className="bg-slate-700/30 rounded-xl p-2.5 mb-3">
+                        <div className="text-[10px] text-slate-500 uppercase mb-1">Poznámka k plánu</div>
+                        <p className="text-xs text-slate-300 whitespace-pre-wrap">{batch.note}</p>
+                      </div>
+                    )}
 
                     {/* Shift log */}
                     {batch.shiftLog && (
@@ -641,6 +723,52 @@ export default function ProductionPage() {
       {showNewBatch && (
         <ModalShell title="Nová extruzní dávka" icon={<Cog className="w-5 h-5 text-orange-400" />} onClose={() => setShowNewBatch(false)}>
           <div className="space-y-4">
+            <Field label="Datum plánu">
+              <input type="date" value={batchForm.planDate}
+                onChange={e => setBatchForm(p => ({ ...p, planDate: e.target.value }))}
+                className={INP_CLS} />
+            </Field>
+            <Field label="Extrudovna">
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: 'extrudovna_i' as const, label: 'Extrudovna I', hint: 'Extruder 1, 2' },
+                  { id: 'extrudovna_ii' as const, label: 'Extrudovna II', hint: 'Extruder 3, 4' },
+                ].map(area => (
+                  <button
+                    key={area.id}
+                    type="button"
+                    onClick={() => setBatchForm(p => ({ ...p, productionArea: area.id }))}
+                    className={`rounded-xl border p-3 text-left transition active:scale-[0.98] ${
+                      batchForm.productionArea === area.id
+                        ? 'border-orange-400 bg-orange-500/20 text-white'
+                        : 'border-white/10 bg-white/5 text-slate-300'
+                    }`}
+                  >
+                    <span className="block text-sm font-bold">{area.label}</span>
+                    <span className="mt-1 block text-xs opacity-75">{area.hint}</span>
+                  </button>
+                ))}
+              </div>
+            </Field>
+            <Field label="Extruder">
+              <div className="grid grid-cols-2 gap-2">
+                {visibleExtrusionLines.map(line => (
+                  <button
+                    key={line.number}
+                    type="button"
+                    onClick={() => setBatchForm(p => ({ ...p, extruderNumber: String(line.number) }))}
+                    className={`rounded-xl border p-3 text-left transition active:scale-[0.98] ${
+                      batchForm.extruderNumber === String(line.number)
+                        ? 'border-emerald-400 bg-emerald-500/20 text-white'
+                        : 'border-white/10 bg-white/5 text-slate-300'
+                    }`}
+                  >
+                    <span className="block text-sm font-bold">{line.assetName}</span>
+                    <span className="mt-1 block text-xs opacity-75">{line.areaLabel}</span>
+                  </button>
+                ))}
+              </div>
+            </Field>
             <Field label="Surovina">
               <select value={batchForm.rawMaterial} onChange={e => setBatchForm(p => ({ ...p, rawMaterial: e.target.value }))}
                 className={SEL_CLS} style={{ appearance: 'auto' }}>
@@ -653,14 +781,14 @@ export default function ProductionPage() {
                 onChange={e => setBatchForm(p => ({ ...p, targetWeight: e.target.value }))}
                 placeholder="500" className={INP_CLS} />
             </Field>
-            <Field label="Extruder">
-              <select value={batchForm.machineId} onChange={e => {
-                const asset = extruderOptions.find(a => a.id === e.target.value);
-                setBatchForm(p => ({ ...p, machineId: e.target.value, machineName: asset?.name || '' }));
-              }} className={SEL_CLS} style={{ appearance: 'auto' }}>
-                <option value="" className="bg-slate-800">— vybrat stroj —</option>
-                {extruderOptions.map(a => <option key={a.id} value={a.id} className="bg-slate-800">{a.name}{a.code ? ` (${a.code})` : ''}</option>)}
-              </select>
+            <Field label="Poznámka pro operátory">
+              <textarea
+                value={batchForm.note}
+                onChange={e => setBatchForm(p => ({ ...p, note: e.target.value }))}
+                placeholder="Např. priorita, změna směsi, upozornění..."
+                rows={3}
+                className={INP_CLS + ' resize-none'}
+              />
             </Field>
             <button onClick={createBatch} disabled={!batchForm.rawMaterial || !batchForm.targetWeight || batchSaving}
               className="w-full py-3.5 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-2xl font-bold disabled:opacity-50 flex items-center justify-center gap-2 transition active:scale-[0.98]">

@@ -15,7 +15,7 @@ import {
   Settings, AlertTriangle, Bell, LogOut, Loader2, ClipboardCheck,
   Sparkles, Wrench, BarChart3,
   Clock, FileText, PlusCircle, Search, ShieldCheck, X, User, MapPin,
-  Calendar, Building2, Package, Wind, Cog, Thermometer, Monitor,
+  Calendar, Building2, Package, Wind, Cog, Thermometer, Monitor, Factory,
 } from 'lucide-react';
 import appConfig from '../appConfig';
 import { DEFAULT_ENABLED_MODULES, MODULE_DEFINITIONS } from '../types/user';
@@ -311,6 +311,7 @@ function ModuleShortcuts({ onNavigate }: { onNavigate: (path: string) => void })
     { label: 'Převodovky', detail: 'umístění a teploty', path: '/gearboxes', icon: Cog, tone: 'text-violet-600', permissions: ['gearbox.temperature.write', 'gearbox.manage', 'asset.update', 'asset.read'] },
     { label: 'Datalogery', detail: 'denní teploty skladu', path: '/dataloggers', icon: Thermometer, tone: 'text-cyan-700', permissions: ['datalogger.read', 'datalogger.temperature.write', 'datalogger.manage'] },
     { label: 'Vzduchotechnika', detail: 'filtry a výměny', path: '/hvac', icon: Wind, tone: 'text-sky-600', permissions: ['hvac.read', 'hvac.manage'] },
+    { label: 'Výroba', detail: 'plán extrudoven', path: '/production', icon: Factory, tone: 'text-emerald-700', permissions: ['production.manage'] },
     { label: 'Administrace', detail: 'uživatelé a práva', path: '/admin', icon: Settings, tone: 'text-slate-600', permissions: ['admin.view', 'admin.manage', 'user.manage'] },
     ...(canViewSecretBox
       ? [{ label: 'Schránka důvěry', detail: trustboxNew > 0 ? czNewMessages(trustboxNew) : 'anonymní zprávy', path: '/trustbox', icon: ShieldCheck, tone: 'text-purple-600', badge: trustboxNew, permissions: ['secretbox.view'] }]
