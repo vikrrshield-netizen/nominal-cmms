@@ -15,7 +15,7 @@ import {
   Settings, AlertTriangle, Bell, LogOut, Loader2, ClipboardCheck,
   Sparkles, Wrench, BarChart3,
   Clock, FileText, PlusCircle, Search, ShieldCheck, X, User, MapPin,
-  Calendar, Building2, Package, Wind, Cog, Thermometer, Monitor, Factory,
+  Calendar, Building2, Package, Wind, Cog, Thermometer, Monitor, Factory, FlaskConical,
 } from 'lucide-react';
 import appConfig from '../appConfig';
 import { DEFAULT_ENABLED_MODULES, MODULE_DEFINITIONS } from '../types/user';
@@ -289,7 +289,7 @@ function czNewMessages(n: number): string {
 }
 
 function ModuleShortcuts({ onNavigate }: { onNavigate: (path: string) => void }) {
-  const { canViewSecretBox, hasPermission } = useAuthContext();
+  const { canViewSecretBox, hasPermission, user } = useAuthContext();
   const [trustboxNew, setTrustboxNew] = useState(0);
 
   useEffect(() => {
@@ -314,6 +314,9 @@ function ModuleShortcuts({ onNavigate }: { onNavigate: (path: string) => void })
     { label: 'Vzduchotechnika', detail: 'filtry a výměny', path: '/hvac', icon: Wind, tone: 'text-sky-600', permissions: ['hvac.read', 'hvac.manage'] },
     { label: 'Výroba', detail: 'plán extrudoven', path: '/production', icon: Factory, tone: 'text-emerald-700', permissions: ['production.manage'] },
     { label: 'Administrace', detail: 'uživatelé a práva', path: '/admin', icon: Settings, tone: 'text-slate-600', permissions: ['admin.view', 'admin.manage', 'user.manage'] },
+    ...(user?.role === 'SUPERADMIN'
+      ? [{ label: 'Testovací stránky', detail: 'preview před produkcí', path: '/preview', icon: FlaskConical, tone: 'text-emerald-700', permissions: ['admin.manage'] }]
+      : []),
     ...(canViewSecretBox
       ? [{ label: 'Schránka důvěry', detail: trustboxNew > 0 ? czNewMessages(trustboxNew) : 'anonymní zprávy', path: '/trustbox', icon: ShieldCheck, tone: 'text-purple-600', badge: trustboxNew, permissions: ['secretbox.view'] }]
       : []),

@@ -42,6 +42,7 @@ const WarehousePage = lazy(() => import('./pages/WarehousePage'));
 const ShiftPlannerPage = lazy(() => import('./pages/ShiftPlannerPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const KartotekaPage = lazy(() => import('./pages/KartotekaPage'));
+const PreviewPage = lazy(() => import('./pages/PreviewPage'));
 
 // ═══════════════════════════════════════════════════════════════════
 // PROTECTED ROUTE WRAPPER
@@ -210,6 +211,7 @@ function ProtectedRoutes() {
         <Route path="/shifts" element={<ProtectedPage moduleId="shifts" permissions={['shifts.view']}><ShiftPlannerPage /></ProtectedPage>} />
         <Route path="/settings" element={<ProtectedPage permissions={['admin.view', 'admin.manage']}><SettingsPage /></ProtectedPage>} />
         <Route path="/kartoteka" element={<ProtectedPage permissions={['asset.read']}><KartotekaPage /></ProtectedPage>} />
+        <Route path="/preview" element={<ProtectedPage roles={['SUPERADMIN']} permissions={['preview.superadmin']}><PreviewPage /></ProtectedPage>} />
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
