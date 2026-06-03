@@ -865,7 +865,7 @@ function useDashboardStats() {
   const [stats, setStats] = useState({
     openTasks: 0, criticalTasks: 0, urgentTasks: 0, newReports: 0,
     totalAssets: 0, operationalAssets: 0, maintenanceAssets: 0, breakdownAssets: 0,
-    upcomingRevisions: 0, inProgress: 0, overdueTasks: 0, loading: true,
+    upcomingRevisions: 0, inProgress: 0, overdueTasks: 0, newKioskTasks: 0, loading: true,
   });
 
   useEffect(() => {
@@ -873,16 +873,17 @@ function useDashboardStats() {
 
     const tq = query(collection(db, 'tasks'), where('status', 'in', ['backlog', 'planned', 'in_progress', 'paused']));
     unsubs.push(onSnapshot(tq, (snap) => {
-      let c = 0, u = 0, b = 0, ip = 0, overdue = 0;
+      let c = 0, u = 0, b = 0, ip = 0, overdue = 0, kiosk = 0;
       snap.docs.forEach((d) => {
         const data = d.data();
         if (data.priority === 'P1') c++;
         if (data.priority === 'P2') u++;
         if (data.status === 'backlog') b++;
+        if (data.status === 'backlog' && data.source === 'kiosk') kiosk++;
         if (data.status === 'in_progress') ip++;
         if (isBeforeToday(data.dueDate || data.plannedDate)) overdue++;
       });
-      setStats((p) => ({ ...p, openTasks: snap.size, criticalTasks: c, urgentTasks: u, newReports: b, inProgress: ip, overdueTasks: overdue, loading: false }));
+      setStats((p) => ({ ...p, openTasks: snap.size, criticalTasks: c, urgentTasks: u, newReports: b, inProgress: ip, overdueTasks: overdue, newKioskTasks: kiosk, loading: false }));
     }, () => setStats((p) => ({ ...p, loading: false }))));
 
     const aq = query(collection(db, 'assets'));
@@ -1022,6 +1023,7 @@ function VacationNotice({ todayVacations, upcomingVacations, onNavigate }: {
 }
 
 function OperationalAlerts({
+  newKioskTasks,
   criticalTasks,
   overdueTasks,
   expiredRevisions,
@@ -1031,6 +1033,7 @@ function OperationalAlerts({
   todayAbsences,
   onNavigate,
 }: {
+  newKioskTasks: number;
   criticalTasks: number;
   overdueTasks: number;
   expiredRevisions: number;
@@ -1041,6 +1044,7 @@ function OperationalAlerts({
   onNavigate: (path: string) => void;
 }) {
   const alerts = [
+    newKioskTasks > 0 ? { label: 'Nové z kiosku', value: newKioskTasks, detail: 'hlášení od obsluhy', path: '/tasks?source=kiosk', icon: Bell, tone: 'text-red-700', border: 'border-red-200 bg-red-50' } : null,
     criticalTasks > 0 ? { label: 'P1 úkoly', value: criticalTasks, detail: 'řešit hned', path: '/tasks', icon: AlertTriangle, tone: 'text-red-700', border: 'border-red-200 bg-red-50' } : null,
     overdueTasks > 0 ? { label: 'Po termínu', value: overdueTasks, detail: 'otevřené práce', path: '/tasks', icon: Clock, tone: 'text-orange-700', border: 'border-orange-200 bg-orange-50' } : null,
     expiredRevisions > 0 ? { label: 'Prošlé revize', value: expiredRevisions, detail: 'auditní riziko', path: '/revisions', icon: ShieldCheck, tone: 'text-red-700', border: 'border-red-200 bg-red-50' } : null,
@@ -1842,6 +1846,7 @@ function FullDashboard() {
         }} />
 
         <OperationalAlerts
+          newKioskTasks={(stats as any).newKioskTasks || 0}
           criticalTasks={stats.criticalTasks || 0}
           overdueTasks={(stats as any).overdueTasks || 0}
           expiredRevisions={revStats.expired ?? 0}

@@ -28,6 +28,8 @@ import {
   MapPin,
   Search,
   User,
+  AlertTriangle,
+  BellRing,
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -58,6 +60,7 @@ interface Task {
   assetId?: string;
   assetName?: string;
   createdAt?: any;
+  updatedAt?: any;
   startedAt?: any;
   plannedDate?: string;
   completedAt?: any;
@@ -260,6 +263,51 @@ function timeAgo(date: any): string {
   if (hours < 24) return `${hours}h`;
   const days = Math.floor(hours / 24);
   return `${days}d`;
+}
+
+function taskTimeValue(value: any): number {
+  if (!value) return 0;
+  const date = value.toDate ? value.toDate() : new Date(value);
+  const time = date instanceof Date ? date.getTime() : Number.NaN;
+  return Number.isNaN(time) ? 0 : time;
+}
+
+function isKioskTask(task: Task): boolean {
+  return task.source === 'kiosk';
+}
+
+function isNewKioskTask(task: Task): boolean {
+  return isKioskTask(task) && task.status === 'backlog';
+}
+
+function priorityRank(priority?: string): number {
+  return ({ P1: 0, P2: 1, P3: 2, P4: 3 } as Record<string, number>)[priority || ''] ?? 9;
+}
+
+function compareTasks(a: Task, b: Task, mode: SortMode): number {
+  const newestA = taskTimeValue(a.createdAt || a.updatedAt || a.completedAt);
+  const newestB = taskTimeValue(b.createdAt || b.updatedAt || b.completedAt);
+
+  if (mode === 'newest') return newestB - newestA;
+
+  const priorityDiff = priorityRank(a.priority) - priorityRank(b.priority);
+  if (priorityDiff !== 0) return priorityDiff;
+
+  if (mode === 'smart') {
+    const kioskDiff = Number(isNewKioskTask(b)) - Number(isNewKioskTask(a));
+    if (kioskDiff !== 0) return kioskDiff;
+    const activeDiff = Number(b.status === 'in_progress') - Number(a.status === 'in_progress');
+    if (activeDiff !== 0) return activeDiff;
+  }
+
+  return newestB - newestA;
+}
+
+function priorityCardClass(priority?: string): string {
+  if (priority === 'P1') return 'bg-red-50 border-red-200';
+  if (priority === 'P2') return 'bg-amber-50 border-amber-200';
+  if (priority === 'P3') return 'bg-white border-slate-200';
+  return 'bg-slate-50 border-slate-200';
 }
 
 function toDate(value: any): Date | null {
@@ -522,6 +570,8 @@ function WorkerMultiSelect({
 // TAB FILTER TYPE
 // ═══════════════════════════════════════════════════
 type FilterTab = 'mine' | 'active' | 'done';
+type SourceFilter = 'all' | 'kiosk';
+type SortMode = 'smart' | 'newest' | 'priority';
 
 const TAB_OPTIONS: { key: FilterTab; label: string; color: string }[] = [
   { key: 'active', label: 'Aktivní', color: '#fbbf24' },
@@ -539,15 +589,23 @@ function TaskCard({ task, onClick, onEdit, onDelete, onAddLog, onComplete }: { t
   const initials = assignee !== '—' ? assignee.split(/[,\s]+/).filter(Boolean).map(w => w[0] || '').join('').slice(0, 2) || '?' : '?';
   const isActive = task.status === 'in_progress';
   const isDone = task.status === 'done' || task.status === 'completed';
+  const fromKiosk = isKioskTask(task);
+  const freshKiosk = isNewKioskTask(task);
   const diaryTask = isDiaryTask(task);
   const problem = taskProblemText(task);
   const action = taskActionText(task);
   const typeLabel = workTypeLabel(task.workType);
 
   return (
-    <div className={`vik-row-card bg-white flex flex-col overflow-hidden ${pc.borderLeft} ${
-      isActive ? 'border-amber-500/50 ring-1 ring-amber-500/30' : ''
+    <div className={`vik-row-card flex flex-col overflow-hidden ${priorityCardClass(task.priority)} ${pc.borderLeft} ${
+      freshKiosk ? 'ring-2 ring-red-300/70' : isActive ? 'ring-1 ring-amber-500/30' : ''
     }`}>
+      {freshKiosk && (
+        <div className="flex items-center gap-2 border-b border-red-200 bg-red-50 px-3 py-2 text-xs font-black text-red-700">
+          <BellRing className="h-4 w-4" />
+          Nové hlášení z kiosku
+        </div>
+      )}
       {/* Active technician bar */}
       {isActive && assignee !== '—' && (
         <div className="px-2.5 py-1 bg-amber-500/15 border-b border-amber-500/20 flex items-center gap-1.5">
@@ -565,6 +623,11 @@ function TaskCard({ task, onClick, onEdit, onDelete, onAddLog, onComplete }: { t
             {task.priority}
           </span>
           <span className={`text-[10px] font-bold px-2 py-1 rounded-lg ${sb.bg} ${sb.text}`}>{sb.label}</span>
+          {fromKiosk && !freshKiosk && (
+            <span className="flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-[10px] font-black text-red-700">
+              <BellRing className="h-3 w-3" /> kiosk
+            </span>
+          )}
           {typeLabel && (
             <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-slate-700 text-white">
               {typeLabel}
@@ -685,6 +748,8 @@ export default function TasksPage() {
   const [filterTab, setFilterTab] = useState<FilterTab>('active');
   const [filterPriority, setFilterPriority] = useState<string | null>(null);
   const [filterTechnician, setFilterTechnician] = useState<string | null>(null);
+  const [filterSource, setFilterSource] = useState<SourceFilter>('all');
+  const [sortMode, setSortMode] = useState<SortMode>('smart');
   const [openedTaskFromUrl, setOpenedTaskFromUrl] = useState<string | null>(null);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [suggestMode, setSuggestMode] = useState<TaskSuggestMode>(null);
@@ -737,6 +802,16 @@ export default function TasksPage() {
     }
   }, [loading, openedTaskFromUrl, searchParams, setSearchParams, tasks]);
 
+  useEffect(() => {
+    if (searchParams.get('source') !== 'kiosk') return;
+    setFilterTab('active');
+    setFilterSource('kiosk');
+    setSortMode('newest');
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('source');
+    setSearchParams(nextParams, { replace: true });
+  }, [searchParams, setSearchParams]);
+
   // Counts for tabs
   const activeCount = tasks.filter((t) => t.status !== 'done' && t.status !== 'completed').length;
   const mineCount = tasks.filter((t) =>
@@ -745,6 +820,7 @@ export default function TasksPage() {
   ).length;
   const doneCount = tasks.filter((t) => t.status === 'done' || t.status === 'completed').length;
   const tabCounts: Record<FilterTab, number> = { active: activeCount, mine: mineCount, done: doneCount };
+  const newKioskCount = tasks.filter(isNewKioskTask).length;
 
   const equipmentAssets = useMemo(() => (
     assets
@@ -863,8 +939,11 @@ export default function TasksPage() {
       result = result.filter((t) => taskWorkerNames(t).includes(filterTechnician));
     }
 
-    const order: Record<string, number> = { P1: 0, P2: 1, P3: 2, P4: 3 };
-    return result.sort((a, b) => (order[a.priority] ?? 9) - (order[b.priority] ?? 9));
+    if (filterSource === 'kiosk') {
+      result = result.filter((t) => isKioskTask(t));
+    }
+
+    return result.sort((a, b) => compareTasks(a, b, sortMode));
   })();
 
   const handleCreateTask = async () => {
@@ -969,6 +1048,24 @@ export default function TasksPage() {
         {/* Summary */}
         <TaskSummary tasks={tasks} />
 
+        {newKioskCount > 0 && filterTab !== 'done' && (
+          <button
+            type="button"
+            onClick={() => { setFilterTab('active'); setFilterSource('kiosk'); setSortMode('newest'); }}
+            className="mb-3 flex w-full items-center gap-3 rounded-2xl border border-red-200 bg-red-50 p-3 text-left shadow-sm"
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-100 text-red-700">
+              <AlertTriangle className="h-5 w-5" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-black text-red-800">
+                {newKioskCount === 1 ? 'Nové hlášení z kiosku' : `${newKioskCount} nová hlášení z kiosku`}
+              </span>
+              <span className="block text-xs font-semibold text-red-700">Kliknutím zobrazíš nejnovější úkoly od obsluhy.</span>
+            </span>
+          </button>
+        )}
+
         {/* Tab filters */}
         <div className="flex gap-2 mb-3 border-b border-white/10 pb-2 overflow-x-auto">
           {TAB_OPTIONS.map((tab) => (
@@ -987,8 +1084,8 @@ export default function TasksPage() {
           ))}
         </div>
 
-        {/* Compact filters — priority + technician in one row */}
-        <div className="flex flex-col sm:flex-row gap-2 mb-4">
+        {/* Compact filters */}
+        <div className="grid grid-cols-1 gap-2 mb-4 sm:grid-cols-2 xl:grid-cols-4">
           <select
             value={filterPriority || ''}
             onChange={(e) => setFilterPriority(e.target.value || null)}
@@ -999,6 +1096,23 @@ export default function TasksPage() {
             <option value="P2">P2 — Tento týden</option>
             <option value="P3">P3 — Běžná</option>
             <option value="P4">P4 — Nápad</option>
+          </select>
+          <select
+            value={sortMode}
+            onChange={(e) => setSortMode(e.target.value as SortMode)}
+            className="vik-input flex-1 text-sm font-semibold"
+          >
+            <option value="smart">Řazení: priorita + nové</option>
+            <option value="newest">Řazení: nejnovější</option>
+            <option value="priority">Řazení: jen priorita</option>
+          </select>
+          <select
+            value={filterSource}
+            onChange={(e) => setFilterSource(e.target.value as SourceFilter)}
+            className="vik-input flex-1 text-sm font-semibold"
+          >
+            <option value="all">Zdroj: Vše</option>
+            <option value="kiosk">Zdroj: Kiosk</option>
           </select>
           {technicians.length > 0 && (
             <select
