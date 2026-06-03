@@ -6,6 +6,7 @@ import {
   CalendarClock,
   CheckCircle2,
   ClipboardList,
+  Droplets,
   Loader2,
   MapPin,
   Search,
@@ -80,6 +81,10 @@ function placeLabel(asset: Asset): string {
   return [asset.buildingId ? `Budova ${asset.buildingId}` : '', asset.floor, asset.areaName || asset.location]
     .filter(Boolean)
     .join(' | ') || 'Umístění není vyplněné';
+}
+
+function roomLabel(asset: Asset): string {
+  return asset.areaName || asset.roomId || asset.location || '';
 }
 
 function customFieldText(asset: Asset, keys: string[]): string {
@@ -382,6 +387,7 @@ function DataloggerCard({
 }) {
   const min = customFieldNumber(asset, ['min', 'minimum', 'min teplota', 'dolni limit']);
   const max = customFieldNumber(asset, ['max', 'maximum', 'max teplota', 'horni limit']);
+  const directRoom = latest?.roomName || roomLabel(asset);
 
   return (
     <article className="vik-card overflow-hidden p-4">
@@ -394,9 +400,10 @@ function DataloggerCard({
             <div className="min-w-0">
               <h2 className="truncate text-lg font-black text-slate-950">{asset.name}</h2>
               <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-semibold text-slate-600">
+                {asset.buildingId && <span>Budova {asset.buildingId}</span>}
                 <span className="inline-flex items-center gap-1">
                   <MapPin className="h-4 w-4 text-slate-400" />
-                  {placeLabel(asset)}
+                  {directRoom || 'Místnost nedoplněna'}
                 </span>
                 <span className="font-mono">{asset.code || 'bez kódu'}</span>
               </div>
@@ -419,7 +426,13 @@ function DataloggerCard({
           </div>
         </div>
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-          <div className="text-xs font-black uppercase tracking-wide text-slate-500">Limit</div>
+          <div className="text-xs font-black uppercase tracking-wide text-slate-500">Vlhkost / limit</div>
+          {typeof latest?.humidityPct === 'number' && (
+            <div className="mt-2 flex items-center gap-1 text-2xl font-black text-cyan-700">
+              <Droplets className="h-5 w-5" />
+              {latest.humidityPct} %
+            </div>
+          )}
           <div className="mt-2 text-base font-black text-slate-950">{rangeLabel(min, max)}</div>
           <div className="mt-1 text-xs font-semibold text-slate-500">
             {customFieldText(asset, ['typ', 'prostor', 'sklad']) || 'dle karty'}
@@ -465,6 +478,7 @@ function TemperatureModal({
   onSaved: () => void;
 }) {
   const [temperature, setTemperature] = useState('');
+  const [humidity, setHumidity] = useState('');
   const [measuredAt, setMeasuredAt] = useState(toDateTimeLocal(new Date()));
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
@@ -475,6 +489,11 @@ function TemperatureModal({
       showToast('Zadej platnou teplotu.', 'error');
       return;
     }
+    const humidityValue = humidity.trim() ? Number(humidity.replace(',', '.')) : undefined;
+    if (humidityValue !== undefined && (!Number.isFinite(humidityValue) || humidityValue < 0 || humidityValue > 100)) {
+      showToast('Vlhkost musí být číslo 0-100 %.', 'error');
+      return;
+    }
 
     setSaving(true);
     try {
@@ -483,7 +502,9 @@ function TemperatureModal({
         datalogger: asset,
         user,
         temperatureC: value,
+        humidityPct: humidityValue,
         measuredAt: fromDateTimeLocal(measuredAt),
+        roomName: roomLabel(asset),
         note: note.trim(),
       });
       showToast('Teplota dataloggeru uložena.', 'success');
@@ -521,6 +542,21 @@ function TemperatureModal({
               className="vik-input text-2xl font-black"
               autoFocus
             />
+          </label>
+
+          <label className="block">
+            <span className="mb-1 flex items-center gap-1 text-sm font-black text-slate-800">
+              <Droplets className="h-4 w-4 text-cyan-700" />
+              Vlhkost
+            </span>
+            <input
+              value={humidity}
+              onChange={(event) => setHumidity(event.target.value)}
+              inputMode="decimal"
+              placeholder="volitelně, např. 55"
+              className="vik-input text-xl font-black"
+            />
+            <span className="mt-1 block text-xs font-semibold text-slate-500">Zadej procenta RH, pokud datalogger vlhkost ukazuje.</span>
           </label>
 
           <div>

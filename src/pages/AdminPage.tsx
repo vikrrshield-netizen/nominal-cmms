@@ -12,7 +12,7 @@ import {
   Users, Shield, Edit2, Trash2, Save,
   X, ArrowLeft, AlertTriangle, Eye, EyeOff, UserPlus,
   Lock, Unlock, History, Building2, Settings2, Plus, Check, Loader2, LayoutGrid, Briefcase,
-  Upload, FileSpreadsheet, Download, CheckCircle2, Bug,
+  Upload, FileSpreadsheet, Download, CheckCircle2, Bug, Search,
 } from 'lucide-react';
 import { parseExcelFile } from '../utils/importers/excelImporter';
 import type { ParseResult } from '../utils/importers/excelImporter';
@@ -173,6 +173,11 @@ const allKnownPermissions = () => uniqueStrings([
   ...PERMISSION_GROUPS.flatMap(group => group.permissions.map(permission => permission.key)),
 ]).sort((a, b) => getPermissionLabel(a).localeCompare(getPermissionLabel(b), 'cs'));
 
+const normalizeAdminSearch = (value: unknown): string => String(value || '')
+  .toLowerCase()
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '');
+
 // ═══════════════════════════════════════════════════════════════════
 // COMPONENT
 // ═══════════════════════════════════════════════════════════════════
@@ -238,6 +243,7 @@ export default function AdminPage() {
   const [showNewUserModal, setShowNewUserModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'users' | 'roles' | 'modules' | 'positions' | 'config' | 'audit' | 'errors' | 'import'>('users');
   const [filterRole, setFilterRole] = useState<UserRole | 'ALL'>('ALL');
+  const [userSearch, setUserSearch] = useState('');
 
   // Access: admin.view = read-only, admin.manage = full edit
   const canView = hasPermission('admin.view') || hasPermission('admin.manage');
@@ -262,10 +268,23 @@ export default function AdminPage() {
   }
 
   // eslint-disable-next-line react-hooks/rules-of-hooks
-  const filteredUsers = useMemo(
-    () => users.filter(u => filterRole === 'ALL' || u.role === filterRole),
-    [users, filterRole]
-  );
+  const filteredUsers = useMemo(() => {
+    const needle = normalizeAdminSearch(userSearch);
+    return users.filter((u) => {
+      if (filterRole !== 'ALL' && u.role !== filterRole) return false;
+      if (!needle) return true;
+      return normalizeAdminSearch([
+        u.displayName,
+        u.pin,
+        u.role,
+        ROLE_CONFIG[u.role]?.label,
+        u.email,
+        u.phone,
+        u.building,
+        u.positionId,
+      ].join(' ')).includes(needle);
+    });
+  }, [users, filterRole, userSearch]);
 
   // eslint-disable-next-line react-hooks/rules-of-hooks
   const handleDeleteUser = useCallback(async (userId: string) => {
@@ -414,6 +433,33 @@ export default function AdminPage() {
                     </button>
                   );
                 })}
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-xs font-bold uppercase tracking-wider text-purple-300">Správa podle jména</div>
+                    <div className="text-sm text-slate-400">{filteredUsers.length} z {users.length} pracovníků</div>
+                  </div>
+                  {userSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setUserSearch('')}
+                      className="rounded-lg px-3 py-1.5 text-xs font-bold text-slate-300 hover:bg-white/10 hover:text-white"
+                    >
+                      Vymazat
+                    </button>
+                  )}
+                </div>
+                <div className="flex min-h-12 items-center gap-3 rounded-xl border border-white/10 bg-slate-950/60 px-3">
+                  <Search className="h-5 w-5 shrink-0 text-slate-500" />
+                  <input
+                    value={userSearch}
+                    onChange={(event) => setUserSearch(event.target.value)}
+                    placeholder="Hledat pracovníka podle jména, PINu, role, budovy..."
+                    className="h-12 w-full bg-transparent text-base font-semibold text-white outline-none placeholder:text-slate-500"
+                  />
+                </div>
               </div>
 
               {/* Users List */}

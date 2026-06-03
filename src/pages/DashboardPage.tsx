@@ -15,7 +15,7 @@ import {
   Settings, AlertTriangle, Bell, LogOut, Loader2, ClipboardCheck,
   Sparkles, Wrench, BarChart3,
   Clock, FileText, PlusCircle, Search, ShieldCheck, X, User, MapPin,
-  Calendar, Building2, Package, Wind, Cog, Thermometer,
+  Calendar, Building2, Package, Wind, Cog, Thermometer, Monitor,
 } from 'lucide-react';
 import appConfig from '../appConfig';
 import { DEFAULT_ENABLED_MODULES, MODULE_DEFINITIONS } from '../types/user';
@@ -237,7 +237,10 @@ function QuickActions({ onNavigate }: { onNavigate: (path: string) => void }) {
     { label: 'Report zařízení', detail: 'podklady pro audit', path: '/reports', icon: BarChart3, tone: 'text-cyan-600' },
   ];
   const primaryActions = actions.filter((action) => action.primary);
-  const secondaryActions = actions.filter((action) => !action.primary);
+  const secondaryActions = [
+    { label: 'Kiosk', detail: 'režim pro obsluhu', path: '/kiosk', icon: Monitor, tone: 'text-emerald-700' },
+    ...actions.filter((action) => !action.primary),
+  ];
 
   return (
     <section className="mb-5">

@@ -5,8 +5,11 @@ export interface DataloggerTemperatureLog {
   tenantId: string;
   dataloggerId: string;
   dataloggerName: string;
+  buildingId?: string;
+  roomName?: string;
   location?: string;
   temperatureC: number;
+  humidityPct?: number;
   measuredAt: Date | Timestamp;
   userId: string;
   userName: string;

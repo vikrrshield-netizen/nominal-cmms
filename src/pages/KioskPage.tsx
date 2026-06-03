@@ -296,8 +296,11 @@ const getKioskDevicePriority = (
 
 export default function KioskPage() {
   const navigate = useNavigate();
-  const { user, logout, canSeeBuilding } = useAuthContext();
+  const { user, logout, canSeeBuilding, hasPermission } = useAuthContext();
   const handoverRecipients = useEmployeeNames({ tenantId: user?.tenantId });
+  const canUseGearboxKiosk = hasPermission('gearbox.temperature.write') || hasPermission('gearbox.manage') || hasPermission('asset.update');
+  const canUsePrefilterKiosk = canUseGearboxKiosk;
+  const canUseDataloggerKiosk = hasPermission('datalogger.temperature.write') || hasPermission('datalogger.read') || hasPermission('datalogger.manage');
 
   const [activeView, setActiveView] = useState<ViewState>('MENU');
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -571,35 +574,35 @@ export default function KioskPage() {
   }, [activeGearboxAssets, currentTime]);
 
   const todayActions = useMemo<KioskTodayAction[]>(() => {
-    const gearboxActions = gearboxTemperatureAlerts.missing.map(({ asset, status }) => ({
+    const gearboxActions = canUseGearboxKiosk ? gearboxTemperatureAlerts.missing.map(({ asset, status }) => ({
       id: `gearbox-${asset.id}`,
       type: 'gearbox_temperature' as const,
       assetId: asset.id,
       title: `Zapsat teplotu: ${asset.name}`,
       detail: `${asset.currentExtruderName || getAssetRoom(asset, assets) || 'Převodovka'} | ${status.label}`,
       tone: 'violet' as const,
-    }));
+    })) : [];
 
-    const overduePrefilters = prefilterAlerts.overdue.map(({ asset, status }) => ({
+    const overduePrefilters = canUsePrefilterKiosk ? prefilterAlerts.overdue.map(({ asset, status }) => ({
       id: `prefilter-overdue-${asset.id}`,
       type: 'prefilter' as const,
       assetId: asset.id,
       title: `Výměna předfiltru: ${asset.name}`,
       detail: `${getAssetRoom(asset, assets) || 'Extruder'} | ${status.label}`,
       tone: 'red' as const,
-    }));
+    })) : [];
 
-    const warningPrefilters = prefilterAlerts.warning.map(({ asset, status }) => ({
+    const warningPrefilters = canUsePrefilterKiosk ? prefilterAlerts.warning.map(({ asset, status }) => ({
       id: `prefilter-warning-${asset.id}`,
       type: 'prefilter' as const,
       assetId: asset.id,
       title: `Zkontrolovat předfiltr: ${asset.name}`,
       detail: `${getAssetRoom(asset, assets) || 'Extruder'} | ${status.label}`,
       tone: 'amber' as const,
-    }));
+    })) : [];
 
     return [...gearboxActions, ...overduePrefilters, ...warningPrefilters];
-  }, [assets, gearboxTemperatureAlerts.missing, prefilterAlerts.overdue, prefilterAlerts.warning]);
+  }, [assets, canUseGearboxKiosk, canUsePrefilterKiosk, gearboxTemperatureAlerts.missing, prefilterAlerts.overdue, prefilterAlerts.warning]);
 
   const filteredAssets = useMemo(() => {
     const queryText = normalize(assetSearch);
@@ -1455,8 +1458,15 @@ export default function KioskPage() {
           <MenuButton icon={<AlertTriangle className="w-12 h-12" />} label="Nahlásit poruchu" color="bg-red-600 hover:bg-red-500" onClick={() => setActiveView('BREAKDOWN')} />
           <MenuButton icon={<Package className="w-12 h-12" />} label="Požadavek na díl" color="bg-blue-600 hover:bg-blue-500" onClick={() => setActiveView('ORDER')} />
           <MenuButton icon={<ClipboardList className="w-12 h-12" />} label="Předání směny" color="bg-indigo-600 hover:bg-indigo-500" onClick={() => setActiveView('HANDOVER')} />
-          <MenuButton icon={<Filter className="w-12 h-12" />} label="Výměna předfiltru" color="bg-cyan-700 hover:bg-cyan-600" badge={prefilterAlerts.overdue.length + prefilterAlerts.warning.length} onClick={() => setActiveView('PREFILTER')} />
-          <MenuButton icon={<Thermometer className="w-12 h-12" />} label="Teplota převodovky" color="bg-violet-700 hover:bg-violet-600" badge={gearboxTemperatureAlerts.missing.length} onClick={() => setActiveView('GEARBOX_TEMP')} />
+          {canUseDataloggerKiosk && (
+            <MenuButton icon={<Thermometer className="w-12 h-12" />} label="Datalogery" color="bg-teal-700 hover:bg-teal-600" onClick={() => navigate('/dataloggers')} />
+          )}
+          {canUsePrefilterKiosk && (
+            <MenuButton icon={<Filter className="w-12 h-12" />} label="Výměna předfiltru" color="bg-cyan-700 hover:bg-cyan-600" badge={prefilterAlerts.overdue.length + prefilterAlerts.warning.length} onClick={() => setActiveView('PREFILTER')} />
+          )}
+          {canUseGearboxKiosk && (
+            <MenuButton icon={<Thermometer className="w-12 h-12" />} label="Teplota převodovky" color="bg-violet-700 hover:bg-violet-600" badge={gearboxTemperatureAlerts.missing.length} onClick={() => setActiveView('GEARBOX_TEMP')} />
+          )}
           <MenuButton icon={<Lightbulb className="w-12 h-12" />} label="Nápad" color="bg-emerald-700 hover:bg-emerald-600" onClick={() => setActiveView('IDEA')} />
           <MenuButton icon={<HelpCircle className="w-12 h-12" />} label="Jak postupovat" color="bg-amber-700 hover:bg-amber-600" onClick={() => setActiveView('ASSISTANT')} />
           <MenuButton icon={<ShieldCheck className="w-12 h-12" />} label="Schránka důvěry" color="bg-purple-700 hover:bg-purple-600" onClick={() => setActiveView('MESSAGE')} />
@@ -1483,7 +1493,7 @@ export default function KioskPage() {
           <div className="mt-2 space-y-2">
             {todayActions.length === 0 ? (
               <div className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-3 text-sm font-bold text-emerald-100">
-                Předfiltry i teploty převodovek jsou dnes v pořádku.
+                Pro tvoji roli tu dnes není žádná položka k vyřízení.
               </div>
             ) : (
               <>
