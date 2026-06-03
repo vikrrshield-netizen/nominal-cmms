@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
 import { useFleet } from '../hooks/useFleet';
@@ -22,6 +22,7 @@ import { DEFAULT_ENABLED_MODULES, MODULE_DEFINITIONS } from '../types/user';
 import type { UserRole } from '../types/user';
 import type { WidgetInstance } from '../types/dashboard';
 import type { Asset } from '../types/asset';
+import type { GearboxTemperatureLog } from '../types/gearbox';
 import { getWidgetDef } from '../config/widgetRegistry';
 import { SANDBOX_STATS, initSandboxMockData } from '../lib/sandboxDb';
 import { showToast } from '../components/ui/Toast';
@@ -375,15 +376,26 @@ function dashboardGearboxTemp(asset: Asset) {
   const ageDays = measuredAt ? Math.floor((Date.now() - measuredAt.getTime()) / (1000 * 60 * 60 * 24)) : null;
 
   if (value === null) {
-    return { label: 'bez měření', alert: true, tone: 'text-red-700' };
+    return { label: 'bez měření', value, measuredAt, alert: true, tone: 'text-red-700' };
   }
   if (value >= critical) {
-    return { label: `${value} °C`, alert: true, tone: 'text-red-700' };
+    return { label: `${value} °C`, value, measuredAt, alert: true, tone: 'text-red-700' };
   }
   if (value >= warning || (ageDays !== null && ageDays >= 5)) {
-    return { label: `${value} °C`, alert: ageDays === null || ageDays >= 7 || value >= warning, tone: 'text-amber-700' };
+    return { label: `${value} °C`, value, measuredAt, alert: ageDays === null || ageDays >= 7 || value >= warning, tone: 'text-amber-700' };
   }
-  return { label: `${value} °C`, alert: false, tone: 'text-emerald-700' };
+  return { label: `${value} °C`, value, measuredAt, alert: false, tone: 'text-emerald-700' };
+}
+
+function dashboardGearboxShortDate(value: unknown): string {
+  const date = dashboardGearboxDate(value);
+  if (!date) return 'bez data';
+  return date.toLocaleString('cs-CZ', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 function dashboardGearboxStatus(status: ReturnType<typeof getGearboxStatus>) {
@@ -407,6 +419,7 @@ function dashboardGearboxStatus(status: ReturnType<typeof getGearboxStatus>) {
 
 function useGearboxDashboard(tenantId: string) {
   const [items, setItems] = useState<Asset[]>([]);
+  const [temperatureLogs, setTemperatureLogs] = useState<GearboxTemperatureLog[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
@@ -418,6 +431,23 @@ function useGearboxDashboard(tenantId: string) {
       .catch((err) => console.warn('[Dashboard] gearboxes error:', err));
     return () => { alive = false; };
   }, [tenantId, refreshKey]);
+
+  useEffect(() => {
+    const logsQuery = query(collection(db, 'gearbox_temperature_logs'), orderBy('measuredAt', 'desc'), limit(240));
+    return onSnapshot(
+      logsQuery,
+      (snap) => {
+        setTemperatureLogs(snap.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...docSnap.data(),
+        } as GearboxTemperatureLog)).filter((log) => log.tenantId === tenantId || !log.tenantId));
+      },
+      (err) => {
+        console.warn('[Dashboard] gearbox temperature logs error:', err);
+        setTemperatureLogs([]);
+      },
+    );
+  }, [tenantId]);
 
   return useMemo(() => {
     const rows = items.map((asset) => {
@@ -432,6 +462,7 @@ function useGearboxDashboard(tenantId: string) {
         status,
         statusInfo,
         temp,
+        temperatureLogs: temperatureLogs.filter((log) => log.gearboxId === asset.id).slice(0, 12),
       };
     });
     return {
@@ -446,7 +477,60 @@ function useGearboxDashboard(tenantId: string) {
       }),
       refresh: () => setRefreshKey((value) => value + 1),
     };
-  }, [items]);
+  }, [items, temperatureLogs]);
+}
+
+function DashboardGearboxTrend({ logs }: { logs: GearboxTemperatureLog[] }) {
+  const points = logs
+    .filter((log) => typeof log.temperatureC === 'number' && dashboardGearboxDate(log.measuredAt))
+    .slice(0, 8)
+    .reverse();
+
+  if (points.length < 2) {
+    return (
+      <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-500">
+        Trend bude vidět po dalším zápisu.
+      </div>
+    );
+  }
+
+  const values = points.map((log) => log.temperatureC);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const spread = Math.max(1, max - min);
+  const polyline = points.map((log, index) => {
+    const x = points.length === 1 ? 50 : (index / (points.length - 1)) * 100;
+    const y = 34 - ((log.temperatureC - min) / spread) * 24;
+    return `${x.toFixed(2)},${y.toFixed(2)}`;
+  }).join(' ');
+  const first = points[0];
+  const latest = points[points.length - 1];
+
+  return (
+    <div className="mt-3 rounded-xl border border-cyan-100 bg-cyan-50/55 px-3 py-2">
+      <div className="mb-1 flex items-center justify-between gap-2 text-xs font-black text-slate-700">
+        <span className="inline-flex items-center gap-1">
+          <Thermometer className="h-3.5 w-3.5 text-cyan-700" />
+          Trend teplot
+        </span>
+        <span className="text-cyan-800">{first.temperatureC} °C → {latest.temperatureC} °C</span>
+      </div>
+      <svg viewBox="0 0 100 40" preserveAspectRatio="none" className="h-10 w-full overflow-visible">
+        <line x1="0" y1="34" x2="100" y2="34" className="stroke-slate-300" strokeWidth="1" />
+        <line x1="0" y1="10" x2="100" y2="10" className="stroke-cyan-100" strokeWidth="1" />
+        <polyline points={polyline} fill="none" className="stroke-cyan-600" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        {points.map((log, index) => {
+          const x = points.length === 1 ? 50 : (index / (points.length - 1)) * 100;
+          const y = 34 - ((log.temperatureC - min) / spread) * 24;
+          return <circle key={`${log.id}-${index}`} cx={x} cy={y} r="2" className="fill-cyan-700" />;
+        })}
+      </svg>
+      <div className="mt-1 flex justify-between text-[11px] font-semibold text-slate-500">
+        <span>{dashboardGearboxShortDate(first.measuredAt)}</span>
+        <span>{dashboardGearboxShortDate(latest.measuredAt)}</span>
+      </div>
+    </div>
+  );
 }
 
 function GearboxDashboardWidget({
@@ -488,25 +572,25 @@ function GearboxDashboardWidget({
   if (!data.total) return null;
 
   return (
-    <section className="mb-5 rounded-3xl border border-slate-800 bg-slate-950 p-4 text-white shadow-lg">
+    <section className={`mb-5 ${DASH_PANEL} p-4`}>
       <button
         type="button"
         onClick={() => onNavigate('/gearboxes')}
         className="flex w-full items-start justify-between gap-3 text-left transition hover:opacity-90 active:scale-[0.99]"
       >
         <div className="flex min-w-0 items-start gap-3">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-violet-400/35 bg-violet-500/20">
-            <Cog className="h-6 w-6 text-violet-100" />
+          <div className={DASH_ICON_BOX}>
+            <Cog className="h-5 w-5 text-violet-600" />
           </div>
           <div className="min-w-0">
-            <div className="text-base font-black text-white">Převodovky</div>
-            <div className="mt-1 text-sm font-semibold text-slate-300">
+            <div className="text-sm font-black text-slate-950">Převodovky</div>
+            <div className="mt-1 text-sm font-semibold text-slate-500">
               {data.installed} v provozu · {data.stock} sklad · {data.service} servis
             </div>
           </div>
         </div>
         {data.alerts > 0 && (
-          <span className="shrink-0 rounded-full border border-red-400/40 bg-red-500/15 px-2.5 py-1 text-xs font-black text-red-100">
+          <span className="shrink-0 rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-black text-red-700">
             {data.alerts} upozornění
           </span>
         )}
@@ -518,10 +602,10 @@ function GearboxDashboardWidget({
             key={item.id}
             className={`rounded-2xl border p-3 shadow-sm ${
               item.status === 'in_stock'
-                ? 'border-sky-400/35 bg-sky-500/10'
+                ? 'border-sky-200 bg-sky-50/80'
                 : item.status === 'service'
-                  ? 'border-amber-400/40 bg-amber-500/10'
-                  : 'border-slate-700 bg-[#0b1220]'
+                  ? 'border-amber-200 bg-amber-50/75'
+                  : 'border-[var(--vik-border)] bg-[var(--vik-surface-2)]'
             }`}
           >
             <button
@@ -531,9 +615,9 @@ function GearboxDashboardWidget({
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="truncate text-base font-black text-white">{item.name}</div>
+                  <div className="truncate text-sm font-black text-slate-950">{item.name}</div>
                   <div className="mt-1 flex flex-wrap items-center gap-2">
-                    <span className="truncate text-sm font-semibold text-slate-300">{item.location}</span>
+                    <span className="truncate text-sm font-semibold text-slate-500">{item.location}</span>
                     <span className={`rounded-full border px-2 py-1 text-xs font-black ${item.statusInfo.tone}`}>
                       {item.statusInfo.label}
                     </span>
@@ -541,21 +625,25 @@ function GearboxDashboardWidget({
                 </div>
                 <div className={`shrink-0 text-sm font-black ${
                   item.temp.tone.includes('red')
-                    ? 'text-red-200'
+                    ? 'text-red-700'
                     : item.temp.tone.includes('amber')
-                      ? 'text-amber-200'
-                      : 'text-emerald-200'
+                      ? 'text-amber-700'
+                      : 'text-emerald-700'
                 }`}>{item.temp.label}</div>
               </div>
+              <div className="mt-2 text-xs font-bold text-slate-500">
+                {item.temp.measuredAt ? `Naposledy ${dashboardGearboxShortDate(item.temp.measuredAt)}` : 'Teplota zatím bez zápisu'}
+              </div>
             </button>
+            <DashboardGearboxTrend logs={item.temperatureLogs} />
             <div className="mt-2 flex flex-wrap gap-2">
               {canLogRepair && (
-                <div className="grid w-full grid-cols-3 gap-1 rounded-lg border border-white/10 bg-slate-950/60 p-1">
+                <div className="grid w-full grid-cols-3 gap-1 rounded-lg border border-[var(--vik-border)] bg-white p-1">
                   <button
                     type="button"
                     onClick={() => onNavigate(`/asset/${item.id}?action=assign`)}
                     className={`min-h-9 rounded-md px-2 text-[11px] font-black transition active:scale-[0.98] ${
-                      item.status === 'installed' ? 'bg-emerald-500/20 text-emerald-100' : 'text-slate-300 hover:bg-white/10'
+                      item.status === 'installed' ? 'bg-emerald-100 text-emerald-800' : 'text-slate-600 hover:bg-[var(--vik-surface-2)]'
                     }`}
                   >
                     Extruder
@@ -565,7 +653,7 @@ function GearboxDashboardWidget({
                     disabled={savingStatusId === item.id || item.status === 'in_stock'}
                     onClick={() => handleStatusChange(item.asset, 'in_stock')}
                     className={`min-h-9 rounded-md px-2 text-[11px] font-black transition disabled:opacity-45 active:scale-[0.98] ${
-                      item.status === 'in_stock' ? 'bg-sky-500/20 text-sky-100' : 'text-slate-300 hover:bg-white/10'
+                      item.status === 'in_stock' ? 'bg-sky-100 text-sky-800' : 'text-slate-600 hover:bg-[var(--vik-surface-2)]'
                     }`}
                   >
                     {savingStatusId === item.id && item.status !== 'in_stock' ? '...' : 'Sklad'}
@@ -575,7 +663,7 @@ function GearboxDashboardWidget({
                     disabled={savingStatusId === item.id || item.status === 'service'}
                     onClick={() => handleStatusChange(item.asset, 'service')}
                     className={`min-h-9 rounded-md px-2 text-[11px] font-black transition disabled:opacity-45 active:scale-[0.98] ${
-                      item.status === 'service' ? 'bg-amber-500/20 text-amber-100' : 'text-slate-300 hover:bg-white/10'
+                      item.status === 'service' ? 'bg-amber-100 text-amber-800' : 'text-slate-600 hover:bg-[var(--vik-surface-2)]'
                     }`}
                   >
                     {savingStatusId === item.id && item.status !== 'service' ? '...' : 'Servis'}
@@ -585,7 +673,7 @@ function GearboxDashboardWidget({
               <button
                 type="button"
                 onClick={() => onNavigate(`/asset/${item.id}`)}
-                className="min-h-[44px] flex-1 rounded-lg border border-white/10 bg-white/5 px-2 text-xs font-black text-slate-100 transition hover:bg-white/10 active:scale-[0.98]"
+                className="min-h-[44px] flex-1 rounded-lg border border-slate-200 bg-white px-2 text-xs font-black text-slate-700 transition hover:bg-slate-50 active:scale-[0.98]"
               >
                 <FileText className="mr-1 inline h-4 w-4" />
                 Karta
@@ -594,7 +682,7 @@ function GearboxDashboardWidget({
                 <button
                   type="button"
                   onClick={() => onNavigate(`/asset/${item.id}?action=temp`)}
-                  className="min-h-[44px] flex-1 rounded-lg border border-sky-400/35 bg-sky-500/15 px-2 text-xs font-black text-sky-100 transition hover:bg-sky-500/25 active:scale-[0.98]"
+                  className="min-h-[44px] flex-1 rounded-lg border border-sky-200 bg-sky-50 px-2 text-xs font-black text-sky-700 transition hover:bg-sky-100 active:scale-[0.98]"
                 >
                   Teplota
                 </button>
@@ -603,7 +691,7 @@ function GearboxDashboardWidget({
                 <button
                   type="button"
                   onClick={() => setProblemAsset(item.asset)}
-                  className="min-h-[44px] flex-1 rounded-lg border border-red-400/35 bg-red-500/15 px-2 text-xs font-black text-red-100 transition hover:bg-red-500/25 active:scale-[0.98]"
+                  className="min-h-[44px] flex-1 rounded-lg border border-red-200 bg-red-50 px-2 text-xs font-black text-red-700 transition hover:bg-red-100 active:scale-[0.98]"
                 >
                   Nahlásit problém
                 </button>
@@ -612,7 +700,7 @@ function GearboxDashboardWidget({
                 <button
                   type="button"
                   onClick={() => setRepairAsset(item.asset)}
-                  className="min-h-[44px] flex-1 rounded-lg border border-amber-400/35 bg-amber-500/15 px-2 text-xs font-black text-amber-100 transition hover:bg-amber-500/25 active:scale-[0.98]"
+                  className="min-h-[44px] flex-1 rounded-lg border border-amber-200 bg-amber-50 px-2 text-xs font-black text-amber-700 transition hover:bg-amber-100 active:scale-[0.98]"
                 >
                   Oprava / úprava
                 </button>
