@@ -71,6 +71,15 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     ],
   },
   {
+    module: 'dataloggers',
+    label: 'Datalogery',
+    permissions: [
+      { key: 'datalogger.read', label: 'Číst', description: 'Zobrazit datalogery a historii teplot' },
+      { key: 'datalogger.temperature.write', label: 'Zapsat teplotu', description: 'Zapsat denní teplotu z dataloggeru' },
+      { key: 'datalogger.manage', label: 'Spravovat', description: 'Správa dataloggerů a mazání chybných zápisů' },
+    ],
+  },
+  {
     module: 'fleet',
     label: 'Vozidla',
     permissions: [

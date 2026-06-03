@@ -97,6 +97,7 @@ service cloud.firestore {
           'wo.read',
           'asset.read',
           'fleet.read',
+          'datalogger.read',
           'user.read',
           'report.read', 'report.export', 'audit.read',
           'finance.view', 'secretbox.view', 'purchase.approve',
@@ -109,6 +110,7 @@ service cloud.firestore {
           'wo.read', 'wo.approve',
           'asset.read',
           'fleet.manage', 'fleet.read',
+          'datalogger.read',
           'user.manage', 'user.read',
           'report.read', 'report.export', 'audit.read',
           'finance.view', 'purchase.approve',
@@ -121,6 +123,7 @@ service cloud.firestore {
           'wo.create', 'wo.update', 'wo.delete', 'wo.read', 'wo.approve', 'wo.close', 'wo.plan', 'wo.assign',
           'asset.create', 'asset.update', 'asset.delete', 'asset.read',
           'inv.consume', 'inv.restock', 'inv.manage', 'inv.order',
+          'datalogger.read', 'datalogger.temperature.write', 'datalogger.manage',
           'fleet.manage', 'fleet.read',
           'user.manage', 'user.read',
           'zone.change',
@@ -135,6 +138,7 @@ service cloud.firestore {
           'wo.create', 'wo.update', 'wo.read', 'wo.close',
           'asset.read', 'asset.update',
           'inv.consume', 'inv.restock',
+          'datalogger.read', 'datalogger.temperature.write', 'datalogger.manage',
           'fleet.read',
           'report.read',
           'ai.use', 'schedule.manage', 'production.manage',
@@ -155,6 +159,7 @@ service cloud.firestore {
           'wo.create', 'wo.update', 'wo.read',
           'asset.read',
           'inv.consume', 'inv.restock', 'inv.manage', 'inv.order',
+          'datalogger.read', 'datalogger.temperature.write',
           'report.read', 'schedule.manage'
         ]
       ) || (
@@ -356,6 +361,22 @@ service cloud.firestore {
         && request.resource.data.userName is string;
       allow update: if false;
       allow delete: if hasPermission('asset.delete');
+    }
+
+    match /datalogger_temperature_logs/{logId} {
+      allow read: if hasPermission('datalogger.read')
+        || hasPermission('datalogger.temperature.write')
+        || hasPermission('datalogger.manage')
+        || hasPermission('report.read');
+      allow create: if (hasPermission('datalogger.temperature.write') || hasPermission('datalogger.manage'))
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.measuredAt is timestamp
+        && request.resource.data.temperatureC is number
+        && request.resource.data.dataloggerId is string
+        && request.resource.data.dataloggerName is string
+        && request.resource.data.userName is string;
+      allow update: if false;
+      allow delete: if hasPermission('datalogger.manage');
     }
 
     match /gearbox_installation_events/{eventId} {

@@ -17,6 +17,7 @@ export const WIDGET_DEFINITIONS: WidgetDefinition[] = [
   { id: 'inventory',   type: 'tile',   label: 'Sklad ND',         icon: '📦', gradient: 'from-emerald-500 to-teal-600',   defaultSize: '1x1', component: 'TileWidget' },
   { id: 'fleet',       type: 'tile',   label: 'Vozidla',          icon: '🚗', gradient: 'from-cyan-500 to-blue-600',      defaultSize: '1x1', component: 'TileWidget' },
   { id: 'hvac',        type: 'tile',   label: 'Vzduchotechnika',  icon: '💨', gradient: 'from-sky-500 to-cyan-600',       defaultSize: '1x1', component: 'TileWidget' },
+  { id: 'dataloggers', type: 'tile',   label: 'Datalogery',       icon: '🌡️', gradient: 'from-cyan-500 to-blue-600',      defaultSize: '1x1', component: 'TileWidget', requiredPermission: 'datalogger.read' },
   { id: 'inspections', type: 'tile',   label: 'Kontroly',         icon: '✅', gradient: 'from-teal-500 to-emerald-600',   defaultSize: '1x1', component: 'TileWidget' },
   { id: 'calendar',    type: 'tile',   label: 'Kalendář',         icon: '📅', gradient: 'from-indigo-500 to-purple-600',  defaultSize: '1x1', component: 'TileWidget' },
   { id: 'ai',          type: 'action', label: 'VIKRR AI',         icon: '🤖', gradient: 'from-pink-500 to-rose-600',      defaultSize: '1x1', component: 'TileWidget', requiredPermission: 'ai.use' },
@@ -67,7 +68,7 @@ function makeInstances(ids: string[]): WidgetInstance[] {
 const ADMIN_ORDER = [
   'semaphore', 'top5', 'lemon',
   'fault', 'tasks', 'revisions', 'inventory',
-  'fleet', 'hvac', 'inspections', 'calendar', 'ai', 'reports',
+  'fleet', 'hvac', 'dataloggers', 'inspections', 'calendar', 'ai', 'reports',
   'idea', 'request', 'noticeboard', 'academy', 'production', 'warehouse', 'shifts', 'admin',
 ];
 
@@ -79,12 +80,12 @@ const VYROBA_ORDER = [
 const UDRZBA_ORDER = [
   'semaphore', 'top5',
   'fault', 'tasks', 'production', 'warehouse', 'shifts', 'revisions', 'inventory',
-  'fleet', 'hvac', 'inspections', 'calendar', 'ai',
+  'fleet', 'hvac', 'dataloggers', 'inspections', 'calendar', 'ai',
   'idea', 'request', 'noticeboard', 'academy',
 ];
 
 const SKLADNIK_ORDER = [
-  'inventory', 'hvac', 'tasks', 'fault', 'noticeboard', 'idea', 'request', 'academy',
+  'inventory', 'hvac', 'dataloggers', 'tasks', 'fault', 'noticeboard', 'idea', 'request', 'academy',
 ];
 
 const DEFAULT_CONFIGS: Record<UserRole, string[]> = {

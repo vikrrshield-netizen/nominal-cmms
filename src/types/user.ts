@@ -31,6 +31,8 @@ export type Permission =
   | 'fleet.manage' | 'fleet.read'
   // HVAC
   | 'hvac.read' | 'hvac.manage'
+  // Dataloggers
+  | 'datalogger.read' | 'datalogger.temperature.write' | 'datalogger.manage'
   // Users
   | 'user.manage' | 'user.read'
   // Zones
@@ -154,6 +156,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   MAJITEL: [
     'wo.read',
     'asset.read',
+    'datalogger.read',
     'fleet.read',
     'user.read',
     'report.read', 'report.export', 'audit.read',
@@ -170,6 +173,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   VEDENI: [
     'wo.read', 'wo.approve',
     'asset.read',
+    'datalogger.read',
     'fleet.manage', 'fleet.read',
     'user.manage', 'user.read',
     'report.read', 'report.export', 'audit.read',
@@ -188,6 +192,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'wo.create', 'wo.update', 'wo.delete', 'wo.read', 'wo.approve', 'wo.close', 'wo.plan', 'wo.assign',
     'asset.create', 'asset.update', 'asset.delete', 'asset.read',
     'gearbox.temperature.write', 'gearbox.manage',
+    'datalogger.read', 'datalogger.temperature.write', 'datalogger.manage',
     'inv.consume', 'inv.restock', 'inv.manage', 'inv.order',
     'fleet.manage', 'fleet.read',
     'user.manage', 'user.read',
@@ -211,6 +216,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'wo.create', 'wo.update', 'wo.read', 'wo.close',
     'asset.read', 'asset.update',
     'gearbox.temperature.write', 'gearbox.manage',
+    'datalogger.read', 'datalogger.temperature.write', 'datalogger.manage',
     'inv.consume', 'inv.restock',
     'fleet.read',
     'report.read',
@@ -239,6 +245,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'wo.create', 'wo.update', 'wo.read',
     'asset.read',
     'inv.consume', 'inv.restock', 'inv.manage', 'inv.order',
+    'datalogger.read', 'datalogger.temperature.write',
     'report.read',
     'schedule.manage',
   ],
@@ -341,6 +348,7 @@ export const MODULE_DEFINITIONS: ModuleDefinition[] = [
   { id: 'fleet', label: 'Vozidla', icon: '🚗', category: 'Údržba' },
   { id: 'hvac', label: 'Vzduchotechnika', icon: '💨', category: 'Údržba' },
   { id: 'gearboxes', label: 'Převodovky', icon: '⚙️', category: 'Údržba' },
+  { id: 'dataloggers', label: 'Datalogery', icon: '🌡️', category: 'Údržba' },
   { id: 'inspections', label: 'Kontroly', icon: '✅', category: 'Údržba' },
   { id: 'production', label: 'Výroba', icon: '🏭', category: 'Výroba' },
   { id: 'warehouse', label: 'Sklad výroby', icon: '📦', category: 'Výroba' },
@@ -356,8 +364,8 @@ export const DEFAULT_ENABLED_MODULES: Record<UserRole, string[]> = {
   MAJITEL: ALL_MODULE_IDS,
   VEDENI: ALL_MODULE_IDS,
   SUPERADMIN: ALL_MODULE_IDS,
-  UDRZBA: ['fault', 'tasks', 'revisions', 'inventory', 'fleet', 'hvac', 'gearboxes', 'inspections', 'calendar', 'reports', 'ai', 'idea', 'request', 'noticeboard', 'academy', 'production', 'warehouse', 'shifts'],
+  UDRZBA: ['fault', 'tasks', 'revisions', 'inventory', 'fleet', 'hvac', 'gearboxes', 'dataloggers', 'inspections', 'calendar', 'reports', 'ai', 'idea', 'request', 'noticeboard', 'academy', 'production', 'warehouse', 'shifts'],
   VYROBA: ['fault', 'tasks', 'production', 'warehouse', 'shifts', 'inspections', 'calendar', 'inventory', 'hvac', 'gearboxes', 'revisions', 'reports', 'noticeboard', 'idea', 'request', 'academy'],
-  SKLADNIK: ['inventory', 'hvac', 'gearboxes', 'tasks', 'fault', 'reports', 'noticeboard', 'idea', 'request', 'academy'],
+  SKLADNIK: ['inventory', 'hvac', 'gearboxes', 'dataloggers', 'tasks', 'fault', 'reports', 'noticeboard', 'idea', 'request', 'academy'],
   OPERATOR: [],
 };

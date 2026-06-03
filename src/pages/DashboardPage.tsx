@@ -15,7 +15,7 @@ import {
   Settings, AlertTriangle, Bell, LogOut, Loader2, ClipboardCheck,
   Sparkles, Wrench, BarChart3,
   Clock, FileText, PlusCircle, Search, ShieldCheck, X, User, MapPin,
-  Calendar, Building2, Package, Wind, Cog,
+  Calendar, Building2, Package, Wind, Cog, Thermometer,
 } from 'lucide-react';
 import appConfig from '../appConfig';
 import { DEFAULT_ENABLED_MODULES, MODULE_DEFINITIONS } from '../types/user';
@@ -306,6 +306,7 @@ function ModuleShortcuts({ onNavigate }: { onNavigate: (path: string) => void })
     { label: 'Kalendář', detail: 'plán a dovolené', path: '/calendar', icon: Calendar, tone: 'text-indigo-600', permissions: ['wo.read', 'schedule.manage'] },
     { label: 'Sklad ND', detail: 'díly a převodovky', path: '/inventory', icon: Package, tone: 'text-orange-600', permissions: ['inv.consume', 'inv.restock', 'inv.manage', 'inv.order', 'report.read'] },
     { label: 'Převodovky', detail: 'umístění a teploty', path: '/gearboxes', icon: Cog, tone: 'text-violet-600', permissions: ['gearbox.temperature.write', 'gearbox.manage', 'asset.update', 'asset.read'] },
+    { label: 'Datalogery', detail: 'denní teploty skladu', path: '/dataloggers', icon: Thermometer, tone: 'text-cyan-700', permissions: ['datalogger.read', 'datalogger.temperature.write', 'datalogger.manage'] },
     { label: 'Vzduchotechnika', detail: 'filtry a výměny', path: '/hvac', icon: Wind, tone: 'text-sky-600', permissions: ['hvac.read', 'hvac.manage'] },
     { label: 'Administrace', detail: 'uživatelé a práva', path: '/admin', icon: Settings, tone: 'text-slate-600', permissions: ['admin.view', 'admin.manage', 'user.manage'] },
     ...(canViewSecretBox
@@ -1588,6 +1589,7 @@ function FullDashboard() {
       };
       case 'fleet': return { value: String(fleetStats.available ?? 0), subtext: `z ${fleetStats.total ?? 0} vozidel` };
       case 'hvac': return { subtext: 'filtry a výměny' };
+      case 'dataloggers': return { subtext: 'denní teploty' };
       case 'inspections': return {
         value: `${inspStats.percentDone ?? 0}%`,
         subtext: `${(inspStats.ok ?? 0) + (inspStats.defect ?? 0)}/${inspStats.total ?? 0}`,
@@ -1609,7 +1611,7 @@ function FullDashboard() {
   const handleTileClick = (tileId: string) => {
     const routes: Record<string, string> = {
       tasks: '/tasks', map: '/kartoteka', revisions: '/revisions',
-      inventory: '/inventory', fleet: '/fleet', hvac: '/hvac',
+      inventory: '/inventory', fleet: '/fleet', hvac: '/hvac', dataloggers: '/dataloggers',
       inspections: '/inspections', calendar: '/calendar', reports: '/reports', admin: '/admin',
       noticeboard: '/noticeboard', academy: '/academy',
       production: '/production', warehouse: '/warehouse', shifts: '/shifts',

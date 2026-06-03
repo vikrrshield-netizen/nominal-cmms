@@ -21,6 +21,7 @@ const FleetPage = lazy(() => import('./pages/FleetPage'));
 const VzvPage = lazy(() => import('./pages/VzvPage'));
 const HvacPage = lazy(() => import('./pages/HvacPage'));
 const GearboxesPage = lazy(() => import('./pages/GearboxesPage'));
+const DataloggersPage = lazy(() => import('./pages/DataloggersPage'));
 const RevisionsPage = lazy(() => import('./pages/RevisionsPage'));
 const AssetCardPage = lazy(() => import('./pages/AssetCardPage'));
 const CalendarPage = lazy(() => import('./pages/CalendarPage'));
@@ -178,6 +179,7 @@ function ProtectedRoutes() {
         <Route path="/vzv" element={<ProtectedPage moduleId="fleet" permissions={['fleet.read', 'fleet.manage']}><VzvPage /></ProtectedPage>} />
         <Route path="/hvac" element={<ProtectedPage permissions={['asset.read', 'hvac.read', 'hvac.manage']}><HvacPage /></ProtectedPage>} />
         <Route path="/gearboxes" element={<ProtectedPage permissions={['asset.read', 'gearbox.temperature.write', 'gearbox.manage']}><GearboxesPage /></ProtectedPage>} />
+        <Route path="/dataloggers" element={<ProtectedPage permissions={['datalogger.read', 'datalogger.temperature.write', 'datalogger.manage']}><DataloggersPage /></ProtectedPage>} />
         <Route path="/revisions" element={<ProtectedPage moduleId="revisions" permissions={['asset.read']}><RevisionsPage /></ProtectedPage>} />
         <Route path="/asset/:assetId" element={<ProtectedPage permissions={['asset.read']}><AssetCardPage /></ProtectedPage>} />
         <Route path="/calendar" element={<ProtectedPage moduleId="calendar" permissions={['wo.read', 'schedule.manage']}><CalendarPage /></ProtectedPage>} />

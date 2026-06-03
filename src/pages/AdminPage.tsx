@@ -899,6 +899,7 @@ function PermissionOverrideEditor({
     tasks: 'wo.read',
     inventory: 'inv.consume',
     gearboxes: 'asset.read',
+    dataloggers: 'datalogger.read',
     fleet: 'fleet.read',
     hvac: 'hvac.read',
     reports: 'report.read',
