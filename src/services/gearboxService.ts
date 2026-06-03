@@ -233,18 +233,22 @@ export async function returnGearboxToStock(input: {
 
   await batch.commit();
 
-  await addWorkLog({
-    assetId: input.gearbox.id,
-    assetName: input.gearbox.name,
-    location: input.gearbox.currentExtruderName || 'Sklad ND',
-    userId: userId(input.user),
-    userName: userName(input.user),
-    type: 'maintenance',
-    workType: 'gearbox_return_to_stock',
-    auditReady: true,
-    performedAt: performedAt.toDate(),
-    content: `Prevodovka vracena do skladu${input.gearbox.currentExtruderName ? ` z extruderu ${input.gearbox.currentExtruderName}` : ''}${input.note ? `\nPoznamka: ${input.note}` : ''}`,
-  });
+  try {
+    await addWorkLog({
+      assetId: input.gearbox.id,
+      assetName: input.gearbox.name,
+      location: input.gearbox.currentExtruderName || 'Sklad ND',
+      userId: userId(input.user),
+      userName: userName(input.user),
+      type: 'maintenance',
+      workType: 'gearbox_return_to_stock',
+      auditReady: true,
+      performedAt: performedAt.toDate(),
+      content: `Prevodovka vracena do skladu${input.gearbox.currentExtruderName ? ` z extruderu ${input.gearbox.currentExtruderName}` : ''}${input.note ? `\nPoznamka: ${input.note}` : ''}`,
+    });
+  } catch (err) {
+    console.warn('[Gearbox] Work log failed after successful return to stock:', err);
+  }
 }
 
 export async function setGearboxStockStatus(input: {
@@ -288,23 +292,27 @@ export async function setGearboxStockStatus(input: {
 
   await batch.commit();
 
-  await addWorkLog({
-    assetId: input.gearbox.id,
-    assetName: input.gearbox.name,
-    location: input.gearbox.currentExtruderName || location,
-    userId: userId(input.user),
-    userName: userName(input.user),
-    type: 'maintenance',
-    workType: isService ? 'gearbox_service_status' : 'gearbox_ready_for_stock',
-    auditReady: true,
-    performedAt: performedAt.toDate(),
-    content: [
-      isService
-        ? `Převodovka přesunuta do servisu${input.gearbox.currentExtruderName ? ` z extruderu ${input.gearbox.currentExtruderName}` : ''}.`
-        : `Převodovka přesunuta do skladu${input.gearbox.currentExtruderName ? ` z extruderu ${input.gearbox.currentExtruderName}` : ''}.`,
-      input.note ? `Poznámka: ${input.note}` : '',
-    ].filter(Boolean).join('\n'),
-  });
+  try {
+    await addWorkLog({
+      assetId: input.gearbox.id,
+      assetName: input.gearbox.name,
+      location: input.gearbox.currentExtruderName || location,
+      userId: userId(input.user),
+      userName: userName(input.user),
+      type: 'maintenance',
+      workType: isService ? 'gearbox_service_status' : 'gearbox_ready_for_stock',
+      auditReady: true,
+      performedAt: performedAt.toDate(),
+      content: [
+        isService
+          ? `Převodovka přesunuta do servisu${input.gearbox.currentExtruderName ? ` z extruderu ${input.gearbox.currentExtruderName}` : ''}.`
+          : `Převodovka přesunuta do skladu${input.gearbox.currentExtruderName ? ` z extruderu ${input.gearbox.currentExtruderName}` : ''}.`,
+        input.note ? `Poznámka: ${input.note}` : '',
+      ].filter(Boolean).join('\n'),
+    });
+  } catch (err) {
+    console.warn('[Gearbox] Work log failed after successful stock status change:', err);
+  }
 }
 
 export async function addGearboxTemperatureLog(input: {
