@@ -157,6 +157,25 @@ function csvCell(value: unknown) {
   return `"${text.replace(/"/g, '""')}"`;
 }
 
+function cleaningEvidenceConfirmed(log: WorkLog) {
+  return Boolean(
+    (log.cleaningDone && log.cleaningChecked) ||
+    log.cleaningStatus === 'done' ||
+    log.cleaningStatus === 'not_applicable' ||
+    log.cleaningNotApplicable
+  );
+}
+
+function cleaningEvidenceLabel(log: WorkLog) {
+  if (log.cleaningStatus === 'done' || (log.cleaningDone && log.cleaningChecked)) {
+    return 'ANO - uklizeno a nic nezustalo na miste';
+  }
+  if (log.cleaningStatus === 'not_applicable' || log.cleaningNotApplicable) {
+    return 'NETYKA SE';
+  }
+  return 'NE';
+}
+
 function exportDiaryCSV(logs: WorkLog[], label: string) {
   const rows = [
     ['Datum provedení', 'Datum zápisu', 'Typ', 'Kdo', 'Spolupracovali', 'Kde', 'Zařízení/věc', 'Čas', 'Úklid a kontrola', 'Obsah', 'Úkol'],
@@ -169,7 +188,7 @@ function exportDiaryCSV(logs: WorkLog[], label: string) {
       log.location || '',
       log.assetName || '',
       log.hoursWorked ? formatDuration(Math.round(log.hoursWorked * 60)) : '',
-      log.cleaningDone && log.cleaningChecked ? 'ANO - uklizeno a nic nezustalo na miste' : 'NE',
+      cleaningEvidenceLabel(log),
       log.content || '',
       log.taskTitle || log.taskId || '',
     ]),
@@ -622,7 +641,7 @@ export default function WorkDiaryPage() {
           log.userName,
           ...(Array.isArray(log.workerNames) ? log.workerNames : []),
         ]);
-        const cleanupOk = Boolean(log.cleaningDone && log.cleaningChecked);
+        const cleanupOk = cleaningEvidenceConfirmed(log);
         if (!date || date < start || date > end) return false;
         if (filterType !== 'all' && log.type !== filterType) return false;
         if (filterPerson && !logWorkers.some((worker) => samePerson(worker, filterPerson))) return false;
@@ -639,7 +658,7 @@ export default function WorkDiaryPage() {
             ...logWorkers,
             log.taskTitle,
             typeLabel(log.type),
-            log.cleaningDone && log.cleaningChecked ? 'uklid kontrola audit potvrzeno' : '',
+            cleanupOk ? `uklid kontrola audit potvrzeno ${cleaningEvidenceLabel(log)}` : '',
           ].filter(Boolean).join(' ');
           const normalizedText = normalizeSearchText(text);
           if (!normalizedText.includes(q)) return false;
@@ -654,7 +673,7 @@ export default function WorkDiaryPage() {
   ), [filteredLogs]);
 
   const cleanupStats = useMemo(() => {
-    const confirmed = filteredLogs.filter((log) => log.cleaningDone && log.cleaningChecked).length;
+    const confirmed = filteredLogs.filter((log) => cleaningEvidenceConfirmed(log)).length;
     return {
       confirmed,
       missing: filteredLogs.length - confirmed,
@@ -864,7 +883,7 @@ export default function WorkDiaryPage() {
     setPerformedDate(logDate(log).toISOString().slice(0, 10));
     setBackDateMode(true);
     setMinutes(String(Math.round((log.hoursWorked || 0.5) * 60)));
-    setCleanupConfirmed(Boolean(log.cleaningDone && log.cleaningChecked));
+    setCleanupConfirmed(cleaningEvidenceConfirmed(log));
     setCreateFollowUpTask(false);
     setTaskTitle('');
     setTaskPriority('P3');
@@ -1747,10 +1766,10 @@ export default function WorkDiaryPage() {
                           {log.taskTitle || 'Zápis z úkolu'}
                         </button>
                       )}
-                      {log.cleaningDone && log.cleaningChecked && (
+                      {cleaningEvidenceConfirmed(log) && (
                         <div className="mb-2 inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-700">
                           <CheckCircle2 className="w-3 h-3" />
-                          Úklid a kontrola potvrzena
+                          {cleaningEvidenceLabel(log)}
                         </div>
                       )}
                       {log.assetName && <div className="text-base font-black text-amber-700 mb-1 leading-tight">{log.assetName}</div>}
@@ -1825,12 +1844,12 @@ export default function WorkDiaryPage() {
                           </div>
 
                           <div className={`rounded-xl border px-3 py-2 text-sm font-bold ${
-                            log.cleaningDone && log.cleaningChecked
+                            cleaningEvidenceConfirmed(log)
                               ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-200'
                               : 'border-red-500/25 bg-red-500/10 text-red-200'
                           }`}>
-                            {log.cleaningDone && log.cleaningChecked
-                              ? 'Úklid a kontrola pracoviště potvrzena'
+                            {cleaningEvidenceConfirmed(log)
+                              ? cleaningEvidenceLabel(log)
                               : 'Úklid a kontrola pracoviště není potvrzena'}
                           </div>
                           {log.updatedAt && (

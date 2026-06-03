@@ -1209,6 +1209,7 @@ export default function TasksPage() {
                 value={form.foodSafetyImpact}
                 onChange={(v) => setForm(prev => ({ ...prev, foodSafetyImpact: v }))}
                 placeholder="Např. produkt zastaven, nutná kontrola linky..."
+                required
               />
             </div>
           )}
@@ -1246,7 +1247,7 @@ export default function TasksPage() {
           onSubmit={handleCreateTask}
           submitLabel="Vytvořit úkol"
           loading={saving}
-          disabled={!form.title.trim() || (form.temporaryRepair && !form.permanentFixDueDate)}
+          disabled={!form.title.trim() || (form.foodSafetyRisk && !form.foodSafetyImpact.trim()) || (form.temporaryRepair && !form.permanentFixDueDate)}
         />
         </div>
       </BottomSheet>
@@ -1284,7 +1285,8 @@ export default function TasksPage() {
             const diaryContent = [
               data.resolution,
               resultLabel ? `Výsledek: ${resultLabel}` : '',
-              data.cleaningDone ? `Úklid po opravě: provedeno${data.cleaningNote ? ` (${data.cleaningNote})` : ''}` : '',
+              data.cleaningStatus === 'done' ? `Úklid po opravě: provedeno${data.cleaningNote ? ` (${data.cleaningNote})` : ''}` : '',
+              data.cleaningStatus === 'not_applicable' ? `Úklid po opravě: netýká se${data.cleaningNote ? ` (${data.cleaningNote})` : ''}` : '',
               data.auditNote ? `Audit: ${data.auditNote}` : '',
             ].filter(Boolean).join('\n');
             const batch = writeBatch(db);
@@ -1312,8 +1314,10 @@ export default function TasksPage() {
               createdAt: serverTimestamp(),
               result: data.result,
               auditNote: data.auditNote,
+              cleaningStatus: data.cleaningStatus,
               cleaningDone: data.cleaningDone,
               cleaningChecked: data.cleaningChecked,
+              cleaningNotApplicable: data.cleaningNotApplicable,
               cleaningNote: data.cleaningNote,
             };
             if (completingTask.assetId) workLogData.assetId = completingTask.assetId;

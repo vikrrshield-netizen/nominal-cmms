@@ -20,8 +20,10 @@ export interface WorkLog {
   relatedAssetId?: string;
   relatedAssetName?: string;
   auditReady?: boolean;
+  cleaningStatus?: 'done' | 'not_applicable';
   cleaningDone?: boolean;
   cleaningChecked?: boolean;
+  cleaningNotApplicable?: boolean;
   cleaningNote?: string;
   updatedBy?: string;
   updatedByName?: string;

@@ -34,8 +34,10 @@ interface CompleteTaskModalProps {
     performedDate: string;
     result: string;
     auditNote: string;
+    cleaningStatus: 'done' | 'not_applicable';
     cleaningDone: boolean;
     cleaningChecked: boolean;
+    cleaningNotApplicable: boolean;
     cleaningNote: string;
   }) => Promise<void>;
   onClose: () => void;
@@ -78,14 +80,15 @@ export default function CompleteTaskModal({ taskTitle, defaultWorkers = [], work
   const [performedDate, setPerformedDate] = useState(todayDateInput());
   const [result, setResult] = useState('fixed');
   const [auditNote, setAuditNote] = useState('');
-  const [cleaningDone, setCleaningDone] = useState(false);
+  const [cleaningStatus, setCleaningStatus] = useState<'done' | 'not_applicable' | ''>('');
   const [cleaningNote, setCleaningNote] = useState('');
   const [pin, setPin] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   const workerChoices = useMemo(() => uniqueNames([...workerOptions, ...workers]), [workerOptions, workers]);
-  const isValid = resolution.trim().length >= 5 && pin.length === 4 && workers.length > 0 && workType !== '';
+  const cleaningSelected = cleaningStatus === 'done' || cleaningStatus === 'not_applicable';
+  const isValid = resolution.trim().length >= 5 && pin.length === 4 && workers.length > 0 && workType !== '' && cleaningSelected;
 
   const toggleWorker = (name: string) => {
     const key = normalizePersonKey(name);
@@ -108,6 +111,10 @@ export default function CompleteTaskModal({ taskTitle, defaultWorkers = [], work
       setError('Vyber typ práce');
       return;
     }
+    if (!cleaningSelected) {
+      setError('Vyber stav úklidu po zásahu');
+      return;
+    }
     if (pin.length !== 4) {
       setError('Zadej 4místný PIN pro potvrzení');
       return;
@@ -125,8 +132,10 @@ export default function CompleteTaskModal({ taskTitle, defaultWorkers = [], work
         performedDate,
         result,
         auditNote: auditNote.trim(),
-        cleaningDone,
-        cleaningChecked: cleaningDone,
+        cleaningStatus,
+        cleaningDone: cleaningStatus === 'done',
+        cleaningChecked: true,
+        cleaningNotApplicable: cleaningStatus === 'not_applicable',
         cleaningNote: cleaningNote.trim(),
       });
       onClose();
@@ -221,26 +230,35 @@ export default function CompleteTaskModal({ taskTitle, defaultWorkers = [], work
       <FormField label="Výsledek" value={result} onChange={setResult} type="select" required options={RESULT_OPTIONS} />
 
       <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-        <button
-          type="button"
-          onClick={() => setCleaningDone((value) => !value)}
-          className="flex w-full items-center gap-3 text-left"
-        >
-          <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border text-xs font-bold ${
-            cleaningDone ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-400 bg-white text-transparent'
-          }`}>
-            ✓
-          </span>
-          <span>
-            <span className="block text-sm font-bold text-slate-950">Úklid po opravě proveden</span>
-            <span className="block text-xs text-slate-600">IFS/Tesco důkaz, že po zásahu nezůstal materiál, nářadí ani riziko kontaminace.</span>
-          </span>
-        </button>
-        {cleaningDone && (
+        <div className="mb-2 text-sm font-bold text-slate-950">Úklid / kontrola po zásahu <span className="text-red-600">*</span></div>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {[
+            { id: 'done', title: 'Provedeno', text: 'Pracoviště uklizeno a zkontrolováno.' },
+            { id: 'not_applicable', title: 'Netýká se', text: 'Zásah nevytvořil hygienické riziko.' },
+          ].map((option) => {
+            const active = cleaningStatus === option.id;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => setCleaningStatus(option.id as 'done' | 'not_applicable')}
+                className={`min-h-16 rounded-xl border p-3 text-left transition ${
+                  active ? 'border-emerald-600 bg-white text-slate-950' : 'border-emerald-200 bg-emerald-50 text-slate-700'
+                }`}
+              >
+                <span className="block text-sm font-black">{option.title}</span>
+                <span className="mt-1 block text-xs font-semibold">{option.text}</span>
+              </button>
+            );
+          })}
+        </div>
+        {cleaningSelected && (
           <textarea
             value={cleaningNote}
             onChange={(event) => setCleaningNote(event.target.value)}
-            placeholder="Volitelně: co bylo uklizeno / kdo ověřil / poznámka k hygieně..."
+            placeholder={cleaningStatus === 'done'
+              ? 'Volitelně: co bylo uklizeno / kdo ověřil / poznámka k hygieně...'
+              : 'Volitelně: proč se úklid netýká tohoto zásahu...'}
             rows={2}
             className="mt-3 w-full resize-none rounded-xl border border-emerald-200 bg-white px-3 py-2 text-sm text-slate-950 outline-none placeholder:text-slate-400 focus:border-emerald-600"
           />
@@ -312,6 +330,7 @@ export default function CompleteTaskModal({ taskTitle, defaultWorkers = [], work
         onSubmit={handleSubmit}
         submitLabel="Dokončit a uzavřít"
         loading={saving}
+        disabled={!isValid}
         color="green"
       />
     </BottomSheet>

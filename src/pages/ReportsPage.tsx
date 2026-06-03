@@ -48,6 +48,8 @@ interface TaskRow {
   foodSafetyRisk?: boolean;
   foodSafetyHazardType?: string;
   foodSafetyImpact?: string;
+  temporaryRepair?: boolean;
+  permanentFixDueDate?: any;
 }
 
 interface InspectionLogRow {
@@ -90,8 +92,10 @@ interface WorkLogRow {
   auditNote?: string;
   hoursWorked?: number;
   auditReady?: boolean;
+  cleaningStatus?: 'done' | 'not_applicable';
   cleaningDone?: boolean;
   cleaningChecked?: boolean;
+  cleaningNotApplicable?: boolean;
   cleaningNote?: string;
   performedAt?: any;
   createdAt?: any;
@@ -609,7 +613,31 @@ function computeAuditSummary(tasks: TaskRow[], inspections: InspectionLogRow[], 
   const defects = inspections.filter((inspection) => inspection.status === 'defect' || inspection.status === 'issue' || (inspection.issueCount || 0) > 0).length;
   const workMinutes = workLogs.reduce((sum, log) => sum + workLogMinutes(log), 0);
   const p1Open = tasks.filter((task) => task.priority === 'P1' && task.status !== 'completed' && task.status !== 'cancelled').length;
-  return { completedTasks, defects, workMinutes, p1Open };
+  const temporaryRepairs = tasks.filter((task) => task.temporaryRepair === true).length;
+  const temporaryOpen = tasks.filter((task) => task.temporaryRepair === true && task.status !== 'completed' && task.status !== 'cancelled').length;
+  const foodSafetyTasks = tasks.filter((task) => task.foodSafetyRisk === true).length;
+  return { completedTasks, defects, workMinutes, p1Open, temporaryRepairs, temporaryOpen, foodSafetyTasks };
+}
+
+function temporaryRepairText(task: TaskRow) {
+  if (task.temporaryRepair !== true) return '';
+  const due = fmtDateTime(task.permanentFixDueDate) || 'termin nezadan';
+  return `Docasna oprava: trvale reseni do ${due}`;
+}
+
+function foodSafetyTaskText(task: TaskRow) {
+  if (task.foodSafetyRisk !== true) return '';
+  return `Food safety: ${task.foodSafetyHazardType || 'neurceno'} / ${task.foodSafetyImpact || 'neurceno'}`;
+}
+
+function cleaningEvidenceText(log: WorkLogRow) {
+  if (log.cleaningStatus === 'done' || (log.cleaningDone && log.cleaningChecked)) {
+    return `Uklid a kontrola: ANO${log.cleaningNote ? ` - ${log.cleaningNote}` : ''}`;
+  }
+  if (log.cleaningStatus === 'not_applicable' || log.cleaningNotApplicable) {
+    return `Uklid: NETYKA SE${log.cleaningNote ? ` - ${log.cleaningNote}` : ''}`;
+  }
+  return '';
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -718,6 +746,8 @@ function exportExpandedCSV(tasks: TaskRow[], inspections: InspectionLogRow[], wo
     [
       task.resolution || task.description || '',
       resultLabel(task.result) ? `Vysledek: ${resultLabel(task.result)}` : '',
+      foodSafetyTaskText(task),
+      temporaryRepairText(task),
       task.auditNote ? `Audit: ${task.auditNote}` : '',
     ].filter(Boolean).join(' | ').replace(/[\n\r]+/g, ' '),
   ]);
@@ -745,7 +775,7 @@ function exportExpandedCSV(tasks: TaskRow[], inspections: InspectionLogRow[], wo
     workLogMinutes(log) ? String(workLogMinutes(log)) : '',
     [
       log.auditReady ? 'audit ready' : '',
-      log.cleaningDone && log.cleaningChecked ? 'Uklid a kontrola: ANO' : '',
+      cleaningEvidenceText(log),
       resultLabel(log.result) ? `Vysledek: ${resultLabel(log.result)}` : '',
       log.auditNote ? `Audit: ${log.auditNote}` : '',
     ].filter(Boolean).join(' | '),
@@ -774,6 +804,8 @@ function exportExpandedPDF(tasks: TaskRow[], inspections: InspectionLogRow[], wo
       [
         task.resolution || task.description || '-',
         resultLabel(task.result) ? `<strong>Výsledek:</strong> ${resultLabel(task.result)}` : '',
+        foodSafetyTaskText(task) ? `<strong>${foodSafetyTaskText(task)}</strong>` : '',
+        temporaryRepairText(task) ? `<strong>${temporaryRepairText(task)}</strong>` : '',
         task.auditNote ? `<strong>Audit:</strong> ${task.auditNote}` : '',
       ].filter(Boolean).join('<br>')
     }</td>
@@ -790,7 +822,7 @@ function exportExpandedPDF(tasks: TaskRow[], inspections: InspectionLogRow[], wo
     <td>${log.assetName || log.location || '-'}</td><td class="wrap">${
       [
         log.content || '',
-        log.cleaningDone && log.cleaningChecked ? '<strong>Uklid a kontrola:</strong> ANO - pracoviste uklizeno a nic nezustalo na miste' : '',
+        cleaningEvidenceText(log) ? `<strong>${cleaningEvidenceText(log)}</strong>` : '',
         resultLabel(log.result) ? `<strong>Výsledek:</strong> ${resultLabel(log.result)}` : '',
         log.auditNote ? `<strong>Audit:</strong> ${log.auditNote}` : '',
       ].filter(Boolean).join('<br>')
@@ -1292,6 +1324,51 @@ function AuditTrailTable({ rows }: { rows: AuditTrailRow[] }) {
   );
 }
 
+function TemporaryRepairPanel({ tasks }: { tasks: TaskRow[] }) {
+  const rows = tasks.filter((task) => task.temporaryRepair === true);
+  const openRows = rows.filter((task) => task.status !== 'completed' && task.status !== 'cancelled');
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-amber-200 overflow-hidden">
+      <div className="px-6 py-4 border-b border-amber-100 flex items-center justify-between gap-3">
+        <div>
+          <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-amber-600" /> Dočasné opravy
+          </h3>
+          <p className="text-xs text-slate-500 mt-1">IFS 4.16: každá dočasná oprava musí mít trvalé řešení a termín.</p>
+        </div>
+        <span className="text-xs font-bold text-amber-700">{openRows.length}/{rows.length} otevřeno</span>
+      </div>
+      {rows.length === 0 ? (
+        <div className="p-6 text-sm text-slate-500">V tomto období není evidovaná žádná dočasná oprava.</div>
+      ) : (
+        <div className="divide-y divide-amber-100">
+          {rows.slice(0, 12).map((task) => (
+            <div key={task.id} className="p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-black text-slate-950">{task.title}</div>
+                  <div className="mt-1 text-xs text-slate-600">
+                    {[task.priority, task.status, task.assetName || task.buildingId].filter(Boolean).join(' · ')}
+                  </div>
+                  <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-950">
+                    Trvalé řešení do: {fmtDateTime(task.permanentFixDueDate) || 'není zadáno'}
+                  </div>
+                </div>
+                <span className={`shrink-0 rounded-xl px-2 py-1 text-xs font-bold ${
+                  task.status === 'completed' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-100 text-amber-800'
+                }`}>
+                  {task.status === 'completed' ? 'Uzavřeno' : 'Sledovat'}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function fmtMinLocal(minutes: number) {
   return minutes >= 60 ? `${(minutes / 60).toFixed(1)}h` : `${minutes}min`;
 }
@@ -1351,6 +1428,8 @@ export default function ReportsPage() {
           ...(Array.isArray(t.completedByNames) ? t.completedByNames : []),
           t.workType,
           resultLabel(t.result),
+          foodSafetyTaskText(t),
+          temporaryRepairText(t),
           t.auditNote,
         ])) return false;
         return true;
@@ -1396,7 +1475,7 @@ export default function ReportsPage() {
           log.workType,
           resultLabel(log.result),
           log.auditNote,
-          log.cleaningDone && log.cleaningChecked ? 'uklid kontrola audit potvrzeno' : '',
+          cleaningEvidenceText(log),
         ])) return false;
         return true;
       })
@@ -1961,7 +2040,7 @@ export default function ReportsPage() {
 
           {activeTab === 'audit' && (
             <>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
                 <div className="bg-emerald-500/10 rounded-2xl p-4 border border-emerald-200">
                   <div className="text-3xl font-bold text-emerald-700">{auditSummary.completedTasks}</div>
                   <div className="text-sm text-slate-600">Dokončené úkoly</div>
@@ -1978,9 +2057,18 @@ export default function ReportsPage() {
                   <div className="text-3xl font-bold text-red-700">{auditSummary.p1Open}</div>
                   <div className="text-sm text-red-700">Otevřené P1</div>
                 </div>
+                <div className="bg-red-500/10 rounded-2xl p-4 border border-red-200">
+                  <div className="text-3xl font-bold text-red-700">{auditSummary.foodSafetyTasks}</div>
+                  <div className="text-sm text-red-700">Food safety</div>
+                </div>
+                <div className="bg-amber-500/10 rounded-2xl p-4 border border-amber-300">
+                  <div className="text-3xl font-bold text-amber-700">{auditSummary.temporaryOpen}</div>
+                  <div className="text-sm text-amber-800">Dočasné opravy</div>
+                </div>
               </div>
 
               <AuditTrailTable rows={auditTrail} />
+              <TemporaryRepairPanel tasks={filteredTasks} />
 
               <div className="bg-white rounded-2xl shadow-sm p-6 border border-slate-200">
                 <h3 className="text-lg font-bold text-slate-950 mb-2">Auditní balíček</h3>
