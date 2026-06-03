@@ -584,9 +584,9 @@ function AssignRoomModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-3 sm:items-center">
-      <div className="w-full max-w-xl rounded-3xl border border-slate-200 bg-white p-4 shadow-2xl">
-        <div className="mb-4 flex items-start justify-between gap-3">
+    <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/45 p-2 sm:items-center sm:p-3">
+      <div className="max-h-[92dvh] w-full max-w-xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-3 shadow-2xl sm:p-4">
+        <div className="sticky top-0 z-10 -mx-3 -mt-3 mb-3 flex items-start justify-between gap-3 border-b border-slate-100 bg-white/95 px-3 py-3 backdrop-blur sm:-mx-4 sm:-mt-4 sm:px-4">
           <div>
             <div className="text-xs font-black uppercase tracking-widest text-cyan-700">Umístění</div>
             <h2 className="mt-1 text-2xl font-black text-slate-950">Přiřadit místnost</h2>
@@ -706,7 +706,7 @@ function TemperatureModal({
           </button>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-3 pb-3 sm:space-y-4">
           <label className="block">
             <span className="mb-1 block text-sm font-black text-slate-800">Teplota</span>
             <input
@@ -717,7 +717,7 @@ function TemperatureModal({
               className="vik-input text-2xl font-black"
               autoFocus
             />
-            <div className="mt-3 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-3">
+            <div className="mt-2 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-2.5 sm:p-3">
               <div className="mb-2 flex items-center justify-end">
                 <span className="rounded-full bg-white px-2.5 py-1 text-sm font-black text-emerald-800">
                   {temperature.trim() ? `${temperature.replace('.', ',')} °C` : 'nezadáno'}
@@ -733,13 +733,13 @@ function TemperatureModal({
                 className="w-full accent-emerald-700"
                 aria-label="Teplota ve stupních Celsia"
               />
-              <div className="mt-2 grid grid-cols-4 gap-2 sm:grid-cols-7">
+              <div className="mt-2 grid grid-cols-4 gap-1.5 sm:grid-cols-7 sm:gap-2">
                 {QUICK_TEMPS.map((temp) => (
                   <button
                     key={temp}
                     type="button"
                     onClick={() => setTemperature(String(temp))}
-                    className={`min-h-10 rounded-xl border px-2 text-sm font-black ${
+                    className={`min-h-9 rounded-xl border px-2 text-xs font-black sm:min-h-10 sm:text-sm ${
                       temperature === String(temp)
                         ? 'border-emerald-600 bg-emerald-100 text-emerald-800'
                         : 'border-emerald-100 bg-white text-emerald-800'
@@ -764,7 +764,7 @@ function TemperatureModal({
               placeholder="volitelně, např. 55"
               className="vik-input text-xl font-black"
             />
-            <div className="mt-3 rounded-2xl border border-cyan-100 bg-cyan-50/60 p-3">
+            <div className="mt-2 rounded-2xl border border-cyan-100 bg-cyan-50/60 p-2.5 sm:p-3">
               <div className="mb-2 flex items-center justify-end">
                 <span className="rounded-full bg-white px-2.5 py-1 text-sm font-black text-cyan-800">
                   {humidity.trim() ? `${humidity.replace('.', ',')} %` : 'nezadáno'}
