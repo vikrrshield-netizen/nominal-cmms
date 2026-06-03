@@ -537,25 +537,44 @@ function GearboxCard({
 
         {canSetStockStatus && (
           <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/45 p-3">
-            <div className="mb-2 text-sm font-black text-white">Stav náhradní převodovky</div>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="text-sm font-black text-white">Stav náhradní převodovky</div>
+              <div className={`rounded-full border px-2.5 py-1 text-xs font-black ${statusClass(status)}`}>
+                {status === 'service'
+                  ? 'Aktuálně v opravě'
+                  : status === 'in_stock'
+                    ? 'Aktuálně ve skladu'
+                    : 'Namontovaná'}
+              </div>
+            </div>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <button
                 type="button"
                 disabled={savingStatus || status === 'in_stock'}
                 onClick={() => onSetStockStatus('in_stock')}
-                className="min-h-12 rounded-xl border border-emerald-400/25 bg-emerald-500/10 px-3 text-sm font-black text-emerald-100 disabled:opacity-45 active:scale-[0.98]"
+                aria-pressed={status === 'in_stock'}
+                className={`min-h-12 rounded-xl border px-3 text-sm font-black transition active:scale-[0.98] ${
+                  status === 'in_stock'
+                    ? 'border-emerald-300/60 bg-emerald-500/25 text-emerald-50'
+                    : 'border-emerald-400/25 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/15'
+                } ${savingStatus && status !== 'in_stock' ? 'opacity-60' : ''}`}
               >
                 {savingStatus && status !== 'in_stock' ? <Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> : null}
-                Připravená ve skladu
+                {status === 'in_stock' ? 'Aktuálně ve skladu' : 'Přesunout do skladu'}
               </button>
               <button
                 type="button"
                 disabled={savingStatus || status === 'service'}
                 onClick={() => onSetStockStatus('service')}
-                className="min-h-12 rounded-xl border border-amber-400/25 bg-amber-500/10 px-3 text-sm font-black text-amber-100 disabled:opacity-45 active:scale-[0.98]"
+                aria-pressed={status === 'service'}
+                className={`min-h-12 rounded-xl border px-3 text-sm font-black transition active:scale-[0.98] ${
+                  status === 'service'
+                    ? 'border-amber-300/60 bg-amber-500/25 text-amber-50'
+                    : 'border-amber-400/25 bg-amber-500/10 text-amber-100 hover:bg-amber-500/15'
+                } ${savingStatus && status !== 'service' ? 'opacity-60' : ''}`}
               >
                 {savingStatus && status !== 'service' ? <Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> : null}
-                V opravě
+                {status === 'service' ? 'Aktuálně v opravě' : 'Dát do opravy'}
               </button>
             </div>
           </div>
