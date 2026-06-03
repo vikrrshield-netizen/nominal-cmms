@@ -228,7 +228,7 @@ export default function AssetCardPage() {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showRevisionModal, setShowRevisionModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<'info' | 'history' | 'tasks' | 'revisions'>('history');
+  const [activeTab, setActiveTab] = useState<'info' | 'history' | 'tasks' | 'revisions'>('info');
   const [stanoviste, setStanoviste] = useState('Expedice');
   const [prefilterSaving, setPrefilterSaving] = useState(false);
   const [historySearch, setHistorySearch] = useState('');
@@ -950,6 +950,49 @@ export default function AssetCardPage() {
               )}
             </div>
           </div>
+        </div>
+
+        <div className="mb-3 grid grid-cols-2 gap-2 rounded-2xl border border-[#e2d8c9] bg-white p-2 shadow-sm lg:grid-cols-5">
+          <div className="rounded-xl bg-[#fbf9f4] border border-[#eadfce] p-3">
+            <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">Typ</div>
+            <div className="mt-1 truncate text-sm font-black text-slate-950">{assetV2?.entityType || asset.entityType || asset.category || 'Karta'}</div>
+          </div>
+          <div className="rounded-xl bg-[#fbf9f4] border border-[#eadfce] p-3">
+            <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">Umístění</div>
+            <div className="mt-1 truncate text-sm font-black text-slate-950">
+              {[buildingName, asset.areaName || asset.location].filter(Boolean).join(' · ') || 'Nezadáno'}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setActiveTab('history')}
+            className="rounded-xl bg-[#fbf9f4] border border-[#eadfce] p-3 text-left transition hover:bg-[#f4ede2]"
+          >
+            <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">Historie</div>
+            <div className="mt-1 text-sm font-black text-slate-950">{historyItems.length} záznamů</div>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('tasks')}
+            className="rounded-xl bg-[#fbf9f4] border border-[#eadfce] p-3 text-left transition hover:bg-[#f4ede2]"
+          >
+            <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">Úkoly</div>
+            <div className="mt-1 text-sm font-black text-slate-950">{tasks.length} celkem</div>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('revisions')}
+            className={`rounded-xl border p-3 text-left transition ${
+              expiredRevisions.length > 0
+                ? 'bg-red-50 border-red-200 hover:bg-red-100'
+                : 'bg-[#fbf9f4] border-[#eadfce] hover:bg-[#f4ede2]'
+            }`}
+          >
+            <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">Revize</div>
+            <div className={`mt-1 text-sm font-black ${expiredRevisions.length > 0 ? 'text-red-700' : 'text-slate-950'}`}>
+              {expiredRevisions.length > 0 ? `${expiredRevisions.length} prošlé` : `${revisions.length} záznamů`}
+            </div>
+          </button>
         </div>
 
         {/* Primary Action Buttons */}
