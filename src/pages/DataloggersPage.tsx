@@ -542,6 +542,39 @@ function TemperatureModal({
               className="vik-input text-2xl font-black"
               autoFocus
             />
+            <div className="mt-3 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-3">
+              <div className="mb-2 flex items-center justify-end">
+                <span className="rounded-full bg-white px-2.5 py-1 text-sm font-black text-emerald-800">
+                  {temperature.trim() ? `${temperature.replace('.', ',')} °C` : 'nezadáno'}
+                </span>
+              </div>
+              <input
+                type="range"
+                min="-30"
+                max="40"
+                step="0.5"
+                value={temperature.trim() ? Math.max(-30, Math.min(40, Number(temperature.replace(',', '.')) || 0)) : 5}
+                onChange={(event) => setTemperature(event.target.value)}
+                className="w-full accent-emerald-700"
+                aria-label="Teplota ve stupních Celsia"
+              />
+              <div className="mt-2 grid grid-cols-4 gap-2 sm:grid-cols-7">
+                {QUICK_TEMPS.map((temp) => (
+                  <button
+                    key={temp}
+                    type="button"
+                    onClick={() => setTemperature(String(temp))}
+                    className={`min-h-10 rounded-xl border px-2 text-sm font-black ${
+                      temperature === String(temp)
+                        ? 'border-emerald-600 bg-emerald-100 text-emerald-800'
+                        : 'border-emerald-100 bg-white text-emerald-800'
+                    }`}
+                  >
+                    {temp} °C
+                  </button>
+                ))}
+              </div>
+            </div>
           </label>
 
           <label className="block">
@@ -557,8 +590,7 @@ function TemperatureModal({
               className="vik-input text-xl font-black"
             />
             <div className="mt-3 rounded-2xl border border-cyan-100 bg-cyan-50/60 p-3">
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <span className="text-xs font-black uppercase tracking-wide text-cyan-800">Posuvník vlhkosti</span>
+              <div className="mb-2 flex items-center justify-end">
                 <span className="rounded-full bg-white px-2.5 py-1 text-sm font-black text-cyan-800">
                   {humidity.trim() ? `${humidity.replace('.', ',')} %` : 'nezadáno'}
                 </span>
@@ -592,26 +624,6 @@ function TemperatureModal({
             </div>
             <span className="mt-1 block text-xs font-semibold text-slate-500">Zadej procenta RH, pokud datalogger vlhkost ukazuje.</span>
           </label>
-
-          <div>
-            <div className="mb-2 text-sm font-black text-slate-800">Rychlé hodnoty</div>
-            <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
-              {QUICK_TEMPS.map((temp) => (
-                <button
-                  key={temp}
-                  type="button"
-                  onClick={() => setTemperature(String(temp))}
-                  className={`min-h-11 rounded-xl border px-2 text-sm font-black ${
-                    temperature === String(temp)
-                      ? 'border-emerald-600 bg-emerald-50 text-emerald-700'
-                      : 'border-slate-200 bg-slate-50 text-slate-700'
-                  }`}
-                >
-                  {temp} °C
-                </button>
-              ))}
-            </div>
-          </div>
 
           <label className="block">
             <span className="mb-1 block text-sm font-black text-slate-800">Datum a čas měření</span>
