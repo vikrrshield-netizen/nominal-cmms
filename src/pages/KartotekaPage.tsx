@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { addDoc, collection, doc, serverTimestamp, setDoc, Timestamp } from 'firebase/firestore';
 import {
   ArrowLeft, Building2, Search, Upload, Plus, X,
-  ChevronRight, ChevronDown, FileText, Loader2, Pencil, Trash2,
+  ChevronRight, ChevronDown, FileText, Loader2, Trash2,
   ClipboardCheck, Cog,
 } from 'lucide-react';
 import { db } from '../lib/firebase';
@@ -366,42 +366,47 @@ function TreeNode({ asset, allAssets, depth, expanded, onToggle, onDetail, onAdd
           <span className="k-tree-childcount">{children.length}</span>
         )}
 
-        {/* Action: Edit (navigate to detail) */}
-        {!asset.isVirtual && <button
-          className="k-tree-action k-tree-action-edit"
-          onClick={(e) => { e.stopPropagation(); onDetail(asset); }}
-          title="Upravit"
-        >
-          <Pencil size={14} />
-        </button>}
+        <span className="k-tree-stats-inline">
+          <span className="k-tree-stat">{desc.total} položek</span>
+          {desc.operational > 0 && (
+            <span className="k-tree-stat"><span style={{ color: '#22c55e' }}>●</span> {desc.operational}</span>
+          )}
+          {desc.maintenance > 0 && (
+            <span className="k-tree-stat"><span style={{ color: '#eab308' }}>●</span> {desc.maintenance}</span>
+          )}
+          {desc.broken > 0 && (
+            <span className="k-tree-stat is-alert"><span style={{ color: '#ef4444' }}>●</span> {desc.broken}</span>
+          )}
+          {desc.stopped > 0 && (
+            <span className="k-tree-stat"><span style={{ color: '#6b7280' }}>●</span> {desc.stopped}</span>
+          )}
+        </span>
 
-        {/* Action: Add child */}
+        {/* Akce — stejné menu jako u budovy (Rodný list / Přidat / Smazat) */}
+        <button
+          className="k-tree-action k-tree-action-detail"
+          onClick={(e) => { e.stopPropagation(); onDetail(asset); }}
+          title="Otevřít rodný list"
+        >
+          <FileText size={14} /> Rodný list
+        </button>
+
         {canCreateAsset && (
           <button
             className="k-tree-action k-tree-action-add"
             onClick={(e) => { e.stopPropagation(); onAddChild(asset.id); }}
             title="Přidat potomka"
           >
-            <Plus size={14} />
+            <Plus size={14} /> Přidat
           </button>
         )}
 
-        {/* Action: Open detail card */}
-        <button
-          className="k-tree-action k-tree-action-detail"
-          onClick={(e) => { e.stopPropagation(); onDetail(asset); }}
-          title="Otevřít kartu"
-        >
-          <FileText size={14} />
-        </button>
-
-        {/* Action: Delete */}
         <button
           className="k-tree-action k-tree-action-delete"
           onClick={(e) => { e.stopPropagation(); onDelete(asset); }}
           title="Smazat"
         >
-          <Trash2 size={14} />
+          <Trash2 size={14} /> Smazat
         </button>
       </div>
 
@@ -1055,6 +1060,74 @@ export default function KartotekaPage() {
     }
   }, [canCreateAsset, isSandbox, tenantId]);
 
+  const createRealRoomFromVirtual = useCallback(async (asset: DisplayAsset): Promise<string | null> => {
+    if (!tenantId || asset.virtualKind !== 'room') return null;
+    if (!canCreateAsset) {
+      showToast(isSandbox
+        ? 'Demo režim neukládá do databáze. Přihlas se skutečným PINem údržby nebo vedení.'
+        : 'Tvoje role nemá právo vytvářet místnosti v kartotéce.',
+        'error'
+      );
+      return null;
+    }
+
+    const buildingId = safeText(
+      asset.sourceBuildingId
+      || asset.buildingId
+      || inferBuildingIdFromText(safeText(asset.name), safeText(asset.code))
+    ).toUpperCase();
+    const areaName = safeText(asset.sourceAreaName || asset.areaName || asset.name) || 'Místnost';
+    const parentBuilding = assets.find((candidate) => {
+      if (!isBuildingAsset(candidate)) return false;
+      const candidateBuildingId = safeText(candidate.buildingId || inferBuildingIdFromText(safeText(candidate.name), safeText(candidate.code))).toUpperCase();
+      const candidateCode = safeText(candidate.code).toUpperCase();
+      return Boolean(buildingId && (candidateBuildingId === buildingId || candidateCode === buildingId));
+    });
+
+    try {
+      const newAssetId = await assetService.add(tenantId, {
+        tenantId,
+        parentId: parentBuilding?.id || null,
+        name: areaName,
+        entityType: 'Místnost',
+        code: undefined,
+        buildingId: buildingId || undefined,
+        areaName,
+        status: 'operational',
+        criticality: 'medium',
+        notes: 'Karta místnosti vytvořená z kartotéky.',
+      });
+
+      setAssets((prev) => [
+        ...prev,
+        {
+          id: newAssetId,
+          tenantId,
+          parentId: parentBuilding?.id || null,
+          name: areaName,
+          entityType: 'Místnost',
+          buildingId: buildingId || undefined,
+          areaName,
+          status: 'operational',
+          criticality: 'medium',
+          notes: 'Karta místnosti vytvořená z kartotéky.',
+        },
+      ]);
+      showToast(`Místnost "${areaName}" dostala vlastní kartu`, 'success');
+      return newAssetId;
+    } catch (err) {
+      console.error('[Kartoteka] create virtual room card error:', err);
+      const code = typeof err === 'object' && err && 'code' in err ? String(err.code) : '';
+      showToast(
+        code.includes('permission-denied')
+          ? 'Databáze zápis odmítla: nemáš oprávnění založit kartu místnosti.'
+          : 'Nepodařilo se založit kartu místnosti. Zkus to prosím znovu.',
+        'error'
+      );
+      return null;
+    }
+  }, [assets, canCreateAsset, isSandbox, tenantId]);
+
   const handleDetail = useCallback(async (asset: DisplayAsset) => {
     if (asset.isVirtual) {
       const realAsset = resolveVirtualAsset(asset);
@@ -1069,6 +1142,13 @@ export default function KartotekaPage() {
         }
         return;
       }
+      if (asset.virtualKind === 'room') {
+        const newAssetId = await createRealRoomFromVirtual(asset);
+        if (newAssetId) {
+          navigate(`/asset/${newAssetId}`, { state: { from: '/kartoteka' } });
+        }
+        return;
+      }
       showToast(
         'Tahle položka je zatím jen větev stromu. Založ ji jako skutečnou kartu, aby šla otevřít.',
         'error'
@@ -1076,7 +1156,7 @@ export default function KartotekaPage() {
       return;
     }
     navigate(`/asset/${asset.id}`, { state: { from: '/kartoteka' } });
-  }, [createRealBuildingFromVirtual, navigate, resolveVirtualAsset]);
+  }, [createRealBuildingFromVirtual, createRealRoomFromVirtual, navigate, resolveVirtualAsset]);
 
   // ── Counts ───
   const counts = useMemo(() => ({

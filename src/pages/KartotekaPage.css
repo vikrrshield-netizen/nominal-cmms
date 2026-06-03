@@ -1135,6 +1135,62 @@ select.k-input {
   color: #607080;
 }
 
+.kartoteka-page .k-tree-issues,
+.kartoteka-page .k-tree-childcount {
+  display: none;
+}
+
+.kartoteka-page .k-tree-stats-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  margin-left: auto;
+  white-space: nowrap;
+  color: #607080;
+}
+
+.kartoteka-page .k-tree-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.kartoteka-page .k-tree-stat.is-alert {
+  color: #dc2626;
+}
+
+.kartoteka-page .k-tree-action {
+  width: auto;
+  min-width: 88px;
+  height: 34px;
+  padding: 0 12px;
+  gap: 6px;
+  border: 1px solid #e1d6c6;
+  background: #fbf9f4;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  opacity: 1;
+}
+
+.kartoteka-page .k-tree-action-detail {
+  color: #2563eb;
+  border-color: #bfdbfe;
+}
+
+.kartoteka-page .k-tree-action-add {
+  color: #0284c7;
+  border-color: #bae6fd;
+}
+
+.kartoteka-page .k-tree-action-delete {
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
 @media (min-width: 1024px) {
   .kartoteka-page .k-root-card {
     grid-template-columns: minmax(280px, 1fr) minmax(140px, 220px) auto auto;
@@ -1212,5 +1268,28 @@ select.k-input {
 
   .kartoteka-page .k-root-stats-inline .k-root-stat {
     font-size: 0.72rem;
+  }
+
+  .kartoteka-page .k-tree-row {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+
+  .kartoteka-page .k-tree-name {
+    flex-basis: calc(100% - 54px);
+  }
+
+  .kartoteka-page .k-tree-stats-inline {
+    order: 2;
+    margin-left: 32px;
+    gap: 5px;
+  }
+
+  .kartoteka-page .k-tree-action {
+    order: 3;
+    min-width: 0;
+    height: 32px;
+    padding: 0 9px;
+    font-size: 0.76rem;
   }
 }
