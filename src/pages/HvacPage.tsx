@@ -176,7 +176,7 @@ function dedupeLogs(logs: WorkLog[]) {
 
 export default function HvacPage() {
   const navigate = useNavigate();
-  const { user } = useAuthContext();
+  const { user, hasPermission } = useAuthContext();
   const employeeNames = useEmployeeNames({ tenantId: user?.tenantId, roles: MAINTENANCE_EMPLOYEE_ROLES });
   const [assets, setAssets] = useState<Asset[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -190,6 +190,7 @@ export default function HvacPage() {
   const [exchangeNote, setExchangeNote] = useState('');
   const [savingExchange, setSavingExchange] = useState(false);
   const [showPrefilters, setShowPrefilters] = useState(false);
+  const canWriteHvacExchange = hasPermission('hvac.manage') || hasPermission('wo.create') || hasPermission('wo.update');
 
   useEffect(() => {
     if (!exchangeWorker && user?.displayName) setExchangeWorker(user.displayName);
@@ -330,7 +331,12 @@ export default function HvacPage() {
           <button type="button" onClick={() => setSelectedAsset(asset)} className="min-h-11 rounded-xl bg-blue-600 px-2 text-sm font-bold text-white">
             Detail
           </button>
-          <button type="button" onClick={() => openExchange(asset)} className="min-h-11 rounded-xl bg-emerald-600 px-2 text-sm font-bold text-white">
+          <button
+            type="button"
+            onClick={() => openExchange(asset)}
+            disabled={!canWriteHvacExchange}
+            className="min-h-11 rounded-xl bg-emerald-600 px-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+          >
             Výměna
           </button>
           <button type="button" onClick={() => navigate(`/inventory?asset=${asset.id}&category=filters`)} className="min-h-11 rounded-xl border border-slate-200 bg-white px-2 text-sm font-bold text-slate-700">
@@ -356,7 +362,12 @@ export default function HvacPage() {
           <div className="mt-1 text-sm font-bold text-blue-700">Filtr: {dimension || 'doplnit rozměr / počet'}</div>
         </div>
         <div className="grid grid-cols-2 gap-2 sm:w-56">
-          <button type="button" onClick={() => openExchange(asset)} className="min-h-10 rounded-xl bg-emerald-600 px-2 text-sm font-black text-white">
+          <button
+            type="button"
+            onClick={() => openExchange(asset)}
+            disabled={!canWriteHvacExchange}
+            className="min-h-10 rounded-xl bg-emerald-600 px-2 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+          >
             Výměna
           </button>
           <button type="button" onClick={() => setSelectedAsset(asset)} className="min-h-10 rounded-xl border border-slate-200 bg-white px-2 text-sm font-black text-slate-700">
@@ -376,6 +387,10 @@ export default function HvacPage() {
 
   const saveExchange = async () => {
     if (!exchangeAsset) return;
+    if (!canWriteHvacExchange) {
+      showToast('Tvoje role nemá právo zapisovat výměny VZT.', 'error');
+      return;
+    }
     const worker = exchangeWorker.trim();
     if (!worker) {
       showToast('Vyber nebo napiš pracovníka.', 'error');
@@ -571,6 +586,7 @@ export default function HvacPage() {
           asset={selectedAsset}
           filters={filtersForAsset(selectedAsset)}
           logs={logsForAsset(selectedAsset)}
+          canWriteExchange={canWriteHvacExchange}
           onClose={() => setSelectedAsset(null)}
           onExchange={() => openExchange(selectedAsset)}
           onOpenAssetCard={() => navigate(`/asset/${selectedAsset.id}`, { state: { from: '/hvac', backStack: ['/hvac'] } })}
@@ -645,6 +661,7 @@ function HvacDetailModal({
   asset,
   filters,
   logs,
+  canWriteExchange,
   onClose,
   onExchange,
   onOpenAssetCard,
@@ -652,6 +669,7 @@ function HvacDetailModal({
   asset: Asset;
   filters: InventoryItem[];
   logs: WorkLog[];
+  canWriteExchange: boolean;
   onClose: () => void;
   onExchange: () => void;
   onOpenAssetCard: () => void;
@@ -673,7 +691,12 @@ function HvacDetailModal({
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <button type="button" onClick={onExchange} className="flex min-h-14 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 font-black text-white">
+          <button
+            type="button"
+            onClick={onExchange}
+            disabled={!canWriteExchange}
+            className="flex min-h-14 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 font-black text-white disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+          >
             <CheckCircle2 className="h-5 w-5" /> Potvrdit výměnu
           </button>
           <button type="button" onClick={onOpenAssetCard} className="flex min-h-14 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 font-bold text-slate-700">

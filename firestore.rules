@@ -327,7 +327,15 @@ service cloud.firestore {
 
     match /workLogs/{logId} {
       allow read: if hasPermission('wo.read') || hasPermission('report.read');
-      allow create: if (hasPermission('wo.create') || hasPermission('wo.update'))
+      allow create: if (
+          hasPermission('wo.create')
+          || hasPermission('wo.update')
+          || (
+            hasPermission('hvac.manage')
+            && request.resource.data.workType is string
+            && request.resource.data.workType.matches('.*VZT.*')
+          )
+        )
         && request.resource.data.createdAt is timestamp
         && (!('workOrderId' in request.resource.data) || request.resource.data.workOrderId is string)
         && request.resource.data.userName is string
