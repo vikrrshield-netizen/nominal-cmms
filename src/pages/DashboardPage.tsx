@@ -488,68 +488,74 @@ function GearboxDashboardWidget({
   if (!data.total) return null;
 
   return (
-    <section className={`mb-5 ${DASH_PANEL} p-4`}>
+    <section className="mb-5 rounded-3xl border border-slate-800 bg-slate-950 p-4 text-white shadow-lg">
       <button
         type="button"
         onClick={() => onNavigate('/gearboxes')}
-        className="flex w-full items-start justify-between gap-3 text-left"
+        className="flex w-full items-start justify-between gap-3 text-left transition hover:opacity-90 active:scale-[0.99]"
       >
         <div className="flex min-w-0 items-start gap-3">
-          <div className={DASH_ICON_BOX}>
-            <Cog className="h-5 w-5 text-violet-600" />
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-violet-400/35 bg-violet-500/20">
+            <Cog className="h-6 w-6 text-violet-100" />
           </div>
           <div className="min-w-0">
-            <div className="text-sm font-black text-slate-950">Převodovky</div>
-            <div className="mt-1 text-sm font-semibold text-slate-500">
+            <div className="text-base font-black text-white">Převodovky</div>
+            <div className="mt-1 text-sm font-semibold text-slate-300">
               {data.installed} v provozu · {data.stock} sklad · {data.service} servis
             </div>
           </div>
         </div>
         {data.alerts > 0 && (
-          <span className="shrink-0 rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-black text-red-700">
+          <span className="shrink-0 rounded-full border border-red-400/40 bg-red-500/15 px-2.5 py-1 text-xs font-black text-red-100">
             {data.alerts} upozornění
           </span>
         )}
       </button>
 
-      <div className="mt-3 grid gap-2 md:grid-cols-2">
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
         {data.rows.slice(0, 6).map((item) => (
           <div
             key={item.id}
-            className={`rounded-xl border px-3 py-2 shadow-sm ${
+            className={`rounded-2xl border p-3 shadow-sm ${
               item.status === 'in_stock'
-                ? 'border-sky-200 bg-sky-50/80'
+                ? 'border-sky-400/35 bg-sky-500/10'
                 : item.status === 'service'
-                  ? 'border-amber-200 bg-amber-50/75'
-                  : 'border-[var(--vik-border)] bg-[var(--vik-surface-2)]'
+                  ? 'border-amber-400/40 bg-amber-500/10'
+                  : 'border-slate-700 bg-[#0b1220]'
             }`}
           >
             <button
               type="button"
-              onClick={() => onNavigate(`/asset/${item.id}`)}
+              onClick={() => onNavigate('/gearboxes')}
               className="min-h-[48px] w-full text-left transition hover:opacity-90 active:scale-[0.99]"
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-black text-slate-950">{item.name}</div>
+                  <div className="truncate text-base font-black text-white">{item.name}</div>
                   <div className="mt-1 flex flex-wrap items-center gap-2">
-                    <span className="truncate text-sm font-semibold text-slate-500">{item.location}</span>
+                    <span className="truncate text-sm font-semibold text-slate-300">{item.location}</span>
                     <span className={`rounded-full border px-2 py-1 text-xs font-black ${item.statusInfo.tone}`}>
                       {item.statusInfo.label}
                     </span>
                   </div>
                 </div>
-                <div className={`shrink-0 text-sm font-black ${item.temp.tone}`}>{item.temp.label}</div>
+                <div className={`shrink-0 text-sm font-black ${
+                  item.temp.tone.includes('red')
+                    ? 'text-red-200'
+                    : item.temp.tone.includes('amber')
+                      ? 'text-amber-200'
+                      : 'text-emerald-200'
+                }`}>{item.temp.label}</div>
               </div>
             </button>
             <div className="mt-2 flex flex-wrap gap-2">
               {canLogRepair && (
-                <div className="grid w-full grid-cols-3 gap-1 rounded-lg border border-[var(--vik-border)] bg-white p-1">
+                <div className="grid w-full grid-cols-3 gap-1 rounded-lg border border-white/10 bg-slate-950/60 p-1">
                   <button
                     type="button"
                     onClick={() => onNavigate(`/asset/${item.id}?action=assign`)}
                     className={`min-h-9 rounded-md px-2 text-[11px] font-black transition active:scale-[0.98] ${
-                      item.status === 'installed' ? 'bg-emerald-100 text-emerald-800' : 'text-slate-600 hover:bg-[var(--vik-surface-2)]'
+                      item.status === 'installed' ? 'bg-emerald-500/20 text-emerald-100' : 'text-slate-300 hover:bg-white/10'
                     }`}
                   >
                     Extruder
@@ -559,7 +565,7 @@ function GearboxDashboardWidget({
                     disabled={savingStatusId === item.id || item.status === 'in_stock'}
                     onClick={() => handleStatusChange(item.asset, 'in_stock')}
                     className={`min-h-9 rounded-md px-2 text-[11px] font-black transition disabled:opacity-45 active:scale-[0.98] ${
-                      item.status === 'in_stock' ? 'bg-sky-100 text-sky-800' : 'text-slate-600 hover:bg-[var(--vik-surface-2)]'
+                      item.status === 'in_stock' ? 'bg-sky-500/20 text-sky-100' : 'text-slate-300 hover:bg-white/10'
                     }`}
                   >
                     {savingStatusId === item.id && item.status !== 'in_stock' ? '...' : 'Sklad'}
@@ -569,18 +575,26 @@ function GearboxDashboardWidget({
                     disabled={savingStatusId === item.id || item.status === 'service'}
                     onClick={() => handleStatusChange(item.asset, 'service')}
                     className={`min-h-9 rounded-md px-2 text-[11px] font-black transition disabled:opacity-45 active:scale-[0.98] ${
-                      item.status === 'service' ? 'bg-amber-100 text-amber-800' : 'text-slate-600 hover:bg-[var(--vik-surface-2)]'
+                      item.status === 'service' ? 'bg-amber-500/20 text-amber-100' : 'text-slate-300 hover:bg-white/10'
                     }`}
                   >
                     {savingStatusId === item.id && item.status !== 'service' ? '...' : 'Servis'}
                   </button>
                 </div>
               )}
+              <button
+                type="button"
+                onClick={() => onNavigate(`/asset/${item.id}`)}
+                className="min-h-[44px] flex-1 rounded-lg border border-white/10 bg-white/5 px-2 text-xs font-black text-slate-100 transition hover:bg-white/10 active:scale-[0.98]"
+              >
+                <FileText className="mr-1 inline h-4 w-4" />
+                Karta
+              </button>
               {canWriteTemp && (
                 <button
                   type="button"
                   onClick={() => onNavigate(`/asset/${item.id}?action=temp`)}
-                  className="min-h-[44px] flex-1 rounded-lg border border-sky-200 bg-sky-50 px-2 text-xs font-black text-sky-700 transition hover:bg-sky-100 active:scale-[0.98]"
+                  className="min-h-[44px] flex-1 rounded-lg border border-sky-400/35 bg-sky-500/15 px-2 text-xs font-black text-sky-100 transition hover:bg-sky-500/25 active:scale-[0.98]"
                 >
                   Teplota
                 </button>
@@ -589,7 +603,7 @@ function GearboxDashboardWidget({
                 <button
                   type="button"
                   onClick={() => setProblemAsset(item.asset)}
-                  className="min-h-[44px] flex-1 rounded-lg border border-red-200 bg-red-50 px-2 text-xs font-black text-red-700 transition hover:bg-red-100 active:scale-[0.98]"
+                  className="min-h-[44px] flex-1 rounded-lg border border-red-400/35 bg-red-500/15 px-2 text-xs font-black text-red-100 transition hover:bg-red-500/25 active:scale-[0.98]"
                 >
                   Nahlásit problém
                 </button>
@@ -598,7 +612,7 @@ function GearboxDashboardWidget({
                 <button
                   type="button"
                   onClick={() => setRepairAsset(item.asset)}
-                  className="min-h-[44px] flex-1 rounded-lg border border-amber-200 bg-amber-50 px-2 text-xs font-black text-amber-700 transition hover:bg-amber-100 active:scale-[0.98]"
+                  className="min-h-[44px] flex-1 rounded-lg border border-amber-400/35 bg-amber-500/15 px-2 text-xs font-black text-amber-100 transition hover:bg-amber-500/25 active:scale-[0.98]"
                 >
                   Oprava / úprava
                 </button>

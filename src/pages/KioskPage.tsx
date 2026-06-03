@@ -11,6 +11,7 @@ import {
   ChevronRight,
   ClipboardList,
   Camera,
+  Droplets,
   Factory,
   Filter,
   HelpCircle,
@@ -35,9 +36,11 @@ import { useEmployeeNames } from '../hooks/useEmployeeDirectory';
 import { createTask } from '../services/taskService';
 import { addWorkLog } from '../services/workLogService';
 import { addGearboxTemperatureLog, isGearboxAsset } from '../services/gearboxService';
+import { addDataloggerTemperatureLog, isDataloggerAsset } from '../services/dataloggerService';
 import type { Asset } from '../types/asset';
+import type { DataloggerTemperatureLog } from '../types/datalogger';
 
-type ViewState = 'MENU' | 'BREAKDOWN' | 'ORDER' | 'IDEA' | 'MESSAGE' | 'PREFILTER' | 'GEARBOX_TEMP' | 'ASSISTANT' | 'HANDOVER';
+type ViewState = 'MENU' | 'BREAKDOWN' | 'ORDER' | 'IDEA' | 'MESSAGE' | 'PREFILTER' | 'GEARBOX_TEMP' | 'DATALOGGER_TEMP' | 'ASSISTANT' | 'HANDOVER';
 
 interface QuickOption {
   id: string;
@@ -67,11 +70,11 @@ interface PrefilterLog {
 
 interface KioskTodayAction {
   id: string;
-  type: 'gearbox_temperature' | 'prefilter';
+  type: 'gearbox_temperature' | 'datalogger_temperature' | 'prefilter';
   assetId: string;
   title: string;
   detail: string;
-  tone: 'red' | 'amber' | 'violet';
+  tone: 'red' | 'amber' | 'violet' | 'teal';
 }
 
 interface KioskProductionPlan {
@@ -258,6 +261,7 @@ const localDateKey = (date: Date) => {
 const parseAssetDate = (value: unknown) => {
   if (!value) return null;
   if (value instanceof Date) return value;
+  if (typeof value === 'object' && value && 'toDate' in value && typeof value.toDate === 'function') return value.toDate();
   const date = new Date(value as any);
   return Number.isNaN(date.getTime()) ? null : date;
 };
@@ -353,9 +357,14 @@ export default function KioskPage() {
   const [gearboxProblemOption, setGearboxProblemOption] = useState('');
   const [gearboxProblemPriority, setGearboxProblemPriority] = useState<'P1' | 'P2'>('P2');
   const [gearboxProblemNote, setGearboxProblemNote] = useState('');
+  const [dataloggerTemperature, setDataloggerTemperature] = useState('');
+  const [dataloggerHumidity, setDataloggerHumidity] = useState('');
+  const [dataloggerMeasuredAt, setDataloggerMeasuredAt] = useState(() => new Date().toISOString().slice(0, 16));
+  const [dataloggerNote, setDataloggerNote] = useState('');
 
   const [shiftNotes, setShiftNotes] = useState<ShiftNote[]>([]);
   const [prefilterLogs, setPrefilterLogs] = useState<PrefilterLog[]>([]);
+  const [dataloggerLogs, setDataloggerLogs] = useState<DataloggerTemperatureLog[]>([]);
   const [productionPlans, setProductionPlans] = useState<KioskProductionPlan[]>([]);
   const [handoverText, setHandoverText] = useState('');
   const [handoverPriority, setHandoverPriority] = useState<'normal' | 'important'>('normal');
@@ -490,6 +499,20 @@ export default function KioskPage() {
   }, []);
 
   useEffect(() => {
+    if (!canUseDataloggerKiosk) {
+      setDataloggerLogs([]);
+      return;
+    }
+    const dataloggerQuery = query(collection(db, 'datalogger_temperature_logs'), orderBy('measuredAt', 'desc'), limit(500));
+    const unsubscribe = onSnapshot(
+      dataloggerQuery,
+      (snapshot) => setDataloggerLogs(snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as DataloggerTemperatureLog))),
+      () => setDataloggerLogs([]),
+    );
+    return () => unsubscribe();
+  }, [canUseDataloggerKiosk]);
+
+  useEffect(() => {
     if (!canViewProductionPlan) {
       setProductionPlans([]);
       return;
@@ -536,6 +559,7 @@ export default function KioskPage() {
   }, [assets, equipmentAssets]);
 
   const gearboxAssets = useMemo(() => equipmentAssets.filter((asset) => isGearboxAsset(asset)), [equipmentAssets]);
+  const dataloggerAssets = useMemo(() => equipmentAssets.filter((asset) => isDataloggerAsset(asset)), [equipmentAssets]);
   const activeGearboxAssets = useMemo(() => {
     const installed = gearboxAssets.filter((asset) => Boolean(asset.currentExtruderId || asset.currentExtruderName || asset.gearboxStatus === 'installed'));
     return installed.length ? installed : gearboxAssets;
@@ -585,6 +609,20 @@ export default function KioskPage() {
     return map;
   }, [prefilterLogs]);
 
+  const latestDataloggerByAsset = useMemo(() => {
+    const map = new Map<string, DataloggerTemperatureLog>();
+    for (const log of dataloggerLogs) {
+      if (!log.dataloggerId) continue;
+      const existing = map.get(log.dataloggerId);
+      const currentDate = parseAssetDate(log.measuredAt);
+      const existingDate = existing ? parseAssetDate(existing.measuredAt) : null;
+      if (!existing || (currentDate && (!existingDate || currentDate.getTime() > existingDate.getTime()))) {
+        map.set(log.dataloggerId, log);
+      }
+    }
+    return map;
+  }, [dataloggerLogs]);
+
   const getPrefilterStatus = (asset: Asset) => {
     const last = latestPrefilterByAsset.get(asset.id);
     if (!last) return { state: 'overdue', label: 'Chybí výměna', days: null as number | null, last };
@@ -625,7 +663,39 @@ export default function KioskPage() {
     };
   }, [activeGearboxAssets, currentTime]);
 
+  const getDataloggerDailyTemperatureStatus = (asset: Asset) => {
+    const latest = latestDataloggerByAsset.get(asset.id);
+    const measuredAt = latest ? parseAssetDate(latest.measuredAt) : null;
+    if (measuredAt && startOfDay(measuredAt) === startOfDay(currentTime)) {
+      return {
+        state: 'ok',
+        label: `Dnes zapsáno: ${latest?.temperatureC} °C${typeof latest?.humidityPct === 'number' ? ` / ${latest.humidityPct} %` : ''}`,
+        latest,
+      };
+    }
+    if (!measuredAt) return { state: 'missing', label: 'Dnes chybí záznam', latest };
+    const days = Math.max(1, Math.floor((startOfDay(currentTime) - startOfDay(measuredAt)) / 86400000));
+    return { state: 'missing', label: `Chybí dnešní záznam, poslední před ${days} dny`, latest };
+  };
+
+  const dataloggerAlerts = useMemo(() => {
+    const statuses = dataloggerAssets.map((asset) => ({ asset, status: getDataloggerDailyTemperatureStatus(asset) }));
+    return {
+      missing: statuses.filter((item) => item.status.state !== 'ok'),
+      ok: statuses.filter((item) => item.status.state === 'ok'),
+    };
+  }, [currentTime, dataloggerAssets, latestDataloggerByAsset]);
+
   const todayActions = useMemo<KioskTodayAction[]>(() => {
+    const dataloggerActions = canUseDataloggerKiosk ? dataloggerAlerts.missing.map(({ asset, status }) => ({
+      id: `datalogger-${asset.id}`,
+      type: 'datalogger_temperature' as const,
+      assetId: asset.id,
+      title: `Zapsat datalogger: ${asset.name}`,
+      detail: `${getAssetRoom(asset, assets) || 'Místnost'} | ${status.label}`,
+      tone: 'teal' as const,
+    })) : [];
+
     const gearboxActions = canUseGearboxKiosk ? gearboxTemperatureAlerts.missing.map(({ asset, status }) => ({
       id: `gearbox-${asset.id}`,
       type: 'gearbox_temperature' as const,
@@ -653,8 +723,8 @@ export default function KioskPage() {
       tone: 'amber' as const,
     })) : [];
 
-    return [...gearboxActions, ...overduePrefilters, ...warningPrefilters];
-  }, [assets, canUseGearboxKiosk, canUsePrefilterKiosk, gearboxTemperatureAlerts.missing, prefilterAlerts.overdue, prefilterAlerts.warning]);
+    return [...dataloggerActions, ...gearboxActions, ...overduePrefilters, ...warningPrefilters];
+  }, [assets, canUseDataloggerKiosk, canUseGearboxKiosk, canUsePrefilterKiosk, dataloggerAlerts.missing, gearboxTemperatureAlerts.missing, prefilterAlerts.overdue, prefilterAlerts.warning]);
 
   const todayProductionPlans = useMemo(() => {
     const today = localDateKey(currentTime);
@@ -708,6 +778,21 @@ export default function KioskPage() {
       })
       .slice(0, 8);
   }, [assetSearch, assets, prefilterGroups]);
+
+  const filteredDataloggers = useMemo(() => {
+    const queryText = normalize(assetSearch);
+    return dataloggerAssets
+      .filter((asset) => {
+        if (!queryText) return true;
+        return normalize(assetLabel(asset, assets)).includes(queryText);
+      })
+      .sort((a, b) => {
+        const statusA = getDataloggerDailyTemperatureStatus(a).state === 'ok' ? 1 : 0;
+        const statusB = getDataloggerDailyTemperatureStatus(b).state === 'ok' ? 1 : 0;
+        return statusA - statusB || assetLabel(a, assets).localeCompare(assetLabel(b, assets), 'cs');
+      })
+      .slice(0, 40);
+  }, [assetSearch, assets, dataloggerAssets, latestDataloggerByAsset, currentTime]);
 
   const breakdownAssets = useMemo(() => {
     const queryText = normalize(assetSearch);
@@ -780,6 +865,10 @@ export default function KioskPage() {
     setGearboxProblemOption('');
     setGearboxProblemPriority('P2');
     setGearboxProblemNote('');
+    setDataloggerTemperature('');
+    setDataloggerHumidity('');
+    setDataloggerMeasuredAt(new Date().toISOString().slice(0, 16));
+    setDataloggerNote('');
     setSubmitError('');
   };
 
@@ -789,6 +878,10 @@ export default function KioskPage() {
     setAssetSearch('');
     if (action.type === 'gearbox_temperature') {
       setActiveView('GEARBOX_TEMP');
+      return;
+    }
+    if (action.type === 'datalogger_temperature') {
+      setActiveView('DATALOGGER_TEMP');
       return;
     }
     setActiveView('PREFILTER');
@@ -933,6 +1026,26 @@ export default function KioskPage() {
     setGearboxTemperature(String(clampTemperature(value)));
   };
 
+  const currentDataloggerTemperature = () => {
+    const parsed = Number(String(dataloggerTemperature).replace(',', '.'));
+    if (Number.isFinite(parsed)) return Math.max(-30, Math.min(40, parsed));
+    return 5;
+  };
+
+  const setDataloggerTemperatureValue = (value: number) => {
+    setDataloggerTemperature(String(Math.max(-30, Math.min(40, value))));
+  };
+
+  const currentDataloggerHumidity = () => {
+    const parsed = Number(String(dataloggerHumidity).replace(',', '.'));
+    if (Number.isFinite(parsed)) return Math.max(0, Math.min(100, Math.round(parsed)));
+    return 50;
+  };
+
+  const setDataloggerHumidityValue = (value: number) => {
+    setDataloggerHumidity(String(Math.max(0, Math.min(100, Math.round(value)))));
+  };
+
   const handleGearboxTemperatureSubmit = async () => {
     const temperatureC = currentGearboxTemperature();
     if (isSubmitting || !selectedAsset || !Number.isFinite(temperatureC) || !gearboxMeasuredAt) return;
@@ -953,6 +1066,35 @@ export default function KioskPage() {
     } catch (err) {
       console.error('Kiosk gearbox temperature error:', err);
       setSubmitError('Teplotu se nepodařilo uložit.');
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDataloggerTemperatureSubmit = async () => {
+    const temperatureC = Number(String(dataloggerTemperature).replace(',', '.'));
+    const humidityPct = dataloggerHumidity.trim() ? Number(String(dataloggerHumidity).replace(',', '.')) : undefined;
+    if (isSubmitting || !selectedAsset || !dataloggerMeasuredAt || !Number.isFinite(temperatureC)) return;
+    if (humidityPct !== undefined && (!Number.isFinite(humidityPct) || humidityPct < 0 || humidityPct > 100)) {
+      setSubmitError('Vlhkost musí být číslo 0–100 %.');
+      return;
+    }
+    setIsSubmitting(true);
+    setSubmitError('');
+    try {
+      await addDataloggerTemperatureLog({
+        tenantId: user?.tenantId || selectedAsset.tenantId || 'main_firm',
+        datalogger: selectedAsset,
+        user,
+        temperatureC,
+        humidityPct,
+        measuredAt: new Date(dataloggerMeasuredAt),
+        roomName: getAssetRoom(selectedAsset, assets),
+        note: dataloggerNote.trim(),
+      });
+      showSuccessAndReset('Teplota dataloggeru zapsána');
+    } catch (err) {
+      console.error('Kiosk datalogger temperature error:', err);
+      setSubmitError('Teplotu dataloggeru se nepodařilo uložit.');
       setIsSubmitting(false);
     }
   };
@@ -1525,6 +1667,70 @@ export default function KioskPage() {
     </div>
   );
 
+  const renderDataloggerPicker = () => (
+    <div className="space-y-4">
+      <h3 className="text-xl text-slate-100 font-black leading-tight">1. Vyberte datalogger</h3>
+      {dataloggerAlerts.missing.length > 0 && (
+        <div className="rounded-2xl border border-teal-300/40 bg-teal-600/20 p-4">
+          <div className="flex items-center gap-3">
+            <Thermometer className="h-6 w-6 text-teal-100" />
+            <div>
+              <div className="text-lg font-black text-white">Dnešní teploty skladů nejsou kompletní</div>
+              <div className="text-sm font-bold text-teal-100">{dataloggerAlerts.missing.length} dataloggerů čeká na zápis.</div>
+            </div>
+          </div>
+        </div>
+      )}
+      <label className="relative block">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+        <input
+          value={assetSearch}
+          onChange={(event) => {
+            setAssetSearch(event.target.value);
+            setSelectedAssetId('');
+          }}
+          placeholder="Hledat datalogger, sklad, místnost nebo kód..."
+          className="w-full bg-slate-950 border border-white/10 text-white text-lg rounded-2xl py-4 pl-12 pr-4 outline-none focus:border-teal-400"
+        />
+      </label>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[45vh] overflow-y-auto pr-1">
+        {filteredDataloggers.map((asset) => {
+          const dailyStatus = getDataloggerDailyTemperatureStatus(asset);
+          const missing = dailyStatus.state !== 'ok';
+          return (
+            <button
+              key={asset.id}
+              type="button"
+              onClick={() => {
+                setSelectedAssetId(asset.id);
+                setAssetSearch('');
+              }}
+              className={`text-left border rounded-2xl p-4 transition min-h-[98px] active:scale-[0.99] ${
+                missing
+                  ? 'bg-teal-600/20 border-teal-300/50'
+                  : 'bg-slate-900 border-white/10'
+              }`}
+            >
+              <div className="flex min-w-0 items-start gap-2">
+                {missing && <AlertTriangle className="mt-1 h-5 w-5 shrink-0 text-teal-100" />}
+                <div className="min-w-0">
+                  <div className="text-white text-lg font-black leading-snug break-words">{asset.name}</div>
+                  <div className="text-sm text-slate-300 mt-1 leading-snug break-words">{getAssetRoom(asset, assets) || assetLabel(asset, assets)}</div>
+                  <div className={`mt-2 text-sm font-black ${missing ? 'text-teal-100' : 'text-emerald-100'}`}>
+                    {dailyStatus.label}
+                  </div>
+                </div>
+              </div>
+            </button>
+          );
+        })}
+        {filteredDataloggers.length === 0 && (
+          <div className="col-span-full text-center text-slate-400 py-8 text-lg">V kartotéce zatím není žádný datalogger.</div>
+        )}
+      </div>
+    </div>
+  );
+
   const renderMenu = () => (
     <div className="w-full max-w-6xl space-y-5">
       {renderClock()}
@@ -1536,7 +1742,7 @@ export default function KioskPage() {
           <MenuButton icon={<Package className="w-12 h-12" />} label="Požadavek na díl" color="bg-blue-600 hover:bg-blue-500" onClick={() => setActiveView('ORDER')} />
           <MenuButton icon={<ClipboardList className="w-12 h-12" />} label="Předání směny" color="bg-indigo-600 hover:bg-indigo-500" onClick={() => setActiveView('HANDOVER')} />
           {canUseDataloggerKiosk && (
-            <MenuButton icon={<Thermometer className="w-12 h-12" />} label="Datalogery" color="bg-teal-700 hover:bg-teal-600" onClick={() => navigate('/dataloggers')} />
+            <MenuButton icon={<Thermometer className="w-12 h-12" />} label="Datalogery" color="bg-teal-700 hover:bg-teal-600" badge={dataloggerAlerts.missing.length} onClick={() => setActiveView('DATALOGGER_TEMP')} />
           )}
           {canUsePrefilterKiosk && (
             <MenuButton icon={<Filter className="w-12 h-12" />} label="Výměna předfiltru" color="bg-cyan-700 hover:bg-cyan-600" badge={prefilterAlerts.overdue.length + prefilterAlerts.warning.length} onClick={() => setActiveView('PREFILTER')} />
@@ -1632,8 +1838,10 @@ export default function KioskPage() {
                     ? 'border-red-400/45 bg-red-600/15 text-red-50'
                     : action.tone === 'amber'
                       ? 'border-amber-400/45 bg-amber-500/12 text-amber-50'
-                      : 'border-violet-300/45 bg-violet-600/15 text-violet-50';
-                  const Icon = action.type === 'gearbox_temperature' ? Thermometer : Filter;
+                      : action.tone === 'teal'
+                        ? 'border-teal-300/45 bg-teal-600/15 text-teal-50'
+                        : 'border-violet-300/45 bg-violet-600/15 text-violet-50';
+                  const Icon = action.type === 'prefilter' ? Filter : Thermometer;
                   return (
                     <button
                       key={action.id}
@@ -1971,6 +2179,120 @@ export default function KioskPage() {
     </FormWrapper>
   );
 
+  const renderDataloggerTemperature = () => (
+    <FormWrapper title="Teplota dataloggeru" onCancel={handleCancel}>
+      {renderError()}
+      {!selectedAsset && renderDataloggerPicker()}
+      {selectedAsset && (() => {
+        const temperature = currentDataloggerTemperature();
+        const humidity = currentDataloggerHumidity();
+        return (
+          <div className="space-y-2">
+            <div className="rounded-xl border border-teal-400/30 bg-teal-500/10 p-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="truncate text-base font-black leading-tight text-white">{selectedAsset.name}</div>
+                  <div className="mt-0.5 truncate text-xs font-bold text-teal-100/80">{getAssetRoom(selectedAsset, assets) || assetLabel(selectedAsset, assets)}</div>
+                </div>
+              </div>
+              <button onClick={() => setSelectedAssetId('')} className="mt-1 text-xs font-bold text-teal-200 underline">Vybrat jiný datalogger</button>
+            </div>
+
+            <div className="rounded-xl border border-teal-400/40 bg-teal-500/15 p-2.5">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs font-bold text-slate-300">Teplota</div>
+                  <div className="text-4xl font-black leading-none text-white">{temperature}<span className="text-xl"> °C</span></div>
+                </div>
+              </div>
+              <input
+                type="range"
+                min={-30}
+                max={40}
+                step={0.5}
+                value={temperature}
+                onChange={(event) => setDataloggerTemperatureValue(Number(event.target.value))}
+                className="mt-2 w-full accent-teal-500"
+              />
+              <div className="mt-2 grid grid-cols-4 gap-2 sm:grid-cols-7">
+                {[-25, -18, 0, 2, 5, 8, 20].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setDataloggerTemperatureValue(preset)}
+                    className="min-h-10 rounded-lg border border-white/10 bg-slate-950/60 text-sm font-black text-white active:scale-[0.98]"
+                  >
+                    {preset} °C
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-cyan-400/35 bg-cyan-500/10 p-2.5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Droplets className="h-5 w-5 text-cyan-100" />
+                  <div>
+                    <div className="text-xs font-bold text-slate-300">Vlhkost</div>
+                    <div className="text-3xl font-black leading-none text-white">{dataloggerHumidity.trim() ? humidity : '--'}<span className="text-lg"> %</span></div>
+                  </div>
+                </div>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={1}
+                value={humidity}
+                onChange={(event) => setDataloggerHumidityValue(Number(event.target.value))}
+                className="mt-2 w-full accent-cyan-500"
+              />
+              <div className="mt-2 grid grid-cols-5 gap-2">
+                {[40, 50, 60, 70, 80].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setDataloggerHumidityValue(preset)}
+                    className="min-h-10 rounded-lg border border-white/10 bg-white/5 text-sm font-bold text-slate-200 active:scale-[0.98]"
+                  >
+                    {preset} %
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <label className="block">
+              <span className="mb-1 block text-xs font-black text-slate-200">Datum a čas měření</span>
+              <input
+                type="datetime-local"
+                value={dataloggerMeasuredAt}
+                onChange={(event) => setDataloggerMeasuredAt(event.target.value)}
+                className="w-full rounded-xl border border-white/10 bg-slate-950 p-2.5 text-base text-white"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-black text-slate-200">Poznámka</span>
+              <textarea
+                value={dataloggerNote}
+                onChange={(event) => setDataloggerNote(event.target.value)}
+                placeholder="Volitelně: námraza, otevřené dveře, kontrola OK..."
+                className="h-16 w-full resize-none rounded-xl border border-white/10 bg-slate-950 p-2.5 text-base text-white outline-none focus:border-teal-400"
+              />
+            </label>
+            <button
+              onClick={() => void handleDataloggerTemperatureSubmit()}
+              disabled={!dataloggerTemperature.trim() || !dataloggerMeasuredAt || isSubmitting}
+              className="flex w-full items-center justify-center gap-3 rounded-xl bg-teal-700 py-3 text-base font-bold text-white hover:bg-teal-600 disabled:opacity-50"
+            >
+              <Thermometer className="w-6 h-6" />
+              Zapsat teplotu
+            </button>
+          </div>
+        );
+      })()}
+    </FormWrapper>
+  );
+
   const renderIdea = () => (
     <FormWrapper title="Nápad na zlepšení" onCancel={handleCancel}>
       {renderError()}
@@ -2205,6 +2527,7 @@ export default function KioskPage() {
       {activeView === 'ORDER' && renderOrder()}
       {activeView === 'PREFILTER' && renderPrefilter()}
       {activeView === 'GEARBOX_TEMP' && renderGearboxTemperature()}
+      {activeView === 'DATALOGGER_TEMP' && renderDataloggerTemperature()}
       {activeView === 'IDEA' && renderIdea()}
       {activeView === 'MESSAGE' && renderMessage()}
       {activeView === 'ASSISTANT' && renderAssistant()}

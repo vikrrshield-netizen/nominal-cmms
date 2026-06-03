@@ -27,6 +27,15 @@ import type { Asset, CustomField } from '../types/asset';
 import type { DataloggerTemperatureLevel, DataloggerTemperatureLog } from '../types/datalogger';
 
 type FilterKey = 'all' | 'missing' | 'alerts' | 'today';
+type RoomOption = {
+  id: string;
+  label: string;
+  name: string;
+  buildingId?: string;
+  floor?: string;
+  parentId?: string | null;
+  isAsset: boolean;
+};
 
 const QUICK_TEMPS = [-25, -18, 0, 2, 5, 8, 20];
 
@@ -87,6 +96,11 @@ function roomLabel(asset: Asset): string {
   return asset.areaName || asset.roomId || asset.location || '';
 }
 
+function isRoomAsset(asset: Asset): boolean {
+  const text = normalizeDataloggerText(`${asset.entityType} ${asset.category} ${asset.name}`);
+  return text.includes('mistnost') || text.includes('room') || text.includes('prostor');
+}
+
 function customFieldText(asset: Asset, keys: string[]): string {
   const normalizedKeys = keys.map(normalizeDataloggerText);
   const field = (asset.customFields || []).find((item: CustomField) => {
@@ -145,12 +159,14 @@ export default function DataloggersPage() {
   const { user, hasPermission } = useAuthContext();
   const tenantId = user?.tenantId || 'main_firm';
   const canWrite = hasPermission('datalogger.temperature.write') || hasPermission('datalogger.manage');
+  const canAssignRoom = hasPermission('asset.update');
   const [assets, setAssets] = useState<Asset[]>([]);
   const [logs, setLogs] = useState<DataloggerTemperatureLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterKey>('all');
   const [activeAsset, setActiveAsset] = useState<Asset | null>(null);
+  const [assignAsset, setAssignAsset] = useState<Asset | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -177,6 +193,27 @@ export default function DataloggersPage() {
     () => assets.filter((asset) => isDataloggerAsset(asset)),
     [assets],
   );
+
+  const roomOptions = useMemo<RoomOption[]>(() => {
+    const map = new Map<string, RoomOption>();
+    for (const asset of assets) {
+      const roomName = isRoomAsset(asset) ? (asset.areaName || asset.name) : asset.areaName;
+      if (!roomName) continue;
+      const key = `${asset.buildingId || ''}|${asset.floor || ''}|${roomName}`;
+      const option: RoomOption = {
+        id: isRoomAsset(asset) ? asset.id : `area:${key}`,
+        label: [asset.buildingId ? `Budova ${asset.buildingId}` : '', asset.floor, roomName].filter(Boolean).join(' | '),
+        name: roomName,
+        buildingId: asset.buildingId,
+        floor: asset.floor,
+        parentId: asset.parentId,
+        isAsset: isRoomAsset(asset),
+      };
+      const existing = map.get(key);
+      if (!existing || option.isAsset) map.set(key, option);
+    }
+    return [...map.values()].sort((a, b) => a.label.localeCompare(b.label, 'cs'));
+  }, [assets]);
 
   const stats = useMemo(() => {
     let today = 0;
@@ -328,7 +365,9 @@ export default function DataloggersPage() {
                 latest={latest}
                 level={level}
                 canWrite={canWrite}
+                canAssignRoom={canAssignRoom}
                 onLog={() => setActiveAsset(asset)}
+                onAssignRoom={() => setAssignAsset(asset)}
               />
             );
           })}
@@ -342,6 +381,18 @@ export default function DataloggersPage() {
           tenantId={tenantId}
           onClose={() => setActiveAsset(null)}
           onSaved={() => setActiveAsset(null)}
+        />
+      )}
+      {assignAsset && (
+        <AssignRoomModal
+          asset={assignAsset}
+          tenantId={tenantId}
+          rooms={roomOptions}
+          onClose={() => setAssignAsset(null)}
+          onSaved={(updated) => {
+            setAssets((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+            setAssignAsset(null);
+          }}
         />
       )}
     </div>
@@ -377,13 +428,17 @@ function DataloggerCard({
   latest,
   level,
   canWrite,
+  canAssignRoom,
   onLog,
+  onAssignRoom,
 }: {
   asset: Asset;
   latest: DataloggerTemperatureLog | null;
   level: DataloggerTemperatureLevel;
   canWrite: boolean;
+  canAssignRoom: boolean;
   onLog: () => void;
+  onAssignRoom: () => void;
 }) {
   const min = customFieldNumber(asset, ['min', 'minimum', 'min teplota', 'dolni limit']);
   const max = customFieldNumber(asset, ['max', 'maximum', 'max teplota', 'horni limit']);
@@ -446,21 +501,141 @@ function DataloggerCard({
         </div>
       )}
 
-      <button
-        type="button"
-        disabled={!canWrite}
-        onClick={onLog}
-        className="vik-button vik-button-primary mt-4 w-full"
-      >
-        <ClipboardList className="h-4 w-4" />
-        Zapsat denní teplotu
-      </button>
+      <div className={`mt-4 grid gap-2 ${canAssignRoom ? 'sm:grid-cols-2' : ''}`}>
+        <button
+          type="button"
+          disabled={!canWrite}
+          onClick={onLog}
+          className="vik-button vik-button-primary w-full"
+        >
+          <ClipboardList className="h-4 w-4" />
+          Zapsat denní teplotu
+        </button>
+        {canAssignRoom && (
+          <button
+            type="button"
+            onClick={onAssignRoom}
+            className="vik-button w-full"
+          >
+            <MapPin className="h-4 w-4" />
+            Přiřadit místnost
+          </button>
+        )}
+      </div>
       {!canWrite && (
         <div className="mt-2 text-center text-xs font-semibold text-slate-500">
           Nemáš oprávnění k zápisu teplot dataloggerů.
         </div>
       )}
     </article>
+  );
+}
+
+function AssignRoomModal({
+  asset,
+  tenantId,
+  rooms,
+  onClose,
+  onSaved,
+}: {
+  asset: Asset;
+  tenantId: string;
+  rooms: RoomOption[];
+  onClose: () => void;
+  onSaved: (asset: Asset) => void;
+}) {
+  const currentRoom = roomLabel(asset);
+  const initialRoomId = useMemo(() => {
+    const byRoomId = rooms.find((room) => asset.roomId && room.id === asset.roomId);
+    if (byRoomId) return byRoomId.id;
+    const byName = rooms.find((room) => normalizeDataloggerText(room.name) === normalizeDataloggerText(currentRoom));
+    return byName?.id || rooms[0]?.id || '';
+  }, [asset.roomId, currentRoom, rooms]);
+  const [selectedId, setSelectedId] = useState(initialRoomId);
+  const [saving, setSaving] = useState(false);
+  const selectedRoom = rooms.find((room) => room.id === selectedId) || null;
+
+  const handleSave = async () => {
+    if (!selectedRoom) {
+      showToast('Vyber místnost.', 'error');
+      return;
+    }
+
+    const updateData: Partial<Asset> = {
+      parentId: selectedRoom.isAsset ? selectedRoom.id : asset.parentId,
+      roomId: selectedRoom.isAsset ? selectedRoom.id : '',
+      buildingId: selectedRoom.buildingId || asset.buildingId,
+      floor: selectedRoom.floor || asset.floor,
+      areaName: selectedRoom.name,
+      location: selectedRoom.name,
+    };
+
+    setSaving(true);
+    try {
+      await assetService.update(tenantId, asset.id, updateData);
+      showToast('Datalogger přiřazen k místnosti.', 'success');
+      onSaved({ ...asset, ...updateData });
+    } catch (error) {
+      console.error('[DataloggersPage] room assign failed:', error);
+      showToast('Místnost se nepodařilo uložit.', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-3 sm:items-center">
+      <div className="w-full max-w-xl rounded-3xl border border-slate-200 bg-white p-4 shadow-2xl">
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <div className="text-xs font-black uppercase tracking-widest text-cyan-700">Umístění</div>
+            <h2 className="mt-1 text-2xl font-black text-slate-950">Přiřadit místnost</h2>
+            <p className="text-sm font-semibold text-slate-600">{asset.name}</p>
+          </div>
+          <button type="button" onClick={onClose} className="vik-button h-11 w-11 p-0" aria-label="Zavřít">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {rooms.length === 0 ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-800">
+            V kartotéce zatím nejsou místnosti. Nejdřív založ místnost nebo doplň umístění u zařízení.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <label className="block">
+              <span className="mb-1 block text-sm font-black text-slate-800">Místnost</span>
+              <select
+                value={selectedId}
+                onChange={(event) => setSelectedId(event.target.value)}
+                className="vik-input font-bold"
+                autoFocus
+              >
+                {rooms.map((room) => (
+                  <option key={room.id} value={room.id}>
+                    {room.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {selectedRoom && (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-600">
+                Datalogger se bude zobrazovat v místnosti <strong className="text-slate-950">{selectedRoom.name}</strong>.
+              </div>
+            )}
+            <button
+              type="button"
+              disabled={saving}
+              onClick={handleSave}
+              className="vik-button vik-button-primary min-h-12 w-full"
+            >
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
+              Uložit místnost
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
