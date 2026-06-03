@@ -556,6 +556,40 @@ function TemperatureModal({
               placeholder="volitelně, např. 55"
               className="vik-input text-xl font-black"
             />
+            <div className="mt-3 rounded-2xl border border-cyan-100 bg-cyan-50/60 p-3">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <span className="text-xs font-black uppercase tracking-wide text-cyan-800">Posuvník vlhkosti</span>
+                <span className="rounded-full bg-white px-2.5 py-1 text-sm font-black text-cyan-800">
+                  {humidity.trim() ? `${humidity.replace('.', ',')} %` : 'nezadáno'}
+                </span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                value={humidity.trim() ? Math.max(0, Math.min(100, Number(humidity.replace(',', '.')) || 0)) : 50}
+                onChange={(event) => setHumidity(event.target.value)}
+                className="w-full accent-cyan-700"
+                aria-label="Vlhkost v procentech"
+              />
+              <div className="mt-2 grid grid-cols-5 gap-1.5">
+                {[40, 50, 60, 70, 80].map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setHumidity(String(value))}
+                    className={`min-h-9 rounded-xl border px-2 text-xs font-black ${
+                      humidity === String(value)
+                        ? 'border-cyan-700 bg-cyan-100 text-cyan-800'
+                        : 'border-cyan-100 bg-white text-cyan-800'
+                    }`}
+                  >
+                    {value} %
+                  </button>
+                ))}
+              </div>
+            </div>
             <span className="mt-1 block text-xs font-semibold text-slate-500">Zadej procenta RH, pokud datalogger vlhkost ukazuje.</span>
           </label>
 
