@@ -81,6 +81,11 @@ interface Task {
   lastUpdate?: string;
   lastUpdateAt?: any;
   lastUpdateBy?: string;
+  foodSafetyRisk?: boolean;
+  foodSafetyHazardType?: string;
+  foodSafetyImpact?: string;
+  temporaryRepair?: boolean;
+  permanentFixDueDate?: any;
 }
 
 interface SourceWorkLog {
@@ -95,6 +100,18 @@ interface SourceWorkLog {
 }
 
 type TaskSuggestMode = 'location' | 'asset' | null;
+
+const FOOD_SAFETY_HAZARD_OPTIONS = [
+  { value: 'foreign_body', label: 'Cizí těleso / fyzikální' },
+  { value: 'chemical', label: 'Chemické' },
+  { value: 'biological', label: 'Biologické' },
+  { value: 'allergen', label: 'Alergen' },
+  { value: 'other', label: 'Jiné' },
+];
+
+function foodSafetyHazardLabel(value?: string) {
+  return FOOD_SAFETY_HAZARD_OPTIONS.find((item) => item.value === value)?.label || value || 'neuvedeno';
+}
 
 function normalizeLookup(value: unknown) {
   return String(value || '')
@@ -683,6 +700,11 @@ export default function TasksPage() {
     location: '',
     assetName: '',
     assetId: '',
+    foodSafetyRisk: false,
+    foodSafetyHazardType: 'foreign_body',
+    foodSafetyImpact: '',
+    temporaryRepair: false,
+    permanentFixDueDate: '',
   });
   const [saving, setSaving] = useState(false);
 
@@ -862,6 +884,15 @@ export default function TasksPage() {
         location: form.location?.trim() || null,
         assetId: form.assetId || null,
         assetName: form.assetName?.trim() || null,
+        foodSafetyRisk: form.foodSafetyRisk === true,
+        ...(form.foodSafetyRisk ? {
+          foodSafetyHazardType: form.foodSafetyHazardType || 'foreign_body',
+          foodSafetyImpact: form.foodSafetyImpact?.trim() || null,
+        } : {}),
+        temporaryRepair: form.temporaryRepair === true,
+        ...(form.temporaryRepair && form.permanentFixDueDate ? {
+          permanentFixDueDate: Timestamp.fromDate(new Date(`${form.permanentFixDueDate}T12:00:00`)),
+        } : {}),
         ...(gearboxExtruderId ? {
           relatedAssetId: gearboxExtruderId,
           relatedAssetName: gearboxExtruderName,
@@ -1147,12 +1178,75 @@ export default function TasksPage() {
           required
           options={cmmsConfig.priorities.map(p => ({ value: p.id, label: p.label }))}
         />
+
+        <div className="space-y-3 rounded-2xl border border-red-200 bg-red-50 p-3">
+          <button
+            type="button"
+            onClick={() => setForm(prev => ({ ...prev, foodSafetyRisk: !prev.foodSafetyRisk }))}
+            className="flex w-full items-start gap-3 text-left"
+          >
+            <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border text-xs font-bold ${
+              form.foodSafetyRisk ? 'border-red-600 bg-red-600 text-white' : 'border-slate-400 bg-white text-transparent'
+            }`}>
+              ✓
+            </span>
+            <span>
+              <span className="block text-sm font-black text-slate-950">Food safety riziko</span>
+              <span className="block text-xs font-semibold text-slate-600">Použij pro kontaminaci, alergeny, cizí tělesa nebo hygienické riziko.</span>
+            </span>
+          </button>
+          {form.foodSafetyRisk && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <FormField
+                label="Typ nebezpečí"
+                value={form.foodSafetyHazardType}
+                onChange={(v) => setForm(prev => ({ ...prev, foodSafetyHazardType: v }))}
+                type="select"
+                options={FOOD_SAFETY_HAZARD_OPTIONS}
+              />
+              <FormField
+                label="Dopad"
+                value={form.foodSafetyImpact}
+                onChange={(v) => setForm(prev => ({ ...prev, foodSafetyImpact: v }))}
+                placeholder="Např. produkt zastaven, nutná kontrola linky..."
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50 p-3">
+          <button
+            type="button"
+            onClick={() => setForm(prev => ({ ...prev, temporaryRepair: !prev.temporaryRepair }))}
+            className="flex w-full items-start gap-3 text-left"
+          >
+            <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border text-xs font-bold ${
+              form.temporaryRepair ? 'border-amber-600 bg-amber-500 text-slate-950' : 'border-slate-400 bg-white text-transparent'
+            }`}>
+              ✓
+            </span>
+            <span>
+              <span className="block text-sm font-black text-slate-950">Dočasná oprava</span>
+              <span className="block text-xs font-semibold text-slate-600">IFS 4.16: musí mít termín trvalého řešení.</span>
+            </span>
+          </button>
+          {form.temporaryRepair && (
+            <FormField
+              label="Termín trvalého řešení"
+              value={form.permanentFixDueDate}
+              onChange={(v) => setForm(prev => ({ ...prev, permanentFixDueDate: v }))}
+              type="date"
+              required
+            />
+          )}
+        </div>
+
         <FormFooter
           onCancel={() => setShowNewTask(false)}
           onSubmit={handleCreateTask}
           submitLabel="Vytvořit úkol"
           loading={saving}
-          disabled={!form.title.trim()}
+          disabled={!form.title.trim() || (form.temporaryRepair && !form.permanentFixDueDate)}
         />
         </div>
       </BottomSheet>
@@ -1190,6 +1284,7 @@ export default function TasksPage() {
             const diaryContent = [
               data.resolution,
               resultLabel ? `Výsledek: ${resultLabel}` : '',
+              data.cleaningDone ? `Úklid po opravě: provedeno${data.cleaningNote ? ` (${data.cleaningNote})` : ''}` : '',
               data.auditNote ? `Audit: ${data.auditNote}` : '',
             ].filter(Boolean).join('\n');
             const batch = writeBatch(db);
@@ -1217,6 +1312,9 @@ export default function TasksPage() {
               createdAt: serverTimestamp(),
               result: data.result,
               auditNote: data.auditNote,
+              cleaningDone: data.cleaningDone,
+              cleaningChecked: data.cleaningChecked,
+              cleaningNote: data.cleaningNote,
             };
             if (completingTask.assetId) workLogData.assetId = completingTask.assetId;
             if (taskAsset?.name || completingTask.assetName) workLogData.assetName = taskAsset?.name || completingTask.assetName;
@@ -1591,6 +1689,27 @@ function TaskActionsSheet({ task, userName, onClose, onEdit, onComplete, onStatu
         </div>
         <div className="text-slate-950 font-semibold">{task.title}</div>
         {task.description && <div className="text-xs text-slate-600 mt-1 line-clamp-2">{task.description}</div>}
+        {(task.foodSafetyRisk || task.temporaryRepair) && (
+          <div className="mt-3 grid gap-2">
+            {task.foodSafetyRisk && (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900">
+                <div className="font-black">Food safety riziko</div>
+                <div className="mt-0.5">
+                  {foodSafetyHazardLabel(task.foodSafetyHazardType)}
+                  {task.foodSafetyImpact ? ` · ${task.foodSafetyImpact}` : ''}
+                </div>
+              </div>
+            )}
+            {task.temporaryRepair && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+                <div className="font-black">Dočasná oprava</div>
+                <div className="mt-0.5">
+                  Trvalé řešení do: {formatDateTime(task.permanentFixDueDate) || 'není zadáno'}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {diaryTask && (

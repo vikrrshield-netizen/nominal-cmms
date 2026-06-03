@@ -34,6 +34,9 @@ interface CompleteTaskModalProps {
     performedDate: string;
     result: string;
     auditNote: string;
+    cleaningDone: boolean;
+    cleaningChecked: boolean;
+    cleaningNote: string;
   }) => Promise<void>;
   onClose: () => void;
 }
@@ -75,6 +78,8 @@ export default function CompleteTaskModal({ taskTitle, defaultWorkers = [], work
   const [performedDate, setPerformedDate] = useState(todayDateInput());
   const [result, setResult] = useState('fixed');
   const [auditNote, setAuditNote] = useState('');
+  const [cleaningDone, setCleaningDone] = useState(false);
+  const [cleaningNote, setCleaningNote] = useState('');
   const [pin, setPin] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -120,6 +125,9 @@ export default function CompleteTaskModal({ taskTitle, defaultWorkers = [], work
         performedDate,
         result,
         auditNote: auditNote.trim(),
+        cleaningDone,
+        cleaningChecked: cleaningDone,
+        cleaningNote: cleaningNote.trim(),
       });
       onClose();
     } catch (err: unknown) {
@@ -211,6 +219,34 @@ export default function CompleteTaskModal({ taskTitle, defaultWorkers = [], work
       <FormField label="Datum provedení" value={performedDate} onChange={setPerformedDate} type="date" required />
       <FormField label="Typ práce" value={workType} onChange={setWorkType} type="select" required options={WORK_TYPE_OPTIONS} />
       <FormField label="Výsledek" value={result} onChange={setResult} type="select" required options={RESULT_OPTIONS} />
+
+      <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+        <button
+          type="button"
+          onClick={() => setCleaningDone((value) => !value)}
+          className="flex w-full items-center gap-3 text-left"
+        >
+          <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border text-xs font-bold ${
+            cleaningDone ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-400 bg-white text-transparent'
+          }`}>
+            ✓
+          </span>
+          <span>
+            <span className="block text-sm font-bold text-slate-950">Úklid po opravě proveden</span>
+            <span className="block text-xs text-slate-600">IFS/Tesco důkaz, že po zásahu nezůstal materiál, nářadí ani riziko kontaminace.</span>
+          </span>
+        </button>
+        {cleaningDone && (
+          <textarea
+            value={cleaningNote}
+            onChange={(event) => setCleaningNote(event.target.value)}
+            placeholder="Volitelně: co bylo uklizeno / kdo ověřil / poznámka k hygieně..."
+            rows={2}
+            className="mt-3 w-full resize-none rounded-xl border border-emerald-200 bg-white px-3 py-2 text-sm text-slate-950 outline-none placeholder:text-slate-400 focus:border-emerald-600"
+          />
+        )}
+      </div>
+
       <FormField
         label="Poznámka pro audit"
         value={auditNote}
