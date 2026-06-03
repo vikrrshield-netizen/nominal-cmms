@@ -759,6 +759,27 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
     }
 
+    match /production_materials/{docId} {
+      allow read: if hasPermission('production.manage') || hasPermission('report.read');
+      allow create: if hasPermission('production.manage') && hasTimestamp();
+      allow update: if hasPermission('production.manage') && hasTimestamp();
+      allow delete: if hasPermission('production.manage');
+    }
+
+    match /production_areas/{docId} {
+      allow read: if hasPermission('production.manage') || hasPermission('report.read');
+      allow create: if hasPermission('production.manage') && hasTimestamp();
+      allow update: if hasPermission('production.manage') && hasTimestamp();
+      allow delete: if hasPermission('production.manage');
+    }
+
+    match /production_extruders/{docId} {
+      allow read: if hasPermission('production.manage') || hasPermission('report.read');
+      allow create: if hasPermission('production.manage') && hasTimestamp();
+      allow update: if hasPermission('production.manage') && hasTimestamp();
+      allow delete: if hasPermission('production.manage');
+    }
+
     match /warehouse_receipts/{docId} {
       allow read: if hasPermission('warehouse.view');
       allow create: if hasPermission('warehouse.view') && hasTimestamp();

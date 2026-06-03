@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useBackNavigation } from '../hooks/useBackNavigation';
 import {
-  collection, addDoc, updateDoc, doc, onSnapshot,
+  collection, addDoc, updateDoc, doc, onSnapshot, writeBatch,
   orderBy, query, serverTimestamp, Timestamp,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -21,7 +21,24 @@ import MicButton from '../components/ui/MicButton';
 // ═══════════════════════════════════════════════════════════════════
 
 type ActiveTab = 'extrusion' | 'packaging';
-type ExtrusionArea = 'extrudovna_i' | 'extrudovna_ii';
+type ExtrusionArea = string;
+
+interface ProductionMaterial {
+  id: string;
+  name: string;
+}
+
+interface ProductionAreaOption {
+  id: string;
+  name: string;
+}
+
+interface ProductionExtruderOption {
+  id: string;
+  name: string;
+  areaId: string;
+  areaName: string;
+}
 
 // -- Extrusion --
 type ExtrusionStatus = 'planned' | 'running' | 'done';
@@ -93,6 +110,18 @@ const EXTRUSION_LINES: { number: number; area: ExtrusionArea; areaLabel: string;
   { number: 4, area: 'extrudovna_ii', areaLabel: 'Extrudovna II', label: 'Extruder 4' },
 ];
 
+const DEFAULT_PRODUCTION_AREAS: ProductionAreaOption[] = [
+  { id: 'extrudovna_i', name: 'Extrudovna I' },
+  { id: 'extrudovna_ii', name: 'Extrudovna II' },
+];
+
+const DEFAULT_PRODUCTION_EXTRUDERS: ProductionExtruderOption[] = EXTRUSION_LINES.map((line) => ({
+  id: `extruder-${line.number}`,
+  name: line.label,
+  areaId: line.area,
+  areaName: line.areaLabel,
+}));
+
 // ═══════════════════════════════════════════════════════════════════
 // HOOKS
 // ═══════════════════════════════════════════════════════════════════
@@ -163,6 +192,102 @@ function usePackagingOrders() {
   return { orders, loading };
 }
 
+function useProductionCatalogs(canManage: boolean, user: any) {
+  const [materials, setMaterials] = useState<ProductionMaterial[]>([]);
+  const [areas, setAreas] = useState<ProductionAreaOption[]>([]);
+  const [extruders, setExtruders] = useState<ProductionExtruderOption[]>([]);
+  const [ready, setReady] = useState({ materials: false, areas: false, extruders: false });
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'production_materials'), (snap) => {
+      if (snap.empty && canManage) {
+        const batch = writeBatch(db);
+        RAW_MATERIALS.forEach((name, index) => {
+          batch.set(doc(db, 'production_materials', `material-${index + 1}`), {
+            name,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+            createdById: user?.uid || user?.id || '',
+            createdByName: user?.displayName || 'System',
+          });
+        });
+        void batch.commit().catch(() => undefined);
+      }
+
+      setMaterials(snap.docs.map((d) => ({ id: d.id, name: d.data().name || '' }))
+        .filter((item) => item.name)
+        .sort((a, b) => a.name.localeCompare(b.name, 'cs')));
+      setReady((prev) => ({ ...prev, materials: true }));
+    }, () => setReady((prev) => ({ ...prev, materials: true })));
+    return () => unsub();
+  }, [canManage, user?.uid, user?.id, user?.displayName]);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'production_areas'), (snap) => {
+      if (snap.empty && canManage) {
+        const batch = writeBatch(db);
+        DEFAULT_PRODUCTION_AREAS.forEach((area) => {
+          batch.set(doc(db, 'production_areas', area.id), {
+            name: area.name,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+            createdById: user?.uid || user?.id || '',
+            createdByName: user?.displayName || 'System',
+          });
+        });
+        void batch.commit().catch(() => undefined);
+      }
+
+      setAreas(snap.docs.map((d) => ({ id: d.id, name: d.data().name || '' }))
+        .filter((item) => item.name)
+        .sort((a, b) => a.name.localeCompare(b.name, 'cs')));
+      setReady((prev) => ({ ...prev, areas: true }));
+    }, () => setReady((prev) => ({ ...prev, areas: true })));
+    return () => unsub();
+  }, [canManage, user?.uid, user?.id, user?.displayName]);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'production_extruders'), (snap) => {
+      if (snap.empty && canManage) {
+        const batch = writeBatch(db);
+        DEFAULT_PRODUCTION_EXTRUDERS.forEach((extruder) => {
+          batch.set(doc(db, 'production_extruders', extruder.id), {
+            name: extruder.name,
+            areaId: extruder.areaId,
+            areaName: extruder.areaName,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+            createdById: user?.uid || user?.id || '',
+            createdByName: user?.displayName || 'System',
+          });
+        });
+        void batch.commit().catch(() => undefined);
+      }
+
+      setExtruders(snap.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: d.id,
+          name: data.name || '',
+          areaId: data.areaId || '',
+          areaName: data.areaName || '',
+        };
+      })
+        .filter((item) => item.name && item.areaId)
+        .sort((a, b) => (a.areaName + a.name).localeCompare(b.areaName + b.name, 'cs')));
+      setReady((prev) => ({ ...prev, extruders: true }));
+    }, () => setReady((prev) => ({ ...prev, extruders: true })));
+    return () => unsub();
+  }, [canManage, user?.uid, user?.id, user?.displayName]);
+
+  return {
+    materials,
+    areas,
+    extruders,
+    loading: !ready.materials || !ready.areas || !ready.extruders,
+  };
+}
+
 function useAssetsPicker(category?: string) {
   const [assets, setAssets] = useState<SimpleAsset[]>([]);
   useEffect(() => {
@@ -224,20 +349,6 @@ function localDateKey(date = new Date()): string {
   return `${y}-${m}-${d}`;
 }
 
-function normalizeText(value: unknown): string {
-  return String(value || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .trim();
-}
-
-function extruderNumberFromAsset(asset: SimpleAsset): number {
-  const text = normalizeText(`${asset.name} ${asset.code || ''}`);
-  const match = text.match(/extruder\s*(\d+)/) || text.match(/\bex\s*(\d+)\b/);
-  return match?.[1] ? Number(match[1]) : 0;
-}
-
 // ═══════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════
@@ -246,6 +357,7 @@ export default function ProductionPage() {
   const goBack = useBackNavigation('/');
   const { user, hasPermission } = useAuthContext();
   const canManage = hasPermission('production.manage');
+  const { materials, areas, extruders: catalogExtruders } = useProductionCatalogs(canManage, user);
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('extrusion');
 
@@ -255,7 +367,7 @@ export default function ProductionPage() {
   const [batchForm, setBatchForm] = useState({
     planDate: localDateKey(),
     productionArea: 'extrudovna_i' as ExtrusionArea,
-    extruderNumber: '1',
+    extruderId: 'extruder-1',
     rawMaterial: '',
     targetWeight: '',
     note: '',
@@ -269,37 +381,59 @@ export default function ProductionPage() {
   const [showNewOrder, setShowNewOrder] = useState(false);
   const [orderForm, setOrderForm] = useState({ packagingType: '', palletCount: '', lineId: '', lineName: '', deadline: '' });
   const [orderSaving, setOrderSaving] = useState(false);
+  const [catalogForms, setCatalogForms] = useState({
+    material: '',
+    area: '',
+    extruder: '',
+    extruderAreaId: 'extrudovna_i',
+  });
 
   // Machine filter for extrusion
   const [machineFilter, setMachineFilter] = useState<string>('ALL');
 
   // Asset pickers
-  const extruderAssets = useAssetsPicker('extruder');
   const packagingAssets = useAssetsPicker('packaging');
   // Fallback: all assets if categories are empty
   const allAssets = useAssetsPicker();
-  const extruderOptions = extruderAssets.length > 0 ? extruderAssets : allAssets;
   const packagingOptions = packagingAssets.length > 0 ? packagingAssets : allAssets;
 
-  const extrusionLineOptions = useMemo(() => EXTRUSION_LINES.map((line) => {
-    const asset = extruderOptions.find((candidate) => extruderNumberFromAsset(candidate) === line.number);
-    return {
-      ...line,
-      assetId: asset?.id || `extruder-${line.number}`,
-      assetName: asset?.name || line.label,
-    };
-  }), [extruderOptions]);
+  const materialOptions = useMemo<ProductionMaterial[]>(
+    () => materials.length > 0 ? materials : RAW_MATERIALS.map((name, index) => ({ id: `fallback-material-${index + 1}`, name })),
+    [materials],
+  );
+
+  const areaOptions = useMemo<ProductionAreaOption[]>(
+    () => areas.length > 0 ? areas : DEFAULT_PRODUCTION_AREAS,
+    [areas],
+  );
+
+  const extrusionLineOptions = useMemo<ProductionExtruderOption[]>(
+    () => catalogExtruders.length > 0 ? catalogExtruders : DEFAULT_PRODUCTION_EXTRUDERS,
+    [catalogExtruders],
+  );
 
   const visibleExtrusionLines = useMemo(
-    () => extrusionLineOptions.filter((line) => line.area === batchForm.productionArea),
+    () => extrusionLineOptions.filter((line) => line.areaId === batchForm.productionArea),
     [batchForm.productionArea, extrusionLineOptions],
   );
 
   useEffect(() => {
-    if (!visibleExtrusionLines.some((line) => String(line.number) === batchForm.extruderNumber)) {
-      setBatchForm((prev) => ({ ...prev, extruderNumber: String(visibleExtrusionLines[0]?.number || 1) }));
+    if (!areaOptions.some((area) => area.id === batchForm.productionArea)) {
+      setBatchForm((prev) => ({ ...prev, productionArea: areaOptions[0]?.id || 'extrudovna_i' }));
     }
-  }, [batchForm.extruderNumber, visibleExtrusionLines]);
+  }, [areaOptions, batchForm.productionArea]);
+
+  useEffect(() => {
+    if (!visibleExtrusionLines.some((line) => line.id === batchForm.extruderId)) {
+      setBatchForm((prev) => ({ ...prev, extruderId: visibleExtrusionLines[0]?.id || '' }));
+    }
+  }, [batchForm.extruderId, visibleExtrusionLines]);
+
+  useEffect(() => {
+    if (!areaOptions.some((area) => area.id === catalogForms.extruderAreaId)) {
+      setCatalogForms((prev) => ({ ...prev, extruderAreaId: areaOptions[0]?.id || 'extrudovna_i' }));
+    }
+  }, [areaOptions, catalogForms.extruderAreaId]);
 
   // Stats
   const extrusionStats = useMemo(() => ({
@@ -317,20 +451,66 @@ export default function ProductionPage() {
   }), [orders]);
 
   // ── Extrusion actions ──
+  const createCatalogItem = async (kind: 'material' | 'area' | 'extruder') => {
+    if (!canManage) return;
+    const userId = user?.uid || user?.id || '';
+    const userName = user?.displayName || 'NeznĂˇmĂ˝';
+    const base = {
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      createdById: userId,
+      createdByName: userName,
+    };
+
+    try {
+      if (kind === 'material') {
+        const name = catalogForms.material.trim();
+        if (!name) return;
+        await addDoc(collection(db, 'production_materials'), { ...base, name });
+        setCatalogForms((prev) => ({ ...prev, material: '' }));
+        showToast('Surovina pĹ™idĂˇna', 'success');
+        return;
+      }
+
+      if (kind === 'area') {
+        const name = catalogForms.area.trim();
+        if (!name) return;
+        await addDoc(collection(db, 'production_areas'), { ...base, name });
+        setCatalogForms((prev) => ({ ...prev, area: '' }));
+        showToast('Extrudovna pĹ™idĂˇna', 'success');
+        return;
+      }
+
+      const name = catalogForms.extruder.trim();
+      const area = areaOptions.find((item) => item.id === catalogForms.extruderAreaId) || areaOptions[0];
+      if (!name || !area) return;
+      await addDoc(collection(db, 'production_extruders'), {
+        ...base,
+        name,
+        areaId: area.id,
+        areaName: area.name,
+      });
+      setCatalogForms((prev) => ({ ...prev, extruder: '' }));
+      showToast('Extruder pĹ™idĂˇn', 'success');
+    } catch {
+      showToast('ÄŚĂ­selnĂ­k se nepodaĹ™ilo uloĹľit', 'error');
+    }
+  };
+
   const createBatch = async () => {
     if (!batchForm.rawMaterial || !batchForm.targetWeight) return;
-    const selectedLine = extrusionLineOptions.find((line) => String(line.number) === batchForm.extruderNumber) || extrusionLineOptions[0];
+    const selectedLine = extrusionLineOptions.find((line) => line.id === batchForm.extruderId) || visibleExtrusionLines[0] || extrusionLineOptions[0];
     setBatchSaving(true);
     try {
       await addDoc(collection(db, 'production_extrusion'), {
         batchId: generateBatchId(),
         planDate: batchForm.planDate || localDateKey(),
-        productionArea: selectedLine?.area || batchForm.productionArea,
-        productionAreaLabel: selectedLine?.areaLabel || (batchForm.productionArea === 'extrudovna_ii' ? 'Extrudovna II' : 'Extrudovna I'),
+        productionArea: selectedLine?.areaId || batchForm.productionArea,
+        productionAreaLabel: selectedLine?.areaName || areaOptions.find((area) => area.id === batchForm.productionArea)?.name || '',
         rawMaterial: batchForm.rawMaterial,
         targetWeight: Number(batchForm.targetWeight),
-        machineId: selectedLine?.assetId || `extruder-${batchForm.extruderNumber}`,
-        machineName: selectedLine?.assetName || `Extruder ${batchForm.extruderNumber}`,
+        machineId: selectedLine?.id || '',
+        machineName: selectedLine?.name || '',
         note: batchForm.note.trim(),
         status: 'planned',
         shiftLog: '',
@@ -342,7 +522,7 @@ export default function ProductionPage() {
         createdByName: user?.displayName || 'Neznámý',
       });
       setShowNewBatch(false);
-      setBatchForm({ planDate: localDateKey(), productionArea: 'extrudovna_i', extruderNumber: '1', rawMaterial: '', targetWeight: '', note: '' });
+      setBatchForm({ planDate: localDateKey(), productionArea: areaOptions[0]?.id || 'extrudovna_i', extruderId: extrusionLineOptions[0]?.id || '', rawMaterial: '', targetWeight: '', note: '' });
       showToast('Dávka vytvořena', 'success');
     } catch { showToast('Chyba při vytváření', 'error'); }
     setBatchSaving(false);
@@ -491,7 +671,7 @@ export default function ProductionPage() {
             >
               Všechny stroje
             </button>
-            {extruderOptions.map(a => (
+            {extrusionLineOptions.map(a => (
               <button
                 key={a.id}
                 onClick={() => setMachineFilter(a.id)}
@@ -730,10 +910,7 @@ export default function ProductionPage() {
             </Field>
             <Field label="Extrudovna">
               <div className="grid grid-cols-2 gap-2">
-                {[
-                  { id: 'extrudovna_i' as const, label: 'Extrudovna I', hint: 'Extruder 1, 2' },
-                  { id: 'extrudovna_ii' as const, label: 'Extrudovna II', hint: 'Extruder 3, 4' },
-                ].map(area => (
+                {areaOptions.map(area => (
                   <button
                     key={area.id}
                     type="button"
@@ -744,8 +921,10 @@ export default function ProductionPage() {
                         : 'border-white/10 bg-white/5 text-slate-300'
                     }`}
                   >
-                    <span className="block text-sm font-bold">{area.label}</span>
-                    <span className="mt-1 block text-xs opacity-75">{area.hint}</span>
+                    <span className="block text-sm font-bold">{area.name}</span>
+                    <span className="mt-1 block text-xs opacity-75">
+                      {extrusionLineOptions.filter((line) => line.areaId === area.id).length} extruderů
+                    </span>
                   </button>
                 ))}
               </div>
@@ -754,17 +933,17 @@ export default function ProductionPage() {
               <div className="grid grid-cols-2 gap-2">
                 {visibleExtrusionLines.map(line => (
                   <button
-                    key={line.number}
+                    key={line.id}
                     type="button"
-                    onClick={() => setBatchForm(p => ({ ...p, extruderNumber: String(line.number) }))}
+                    onClick={() => setBatchForm(p => ({ ...p, extruderId: line.id }))}
                     className={`rounded-xl border p-3 text-left transition active:scale-[0.98] ${
-                      batchForm.extruderNumber === String(line.number)
+                      batchForm.extruderId === line.id
                         ? 'border-emerald-400 bg-emerald-500/20 text-white'
                         : 'border-white/10 bg-white/5 text-slate-300'
                     }`}
                   >
-                    <span className="block text-sm font-bold">{line.assetName}</span>
-                    <span className="mt-1 block text-xs opacity-75">{line.areaLabel}</span>
+                    <span className="block text-sm font-bold">{line.name}</span>
+                    <span className="mt-1 block text-xs opacity-75">{line.areaName}</span>
                   </button>
                 ))}
               </div>
@@ -773,9 +952,74 @@ export default function ProductionPage() {
               <select value={batchForm.rawMaterial} onChange={e => setBatchForm(p => ({ ...p, rawMaterial: e.target.value }))}
                 className={SEL_CLS} style={{ appearance: 'auto' }}>
                 <option value="" className="bg-slate-800">— vybrat —</option>
-                {RAW_MATERIALS.map(m => <option key={m} value={m} className="bg-slate-800">{m}</option>)}
+                {materialOptions.map(m => <option key={m.id} value={m.name} className="bg-slate-800">{m.name}</option>)}
               </select>
             </Field>
+            {canManage && (
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                <div className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-400">Sprava ciselniku</div>
+                <div className="grid gap-3">
+                  <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                    <input
+                      value={catalogForms.material}
+                      onChange={(e) => setCatalogForms((prev) => ({ ...prev, material: e.target.value }))}
+                      placeholder="Nova surovina"
+                      className={INP_CLS}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => createCatalogItem('material')}
+                      disabled={!catalogForms.material.trim()}
+                      className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white disabled:opacity-50"
+                    >
+                      + Surovina
+                    </button>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                    <input
+                      value={catalogForms.area}
+                      onChange={(e) => setCatalogForms((prev) => ({ ...prev, area: e.target.value }))}
+                      placeholder="Nova extrudovna"
+                      className={INP_CLS}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => createCatalogItem('area')}
+                      disabled={!catalogForms.area.trim()}
+                      className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white disabled:opacity-50"
+                    >
+                      + Extrudovna
+                    </button>
+                  </div>
+                  <div className="grid gap-2 lg:grid-cols-[1fr_180px_auto]">
+                    <input
+                      value={catalogForms.extruder}
+                      onChange={(e) => setCatalogForms((prev) => ({ ...prev, extruder: e.target.value }))}
+                      placeholder="Novy extruder"
+                      className={INP_CLS}
+                    />
+                    <select
+                      value={catalogForms.extruderAreaId}
+                      onChange={(e) => setCatalogForms((prev) => ({ ...prev, extruderAreaId: e.target.value }))}
+                      className={SEL_CLS}
+                      style={{ appearance: 'auto' }}
+                    >
+                      {areaOptions.map((area) => (
+                        <option key={area.id} value={area.id} className="bg-slate-800">{area.name}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => createCatalogItem('extruder')}
+                      disabled={!catalogForms.extruder.trim()}
+                      className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white disabled:opacity-50"
+                    >
+                      + Extruder
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
             <Field label="Cílová hmotnost (kg)">
               <input type="number" min="0" value={batchForm.targetWeight}
                 onChange={e => setBatchForm(p => ({ ...p, targetWeight: e.target.value }))}
