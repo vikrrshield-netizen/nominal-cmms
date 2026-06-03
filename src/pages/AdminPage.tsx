@@ -1,8 +1,8 @@
-// src/pages/AdminPage.tsx
+﻿// src/pages/AdminPage.tsx
 // VIKRR — Asset Shield — Administrace uživatelů a nastavení
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { collection, doc, setDoc, addDoc, updateDoc, onSnapshot, serverTimestamp, Timestamp, query, orderBy, limit } from 'firebase/firestore';
+import { collection, doc, setDoc, addDoc, updateDoc, onSnapshot, serverTimestamp, Timestamp, query, orderBy, limit, writeBatch } from 'firebase/firestore';
 import { initializeApp, deleteApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword, signOut as firebaseSignOut } from 'firebase/auth';
 import { db, firebaseConfig } from '../lib/firebase';
@@ -107,6 +107,33 @@ const normalizeCustomPermissions = (value: unknown): AdminCustomPermissions => {
     revoked: normalizeStringList(source.revoked),
   };
 };
+
+const diffStringLists = (before: string[], after: string[]) => {
+  const beforeSet = new Set(before);
+  const afterSet = new Set(after);
+  return {
+    added: after.filter((item) => !beforeSet.has(item)).sort(),
+    removed: before.filter((item) => !afterSet.has(item)).sort(),
+  };
+};
+
+const diffCustomPermissions = (before: AdminCustomPermissions, after: AdminCustomPermissions) => {
+  const granted = diffStringLists(before.granted, after.granted);
+  const revoked = diffStringLists(before.revoked, after.revoked);
+  return {
+    grantedAdded: granted.added,
+    grantedRemoved: granted.removed,
+    revokedAdded: revoked.added,
+    revokedRemoved: revoked.removed,
+  };
+};
+
+const hasPermissionDiff = (changes: ReturnType<typeof diffCustomPermissions>) => (
+  changes.grantedAdded.length > 0
+  || changes.grantedRemoved.length > 0
+  || changes.revokedAdded.length > 0
+  || changes.revokedRemoved.length > 0
+);
 
 const normalizeUserScope = (value: unknown): AdminUserScope => {
   if (!value || typeof value !== 'object') return DEFAULT_USER_SCOPE;
@@ -518,20 +545,41 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
   const handleSave = async () => {
     setSaving(true);
     try {
-      await updateDoc(doc(db, 'users', user.id), {
+      const beforePermissions = normalizeCustomPermissions(user.customPermissions);
+      const afterPermissions = normalizeCustomPermissions(formData.customPermissions);
+      const permissionChanges = diffCustomPermissions(beforePermissions, afterPermissions);
+      const batch = writeBatch(db);
+
+      batch.update(doc(db, 'users', user.id), {
         displayName: formData.displayName.trim(),
         pin: formData.pin,
         role: formData.role,
         email: formData.email.trim() || '',
         phone: formData.phone.trim() || '',
         buildingId: formData.building || '',
-        customPermissions: formData.customPermissions,
+        customPermissions: afterPermissions,
         scope: formData.scope,
         active: user.active,
         isActive: user.active,
         updatedAt: serverTimestamp(),
         updatedBy: authUser?.uid || '',
       });
+
+      if (hasPermissionDiff(permissionChanges)) {
+        const now = Timestamp.now();
+        batch.set(doc(collection(db, 'audit_logs')), {
+          action: 'PERMISSION_CHANGE',
+          documentId: user.id,
+          targetUserName: formData.displayName.trim() || user.displayName,
+          changes: permissionChanges,
+          userId: authUser?.uid || authUser?.id || '',
+          userName: authUser?.displayName || 'Neznámý',
+          timestamp: now,
+          createdAt: now,
+        });
+      }
+
+      await batch.commit();
       showToast('Změny uloženy do Firestore', 'success');
       onSaved();
     } catch (err) {
@@ -2285,3 +2333,4 @@ function PositionManagerTab({ canEdit }: { canEdit: boolean }) {
     </div>
   );
 }
+

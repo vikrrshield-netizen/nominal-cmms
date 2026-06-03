@@ -1927,6 +1927,7 @@ export default function KioskPage() {
             const currentUserId = user?.uid || user?.id || '';
             const acknowledged = Boolean(currentUserId && note.acknowledgedBy?.[currentUserId]);
             const canDeleteNote = Boolean(currentUserId);
+            const acknowledgedNames = Object.values(note.acknowledgedByName || {}).filter(Boolean);
             return (
             <div key={note.id} className={`rounded-xl p-3 border ${note.priority === 'important' ? 'bg-red-950/40 border-red-500/30' : 'bg-slate-900 border-white/10'}`}>
               <div className="flex items-center justify-between gap-3">
@@ -1944,6 +1945,11 @@ export default function KioskPage() {
                 {acknowledged && <span className="rounded-full bg-emerald-500/20 px-2 py-1 text-xs font-bold text-emerald-100">Přečteno</span>}
               </div>
               <p className="mt-2 text-base text-slate-200">{note.text}</p>
+              {acknowledgedNames.length > 0 && (
+                <div className="mt-2 rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-xs font-bold text-emerald-100">
+                  Přečetli: {acknowledgedNames.join(', ')}
+                </div>
+              )}
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <button
                   type="button"
@@ -1952,7 +1958,7 @@ export default function KioskPage() {
                   className="min-h-10 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-2 text-sm font-black text-emerald-100 disabled:opacity-60"
                 >
                   <CheckCircle2 className="mr-2 inline h-4 w-4" />
-                  {acknowledged ? 'Přečteno' : 'Potvrdit'}
+                  {acknowledged ? 'Přečteno' : 'Potvrdit přečtení'}
                 </button>
                 {canDeleteNote ? (
                   <button
