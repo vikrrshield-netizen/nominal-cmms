@@ -1144,8 +1144,8 @@ export default function AssetCardPage() {
         {/* Tabs */}
         <div className="grid grid-cols-2 gap-2 mb-4 rounded-2xl border border-[#e2d8c9] bg-white p-2 shadow-sm sm:grid-cols-4">
           {([
-            { key: 'history' as const, label: `Historie (${historyItems.length})` },
             { key: 'info' as const, label: 'Detaily' },
+            { key: 'history' as const, label: `Historie (${historyItems.length})` },
             { key: 'tasks' as const, label: `Úkoly (${tasks.length})` },
             { key: 'revisions' as const, label: `Revize (${revisions.length})`, alert: expiredRevisions.length > 0 },
           ]).map((tab) => (
@@ -1169,8 +1169,30 @@ export default function AssetCardPage() {
         {/* ═══ TAB: INFO ═══ */}
         {activeTab === 'info' && (
           <div className="space-y-4">
+            <div className="rounded-2xl border border-[#e2d8c9] bg-white p-3 shadow-sm">
+              <div className="mb-2 text-[11px] font-black uppercase tracking-[0.08em] text-slate-500">Rychla orientace</div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                {[
+                  { id: 'asset-section-basic', label: 'Zaklad' },
+                  { id: 'asset-section-links', label: 'Vazby' },
+                  ...(isGearbox ? [{ id: 'asset-section-gearbox', label: 'Prevodovka' }] : []),
+                  { id: 'asset-section-technical', label: 'Technika' },
+                  { id: 'asset-section-service', label: 'Servis' },
+                  { id: 'asset-section-documents', label: 'Dokumenty' },
+                ].map((section) => (
+                  <button
+                    key={section.id}
+                    type="button"
+                    onClick={() => document.getElementById(section.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                    className="min-h-10 rounded-xl border border-[#e2d8c9] bg-[#fbf9f4] px-3 text-sm font-black text-[#10263f] transition hover:border-[#1a6b4f] hover:bg-[#edf7f2]"
+                  >
+                    {section.label}
+                  </button>
+                ))}
+              </div>
+            </div>
             {/* ═══ SEKCE 1: IDENTITY CARD (Apple-style) ═══ */}
-            <div style={{ background: '#fff', borderRadius: 24, padding: 24, border: '1px solid #f1f5f9', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+            <div id="asset-section-basic" style={{ background: '#fff', borderRadius: 24, padding: 24, border: '1px solid #f1f5f9', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
                 <h3 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8', margin: 0 }}>Identifikace</h3>
                 {canEditAsset && !isEditing && (
@@ -1274,7 +1296,7 @@ export default function AssetCardPage() {
               )}
             </div>
 
-            <div style={{ background: '#fff', borderRadius: 24, padding: 24, border: '1px solid #f1f5f9', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+            <div id="asset-section-links" style={{ background: '#fff', borderRadius: 24, padding: 24, border: '1px solid #f1f5f9', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 16 }}>
                 <div>
                   <h3 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8', margin: 0 }}>Přiřazeno k</h3>
@@ -1378,7 +1400,7 @@ export default function AssetCardPage() {
             </div>
 
             {isGearbox && assetV2 && (
-              <div style={{ background: '#fff', borderRadius: 24, padding: 24, border: '1px solid #bae6fd', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+              <div id="asset-section-gearbox" style={{ background: '#fff', borderRadius: 24, padding: 24, border: '1px solid #bae6fd', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
                 {(() => {
                   const tempState = getGearboxTemperatureState(assetV2, assetV2.lastTemperatureC);
                   return (
@@ -1487,7 +1509,7 @@ export default function AssetCardPage() {
             )}
 
             {/* ═══ SEKCE 2: TECHNICAL SHEET (Apple-style) ═══ */}
-            <div style={{ background: '#fff', borderRadius: 24, padding: 24, border: '1px solid #f1f5f9', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+            <div id="asset-section-technical" style={{ background: '#fff', borderRadius: 24, padding: 24, border: '1px solid #f1f5f9', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
               <h3 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8', margin: '0 0 16px 0' }}>Technický list</h3>
               {!isEditing ? (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -1512,7 +1534,7 @@ export default function AssetCardPage() {
             </div>
 
             {/* ═══ SEKCE 3: UDÁLOSTI (Apple-style) ═══ */}
-            <div style={{ background: '#fff', borderRadius: 24, padding: 24, border: '1px solid #f1f5f9', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+            <div id="asset-section-events" style={{ background: '#fff', borderRadius: 24, padding: 24, border: '1px solid #f1f5f9', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                 <h3 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8', margin: 0 }}>
                   Události
@@ -1669,7 +1691,7 @@ export default function AssetCardPage() {
             </div>
 
             {/* ═══ SEKCE 4: HISTORIE OPRAV (Apple-style) ═══ */}
-            <div style={{ background: '#fff', borderRadius: 24, padding: 24, border: '1px solid #f1f5f9', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+            <div id="asset-section-service" style={{ background: '#fff', borderRadius: 24, padding: 24, border: '1px solid #f1f5f9', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                 <h3 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8', margin: 0 }}>
                   Historie oprav
@@ -1830,7 +1852,7 @@ export default function AssetCardPage() {
             </div>
 
             {/* ═══ SEKCE 5: DOKUMENTY (Apple-style) ═══ */}
-            <div style={{ background: '#fff', borderRadius: 24, padding: 24, border: '1px solid #f1f5f9', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+            <div id="asset-section-documents" style={{ background: '#fff', borderRadius: 24, padding: 24, border: '1px solid #f1f5f9', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                 <h3 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8', margin: 0 }}>
                   Dokumenty
@@ -2135,7 +2157,7 @@ export default function AssetCardPage() {
                           <div className="text-xs text-slate-600 mt-1 leading-relaxed">{item.detail}</div>
                         )}
                         {'linkWarning' in item && item.linkWarning && (
-                          <div className="mt-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-[11px] font-semibold text-amber-200">
+                          <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800">
                             {item.linkWarning}
                           </div>
                         )}
