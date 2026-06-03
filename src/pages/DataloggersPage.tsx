@@ -49,6 +49,11 @@ function isToday(value: unknown): boolean {
     && date.getDate() === now.getDate();
 }
 
+function isWeekend(date = new Date()): boolean {
+  const day = date.getDay();
+  return day === 0 || day === 6;
+}
+
 function formatDateTime(value: unknown): string {
   const date = asDate(value);
   if (!date) return 'bez data';
@@ -105,6 +110,7 @@ function latestLogFor(asset: Asset, logs: DataloggerTemperatureLog[]): Datalogge
 }
 
 function temperatureLevel(asset: Asset, log: DataloggerTemperatureLog | null): DataloggerTemperatureLevel {
+  if (isWeekend() && !(log && isToday(log.measuredAt))) return 'not_required';
   if (!log) return 'missing';
   const min = customFieldNumber(asset, ['min', 'minimum', 'min teplota', 'dolni limit']);
   const max = customFieldNumber(asset, ['max', 'maximum', 'max teplota', 'horni limit']);
@@ -115,6 +121,7 @@ function temperatureLevel(asset: Asset, log: DataloggerTemperatureLog | null): D
 
 function levelTone(level: DataloggerTemperatureLevel): string {
   if (level === 'ok') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+  if (level === 'not_required') return 'border-blue-200 bg-blue-50 text-blue-700';
   if (level === 'critical') return 'border-red-200 bg-red-50 text-red-700';
   if (level === 'warning') return 'border-amber-200 bg-amber-50 text-amber-700';
   return 'border-slate-200 bg-slate-50 text-slate-700';
@@ -122,6 +129,7 @@ function levelTone(level: DataloggerTemperatureLevel): string {
 
 function levelLabel(level: DataloggerTemperatureLevel): string {
   if (level === 'ok') return 'Dnes zapsáno';
+  if (level === 'not_required') return 'Víkend';
   if (level === 'critical') return 'Mimo limit';
   if (level === 'warning') return 'Starý zápis';
   return 'Chybí dnes';
@@ -199,7 +207,7 @@ export default function DataloggersPage() {
         ].join(' ')).includes(needle);
       })
       .sort((a, b) => {
-        const order: Record<DataloggerTemperatureLevel, number> = { critical: 0, missing: 1, warning: 2, ok: 3 };
+        const order: Record<DataloggerTemperatureLevel, number> = { critical: 0, missing: 1, warning: 2, not_required: 3, ok: 4 };
         const levelA = temperatureLevel(a, latestLogFor(a, tenantLogs));
         const levelB = temperatureLevel(b, latestLogFor(b, tenantLogs));
         return order[levelA] - order[levelB] || a.name.localeCompare(b.name, 'cs');
@@ -239,6 +247,22 @@ export default function DataloggersPage() {
           <StatCard label="Chybí dnes" value={stats.missing} icon={CalendarClock} tone="text-amber-700" />
           <StatCard label="Mimo limit" value={stats.alerts} icon={AlertTriangle} tone="text-red-700" />
         </section>
+
+        {isWeekend() && (
+          <section className="vik-card border-blue-100 bg-blue-50 p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-blue-100 bg-white text-blue-700">
+                <CalendarClock className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="text-sm font-black text-blue-900">Víkendový režim</div>
+                <p className="mt-1 text-sm font-semibold text-blue-800">
+                  Ruční zápisy nejsou o víkendu vyžadované, pokud ve skladu není obsluha. Systém nevytváří falešné záznamy.
+                </p>
+              </div>
+            </div>
+          </section>
+        )}
 
         <section className="vik-card p-3">
           <div className="mb-3 flex min-h-12 items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3">
@@ -391,7 +415,7 @@ function DataloggerCard({
             {latest ? `${latest.temperatureC} °C` : '—'}
           </div>
           <div className="mt-1 text-xs font-semibold text-slate-500">
-            {latest ? formatDateTime(latest.measuredAt) : 'bez zápisu'}
+            {latest ? formatDateTime(latest.measuredAt) : level === 'not_required' ? 'víkend bez obsluhy' : 'bez zápisu'}
           </div>
         </div>
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">

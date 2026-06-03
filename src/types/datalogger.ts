@@ -14,4 +14,4 @@ export interface DataloggerTemperatureLog {
   createdAt: Date | Timestamp;
 }
 
-export type DataloggerTemperatureLevel = 'ok' | 'warning' | 'critical' | 'missing';
+export type DataloggerTemperatureLevel = 'ok' | 'warning' | 'critical' | 'missing' | 'not_required';
