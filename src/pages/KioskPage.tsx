@@ -345,6 +345,7 @@ export default function KioskPage() {
   const [prefilterDate, setPrefilterDate] = useState(new Date().toISOString().slice(0, 10));
   const [gearboxTemperature, setGearboxTemperature] = useState('');
   const [gearboxMeasuredAt, setGearboxMeasuredAt] = useState(() => new Date().toISOString().slice(0, 16));
+  const [gearboxRawMaterial, setGearboxRawMaterial] = useState('');
   const [gearboxNote, setGearboxNote] = useState('');
   const [gearboxPhotoFile, setGearboxPhotoFile] = useState<File | null>(null);
   const gearboxPhotoInputRef = useRef<HTMLInputElement>(null);
@@ -772,6 +773,7 @@ export default function KioskPage() {
     setPrefilterDate(new Date().toISOString().slice(0, 10));
     setGearboxTemperature('');
     setGearboxMeasuredAt(new Date().toISOString().slice(0, 16));
+    setGearboxRawMaterial('');
     setGearboxNote('');
     setGearboxPhotoFile(null);
     setGearboxProblemOpen(false);
@@ -943,6 +945,7 @@ export default function KioskPage() {
         user,
         temperatureC,
         measuredAt: new Date(gearboxMeasuredAt),
+        rawMaterial: gearboxRawMaterial.trim(),
         note: gearboxNote.trim(),
         photoFile: gearboxPhotoFile,
       });
@@ -1833,6 +1836,16 @@ export default function KioskPage() {
               value={gearboxMeasuredAt}
               onChange={(event) => setGearboxMeasuredAt(event.target.value)}
               className="w-full rounded-xl border border-white/10 bg-slate-950 p-2.5 text-base text-white"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-black text-slate-200">Surovina</span>
+            <input
+              type="text"
+              value={gearboxRawMaterial}
+              onChange={(event) => setGearboxRawMaterial(event.target.value)}
+              placeholder="napr. kukurice, ryze, smes..."
+              className="w-full rounded-xl border border-white/10 bg-slate-950 p-2.5 text-base text-white outline-none placeholder:text-slate-500 focus:border-violet-400"
             />
           </label>
           <label className="block">

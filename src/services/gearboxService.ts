@@ -321,6 +321,7 @@ export async function addGearboxTemperatureLog(input: {
   user?: AppUser | null;
   temperatureC: number;
   measuredAt: Date;
+  rawMaterial?: string;
   note?: string;
   photoFile?: File | null;
 }) {
@@ -332,6 +333,7 @@ export async function addGearboxTemperatureLog(input: {
   }
 
   const measuredAt = Timestamp.fromDate(input.measuredAt);
+  const rawMaterial = input.rawMaterial?.trim() || '';
   await addDoc(collection(db, 'gearbox_temperature_logs'), {
     tenantId: input.tenantId,
     gearboxId: input.gearbox.id,
@@ -342,6 +344,7 @@ export async function addGearboxTemperatureLog(input: {
     measuredAt,
     userId: userId(input.user),
     userName: userName(input.user),
+    rawMaterial,
     note: input.note || '',
     photoUrl,
     createdAt: serverTimestamp(),
@@ -368,6 +371,7 @@ export async function addGearboxTemperatureLog(input: {
     content: [
       `Zaznam teploty prevodovky: ${input.temperatureC} °C`,
       input.gearbox.currentExtruderName ? `Extruder: ${input.gearbox.currentExtruderName}` : '',
+      rawMaterial ? `Surovina: ${rawMaterial}` : '',
       input.note ? `Poznamka: ${input.note}` : '',
       photoUrl ? 'Prilozena fotka kontroly.' : '',
     ].filter(Boolean).join('\n'),

@@ -14,6 +14,7 @@ export interface GearboxTemperatureLog {
   measuredAt: Timestamp;
   userId: string;
   userName: string;
+  rawMaterial?: string;
   note?: string;
   photoUrl?: string;
   createdAt: Timestamp;

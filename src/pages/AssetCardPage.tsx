@@ -828,7 +828,7 @@ export default function AssetCardPage() {
       type: 'event' as const,
       typeLabel: 'Teplota',
       title: `${log.temperatureC} °C`,
-      detail: [log.extruderName ? `Extruder: ${log.extruderName}` : '', log.userName, log.note, log.photoUrl ? 'Fotka přiložena' : ''].filter(Boolean).join(' | '),
+      detail: [log.extruderName ? `Extruder: ${log.extruderName}` : '', log.rawMaterial ? `Surovina: ${log.rawMaterial}` : '', log.userName, log.note, log.photoUrl ? 'Fotka přiložena' : ''].filter(Boolean).join(' | '),
       dateValue: log.measuredAt,
       time: historyTime(log.measuredAt),
       color: '#0ea5e9',
@@ -1504,6 +1504,7 @@ export default function AssetCardPage() {
                         <div>
                           <div style={{ fontWeight: 700, color: '#0f172a' }}>{log.temperatureC} °C</div>
                           <div style={{ fontSize: 12, color: '#64748b' }}>{formatHistoryDate(log.measuredAt)} · {log.userName}</div>
+                          {log.rawMaterial && <div style={{ fontSize: 12, color: '#0f766e', marginTop: 3 }}>Surovina: {log.rawMaterial}</div>}
                           {log.note && <div style={{ fontSize: 12, color: '#475569', marginTop: 3 }}>{log.note}</div>}
                         </div>
                         {log.photoUrl && <a href={log.photoUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#0284c7', fontWeight: 700, fontSize: 12 }}>Foto</a>}
@@ -2375,10 +2376,10 @@ export default function AssetCardPage() {
           user={user}
           saving={gearboxActionSaving}
           onClose={() => setShowGearboxTemperature(false)}
-          onSave={async ({ temperatureC, measuredAt, note, photoFile }) => {
+          onSave={async ({ temperatureC, measuredAt, rawMaterial, note, photoFile }) => {
             setGearboxActionSaving(true);
             try {
-              await addGearboxTemperatureLog({ tenantId, gearbox: assetV2, user, temperatureC, measuredAt, note, photoFile });
+              await addGearboxTemperatureLog({ tenantId, gearbox: assetV2, user, temperatureC, measuredAt, rawMaterial, note, photoFile });
               await refreshAssetV2();
               setShowGearboxTemperature(false);
               setActiveTab('history');
@@ -2821,7 +2822,7 @@ function GearboxTemperatureModal({ gearbox, user, saving, onClose, onSave }: {
   user: { displayName?: string } | null;
   saving: boolean;
   onClose: () => void;
-  onSave: (input: { temperatureC: number; measuredAt: Date; note: string; photoFile?: File | null }) => Promise<void>;
+  onSave: (input: { temperatureC: number; measuredAt: Date; rawMaterial: string; note: string; photoFile?: File | null }) => Promise<void>;
 }) {
   const [temperature, setTemperature] = useState(String(clampTemperature(gearbox.lastTemperatureC ?? 60)));
   const [measuredAt, setMeasuredAt] = useState(() => {
@@ -2829,6 +2830,7 @@ function GearboxTemperatureModal({ gearbox, user, saving, onClose, onSave }: {
     now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
     return now.toISOString().slice(0, 16);
   });
+  const [rawMaterial, setRawMaterial] = useState('');
   const [note, setNote] = useState('');
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState('');
@@ -2905,6 +2907,16 @@ function GearboxTemperatureModal({ gearbox, user, saving, onClose, onSave }: {
           />
         </label>
         <label className="block">
+          <div className="text-sm font-medium text-slate-400 mb-2">Surovina</div>
+          <input
+            type="text"
+            value={rawMaterial}
+            onChange={(e) => setRawMaterial(e.target.value)}
+            placeholder="napr. kukurice, ryze, smes..."
+            className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-cyan-400"
+          />
+        </label>
+        <label className="block">
           <div className="text-sm font-medium text-slate-400 mb-2">Poznámka</div>
           <textarea
             value={note}
@@ -2930,7 +2942,7 @@ function GearboxTemperatureModal({ gearbox, user, saving, onClose, onSave }: {
           {photoPreview && <img src={photoPreview} alt="Náhled" className="mt-3 h-28 rounded-xl object-cover border border-white/10" />}
         </label>
         <button
-          onClick={() => onSave({ temperatureC: temperatureNumber, measuredAt: new Date(measuredAt), note: note.trim(), photoFile })}
+          onClick={() => onSave({ temperatureC: temperatureNumber, measuredAt: new Date(measuredAt), rawMaterial: rawMaterial.trim(), note: note.trim(), photoFile })}
           disabled={!measuredAt || saving}
           className="w-full py-3.5 bg-cyan-600 text-white rounded-xl font-bold disabled:opacity-50 flex items-center justify-center gap-2"
         >

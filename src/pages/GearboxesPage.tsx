@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { collection, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import {
   Activity,
@@ -17,11 +18,12 @@ import {
   Wrench,
 } from 'lucide-react';
 import { useAuthContext } from '../context/AuthContext';
+import { db } from '../lib/firebase';
 import { assetService } from '../services/assetService';
 import { getGearboxStatus, getGearboxStatusLabel, isGearboxAsset, setGearboxStockStatus } from '../services/gearboxService';
 import { subscribeToRecentWorkLogs } from '../services/workLogService';
 import type { Asset } from '../types/asset';
-import type { GearboxStatus } from '../types/gearbox';
+import type { GearboxStatus, GearboxTemperatureLog } from '../types/gearbox';
 import type { WorkLog } from '../types/workLog';
 import { showToast } from '../components/ui/Toast';
 import GearboxRepairModal from '../components/gearbox/GearboxRepairModal';
@@ -172,6 +174,7 @@ export default function GearboxesPage() {
   const tenantId = user?.tenantId || 'main_firm';
   const [assets, setAssets] = useState<Asset[]>([]);
   const [logs, setLogs] = useState<WorkLog[]>([]);
+  const [temperatureLogs, setTemperatureLogs] = useState<GearboxTemperatureLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<GearboxFilter>('all');
@@ -197,6 +200,24 @@ export default function GearboxesPage() {
       unsub();
     };
   }, [tenantId]);
+
+  useEffect(() => {
+    const temperatureQuery = query(
+      collection(db, 'gearbox_temperature_logs'),
+      orderBy('measuredAt', 'desc'),
+      limit(300)
+    );
+    return onSnapshot(
+      temperatureQuery,
+      (snapshot) => {
+        setTemperatureLogs(snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as GearboxTemperatureLog)));
+      },
+      (error) => {
+        console.error('[GearboxesPage] temperature logs error:', error);
+        setTemperatureLogs([]);
+      }
+    );
+  }, []);
 
   const gearboxes = useMemo(
     () => assets.filter((asset) => isGearboxAsset(asset)),
@@ -239,6 +260,17 @@ export default function GearboxesPage() {
           || a.name.localeCompare(b.name, 'cs');
       });
   }, [filter, gearboxes, search]);
+
+  const temperatureLogsByGearbox = useMemo(() => {
+    const grouped = new Map<string, GearboxTemperatureLog[]>();
+    temperatureLogs.forEach((log) => {
+      if (log.tenantId && tenantId && log.tenantId !== tenantId) return;
+      const items = grouped.get(log.gearboxId) || [];
+      items.push(log);
+      grouped.set(log.gearboxId, items);
+    });
+    return grouped;
+  }, [temperatureLogs, tenantId]);
 
   const filters: Array<{ id: GearboxFilter; label: string; count: number }> = [
     { id: 'all', label: 'Vše', count: stats.total },
@@ -364,6 +396,7 @@ export default function GearboxesPage() {
               key={asset.id}
               asset={asset}
               logs={relatedLogsForGearbox(asset, logs)}
+              temperatureLogs={temperatureLogsByGearbox.get(asset.id) || []}
               onOpen={() => navigate(`/asset/${asset.id}`, { state: { from: '/gearboxes' } })}
               onWorkLog={() => navigate('/work-diary?new=1')}
               canRepair={canLogRepair}
@@ -425,6 +458,7 @@ function StatCard({
 function GearboxCard({
   asset,
   logs,
+  temperatureLogs,
   onOpen,
   onWorkLog,
   canRepair,
@@ -436,6 +470,7 @@ function GearboxCard({
 }: {
   asset: Asset;
   logs: WorkLog[];
+  temperatureLogs: GearboxTemperatureLog[];
   onOpen: () => void;
   onWorkLog: () => void;
   canRepair: boolean;
@@ -480,7 +515,7 @@ function GearboxCard({
             label={temp.label}
             value={temp.value}
             tone={temp.tone}
-            detail={`Zapsáno: ${formatDateTime(asset.lastTemperatureAt)}`}
+            detail={asset.lastTemperatureAt ? `Naposledy ${formatDateTime(asset.lastTemperatureAt)}` : 'Zatim bez zapisu'}
           />
           <InfoBlock
             icon={Activity}
@@ -497,6 +532,8 @@ function GearboxCard({
             detail={statusHint(asset)}
           />
         </div>
+
+        <TemperatureTrend logs={temperatureLogs} />
 
         {canSetStockStatus && (
           <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/45 p-3">
@@ -584,6 +621,65 @@ function GearboxCard({
         )}
       </div>
     </article>
+  );
+}
+
+function TemperatureTrend({ logs }: { logs: GearboxTemperatureLog[] }) {
+  const points = logs
+    .filter((log) => typeof log.temperatureC === 'number' && asDate(log.measuredAt))
+    .slice(0, 12)
+    .reverse();
+
+  if (points.length < 2) {
+    return (
+      <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/45 p-3">
+        <div className="flex items-center gap-2 text-sm font-black text-white">
+          <Thermometer className="h-4 w-4 text-cyan-300" />
+          Trend teplot
+        </div>
+        <div className="mt-2 text-sm font-semibold text-slate-400">Trend bude videt po dalsim zapisu.</div>
+      </div>
+    );
+  }
+
+  const values = points.map((log) => log.temperatureC);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const spread = Math.max(1, max - min);
+  const polyline = points.map((log, index) => {
+    const x = points.length === 1 ? 50 : (index / (points.length - 1)) * 100;
+    const y = 46 - ((log.temperatureC - min) / spread) * 36;
+    return `${x.toFixed(2)},${y.toFixed(2)}`;
+  }).join(' ');
+  const latest = points[points.length - 1];
+  const first = points[0];
+
+  return (
+    <div className="mt-4 rounded-xl border border-cyan-400/20 bg-slate-950/45 p-3">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-sm font-black text-white">
+          <Thermometer className="h-4 w-4 text-cyan-300" />
+          Trend teplot
+        </div>
+        <div className="text-xs font-bold text-slate-300">
+          {first.temperatureC} °C {'->'} {latest.temperatureC} °C
+        </div>
+      </div>
+      <svg viewBox="0 0 100 52" preserveAspectRatio="none" className="h-16 w-full overflow-visible">
+        <line x1="0" y1="46" x2="100" y2="46" className="stroke-slate-700" strokeWidth="1" />
+        <line x1="0" y1="10" x2="100" y2="10" className="stroke-slate-800" strokeWidth="1" />
+        <polyline points={polyline} fill="none" className="stroke-cyan-300" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        {points.map((log, index) => {
+          const x = points.length === 1 ? 50 : (index / (points.length - 1)) * 100;
+          const y = 46 - ((log.temperatureC - min) / spread) * 36;
+          return <circle key={`${log.id}-${index}`} cx={x} cy={y} r="2.2" className="fill-cyan-200" />;
+        })}
+      </svg>
+      <div className="mt-1 flex justify-between text-xs font-semibold text-slate-400">
+        <span>{formatDateTime(first.measuredAt)}</span>
+        <span>{formatDateTime(latest.measuredAt)}</span>
+      </div>
+    </div>
   );
 }
 
