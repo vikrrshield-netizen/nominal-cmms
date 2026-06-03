@@ -29,6 +29,8 @@ export type Permission =
   | 'inv.consume' | 'inv.restock' | 'inv.manage' | 'inv.approve' | 'inv.order'
   // Fleet
   | 'fleet.manage' | 'fleet.read'
+  // HVAC
+  | 'hvac.read' | 'hvac.manage'
   // Users
   | 'user.manage' | 'user.read'
   // Zones
@@ -329,7 +331,6 @@ export interface ModuleDefinition {
 export const MODULE_DEFINITIONS: ModuleDefinition[] = [
   { id: 'fault', label: 'Nahlášení poruch', icon: '🚨', category: 'Základní' },
   { id: 'tasks', label: 'Úkoly', icon: '📋', category: 'Základní' },
-  { id: 'map', label: 'Mapa areálu', icon: '🗺️', category: 'Základní' },
   { id: 'calendar', label: 'Kalendář', icon: '📅', category: 'Základní' },
   { id: 'noticeboard', label: 'Nástěnka', icon: '📌', category: 'Základní' },
   { id: 'idea', label: 'Nápady', icon: '💡', category: 'Základní' },
@@ -338,9 +339,9 @@ export const MODULE_DEFINITIONS: ModuleDefinition[] = [
   { id: 'inventory', label: 'Sklad ND', icon: '📦', category: 'Údržba' },
   { id: 'revisions', label: 'Revize', icon: '🔍', category: 'Údržba' },
   { id: 'fleet', label: 'Vozidla', icon: '🚗', category: 'Údržba' },
+  { id: 'hvac', label: 'Vzduchotechnika', icon: '💨', category: 'Údržba' },
+  { id: 'gearboxes', label: 'Převodovky', icon: '⚙️', category: 'Údržba' },
   { id: 'inspections', label: 'Kontroly', icon: '✅', category: 'Údržba' },
-  { id: 'waste', label: 'Odpady', icon: '♻️', category: 'Údržba' },
-  { id: 'louparna', label: 'Loupárna', icon: '🌾', category: 'Výroba' },
   { id: 'production', label: 'Výroba', icon: '🏭', category: 'Výroba' },
   { id: 'warehouse', label: 'Sklad výroby', icon: '📦', category: 'Výroba' },
   { id: 'shifts', label: 'Směny', icon: '👥', category: 'Výroba' },
@@ -349,14 +350,14 @@ export const MODULE_DEFINITIONS: ModuleDefinition[] = [
   { id: 'admin', label: 'Administrace', icon: '⚙️', category: 'Pokročilé' },
 ];
 
-const ALL_MODULE_IDS = MODULE_DEFINITIONS.map(m => m.id);
+const ALL_MODULE_IDS = MODULE_DEFINITIONS.map(m => m.id).filter(id => id !== 'map');
 
 export const DEFAULT_ENABLED_MODULES: Record<UserRole, string[]> = {
   MAJITEL: ALL_MODULE_IDS,
   VEDENI: ALL_MODULE_IDS,
   SUPERADMIN: ALL_MODULE_IDS,
-  UDRZBA: ['fault', 'tasks', 'map', 'revisions', 'inventory', 'waste', 'fleet', 'louparna', 'inspections', 'calendar', 'ai', 'idea', 'request', 'noticeboard', 'academy', 'production', 'warehouse', 'shifts'],
-  VYROBA: ['fault', 'tasks', 'production', 'warehouse', 'shifts', 'map', 'inspections', 'calendar', 'louparna', 'waste', 'inventory', 'revisions', 'noticeboard', 'idea', 'request', 'academy'],
-  SKLADNIK: ['inventory', 'tasks', 'fault', 'map', 'noticeboard', 'idea', 'request', 'academy'],
+  UDRZBA: ['fault', 'tasks', 'revisions', 'inventory', 'fleet', 'hvac', 'gearboxes', 'inspections', 'calendar', 'reports', 'ai', 'idea', 'request', 'noticeboard', 'academy', 'production', 'warehouse', 'shifts'],
+  VYROBA: ['fault', 'tasks', 'production', 'warehouse', 'shifts', 'inspections', 'calendar', 'inventory', 'hvac', 'gearboxes', 'revisions', 'reports', 'noticeboard', 'idea', 'request', 'academy'],
+  SKLADNIK: ['inventory', 'hvac', 'gearboxes', 'tasks', 'fault', 'reports', 'noticeboard', 'idea', 'request', 'academy'],
   OPERATOR: [],
 };

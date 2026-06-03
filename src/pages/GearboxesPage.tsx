@@ -448,7 +448,7 @@ function GearboxCard({
   const status = getGearboxStatus(asset);
   const temp = temperatureInfo(asset);
   const faultCount = logs.filter(isFaultLikeLog).length + (asset.repairLog?.length || 0);
-  const canSetStockStatus = status !== 'installed';
+  const canSetStockStatus = true;
 
   return (
     <article className={`${PANEL} overflow-hidden`}>

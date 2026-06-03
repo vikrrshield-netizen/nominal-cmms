@@ -2,9 +2,9 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ═══════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     // HELPER FUNCTIONS
-    // ═══════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     // Authenticated user
     function isAuth() {
@@ -63,7 +63,7 @@ service cloud.firestore {
       return isAuth() && userRole() in ['SUPERADMIN', 'MAJITEL', 'VEDENI', 'VYROBA', 'UDRZBA', 'SKLADNIK', 'OPERATOR'];
     }
 
-    // Soft delete check — update MUST only set isDeleted=true, not actually delete
+    // Soft delete check â€” update MUST only set isDeleted=true, not actually delete
     function isSoftDelete() {
       return request.resource.data.isDeleted == true
         && resource.data.isDeleted != true;
@@ -74,92 +74,226 @@ service cloud.firestore {
       return request.resource.data.updatedAt is timestamp;
     }
 
-    // Verify the writer records their own UID
-    function hasValidAuthor() {
-      return request.resource.data.updatedBy == request.auth.uid;
+    // Legacy + custom permission check.
+    // This mirrors the app roles enough for database protection.
+    function hasCustomGrant(permission) {
+      return isAuth()
+        && ('customPermissions' in getUserDoc())
+        && ('granted' in getUserDoc().customPermissions)
+        && permission in getUserDoc().customPermissions.granted;
     }
 
-    // ═══════════════════════════════════════════
-    // USERS — profily uživatelů
-    // ═══════════════════════════════════════════
+    function hasCustomRevoke(permission) {
+      return isAuth()
+        && ('customPermissions' in getUserDoc())
+        && ('revoked' in getUserDoc().customPermissions)
+        && permission in getUserDoc().customPermissions.revoked;
+    }
+
+    function hasRolePermission(permission) {
+      return (
+        userRole() == 'MAJITEL'
+        && permission in [
+          'wo.read',
+          'asset.read',
+          'fleet.read',
+          'user.read',
+          'report.read', 'report.export', 'audit.read',
+          'finance.view', 'secretbox.view', 'purchase.approve',
+          'ai.use', 'admin.view',
+          'warehouse.view', 'shifts.view'
+        ]
+      ) || (
+        userRole() == 'VEDENI'
+        && permission in [
+          'wo.read', 'wo.approve',
+          'asset.read',
+          'fleet.manage', 'fleet.read',
+          'user.manage', 'user.read',
+          'report.read', 'report.export', 'audit.read',
+          'finance.view', 'purchase.approve',
+          'weekly.modify', 'ai.use', 'admin.view',
+          'warehouse.view', 'shifts.view'
+        ]
+      ) || (
+        userRole() == 'SUPERADMIN'
+        && permission in [
+          'wo.create', 'wo.update', 'wo.delete', 'wo.read', 'wo.approve', 'wo.close', 'wo.plan', 'wo.assign',
+          'asset.create', 'asset.update', 'asset.delete', 'asset.read',
+          'inv.consume', 'inv.restock', 'inv.manage', 'inv.order',
+          'fleet.manage', 'fleet.read',
+          'user.manage', 'user.read',
+          'zone.change',
+          'report.read', 'report.export', 'audit.read',
+          'weekly.modify', 'ai.use', 'schedule.manage', 'production.manage',
+          'admin.view', 'admin.manage',
+          'warehouse.view', 'shifts.view'
+        ]
+      ) || (
+        userRole() == 'UDRZBA'
+        && permission in [
+          'wo.create', 'wo.update', 'wo.read', 'wo.close',
+          'asset.read', 'asset.update',
+          'inv.consume', 'inv.restock',
+          'fleet.read',
+          'report.read',
+          'ai.use', 'schedule.manage', 'production.manage',
+          'warehouse.view', 'shifts.view'
+        ]
+      ) || (
+        userRole() == 'VYROBA'
+        && permission in [
+          'wo.create', 'wo.read', 'wo.approve', 'wo.plan',
+          'asset.read',
+          'zone.change',
+          'weekly.modify', 'report.read',
+          'production.manage', 'warehouse.view', 'shifts.view'
+        ]
+      ) || (
+        userRole() == 'SKLADNIK'
+        && permission in [
+          'wo.create', 'wo.update', 'wo.read',
+          'asset.read',
+          'inv.consume', 'inv.restock', 'inv.manage', 'inv.order',
+          'report.read', 'schedule.manage'
+        ]
+      ) || (
+        userRole() == 'OPERATOR'
+        && permission in [
+          'wo.create',
+          'wo.read',
+          'asset.read'
+        ]
+      );
+    }
+
+    function hasPermission(permission) {
+      return isAuth()
+        && !hasCustomRevoke(permission)
+        && (hasRolePermission(permission) || hasCustomGrant(permission));
+    }
+
+    function canReadInventory() {
+      return hasPermission('inv.consume')
+        || hasPermission('inv.restock')
+        || hasPermission('inv.manage')
+        || hasPermission('inv.order');
+    }
+
+    function canWriteInspection() {
+      return hasPermission('weekly.modify')
+        || hasPermission('asset.update')
+        || hasPermission('wo.update');
+    }
+
+    function canWriteGearboxTemperature() {
+      return hasPermission('asset.update')
+        || hasPermission('wo.update')
+        || hasPermission('wo.create')
+        || hasPermission('gearbox.temperature.write')
+        || isOperator();
+    }
+
+    function isGearboxTemperatureAssetUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'tenantId',
+          'lastTemperatureC',
+          'lastTemperatureAt',
+          'lastGearboxPhotoUrl',
+          'updatedAt'
+        ])
+        && request.resource.data.lastTemperatureC is number
+        && request.resource.data.lastTemperatureAt is string;
+    }
+
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // USERS â€” profily uĹľivatelĹŻ
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     match /users/{userId} {
-      // Každý přihlášený vidí uživatele (pro zobrazení jmen)
+      // KaĹľdĂ˝ pĹ™ihlĂˇĹˇenĂ˝ vidĂ­ uĹľivatele (pro zobrazenĂ­ jmen)
       allow read: if isAnyRole();
 
-      // Vlastní profil může editovat každý (omezená pole)
-      // Cizí profil jen SUPERADMIN/MAJITEL/VEDENI
+      // VlastnĂ­ profil mĹŻĹľe editovat kaĹľdĂ˝ (omezenĂˇ pole)
+      // CizĂ­ profil jen SUPERADMIN/MAJITEL/VEDENI
       allow update: if isAuth() && (
-        // Vlastní profil — nesmí měnit role
-        (request.auth.uid == userId && !('role' in request.resource.data.diff(resource.data)))
+        // VlastnĂ­ profil â€” nesmĂ­ mÄ›nit role
+        (request.auth.uid == userId
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            'role',
+            'roleIds',
+            'primaryRoleId',
+            'customPermissions',
+            'scope',
+            'tenantId',
+            'pin',
+            'isActive'
+          ]))
         // Nebo management
         || isManagement()
       ) && hasTimestamp();
 
-      // Vytvoření jen SUPERADMIN
+      // VytvoĹ™enĂ­ jen SUPERADMIN
       allow create: if isSuperAdmin();
 
-      // HARD DELETE — POUZE SUPERADMIN
+      // HARD DELETE â€” POUZE SUPERADMIN
       allow delete: if isSuperAdmin();
     }
 
-    // ═══════════════════════════════════════════
-    // ASSETS — zařízení / stroje
-    // ═══════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // ASSETS â€” zaĹ™Ă­zenĂ­ / stroje
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     match /assets/{assetId} {
-      // Čtení — všichni přihlášení
-      allow read: if isAnyRole();
-
-      // Vytvoření — management + technici
-      allow create: if (isManagement() || isTechnician())
-        && hasTimestamp();
-
-      // Update — management + technici
-      // OPERATOR může pouze soft delete (nahlásit vyřazení)
+      allow read: if hasPermission('asset.read');
+      allow create: if hasPermission('asset.create') && hasTimestamp();
       allow update: if isAuth() && (
-        isManagement()
-        || isTechnician()
+        hasPermission('asset.update')
+        || (canWriteGearboxTemperature() && isGearboxTemperatureAssetUpdate())
         || (isOperator() && isSoftDelete())
       ) && hasTimestamp();
+      allow delete: if hasPermission('asset.delete');
 
-      // HARD DELETE — POUZE SUPERADMIN
-      allow delete: if isSuperAdmin();
-
-      // SUB-COLLECTION: pest_logs (hmyzolapače)
       match /pest_logs/{logId} {
-        allow read: if isAnyRole();
-        allow create: if isAnyRole();
-        allow update: if false;  // Logy se needitují
-        allow delete: if isSuperAdmin();
-      }
-
-      // SUB-COLLECTION: empty_logs (vývoz popelnic)
-      match /empty_logs/{logId} {
-        allow read: if isAnyRole();
-        allow create: if isAnyRole();
+        allow read: if hasPermission('asset.read');
+        allow create: if hasPermission('asset.update');
         allow update: if false;
-        allow delete: if isSuperAdmin();
+        allow delete: if hasPermission('asset.delete');
+      }
+
+      match /empty_logs/{logId} {
+        allow read: if hasPermission('asset.read');
+        allow create: if hasPermission('asset.update');
+        allow update: if false;
+        allow delete: if hasPermission('asset.delete');
       }
     }
-
-    // ═══════════════════════════════════════════
-    // TENANT ASSETS — v2 tenant-aware asset tree
-    // ═══════════════════════════════════════════
+    // TENANT ASSETS â€” v2 tenant-aware asset tree
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     match /tenants/{tenantId}/assets/{assetId} {
-      allow read: if isAuth();
+      allow read: if hasPermission('asset.read')
+        && getUserDoc().tenantId == tenantId;
 
-      allow create: if isAuth();
+      allow create: if hasPermission('asset.create')
+        && request.resource.data.tenantId == tenantId
+        && getUserDoc().tenantId == tenantId
+        && hasTimestamp();
 
-      allow update: if isAuth();
+      allow update: if (
+        hasPermission('asset.update')
+        || (canWriteGearboxTemperature() && isGearboxTemperatureAssetUpdate())
+        || (isOperator() && isSoftDelete())
+      )
+        && request.resource.data.tenantId == tenantId
+        && resource.data.tenantId == tenantId
+        && getUserDoc().tenantId == tenantId
+        && hasTimestamp();
 
-      allow delete: if isSuperAdmin();
+      allow delete: if hasPermission('asset.delete');
     }
-
-    // ═══════════════════════════════════════════
-    // STATS_AGGREGATES — agregovaná statistika
-    // ═══════════════════════════════════════════
+    // STATS_AGGREGATES â€” agregovanĂˇ statistika
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     match /stats_aggregates/{docId} {
       allow read: if isAnyRole();
-      // Zápis jen Cloud Functions (Admin SDK) nebo SUPERADMIN
+      // ZĂˇpis jen Cloud Functions (Admin SDK) nebo SUPERADMIN
       allow write: if isSuperAdmin();
     }
 
@@ -168,133 +302,162 @@ service cloud.firestore {
       allow write: if isSuperAdmin();
     }
 
-    // ═══════════════════════════════════════════
-    // TASKS — úkoly / work orders (Status Lock)
-    // ═══════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // TASKS â€” Ăşkoly / work orders (Status Lock)
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     match /tasks/{taskId} {
-      allow read: if isAnyRole();
-
-      // Vytvořit úkol může kdokoliv (i OPERATOR hlásí poruchu)
-      allow create: if request.auth != null && hasTimestamp();
-
-      // Update — STATUS LOCK logika:
-      //   1. SUPERADMIN může vždy
-      //   2. Pokud task NENÍ completed/cancelled → normální update (s timestamp)
-      //   3. Pokud task JE completed/cancelled → BLOKOVÁNO (jen SUPERADMIN)
+      allow read: if hasPermission('wo.read');
+      allow create: if hasPermission('wo.create') && hasTimestamp();
       allow update: if isAuth() && hasTimestamp() && (
-        isSuperAdmin()
-        || !(resource.data.status in ['completed', 'cancelled'])
+        hasPermission('wo.delete')
+        || hasPermission('wo.update')
+        || hasPermission('wo.close')
+        || (!(resource.data.status in ['completed', 'cancelled']) && hasPermission('wo.read'))
       );
-
-      // HARD DELETE — POUZE SUPERADMIN
+      allow delete: if hasPermission('wo.delete');
+    }
+    // REVISIONS â€” revize zaĹ™Ă­zenĂ­
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    match /vacation_plans/{planId} {
+      allow read: if isAnyRole();
+      allow create: if (isManagement() || isTechnician()) && hasTimestamp();
+      allow update: if (isManagement() || isTechnician()) && hasTimestamp();
       allow delete: if isSuperAdmin();
     }
 
-    // ═══════════════════════════════════════════
-    // REVISIONS — revize zařízení
-    // ═══════════════════════════════════════════
+    match /workLogs/{logId} {
+      allow read: if hasPermission('wo.read') || hasPermission('report.read');
+      allow create: if (hasPermission('wo.create') || hasPermission('wo.update'))
+        && request.resource.data.createdAt is timestamp
+        && (!('workOrderId' in request.resource.data) || request.resource.data.workOrderId is string)
+        && request.resource.data.userName is string
+        && request.resource.data.content is string;
+      allow update: if hasPermission('wo.update')
+        && hasTimestamp()
+        && request.resource.data.userName is string
+        && request.resource.data.content is string;
+      allow delete: if hasPermission('wo.delete');
+    }
+
+    match /gearbox_temperature_logs/{logId} {
+      allow read: if hasPermission('asset.read') || hasPermission('report.read');
+      allow create: if canWriteGearboxTemperature()
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.measuredAt is timestamp
+        && request.resource.data.gearboxId is string
+        && request.resource.data.userName is string;
+      allow update: if false;
+      allow delete: if hasPermission('asset.delete');
+    }
+
+    match /gearbox_installation_events/{eventId} {
+      allow read: if hasPermission('asset.read') || hasPermission('report.read');
+      allow create: if hasPermission('asset.update')
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.performedAt is timestamp
+        && request.resource.data.gearboxId is string
+        && request.resource.data.userName is string;
+      allow update: if false;
+      allow delete: if hasPermission('asset.delete');
+    }
+
     match /revisions/{revisionId} {
-      allow read: if isAnyRole();
-
-      allow create: if (isManagement() || isTechnician())
-        && hasTimestamp();
-
-      allow update: if (isManagement() || isTechnician())
-        && hasTimestamp();
-
-      allow delete: if isSuperAdmin();
+      allow read: if hasPermission('asset.read') || hasPermission('report.read');
+      allow create: if hasPermission('asset.update') && hasTimestamp();
+      allow update: if hasPermission('asset.update') && hasTimestamp();
+      allow delete: if hasPermission('asset.delete');
     }
-
-    // ═══════════════════════════════════════════
-    // INVENTORY — náhradní díly
-    // ═══════════════════════════════════════════
+    // INVENTORY â€” nĂˇhradnĂ­ dĂ­ly
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     match /inventory/{itemId} {
-      allow read: if isAnyRole();
-
-      allow create: if (isManagement() || isTechnician())
-        && hasTimestamp();
-
-      // Technici mohou odebírat díly (update množství)
-      allow update: if (isManagement() || isTechnician())
-        && hasTimestamp();
-
-      allow delete: if isSuperAdmin();
+      allow read: if canReadInventory() || hasPermission('report.read');
+      allow create: if (hasPermission('inv.manage') || hasPermission('inv.restock')) && hasTimestamp();
+      allow update: if canReadInventory() && hasTimestamp();
+      allow delete: if hasPermission('inv.manage');
     }
 
-    // ═══════════════════════════════════════════
-    // FLEET — vozidla
-    // ═══════════════════════════════════════════
+    match /inventory_transactions/{txId} {
+      allow read: if canReadInventory() || hasPermission('report.read');
+      allow create: if canReadInventory()
+        && request.resource.data.createdAt is timestamp;
+      allow update: if false;
+      allow delete: if hasPermission('inv.manage');
+    }
+
+    match /purchase_orders/{orderId} {
+      allow read: if canReadInventory() || hasPermission('purchase.approve');
+      allow create: if hasPermission('inv.order') && hasTimestamp();
+      allow update: if (hasPermission('inv.order') || hasPermission('purchase.approve')) && hasTimestamp();
+      allow delete: if hasPermission('inv.manage');
+    }
+
     match /fleet/{vehicleId} {
-      allow read: if isAnyRole();
-
-      allow create: if isManagement() && hasTimestamp();
-
-      // UDRZBA může logovat Mth/km
-      allow update: if (isManagement() || isUdrzba())
-        && hasTimestamp();
-
-      allow delete: if isSuperAdmin();
+      allow read: if hasPermission('fleet.read') || hasPermission('fleet.manage');
+      allow create: if hasPermission('fleet.manage') && hasTimestamp();
+      allow update: if (hasPermission('fleet.manage') || isUdrzba()) && hasTimestamp();
+      allow delete: if hasPermission('fleet.manage') && isSuperAdmin();
     }
 
-    // ═══════════════════════════════════════════
-    // WASTE — odpadové hospodářství
-    // ═══════════════════════════════════════════
     match /waste/{wasteId} {
       allow read: if isAnyRole();
-
       allow create: if isManagement() && hasTimestamp();
-
-      // Technici mohou aktualizovat stav kontejnerů (Semafor)
-      allow update: if (isManagement() || isTechnician())
-        && hasTimestamp();
-
+      allow update: if (isManagement() || isTechnician()) && hasTimestamp();
       allow delete: if isSuperAdmin();
     }
-
-    // ═══════════════════════════════════════════
-    // TRUSTBOX — anonymní schránka (Dual-kolekce systém)
-    // ═══════════════════════════════════════════
+    // TRUSTBOX â€” anonymnĂ­ schrĂˇnka (Dual-kolekce systĂ©m)
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //
     // ARCHITEKTURA:
-    //   trustbox_ingress = "Černá díra" (nikdo nečte, jen zápis)
-    //   trustbox_public  = "Veřejná nástěnka" (čte vedení)
+    //   trustbox_ingress = "ÄŚernĂˇ dĂ­ra" (nikdo neÄŤte, jen zĂˇpis)
+    //   trustbox_public  = "VeĹ™ejnĂˇ nĂˇstÄ›nka" (ÄŤte vedenĂ­)
     //
     // FLOW:
-    //   1. Uživatel → trustbox_ingress (create only)
-    //   2. Synology mixer (Admin SDK) → přesune, zamíchá, smaže timestamp
-    //   3. Vedení čte → trustbox_public
+    //   1. UĹľivatel â†’ trustbox_ingress (create only)
+    //   2. Synology mixer (Admin SDK) â†’ pĹ™esune, zamĂ­chĂˇ, smaĹľe timestamp
+    //   3. VedenĂ­ ÄŤte â†’ trustbox_public
     //
-    // SYNOLOGY MIXER: Zatím nepřipojen.
-    //   Až bude ready, nastaví se CRON na Synology s Admin SDK.
-    //   Do té doby funguje FALLBACK přes trustbox_public přímo.
+    // SYNOLOGY MIXER: ZatĂ­m nepĹ™ipojen.
+    //   AĹľ bude ready, nastavĂ­ se CRON na Synology s Admin SDK.
+    //   Do tĂ© doby funguje FALLBACK pĹ™es trustbox_public pĹ™Ă­mo.
     //
 
-    // INGRESS — "Černá díra" (nikdo nesmí číst, jen vhodit lístek)
+    // INGRESS â€” "ÄŚernĂˇ dĂ­ra" (nikdo nesmĂ­ ÄŤĂ­st, jen vhodit lĂ­stek)
     match /trustbox_ingress/{docId} {
-      allow create: if isAnyRole();              // Kdokoliv vhodí lístek
-      allow read, update, delete: if false;      // Nikdo nevidí dovnitř
+      allow create: if isAnyRole();              // Kdokoliv vhodĂ­ lĂ­stek
+      allow read, update, delete: if false;      // Nikdo nevidĂ­ dovnitĹ™
     }
 
-    // PUBLIC — "Veřejná nástěnka" (jen vedení čte)
+    // PUBLIC â€” "VeĹ™ejnĂˇ nĂˇstÄ›nka" (jen vedenĂ­ ÄŤte)
     match /trustbox_public/{docId} {
-      allow read: if isManagement();             // Vedení + admin čte
-      allow create: if false;                    // Jen Admin SDK (Synology) sem píše
-      allow update: if isManagement() && hasTimestamp(); // Odpovědi na zprávy
+      allow read: if isManagement();             // VedenĂ­ + admin ÄŤte
+      allow create: if false;                    // Jen Admin SDK (Synology) sem pĂ­Ĺˇe
+      allow update: if isManagement() && hasTimestamp(); // OdpovÄ›di na zprĂˇvy
       allow delete: if isSuperAdmin();
     }
 
-    // FALLBACK — dokud není Synology mixer, app píše přímo sem
-    // Po napojení Synology tuto kolekci zrušíme
+    // FALLBACK â€” dokud nenĂ­ Synology mixer, app pĂ­Ĺˇe pĹ™Ă­mo sem
+    // Po napojenĂ­ Synology tuto kolekci zruĹˇĂ­me
     match /trustbox/{messageId} {
-      allow read: if isManagement();
+      allow read: if isManagement() || isMajitel();
       allow create: if isAnyRole();
-      allow update: if isManagement() && hasTimestamp();
+      allow update: if (isManagement() || isMajitel()) && hasTimestamp();
       allow delete: if isSuperAdmin();
     }
 
-    // ═══════════════════════════════════════════
-    // AREAS — místnosti / zóny
-    // ═══════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // AREAS â€” mĂ­stnosti / zĂłny
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    match /prefilters/{logId} {
+      allow read: if hasPermission('asset.read') || hasPermission('report.read');
+      allow create: if (hasPermission('wo.create') || hasPermission('asset.update'))
+        && request.resource.data.changedAt is timestamp
+        && request.resource.data.assetId is string
+        && request.resource.data.assetName is string
+        && request.resource.data.createdAt is timestamp;
+      allow update: if false;
+      allow delete: if hasPermission('asset.delete');
+    }
+
     match /areas/{areaId} {
       allow read: if isAnyRole();
       allow create: if isManagement() && hasTimestamp();
@@ -302,26 +465,26 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
     }
 
-    // ═══════════════════════════════════════════
-    // AUDIT_LOGS — záznamy o akcích (append-only)
-    // ═══════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // AUDIT_LOGS â€” zĂˇznamy o akcĂ­ch (append-only)
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     match /audit_logs/{logId} {
-      // Čtení jen admin
+      // ÄŚtenĂ­ jen admin
       allow read: if isAdmin();
 
-      // Zápis — kdokoliv přihlášený (hook zapisuje automaticky)
+      // ZĂˇpis â€” kdokoliv pĹ™ihlĂˇĹˇenĂ˝ (hook zapisuje automaticky)
       allow create: if isAnyRole();
 
-      // NIKDO nesmí editovat ani mazat audit logy!
+      // NIKDO nesmĂ­ editovat ani mazat audit logy!
       allow update: if false;
       allow delete: if false;
     }
 
-    // ═══════════════════════════════════════════
-    // NOTIFICATIONS — notifikace
-    // ═══════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // NOTIFICATIONS â€” notifikace
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     match /notifications/{notifId} {
-      // Uživatel vidí své notifikace
+      // UĹľivatel vidĂ­ svĂ© notifikace
       allow read: if isAuth() && (
         resource.data.userId == request.auth.uid
         || isManagement()
@@ -329,7 +492,7 @@ service cloud.firestore {
 
       allow create: if isAnyRole();
 
-      // Označit jako přečtené
+      // OznaÄŤit jako pĹ™eÄŤtenĂ©
       allow update: if isAuth() && (
         resource.data.userId == request.auth.uid
         || isManagement()
@@ -338,21 +501,61 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
     }
 
-    // ═══════════════════════════════════════════
-    // SETTINGS — systémová konfigurace
-    // ═══════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // SETTINGS â€” systĂ©movĂˇ konfigurace
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    match /pushTokens/{tokenId} {
+      allow read: if isAuth() && (
+        resource.data.userId == request.auth.uid
+        || isManagement()
+      );
+
+      allow create: if isAuth()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.token is string;
+
+      allow update: if isAuth()
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == request.auth.uid;
+
+      allow delete: if isAuth() && (
+        resource.data.userId == request.auth.uid
+        || isManagement()
+      );
+    }
+
     match /settings/{settingId} {
       allow read: if isAnyRole();
 
-      // POUZE SUPERADMIN mění systémové nastavení
+      // POUZE SUPERADMIN mÄ›nĂ­ systĂ©movĂ© nastavenĂ­
       allow create: if isSuperAdmin();
       allow update: if isSuperAdmin();
       allow delete: if isSuperAdmin();
     }
 
-    // ═══════════════════════════════════════════
-    // LOUPÁRNA — sila, výroba, plevy, stanice
-    // ═══════════════════════════════════════════
+    match /shiftNotes/{noteId} {
+      allow read: if isAnyRole();
+      allow create: if isAnyRole()
+        && request.resource.data.text is string
+        && request.resource.data.authorId == request.auth.uid
+        && request.resource.data.author is string
+        && request.resource.data.priority in ['normal', 'important']
+        && request.resource.data.shift in ['morning', 'afternoon']
+        && request.resource.data.recipient is string
+        && request.resource.data.createdAt is timestamp
+        && hasTimestamp();
+      allow update: if (isManagement() && hasTimestamp())
+        || (
+          isAnyRole()
+          && hasTimestamp()
+          && request.resource.data.diff(resource.data).changedKeys().hasOnly(['acknowledgedBy', 'acknowledgedByName', 'updatedAt'])
+        );
+      allow delete: if isAnyRole();
+    }
+
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // LOUPĂRNA â€” sila, vĂ˝roba, plevy, stanice
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     match /louparna_silos/{siloId} {
       allow read: if isAnyRole();
       allow create: if (isManagement() || isTechnician()) && hasTimestamp();
@@ -381,65 +584,79 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
     }
 
-    // ═══════════════════════════════════════════
-    // ROLES — definice rolí (RBAC)
-    // ═══════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // ROLES â€” definice rolĂ­ (RBAC)
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     match /roles/{roleId} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow write: if hasPermission('admin.manage');
     }
 
-    // ═══════════════════════════════════════════
-    // PERMISSIONS — definice oprávnění (RBAC)
-    // ═══════════════════════════════════════════
     match /permissions/{permId} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow write: if hasPermission('admin.manage');
     }
 
-    // ═══════════════════════════════════════════
-    // INSPECTIONS — kontrolní body budovy
-    // ═══════════════════════════════════════════
+    match /inspections/{docId} {
+      allow read: if hasPermission('asset.read') || hasPermission('weekly.modify') || hasPermission('report.read');
+      allow create: if canWriteInspection()
+        && request.resource.data.createdAt is timestamp;
+      allow update: if canWriteInspection();
+      allow delete: if hasPermission('asset.delete');
+    }
+
     match /inspection_templates/{docId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read: if hasPermission('asset.read') || hasPermission('weekly.modify');
+      allow create: if canWriteInspection();
+      allow update: if canWriteInspection();
+      allow delete: if hasPermission('asset.delete');
     }
 
     match /inspection_logs/{docId} {
-      allow read: if isAuth();
-      allow write: if isAuth();
+      allow read: if hasPermission('asset.read') || hasPermission('report.read');
+      allow create: if canWriteInspection() || hasPermission('wo.create');
+      allow update: if canWriteInspection();
+      allow delete: if hasPermission('asset.delete');
+    }
+    // ENTITIES â€” univerzĂˇlnĂ­ entity (Matryoshka)
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    match /inspection_run_logs/{docId} {
+      allow read: if hasPermission('asset.read') || hasPermission('report.read');
+      allow create: if canWriteInspection() || hasPermission('wo.create');
+      allow update: if false;
+      allow delete: if hasPermission('asset.delete');
     }
 
-    // ═══════════════════════════════════════════
-    // ENTITIES — univerzální entity (Matryoshka)
-    // ═══════════════════════════════════════════
     match /entities/{entityId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read: if hasPermission('fleet.read')
+        || hasPermission('fleet.manage');
+      allow create: if hasPermission('fleet.manage') && hasTimestamp();
+      allow update: if hasPermission('fleet.manage') && hasTimestamp();
+      allow delete: if hasPermission('admin.manage');
     }
 
-    // ═══════════════════════════════════════════
-    // BLUEPRINTS — šablony pro entity typy
-    // ═══════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // BLUEPRINTS â€” Ĺˇablony pro entity typy
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     match /blueprints/{blueprintId} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow write: if hasPermission('admin.manage');
     }
 
-    // ═══════════════════════════════════════════
-    // ENTITY_LOGS — audit trail pro entity
-    // ═══════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // ENTITY_LOGS â€” audit trail pro entity
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     match /entity_logs/{logId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null;
-      // Logy se nesmí editovat ani mazat (audit-proof)
+      // Logy se nesmĂ­ editovat ani mazat (audit-proof)
       allow update: if false;
       allow delete: if false;
     }
 
-    // ═══════════════════════════════════════════
-    // NOTICEBOARD — týmová nástěnka
-    // ═══════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // NOTICEBOARD â€” tĂ˝movĂˇ nĂˇstÄ›nka
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     match /noticeboard/{msgId} {
       allow read: if isAnyRole();
       allow create: if isManagement();
@@ -447,9 +664,9 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
     }
 
-    // ═══════════════════════════════════════════
-    // USER_ENGAGEMENT — sledování zapojení
-    // ═══════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // USER_ENGAGEMENT â€” sledovĂˇnĂ­ zapojenĂ­
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     match /user_engagement/{docId} {
       allow read: if isManagement();
       allow create: if isAnyRole();
@@ -457,52 +674,104 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
     }
 
-    // ═══════════════════════════════════════════
-    // DASHBOARD_CONFIGS — uživatelská konfigurace dashboardu
-    // ═══════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // DASHBOARD_CONFIGS â€” uĹľivatelskĂˇ konfigurace dashboardu
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     match /dashboard_configs/{userId} {
       allow read: if isAuth() && request.auth.uid == userId;
       allow write: if isAuth() && request.auth.uid == userId;
     }
 
-    // ═══════════════════════════════════════════
-    // DASHBOARD_DEFAULTS — výchozí konfigurace per role
-    // ═══════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // DASHBOARD_DEFAULTS â€” vĂ˝chozĂ­ konfigurace per role
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     match /dashboard_defaults/{role} {
       allow read: if isAnyRole();
-      allow write: if isAdmin();
+      allow write: if hasPermission('admin.manage');
     }
 
-    // ═══════════════════════════════════════════
-    // TENANT_SETTINGS — multi-tenant module config
-    // ═══════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // TENANT_SETTINGS â€” multi-tenant module config
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     match /tenant_settings/{tenantId} {
       allow read: if isAnyRole();
-      allow write: if isSuperAdmin();
+      allow write: if hasPermission('admin.manage');
     }
 
-    // ═══════════════════════════════════════════
-    // TENANT_ROLES — custom positions per tenant
-    // ═══════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // TENANT_ROLES â€” custom positions per tenant
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     match /tenant_roles/{roleId} {
       allow read: if isAnyRole();
-      allow create: if isManagement();
-      allow update: if isManagement();
+      allow create: if hasPermission('admin.manage');
+      allow update: if hasPermission('admin.manage');
+      allow delete: if hasPermission('admin.manage');
+    }
+
+    match /recurring_tasks/{taskId} {
+      allow read: if hasPermission('wo.read') || hasPermission('schedule.manage');
+      allow create: if hasPermission('schedule.manage') && hasTimestamp();
+      allow update: if hasPermission('schedule.manage') && hasTimestamp();
+      allow delete: if hasPermission('schedule.manage');
+    }
+
+    match /production_extrusion/{docId} {
+      allow read: if hasPermission('production.manage') || hasPermission('report.read');
+      allow create: if hasPermission('production.manage') && hasTimestamp();
+      allow update: if hasPermission('production.manage') && hasTimestamp();
       allow delete: if isSuperAdmin();
     }
 
-    // SHIFT_NOTES — předání směny z kiosku
-    match /shiftNotes/{docId} {
-      allow read: if hasPermission('shifts.view') || isOperator();
-      allow create: if (hasPermission('shifts.view') || isOperator()) && hasTimestamp();
+    match /production_packaging/{docId} {
+      allow read: if hasPermission('production.manage') || hasPermission('report.read');
+      allow create: if hasPermission('production.manage') && hasTimestamp();
+      allow update: if hasPermission('production.manage') && hasTimestamp();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /warehouse_receipts/{docId} {
+      allow read: if hasPermission('warehouse.view');
+      allow create: if hasPermission('warehouse.view') && hasTimestamp();
+      allow update: if hasPermission('warehouse.view') && hasTimestamp();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /warehouse_stock/{docId} {
+      allow read: if hasPermission('warehouse.view');
+      allow create: if hasPermission('warehouse.view') && hasTimestamp();
+      allow update: if hasPermission('warehouse.view') && hasTimestamp();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /warehouse_shipments/{docId} {
+      allow read: if hasPermission('warehouse.view');
+      allow create: if hasPermission('warehouse.view') && hasTimestamp();
+      allow update: if hasPermission('warehouse.view') && hasTimestamp();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /shift_plans/{docId} {
+      allow read: if hasPermission('shifts.view');
+      allow create: if hasPermission('shifts.view') && hasTimestamp();
       allow update: if hasPermission('shifts.view') && hasTimestamp();
       allow delete: if isSuperAdmin();
     }
-    // ═══════════════════════════════════════════
-    // CATCH-ALL — deny everything else
-    // ═══════════════════════════════════════════
+
+    match /user_notes/{docId} {
+      allow read: if isAuth() && resource.data.userId == request.auth.uid;
+      allow create: if isAuth() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuth() && resource.data.userId == request.auth.uid;
+      allow delete: if isAuth() && resource.data.userId == request.auth.uid;
+    }
+
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // CATCH-ALL â€” deny everything else
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     match /{document=**} {
       allow read, write: if false;
     }
   }
 }
+
+
+

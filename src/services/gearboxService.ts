@@ -2,6 +2,7 @@ import {
   addDoc,
   collection,
   doc,
+  getDocs,
   onSnapshot,
   orderBy,
   query,
@@ -9,6 +10,7 @@ import {
   Timestamp,
   updateDoc,
   where,
+  writeBatch,
 } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { db, storage } from '../lib/firebase';
@@ -79,6 +81,18 @@ function assetRef(assetId: string) {
   return doc(db, 'assets', assetId);
 }
 
+async function findInstalledGearboxesOnExtruder(extruderId: string, exceptGearboxId: string): Promise<Asset[]> {
+  const snap = await getDocs(query(
+    collection(db, 'assets'),
+    where('currentExtruderId', '==', extruderId)
+  ));
+
+  return snap.docs
+    .map((item) => ({ id: item.id, ...item.data() } as Asset))
+    .filter((asset) => asset.id !== exceptGearboxId)
+    .filter((asset) => isGearboxAsset(asset) || asset.gearboxStatus === 'installed');
+}
+
 export async function assignGearboxToExtruder(input: {
   tenantId: string;
   gearbox: Asset;
@@ -87,7 +101,21 @@ export async function assignGearboxToExtruder(input: {
   note?: string;
 }) {
   const performedAt = Timestamp.now();
-  await updateDoc(assetRef(input.gearbox.id), {
+  const replacedGearboxes = await findInstalledGearboxesOnExtruder(input.extruder.id, input.gearbox.id);
+  const batch = writeBatch(db);
+
+  for (const replaced of replacedGearboxes) {
+    batch.update(assetRef(replaced.id), {
+      tenantId: input.tenantId,
+      gearboxStatus: 'service',
+      currentExtruderId: null,
+      currentExtruderName: null,
+      location: 'Servis',
+      updatedAt: performedAt,
+    });
+  }
+
+  batch.update(assetRef(input.gearbox.id), {
     tenantId: input.tenantId,
     gearboxStatus: 'installed',
     currentExtruderId: input.extruder.id,
@@ -96,7 +124,7 @@ export async function assignGearboxToExtruder(input: {
     updatedAt: performedAt,
   });
 
-  await addDoc(collection(db, 'gearbox_installation_events'), {
+  batch.set(doc(collection(db, 'gearbox_installation_events')), {
     tenantId: input.tenantId,
     gearboxId: input.gearbox.id,
     gearboxName: input.gearbox.name,
@@ -112,18 +140,61 @@ export async function assignGearboxToExtruder(input: {
     createdAt: serverTimestamp(),
   });
 
-  await addWorkLog({
-    assetId: input.gearbox.id,
-    assetName: input.gearbox.name,
-    location: input.extruder.name,
-    userId: userId(input.user),
-    userName: userName(input.user),
-    type: 'maintenance',
-    workType: 'gearbox_installation',
-    auditReady: true,
-    performedAt: performedAt.toDate(),
-    content: `Prevodovka namontovana na extruder: ${input.extruder.name}${input.note ? `\nPoznamka: ${input.note}` : ''}`,
-  });
+  for (const replaced of replacedGearboxes) {
+    batch.set(doc(collection(db, 'gearbox_installation_events')), {
+      tenantId: input.tenantId,
+      gearboxId: replaced.id,
+      gearboxName: replaced.name,
+      action: 'service',
+      extruderId: null,
+      extruderName: null,
+      previousExtruderId: input.extruder.id,
+      previousExtruderName: input.extruder.name,
+      userId: userId(input.user),
+      userName: userName(input.user),
+      note: `Automaticky sundano pri montazi prevodovky ${input.gearbox.name}${input.note ? `\nPoznamka k vymene: ${input.note}` : ''}`,
+      performedAt,
+      createdAt: serverTimestamp(),
+    });
+  }
+
+  await batch.commit();
+
+  try {
+    await addWorkLog({
+      assetId: input.gearbox.id,
+      assetName: input.gearbox.name,
+      location: input.extruder.name,
+      userId: userId(input.user),
+      userName: userName(input.user),
+      type: 'maintenance',
+      workType: 'gearbox_installation',
+      auditReady: true,
+      performedAt: performedAt.toDate(),
+      content: `Prevodovka namontovana na extruder: ${input.extruder.name}${input.note ? `\nPoznamka: ${input.note}` : ''}`,
+    });
+  } catch (err) {
+    console.warn('[Gearbox] Work log failed after successful assignment:', err);
+  }
+
+  for (const replaced of replacedGearboxes) {
+    try {
+      await addWorkLog({
+        assetId: replaced.id,
+        assetName: replaced.name,
+        location: input.extruder.name,
+        userId: userId(input.user),
+        userName: userName(input.user),
+        type: 'maintenance',
+        workType: 'gearbox_service_status',
+        auditReady: true,
+        performedAt: performedAt.toDate(),
+        content: `Prevodovka sundana z extruderu ${input.extruder.name} a presunuta do servisu pri montazi prevodovky ${input.gearbox.name}.`,
+      });
+    } catch (err) {
+      console.warn('[Gearbox] Replacement work log failed after successful assignment:', err);
+    }
+  }
 }
 
 export async function returnGearboxToStock(input: {
@@ -133,7 +204,9 @@ export async function returnGearboxToStock(input: {
   note?: string;
 }) {
   const performedAt = Timestamp.now();
-  await updateDoc(assetRef(input.gearbox.id), {
+  const batch = writeBatch(db);
+
+  batch.update(assetRef(input.gearbox.id), {
     tenantId: input.tenantId,
     gearboxStatus: 'in_stock',
     currentExtruderId: null,
@@ -142,7 +215,7 @@ export async function returnGearboxToStock(input: {
     updatedAt: performedAt,
   });
 
-  await addDoc(collection(db, 'gearbox_installation_events'), {
+  batch.set(doc(collection(db, 'gearbox_installation_events')), {
     tenantId: input.tenantId,
     gearboxId: input.gearbox.id,
     gearboxName: input.gearbox.name,
@@ -157,6 +230,8 @@ export async function returnGearboxToStock(input: {
     performedAt,
     createdAt: serverTimestamp(),
   });
+
+  await batch.commit();
 
   await addWorkLog({
     assetId: input.gearbox.id,
@@ -179,16 +254,14 @@ export async function setGearboxStockStatus(input: {
   user?: AppUser | null;
   note?: string;
 }) {
-  if (input.gearbox.currentExtruderId || input.gearbox.gearboxStatus === 'installed') {
-    throw new Error('Namontovanou převodovku nejdřív vrať do skladu.');
-  }
-
   const performedAt = Timestamp.now();
   const isService = input.status === 'service';
   const location = isService ? 'Servis' : 'Sklad ND';
-  const action = isService ? 'service' : 'ready_for_stock';
+  const wasInstalled = Boolean(input.gearbox.currentExtruderId || input.gearbox.gearboxStatus === 'installed');
+  const action = isService ? 'service' : wasInstalled ? 'returned_to_stock' : 'ready_for_stock';
+  const batch = writeBatch(db);
 
-  await updateDoc(assetRef(input.gearbox.id), {
+  batch.update(assetRef(input.gearbox.id), {
     tenantId: input.tenantId,
     gearboxStatus: input.status,
     currentExtruderId: null,
@@ -197,7 +270,7 @@ export async function setGearboxStockStatus(input: {
     updatedAt: performedAt,
   });
 
-  await addDoc(collection(db, 'gearbox_installation_events'), {
+  batch.set(doc(collection(db, 'gearbox_installation_events')), {
     tenantId: input.tenantId,
     gearboxId: input.gearbox.id,
     gearboxName: input.gearbox.name,
@@ -213,10 +286,12 @@ export async function setGearboxStockStatus(input: {
     createdAt: serverTimestamp(),
   });
 
+  await batch.commit();
+
   await addWorkLog({
     assetId: input.gearbox.id,
     assetName: input.gearbox.name,
-    location,
+    location: input.gearbox.currentExtruderName || location,
     userId: userId(input.user),
     userName: userName(input.user),
     type: 'maintenance',
@@ -224,7 +299,9 @@ export async function setGearboxStockStatus(input: {
     auditReady: true,
     performedAt: performedAt.toDate(),
     content: [
-      isService ? 'Převodovka označena jako v opravě.' : 'Převodovka označena jako připravená ve skladu.',
+      isService
+        ? `Převodovka přesunuta do servisu${input.gearbox.currentExtruderName ? ` z extruderu ${input.gearbox.currentExtruderName}` : ''}.`
+        : `Převodovka přesunuta do skladu${input.gearbox.currentExtruderName ? ` z extruderu ${input.gearbox.currentExtruderName}` : ''}.`,
       input.note ? `Poznámka: ${input.note}` : '',
     ].filter(Boolean).join('\n'),
   });

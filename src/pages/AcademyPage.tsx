@@ -3,6 +3,7 @@
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import { ArrowLeft, ChevronDown, BookOpen, Cpu, Sparkles, Shield, GraduationCap } from 'lucide-react';
 import appConfig from '../appConfig';
 import { useAuthContext } from '../context/AuthContext';
@@ -358,6 +359,7 @@ function Accordion({ item, isOpen, onToggle }: {
 
 export default function AcademyPage() {
   const navigate = useNavigate();
+  const goBack = useBackNavigation('/');
   const { logout, login } = useAuthContext();
   const [openItems, setOpenItems] = useState<Set<string>>(new Set());
   const [activeSection, setActiveSection] = useState<string | null>(null);
@@ -393,7 +395,7 @@ export default function AcademyPage() {
     <div className="min-h-screen bg-slate-900 pb-24">
       {/* Header */}
       <div className="bg-slate-800/80 backdrop-blur-sm border-b border-slate-700/50 px-4 py-4 flex items-center gap-3 sticky top-0 z-20">
-        <button onClick={() => navigate('/')} className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition">
+        <button onClick={() => goBack()} className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition">
           <ArrowLeft className="w-5 h-5 text-slate-400" />
         </button>
         <div className="flex-1">

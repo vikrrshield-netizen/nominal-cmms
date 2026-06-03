@@ -2,7 +2,7 @@
 // VIKRR — Asset Shield — Personal Notebook (soukromé poznámky technika)
 
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import { useAuthContext } from '../context/AuthContext';
 import {
   collection, query, where, orderBy, onSnapshot,
@@ -32,7 +32,7 @@ interface UserNote {
 // ═══════════════════════════════════════════
 
 export default function PersonalDiaryPage() {
-  const navigate = useNavigate();
+  const goBack = useBackNavigation('/');
   const { user } = useAuthContext();
   const uid = user?.uid || '';
 
@@ -99,7 +99,7 @@ export default function PersonalDiaryPage() {
       {/* Header */}
       <header className="sticky top-0 z-30 bg-[#0f172a]/95 backdrop-blur-lg border-b border-white/10">
         <div className="max-w-3xl mx-auto flex items-center gap-3 px-4 py-3">
-          <button onClick={() => navigate('/')} className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition">
+          <button onClick={() => goBack()} className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition">
             <ArrowLeft className="w-5 h-5 text-slate-400" />
           </button>
           <BookOpen className="w-6 h-6 text-violet-400" />

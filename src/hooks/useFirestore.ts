@@ -1,7 +1,7 @@
 // src/hooks/useFirestore.ts
 // VIKRR — Asset Shield — Generic Firestore hooks
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   collection,
   doc,
@@ -125,6 +125,8 @@ export function useCollection<T extends DocumentData>(
   collectionName: string,
   options: UseCollectionOptions = { realtime: true }
 ): FirestoreListState<T> {
+  const constraints = useMemo(() => options.constraints ?? [], [options.constraints]);
+  const realtime = options.realtime ?? true;
   const [state, setState] = useState<FirestoreListState<T>>({
     data: [],
     loading: true,
@@ -133,11 +135,11 @@ export function useCollection<T extends DocumentData>(
 
   useEffect(() => {
     const collectionRef = collection(db, collectionName);
-    const q = options.constraints
-      ? query(collectionRef, ...options.constraints)
+    const q = constraints.length > 0
+      ? query(collectionRef, ...constraints)
       : query(collectionRef);
 
-    if (options.realtime) {
+    if (realtime) {
       // Real-time listener
       const unsubscribe = onSnapshot(
         q,
@@ -170,7 +172,7 @@ export function useCollection<T extends DocumentData>(
           setState({ data: [], loading: false, error });
         });
     }
-  }, [collectionName, JSON.stringify(options.constraints), options.realtime]);
+  }, [collectionName, constraints, realtime]);
 
   return state;
 }

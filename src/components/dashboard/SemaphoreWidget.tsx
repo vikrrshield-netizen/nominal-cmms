@@ -7,6 +7,7 @@ interface SemaphoreWidgetProps {
 }
 
 export default function SemaphoreWidget({ stats, wasteRed }: SemaphoreWidgetProps) {
+  void wasteRed;
   const criticalTotal = stats.breakdownAssets + stats.criticalTasks;
   const items = [
     {
@@ -23,17 +24,10 @@ export default function SemaphoreWidget({ stats, wasteRed }: SemaphoreWidgetProp
       textColor: stats.maintenanceAssets > 0 ? 'text-amber-400' : 'text-emerald-400',
       bgColor: stats.maintenanceAssets > 0 ? 'bg-amber-500/10 border-amber-500/30' : 'bg-emerald-500/10 border-emerald-500/30',
     },
-    {
-      label: 'Odpady',
-      value: wasteRed,
-      color: wasteRed > 0 ? 'bg-orange-500' : 'bg-emerald-500',
-      textColor: wasteRed > 0 ? 'text-orange-400' : 'text-emerald-400',
-      bgColor: wasteRed > 0 ? 'bg-orange-500/10 border-orange-500/30' : 'bg-emerald-500/10 border-emerald-500/30',
-    },
   ];
 
   return (
-    <div className="grid grid-cols-3 gap-1 mb-4">
+    <div className="grid grid-cols-2 gap-1 mb-4">
       {items.map((item) => (
         <div key={item.label} className={`rounded-xl p-1 border ${item.bgColor} text-center`}>
           <div className="flex items-center justify-center gap-1.5">

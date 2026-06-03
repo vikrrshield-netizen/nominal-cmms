@@ -95,9 +95,18 @@ export function parseExcelFile(file: File): Promise<ParseResult> {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: 'array' });
 
-        const sheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
-        const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet);
+        let sheetName = '';
+        let rawRows: Record<string, unknown>[] = [];
+
+        for (const candidateName of workbook.SheetNames) {
+          const candidateSheet = workbook.Sheets[candidateName];
+          const candidateRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(candidateSheet);
+          if (candidateRows.length > 0) {
+            sheetName = candidateName;
+            rawRows = candidateRows;
+            break;
+          }
+        }
 
         if (rawRows.length === 0) {
           reject(new Error('Soubor neobsahuje žádná data'));

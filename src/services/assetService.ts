@@ -1,76 +1,118 @@
 // src/services/assetService.ts
-// VIKRR Asset Shield — Asset Service
-// v2 — tenant-aware, rekurzivní strom, parentId model
+// VIKRR Asset Shield - Asset Service
+// Tenant-aware facade over the canonical top-level assets collection.
 import { db } from '../lib/firebase';
 import {
   collection,
+  type DocumentData,
   getDocs,
   getDoc,
   doc,
   updateDoc,
   addDoc,
-  deleteDoc,
-  query,
-  where,
   Timestamp,
+  type QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import type { Asset, AssetStatus } from '../types/asset';
-// ── Helpers ──────────────────────────────────────────────────────────
-const tenantCol = (tenantId: string) =>
-  collection(db, 'tenants', tenantId, 'assets');
-const tenantDoc = (tenantId: string, assetId: string) =>
-  doc(db, 'tenants', tenantId, 'assets', assetId);
-const toAsset = (d: any): Asset => ({
-  id: d.id,
-  ...d.data(),
-  createdAt: d.data().createdAt?.toDate?.()?.toISOString() ?? d.data().createdAt,
-  updatedAt: d.data().updatedAt?.toDate?.()?.toISOString() ?? d.data().updatedAt,
-});
-// ── Asset Service ─────────────────────────────────────────────────────
+
+type NullableAssetFields =
+  'code' | 'manufacturer' | 'model' | 'serialNumber' | 'year' | 'location';
+
+type AssetUpdate = Partial<Omit<Asset, NullableAssetFields>> & {
+  code?: string | null;
+  manufacturer?: string | null;
+  model?: string | null;
+  serialNumber?: string | null;
+  year?: number | null;
+  location?: string | null;
+};
+
+const assetsCol = () => collection(db, 'assets');
+const assetDoc = (assetId: string) => doc(db, 'assets', assetId);
+
+const withoutUndefined = <T extends Record<string, unknown>>(data: T): Partial<T> =>
+  Object.fromEntries(
+    Object.entries(data).filter(([, value]) => value !== undefined)
+  ) as Partial<T>;
+
+const toIso = (value: unknown) => {
+  if (value && typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') {
+    return value.toDate().toISOString();
+  }
+  return value;
+};
+
+const toAsset = (snapshot: QueryDocumentSnapshot<DocumentData>): Asset => {
+  const data = snapshot.data();
+  return {
+    id: snapshot.id,
+    ...data,
+    createdAt: toIso(data.createdAt),
+    updatedAt: toIso(data.updatedAt),
+  } as Asset;
+};
+
+const belongsToTenant = (asset: Asset, tenantId: string) =>
+  asset.tenantId === tenantId || !asset.tenantId;
+
 export const assetService = {
-  // Všechny entity tenantu
   async getAll(tenantId: string): Promise<Asset[]> {
-    const snapshot = await getDocs(tenantCol(tenantId));
-    return snapshot.docs.map(toAsset);
+    const snapshot = await getDocs(assetsCol());
+    return snapshot.docs
+      .map(toAsset)
+      .filter((asset) => belongsToTenant(asset, tenantId) && !asset.isDeleted);
   },
-  // Přímé děti (strom)
+
   async getChildren(tenantId: string, parentId: string | null): Promise<Asset[]> {
-    const q = parentId === null
-      ? query(tenantCol(tenantId), where('parentId', '==', null))
-      : query(tenantCol(tenantId), where('parentId', '==', parentId));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(toAsset);
+    const assets = await assetService.getAll(tenantId);
+    return assets.filter((asset) => (asset.parentId ?? null) === parentId);
   },
-  // Jeden asset
+
   async getById(tenantId: string, assetId: string): Promise<Asset> {
-    const docSnap = await getDoc(tenantDoc(tenantId, assetId));
-    if (!docSnap.exists()) throw new Error(`Asset ${assetId} nenalezen`);
-    return toAsset(docSnap);
+    const snapshot = await getDoc(assetDoc(assetId));
+    if (!snapshot.exists()) throw new Error(`Asset ${assetId} nenalezen`);
+
+    const data = snapshot.data();
+    const asset = {
+      id: snapshot.id,
+      ...data,
+      createdAt: toIso(data.createdAt),
+      updatedAt: toIso(data.updatedAt),
+    } as Asset;
+
+    if (!belongsToTenant(asset, tenantId)) throw new Error(`Asset ${assetId} nenalezen`);
+    return asset;
   },
-  // Přidat nový asset
+
   async add(tenantId: string, data: Omit<Asset, 'id'>): Promise<string> {
-    const docRef = await addDoc(tenantCol(tenantId), {
+    const docRef = await addDoc(assetsCol(), withoutUndefined({
       ...data,
       tenantId,
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
-    });
+    }));
     return docRef.id;
   },
-  // Aktualizovat asset
-  async update(tenantId: string, assetId: string, data: Partial<Asset>): Promise<void> {
-    await updateDoc(tenantDoc(tenantId, assetId), {
+
+  async update(tenantId: string, assetId: string, data: AssetUpdate): Promise<void> {
+    await updateDoc(assetDoc(assetId), withoutUndefined({
       ...data,
+      tenantId,
+      updatedAt: Timestamp.now(),
+    }));
+  },
+
+  async delete(tenantId: string, assetId: string): Promise<void> {
+    await updateDoc(assetDoc(assetId), {
+      tenantId,
+      isDeleted: true,
       updatedAt: Timestamp.now(),
     });
   },
-  // Smazat asset
-  async delete(tenantId: string, assetId: string): Promise<void> {
-    await deleteDoc(tenantDoc(tenantId, assetId));
-  },
-  // Zkratka — update status
+
   async updateStatus(tenantId: string, assetId: string, status: AssetStatus): Promise<void> {
     await assetService.update(tenantId, assetId, { status });
   },
 };
+
 export default assetService;

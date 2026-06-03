@@ -1,5 +1,15 @@
 {
   "projects": {
     "default": "nominal-cmms"
-  }
+  },
+  "targets": {
+    "nominal-cmms": {
+      "hosting": {
+        "vikrr-asset-shield": [
+          "vikrr-asset-shield"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }

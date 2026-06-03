@@ -10,6 +10,7 @@ export type ItemCategory =
   | 'oils'       // Oleje a maziva
   | 'filters'    // Filtry (VZT, stroje)
   | 'electrical' // Elektro
+  | 'gearboxes'  // Prevodovky
   | 'other';
 
 export type ItemStatus = 'ok' | 'low' | 'critical' | 'out';
@@ -41,6 +42,8 @@ export interface InventoryItem {
   buildingId: string;         // "E"
   supplier?: string;
   supplierCode?: string;
+  assetId?: string;           // Rodny list / karta v kartotece
+  assetName?: string;
   unitPrice?: number;
   currency?: string;
   compatibleAssetIds: string[];
@@ -56,6 +59,21 @@ export interface InventoryItem {
   createdAt: Timestamp;
   updatedAt: Timestamp;
   isDeleted: boolean;
+}
+
+// Vstup pro ruční vytvoření skladové položky
+export interface NewInventoryItemInput {
+  name: string;
+  code: string;
+  category: ItemCategory;
+  quantity: number;
+  unit: string;
+  minQuantity: number;
+  location: string;
+  supplier?: string;
+  unitPrice?: number;
+  currency?: string;
+  note?: string;
 }
 
 // ═══════════════════════════════════════════
@@ -74,6 +92,7 @@ export interface InventoryTransaction {
   performedBy: string;
   performedByName: string;
   performedAt: Timestamp;
+  createdAt: Timestamp;
   note?: string;
   quantityAfter: number;      // stav po transakci
 }

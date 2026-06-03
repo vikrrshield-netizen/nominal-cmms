@@ -3,7 +3,8 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, query, where, onSnapshot, doc, getDoc, addDoc, updateDoc, deleteDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { useBackNavigation } from '../hooks/useBackNavigation';
+import { collection, query, where, onSnapshot, doc, getDoc, addDoc, updateDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
 import { useEntityLogs } from '../hooks/useEntityLogs';
@@ -142,30 +143,30 @@ function SemaphorePanel({ entities, blueprint }: { entities: Entity[]; blueprint
   }, [entities, stkField]);
 
   return (
-    <div className="bg-slate-800/60 backdrop-blur-sm rounded-2xl p-4 border border-slate-700/50">
+    <div className="vik-card p-4">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-bold text-slate-400 uppercase">Stav flotily</h2>
+        <h2 className="text-sm font-bold text-slate-700 uppercase">Stav flotily</h2>
         <span className="text-xs text-slate-500">{entities.length} vozidel</span>
       </div>
       <div className="grid grid-cols-3 gap-3 mb-4">
         <div className="bg-emerald-500/10 rounded-xl p-3 text-center">
           <div className="w-6 h-6 rounded-full bg-emerald-500 mx-auto mb-2" />
-          <div className="text-2xl font-bold text-emerald-400">{counts.green}</div>
-          <div className="text-xs text-slate-500">OK</div>
+          <div className="text-2xl font-bold text-emerald-700">{counts.green}</div>
+          <div className="text-xs text-slate-600">OK</div>
         </div>
         <div className="bg-amber-500/10 rounded-xl p-3 text-center">
           <div className="w-6 h-6 rounded-full bg-amber-500 mx-auto mb-2" />
-          <div className="text-2xl font-bold text-amber-400">{counts.yellow}</div>
-          <div className="text-xs text-slate-500">Pozor</div>
+          <div className="text-2xl font-bold text-amber-700">{counts.yellow}</div>
+          <div className="text-xs text-slate-600">Pozor</div>
         </div>
         <div className="bg-red-500/10 rounded-xl p-3 text-center">
           <div className="w-6 h-6 rounded-full bg-red-500 mx-auto mb-2" />
-          <div className="text-2xl font-bold text-red-400">{counts.red}</div>
-          <div className="text-xs text-slate-500">Kritické</div>
+          <div className="text-2xl font-bold text-red-700">{counts.red}</div>
+          <div className="text-xs text-slate-600">Kritické</div>
         </div>
       </div>
-      <div className="flex items-center gap-4 text-xs text-slate-400">
-        <span className="font-medium text-slate-500">STK:</span>
+      <div className="flex items-center gap-4 text-xs text-slate-600">
+        <span className="font-medium text-slate-700">STK:</span>
         <span className="flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />{stkBreakdown.ok} platné</span>
         <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-amber-400" />{stkBreakdown.warning} končí</span>
         <span className="flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5 text-red-400" />{stkBreakdown.expired} prošlé</span>
@@ -179,7 +180,8 @@ function SemaphorePanel({ entities, blueprint }: { entities: Entity[]; blueprint
 // ═══════════════════════════════════════════
 
 function AddVehicleModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (name: string) => void }) {
-  const { user } = useAuthContext();
+  const { user, hasPermission, isReadOnly } = useAuthContext();
+  const canManageFleet = hasPermission('fleet.manage') && !isReadOnly;
   const [name, setName] = useState('');
   const [spz, setSpz] = useState('');
   const [stkDate, setStkDate] = useState('');
@@ -187,6 +189,7 @@ function AddVehicleModal({ onClose, onSuccess }: { onClose: () => void; onSucces
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
+    if (!canManageFleet) return;
     if (!name.trim()) return;
     setSaving(true);
     try {
@@ -282,6 +285,8 @@ function VehicleDetailModal({ entity, blueprint, onClose, toast }: {
   toast: (text: string, type?: ToastItem['type']) => void;
 }) {
   const navigate = useNavigate();
+  const { user, hasPermission, isReadOnly } = useAuthContext();
+  const canManageFleet = hasPermission('fleet.manage') && !isReadOnly;
   const { logs, loading: logsLoading, addLog } = useEntityLogs(entity.id);
   const [showHandover, setShowHandover] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -302,6 +307,7 @@ function VehicleDetailModal({ entity, blueprint, onClose, toast }: {
   };
 
   const saveEdit = async (fieldKey: string) => {
+    if (!canManageFleet) return;
     setSaving(true);
     try {
       await updateDoc(doc(db, 'entities', entity.id), {
@@ -318,6 +324,7 @@ function VehicleDetailModal({ entity, blueprint, onClose, toast }: {
 
   // OIL RESET
   const handleOilReset = async () => {
+    if (!canManageFleet) return;
     setSaving(true);
     try {
       await updateDoc(doc(db, 'entities', entity.id), {
@@ -334,6 +341,7 @@ function VehicleDetailModal({ entity, blueprint, onClose, toast }: {
 
   // HANDOVER
   const handleHandover = async (data: { tachometer: string; condition: string; note: string }) => {
+    if (!canManageFleet) return;
     setSaving(true);
     try {
       const text = [
@@ -359,6 +367,7 @@ function VehicleDetailModal({ entity, blueprint, onClose, toast }: {
 
   // ADD CUSTOM FIELD
   const handleAddField = () => {
+    if (!canManageFleet) return;
     if (!newFieldKey.trim()) return;
     setCustomFields((p) => [...p, { key: newFieldKey.trim(), value: newFieldValue.trim() }]);
     toast(`Parametr "${newFieldKey.trim()}" přidán`, 'info');
@@ -374,19 +383,19 @@ function VehicleDetailModal({ entity, blueprint, onClose, toast }: {
 
   return (
     <div className="fixed inset-0 bg-black/70 z-50 flex items-end md:items-center justify-center" onClick={onClose}>
-      <div className="bg-slate-900 rounded-t-3xl md:rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-slate-700/50" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white text-slate-950 rounded-t-3xl md:rounded-3xl w-full max-w-3xl max-h-[90vh] overflow-y-auto border border-slate-200 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
-        <div className="sticky top-0 bg-slate-900/95 backdrop-blur-sm border-b border-slate-700/50 p-4 flex items-center justify-between z-10">
+        <div className="sticky top-0 bg-white/95 backdrop-blur-sm border-b border-slate-200 p-4 flex items-center justify-between z-10">
           <div className="flex items-center gap-2">
             <Car className="w-5 h-5 text-blue-400" />
-            <span className="font-bold text-white">{entity.name}</span>
+            <span className="font-bold text-slate-950">{entity.name}</span>
           </div>
           <div className="flex items-center gap-1">
-            <button onClick={() => printVehicleReport(entity, blueprint, logEntries)} className="p-2 rounded-lg hover:bg-slate-800 min-w-[44px] min-h-[44px] flex items-center justify-center" title="Tisk reportu">
-              <Printer className="w-5 h-5 text-slate-400" />
+            <button onClick={() => printVehicleReport(entity, blueprint, logEntries)} className="p-2 rounded-lg hover:bg-slate-100 min-w-[44px] min-h-[44px] flex items-center justify-center" title="Tisk reportu">
+              <Printer className="w-5 h-5 text-slate-600" />
             </button>
-            <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-800 min-w-[44px] min-h-[44px] flex items-center justify-center">
-              <X className="w-5 h-5 text-slate-400" />
+            <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100 min-w-[44px] min-h-[44px] flex items-center justify-center">
+              <X className="w-5 h-5 text-slate-600" />
             </button>
           </div>
         </div>
@@ -398,7 +407,7 @@ function VehicleDetailModal({ entity, blueprint, onClose, toast }: {
             <span className="text-slate-600">/</span>
             <button onClick={onClose} className="hover:text-blue-400">Vozový park</button>
             <span className="text-slate-600">/</span>
-            <span className="text-white font-medium">{entity.name}</span>
+            <span className="text-slate-950 font-medium">{entity.name}</span>
           </div>
 
           {/* Entity header */}
@@ -407,7 +416,7 @@ function VehicleDetailModal({ entity, blueprint, onClose, toast }: {
               <Car className="w-8 h-8 text-blue-400" />
             </div>
             <div className="flex-1">
-              <h2 className="text-xl font-bold text-white">{entity.name}</h2>
+              <h2 className="text-xl font-bold text-slate-950">{entity.name}</h2>
               <div className="text-sm text-slate-500 font-mono">{entity.code}</div>
               {entity.data?.assigned_to && <div className="text-sm text-blue-400 mt-1">→ {entity.data.assigned_to}</div>}
             </div>
@@ -415,50 +424,54 @@ function VehicleDetailModal({ entity, blueprint, onClose, toast }: {
 
           {/* RODNÝ LIST — s editací */}
           {blueprint && (
-            <div className="bg-slate-800/40 rounded-2xl p-4 border border-slate-700/30">
+            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
               <h3 className="text-xs text-slate-500 uppercase font-bold mb-3">Rodný list</h3>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {blueprint.fields
                   .filter((f) => f.type !== 'photo' && entity.data?.[f.key] !== undefined && entity.data?.[f.key] !== '')
                   .map((f) => {
                     const val = entity.data?.[f.key];
                     const sem = getFieldSemaphore(f, val);
                     const isEditing = editingField === f.key;
-                    const SEMAPHORE_TEXT: Record<string, string> = { green: 'text-emerald-400', yellow: 'text-amber-400', red: 'text-red-400', gray: 'text-slate-400' };
+                    const SEMAPHORE_TEXT: Record<string, string> = { green: 'text-emerald-700', yellow: 'text-amber-700', red: 'text-red-700', gray: 'text-slate-700' };
                     const daysLeft = f.type === 'date' && val ? Math.round((new Date(val).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
 
                     return (
-                      <div key={f.key} className="bg-slate-700/30 rounded-xl p-3 relative group">
+                      <div key={f.key} className="bg-white rounded-xl p-3 border border-slate-200 relative group">
                         <div className="flex items-center gap-1.5 mb-1">
                           {sem !== 'gray' && <span className={`w-2.5 h-2.5 rounded-full ${sem === 'green' ? 'bg-emerald-500' : sem === 'yellow' ? 'bg-amber-500' : sem === 'red' ? 'bg-red-500' : 'bg-slate-600'}`} />}
-                          <span className="text-xs text-slate-500">{f.label}</span>
+                          <span className="text-sm font-semibold text-slate-600">{f.label}</span>
                           {/* EDIT BUTTON */}
-                          {(f.key === 'stk_date' || f.key === 'insurance_date' || f.key === 'tachometer' || f.key === 'oil_type' || f.key === 'registration' || f.key === 'assigned_to' || f.key === 'keys_location') && !isEditing && (
-                            <button onClick={() => startEdit(f.key, String(val))} className="ml-auto opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-slate-600 transition">
-                              <Pencil className="w-3 h-3 text-slate-400" />
+                          {canManageFleet && !isEditing && (
+                            <button onClick={() => startEdit(f.key, String(val))} className="ml-auto min-h-9 min-w-9 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 transition flex items-center justify-center" title={`Upravit ${f.label}`}>
+                              <Pencil className="w-4 h-4" />
                             </button>
                           )}
                         </div>
                         {isEditing ? (
-                          <div className="flex gap-1">
+                          <div className="space-y-2">
                             <input
                               type={f.type === 'date' ? 'date' : f.type === 'number' ? 'number' : 'text'}
                               value={editValue}
                               onChange={(e) => setEditValue(e.target.value)}
                               autoFocus
-                              className="flex-1 p-1.5 bg-slate-600/50 border border-blue-500 rounded-lg text-sm text-white outline-none min-h-[36px]"
+                              className="w-full p-2 bg-white border border-emerald-500 rounded-lg text-base text-slate-950 outline-none min-h-11"
                             />
-                            <button onClick={() => saveEdit(f.key)} disabled={saving}
-                              className="p-1.5 bg-blue-600 rounded-lg hover:bg-blue-500 min-w-[36px] min-h-[36px] flex items-center justify-center">
-                              <Save className="w-4 h-4 text-white" />
-                            </button>
-                            <button onClick={() => setEditingField(null)}
-                              className="p-1.5 bg-slate-600 rounded-lg hover:bg-slate-500 min-w-[36px] min-h-[36px] flex items-center justify-center">
-                              <X className="w-4 h-4 text-slate-300" />
-                            </button>
+                            <div className="grid grid-cols-2 gap-2">
+                              <button onClick={() => saveEdit(f.key)} disabled={saving}
+                                className="min-h-11 rounded-lg bg-emerald-700 px-3 text-sm font-bold text-white hover:bg-emerald-800 disabled:opacity-60 flex items-center justify-center gap-2">
+                                <Save className="w-4 h-4" />
+                                Uložit
+                              </button>
+                              <button onClick={() => setEditingField(null)}
+                                className="min-h-11 rounded-lg bg-slate-100 px-3 text-sm font-bold text-slate-700 hover:bg-slate-200 flex items-center justify-center gap-2">
+                                <X className="w-4 h-4" />
+                                Zrušit
+                              </button>
+                            </div>
                           </div>
                         ) : (
-                          <div className={`text-sm font-medium ${SEMAPHORE_TEXT[sem] || 'text-white'}`}>
+                          <div className={`text-sm font-medium ${SEMAPHORE_TEXT[sem] || 'text-slate-950'}`}>
                             {f.type === 'date' ? (
                               <>
                                 {val ? new Date(val).toLocaleDateString('cs-CZ') : '—'}
@@ -493,38 +506,44 @@ function VehicleDetailModal({ entity, blueprint, onClose, toast }: {
 
           {/* ACTION BUTTONS */}
           <div className="grid grid-cols-2 gap-2">
+            {canManageFleet && (
             <button onClick={handleOilReset} disabled={saving}
               className="py-3 bg-amber-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-amber-500 transition active:scale-[0.97] min-h-[48px] disabled:opacity-50">
               <Droplets className="w-5 h-5" />
               Výměna oleje
             </button>
+            )}
+            {canManageFleet && (
             <button onClick={() => setShowHandover(true)} disabled={saving}
               className="py-3 bg-blue-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-500 transition active:scale-[0.97] min-h-[48px] disabled:opacity-50">
               <Send className="w-5 h-5" />
               Předat
             </button>
+            )}
             <button onClick={() => printVehicleReport(entity, blueprint, logEntries)}
-              className="py-3 bg-slate-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-600 transition active:scale-[0.97] min-h-[48px]">
+              className="py-3 bg-slate-100 text-slate-800 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-200 transition active:scale-[0.97] min-h-[48px] border border-slate-200">
               <Printer className="w-5 h-5" />
               Tisk reportu
             </button>
+            {canManageFleet && (
             <button onClick={() => setShowAddField(true)}
               className="py-3 bg-purple-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-purple-500 transition active:scale-[0.97] min-h-[48px]">
               <PlusCircle className="w-5 h-5" />
               Přidat parametr
             </button>
+            )}
           </div>
 
           {/* ADD FIELD FORM */}
           {showAddField && (
-            <div className="bg-purple-500/10 rounded-2xl p-4 border border-purple-500/20 space-y-3">
-              <h3 className="text-sm font-bold text-purple-400">Nový parametr</h3>
+            <div className="bg-purple-50 rounded-2xl p-4 border border-purple-200 space-y-3">
+              <h3 className="text-sm font-bold text-purple-800">Nový parametr</h3>
               <input value={newFieldKey} onChange={(e) => setNewFieldKey(e.target.value)} placeholder="Název (např. Barva)"
-                className="w-full p-2.5 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-slate-500 outline-none text-sm min-h-[44px]" autoFocus />
+                className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-slate-950 placeholder-slate-400 outline-none focus:border-emerald-600 text-sm min-h-[44px]" autoFocus />
               <input value={newFieldValue} onChange={(e) => setNewFieldValue(e.target.value)} placeholder="Hodnota (např. Modrá metalíza)"
-                className="w-full p-2.5 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-slate-500 outline-none text-sm min-h-[44px]" />
+                className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-slate-950 placeholder-slate-400 outline-none focus:border-emerald-600 text-sm min-h-[44px]" />
               <div className="flex gap-2">
-                <button onClick={() => setShowAddField(false)} className="flex-1 py-2.5 bg-slate-700 text-slate-300 rounded-xl text-sm min-h-[44px]">Zrušit</button>
+                <button onClick={() => setShowAddField(false)} className="flex-1 py-2.5 bg-white text-slate-700 rounded-xl text-sm min-h-[44px] border border-slate-200">Zrušit</button>
                 <button onClick={handleAddField} disabled={!newFieldKey.trim()} className="flex-1 py-2.5 bg-purple-600 text-white rounded-xl font-bold text-sm disabled:opacity-50 min-h-[44px]">Přidat</button>
               </div>
             </div>
@@ -548,20 +567,20 @@ function VehicleDetailModal({ entity, blueprint, onClose, toast }: {
                 {logEntries.map((log) => {
                   const time = log.createdAt?.toDate ? log.createdAt.toDate().toLocaleDateString('cs-CZ') + ' ' + log.createdAt.toDate().toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' }) : '—';
                   return (
-                    <div key={log.id} className="bg-slate-700/30 rounded-xl p-3">
+                    <div key={log.id} className="bg-slate-50 rounded-xl p-3 border border-slate-200">
                       <div className="flex items-center gap-2 mb-1">
-                        <div className="w-7 h-7 rounded-full bg-slate-600 flex items-center justify-center text-[10px] text-white font-bold flex-shrink-0">{log.userInitials}</div>
+                        <div className="w-7 h-7 rounded-full bg-slate-700 flex items-center justify-center text-[10px] text-white font-bold flex-shrink-0">{log.userInitials}</div>
                         <span className="text-xs text-slate-500">{time}</span>
                         <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
                           log.type === 'handover' ? 'bg-blue-500/20 text-blue-400' :
                           log.type === 'maintenance' ? 'bg-amber-500/20 text-amber-400' :
                           log.type === 'inspection' ? 'bg-emerald-500/20 text-emerald-400' :
-                          'bg-slate-500/20 text-slate-400'
+                          'bg-slate-100 text-slate-600'
                         }`}>
                           {log.type === 'handover' ? 'Předání' : log.type === 'maintenance' ? 'Servis' : log.type === 'inspection' ? 'Kontrola' : 'Poznámka'}
                         </span>
                       </div>
-                      <div className="text-sm text-slate-300 ml-9">{log.text}</div>
+                      <div className="text-sm text-slate-700 ml-9">{log.text}</div>
                     </div>
                   );
                 })}
@@ -570,10 +589,17 @@ function VehicleDetailModal({ entity, blueprint, onClose, toast }: {
           )}
 
           {/* Delete */}
+          {canManageFleet && (
           <button
             onClick={async () => {
+              if (!canManageFleet) return;
               if (window.confirm(`Opravdu smazat ${entity.name}?`)) {
-                await deleteDoc(doc(db, 'entities', entity.id));
+                await updateDoc(doc(db, 'entities', entity.id), {
+                  isDeleted: true,
+                  deletedAt: serverTimestamp(),
+                  deletedBy: user?.id || user?.uid || 'unknown',
+                  updatedAt: serverTimestamp(),
+                });
                 toast(`${entity.name} smazáno`, 'info');
                 onClose();
               }
@@ -583,6 +609,7 @@ function VehicleDetailModal({ entity, blueprint, onClose, toast }: {
             <Trash2 className="w-5 h-5" />
             Smazat vozidlo
           </button>
+          )}
         </div>
       </div>
     </div>
@@ -603,30 +630,30 @@ function HandoverForm({ entity, onSubmit, onCancel }: {
   const [note, setNote] = useState('');
 
   return (
-    <div className="bg-blue-500/5 rounded-2xl p-4 border border-blue-500/20 space-y-3">
-      <h3 className="text-sm font-bold text-blue-400">Předání vozidla</h3>
+    <div className="bg-sky-50 rounded-2xl p-4 border border-sky-200 space-y-3">
+      <h3 className="text-sm font-bold text-sky-800">Předání vozidla</h3>
       <input type="number" value={tachometer} onChange={(e) => setTachometer(e.target.value)} placeholder="Tachometr / Motohodiny"
-        className="w-full p-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-slate-500 outline-none focus:border-blue-500 min-h-[48px]" />
+        className="w-full p-3 bg-white border border-slate-300 rounded-xl text-slate-950 placeholder-slate-400 outline-none focus:border-emerald-600 min-h-[48px]" />
       <div className="grid grid-cols-3 gap-2">
         {([
-          { id: 'ok' as const, label: 'OK ✅', c: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' },
-          { id: 'minor' as const, label: 'Drobné ⚠️', c: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
-          { id: 'damage' as const, label: 'Poškození 🔴', c: 'bg-red-500/20 text-red-400 border-red-500/30' },
+          { id: 'ok' as const, label: 'OK ✅', c: 'bg-emerald-50 text-emerald-800 border-emerald-300' },
+          { id: 'minor' as const, label: 'Drobné ⚠️', c: 'bg-amber-50 text-amber-800 border-amber-300' },
+          { id: 'damage' as const, label: 'Poškození 🔴', c: 'bg-red-50 text-red-800 border-red-300' },
         ]).map((c) => (
           <button key={c.id} onClick={() => setCondition(c.id)}
-            className={`py-2.5 rounded-xl text-xs font-medium border transition min-h-[44px] ${condition === c.id ? c.c : 'bg-slate-700/30 text-slate-400 border-slate-600/30'}`}>{c.label}</button>
+            className={`py-2.5 rounded-xl text-xs font-medium border transition min-h-[44px] ${condition === c.id ? c.c : 'bg-white text-slate-700 border-slate-200'}`}>{c.label}</button>
         ))}
       </div>
       <div className="flex gap-2 items-start">
         <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Poznámka..." rows={2}
-          className="flex-1 p-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-slate-500 outline-none resize-none min-h-[48px]" />
+          className="flex-1 p-3 bg-white border border-slate-300 rounded-xl text-slate-950 placeholder-slate-400 outline-none focus:border-emerald-600 resize-none min-h-[48px]" />
         <div className="pt-1">
           <MicButton onTranscript={(t) => setNote((prev) => prev ? prev + ' ' + t : t)} />
         </div>
       </div>
       <div className="flex gap-2">
-        <button onClick={onCancel} className="flex-1 py-3 bg-slate-700 text-slate-300 rounded-xl font-medium min-h-[48px]">Zrušit</button>
-        <button onClick={() => onSubmit({ tachometer, condition, note })} className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold min-h-[48px]"><Send className="w-4 h-4 inline mr-1" />Předat</button>
+        <button onClick={onCancel} className="flex-1 py-3 bg-white text-slate-700 rounded-xl font-medium min-h-[48px] border border-slate-200">Zrušit</button>
+        <button onClick={() => onSubmit({ tachometer, condition, note })} className="flex-1 py-3 bg-emerald-700 text-white rounded-xl font-bold min-h-[48px]"><Send className="w-4 h-4 inline mr-1" />Předat</button>
       </div>
     </div>
   );
@@ -637,7 +664,9 @@ function HandoverForm({ entity, onSubmit, onCancel }: {
 // ═══════════════════════════════════════════
 
 export default function FleetPage() {
-  const navigate = useNavigate();
+  const goBack = useBackNavigation('/');
+  const { user, hasPermission, isReadOnly } = useAuthContext();
+  const canManageFleet = hasPermission('fleet.manage') && !isReadOnly;
   const { entities, loading } = useEntities('vehicle');
   const blueprint = useBlueprint('blueprint_vehicle');
   const { exportXLSX } = useReports();
@@ -659,20 +688,20 @@ export default function FleetPage() {
   }, [entities, blueprint]);
 
   if (loading) {
-    return <div className="min-h-screen bg-slate-900 flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-blue-400" /></div>;
+    return <div className="vik-page min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-emerald-700" /></div>;
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 pb-24">
+    <div className="vik-page min-h-screen pb-24">
       {/* Header */}
-      <div className="bg-slate-800/60 border-b border-slate-700/50 px-4 py-4">
+      <div className="vik-page-header px-4 py-4">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <button onClick={() => navigate('/')} className="p-2 rounded-xl hover:bg-slate-700/50 transition min-w-[44px] min-h-[44px] flex items-center justify-center">
-              <ArrowLeft className="w-5 h-5 text-slate-400" />
+            <button onClick={() => goBack()} className="min-h-11 min-w-11 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition flex items-center justify-center">
+              <ArrowLeft className="w-5 h-5 text-slate-700" />
             </button>
             <div>
-              <h1 className="text-xl font-bold text-white">Vozový park</h1>
+              <h1 className="text-xl font-bold text-slate-950">Vozový park</h1>
               <div className="text-xs text-slate-500">{entities.length} vozidel</div>
             </div>
           </div>
@@ -681,19 +710,23 @@ export default function FleetPage() {
               const data = entities.map(e => ({ name: e.name, code: e.code, status: e.status, ...e.data }));
               exportXLSX('fleet', data, { filename: `NOMINAL_fleet_${new Date().toISOString().slice(0, 10)}.xlsx` });
             }}
-              className="p-3 bg-slate-700 rounded-xl hover:bg-slate-600 transition min-w-[48px] min-h-[48px] flex items-center justify-center"
+              className="min-h-12 min-w-12 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition flex items-center justify-center"
               title="Export XLSX">
-              <Download className="w-5 h-5 text-white" />
+              <Download className="w-5 h-5 text-slate-700" />
             </button>
+            {canManageFleet && (
             <button onClick={() => setShowImportModal(true)}
-              className="p-3 bg-indigo-600 rounded-xl hover:bg-indigo-500 transition min-w-[48px] min-h-[48px] flex items-center justify-center"
+              className="p-3 bg-sky-600 rounded-xl hover:bg-sky-700 transition min-w-[48px] min-h-[48px] flex items-center justify-center"
               title="Import z Excelu">
               <Upload className="w-5 h-5 text-white" />
             </button>
+            )}
+            {canManageFleet && (
             <button onClick={() => setShowAddModal(true)}
-              className="p-3 bg-blue-600 rounded-xl hover:bg-blue-500 transition active:scale-[0.95] min-w-[48px] min-h-[48px] flex items-center justify-center shadow-lg shadow-blue-500/20">
+              className="p-3 bg-emerald-700 rounded-xl hover:bg-emerald-800 transition active:scale-[0.95] min-w-[48px] min-h-[48px] flex items-center justify-center shadow-lg shadow-emerald-700/20">
               <Plus className="w-6 h-6 text-white" />
             </button>
+            )}
           </div>
         </div>
       </div>
@@ -707,7 +740,8 @@ export default function FleetPage() {
               <div key={entity.id} className="flex flex-col">
                 <EntityCardCompact entity={entity} blueprint={blueprint} onClick={() => setSelectedEntity(entity)} />
                 {/* ACTION FOOTER */}
-                <div className="bg-slate-800/60 -mt-3 pt-5 pb-2.5 px-4 rounded-b-2xl border border-t-0 border-slate-700/50 flex items-center justify-end gap-2">
+                {canManageFleet && (
+                <div className="bg-white -mt-3 pt-5 pb-2.5 px-4 rounded-b-2xl border border-t-0 border-slate-200 shadow-sm flex items-center justify-end gap-2">
                   <button
                     onClick={(e) => { e.stopPropagation(); setSelectedEntity(entity); }}
                     className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 transition flex items-center gap-1.5 min-h-[32px]"
@@ -718,8 +752,14 @@ export default function FleetPage() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
+                      if (!canManageFleet) return;
                       if (window.confirm(`Opravdu smazat ${entity.name}?`)) {
-                        deleteDoc(doc(db, 'entities', entity.id));
+                        updateDoc(doc(db, 'entities', entity.id), {
+                          isDeleted: true,
+                          deletedAt: serverTimestamp(),
+                          deletedBy: user?.id || user?.uid || 'unknown',
+                          updatedAt: serverTimestamp(),
+                        });
                         toast(`${entity.name} smazáno`, 'info');
                       }
                     }}
@@ -729,16 +769,19 @@ export default function FleetPage() {
                     Smazat
                   </button>
                 </div>
+                )}
               </div>
             ))}
           </div>
         ) : (
           <div className="text-center py-16">
-            <Car className="w-16 h-16 text-slate-700 mx-auto mb-4" />
-            <h3 className="text-lg font-bold text-slate-400 mb-2">Žádná vozidla</h3>
-            <button onClick={() => setShowAddModal(true)} className="mt-4 px-6 py-3 bg-blue-600 text-white rounded-xl font-bold flex items-center gap-2 mx-auto">
+            <Car className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+            <h3 className="text-lg font-bold text-slate-700 mb-2">Žádná vozidla</h3>
+            {canManageFleet && (
+            <button onClick={() => setShowAddModal(true)} className="mt-4 px-6 py-3 bg-emerald-700 text-white rounded-xl font-bold flex items-center gap-2 mx-auto">
               <Plus className="w-5 h-5" />Přidat první vozidlo
             </button>
+            )}
           </div>
         )}
       </div>

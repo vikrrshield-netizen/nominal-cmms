@@ -38,7 +38,7 @@ import {
   getGearboxStatusLabel,
   isExtruderAsset,
   isGearboxAsset,
-  returnGearboxToStock,
+  setGearboxStockStatus,
   subscribeGearboxInstallationEvents,
   subscribeGearboxTemperatureLogs,
 } from '../services/gearboxService';
@@ -550,12 +550,26 @@ export default function AssetCardPage() {
     if (!assetV2) return;
     setGearboxActionSaving(true);
     try {
-      await returnGearboxToStock({ tenantId, gearbox: assetV2, user });
+      await setGearboxStockStatus({ tenantId, gearbox: assetV2, status: 'in_stock', user });
       await refreshAssetV2();
       showToast('Převodovka vrácena do skladu', 'success');
     } catch (err) {
       console.error('[Gearbox] return to stock:', err);
       showToast('Nepodařilo se vrátit převodovku do skladu', 'error');
+    }
+    setGearboxActionSaving(false);
+  };
+
+  const handleMoveGearboxToService = async () => {
+    if (!assetV2) return;
+    setGearboxActionSaving(true);
+    try {
+      await setGearboxStockStatus({ tenantId, gearbox: assetV2, status: 'service', user });
+      await refreshAssetV2();
+      showToast('Převodovka přesunuta do servisu', 'success');
+    } catch (err) {
+      console.error('[Gearbox] move to service:', err);
+      showToast('Nepodařilo se přesunout převodovku do servisu', 'error');
     }
     setGearboxActionSaving(false);
   };
@@ -827,7 +841,7 @@ export default function AssetCardPage() {
   // ─── LOADING ───
   if (loadingAsset || loadingAssetV2) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-slate-500" />
       </div>
     );
@@ -835,7 +849,7 @@ export default function AssetCardPage() {
 
   if (!asset) {
     return (
-      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center gap-4">
+      <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center gap-4">
         <Settings className="w-16 h-16 text-slate-600" />
         <h2 className="text-xl font-bold text-slate-400">Zařízení nenalezeno</h2>
         <button onClick={goBackOneStep} className="text-blue-400 font-medium">
@@ -852,7 +866,7 @@ export default function AssetCardPage() {
 
   // ─── RENDER ───
   return (
-    <div className="min-h-screen bg-slate-900 pb-24">
+    <div className="min-h-screen bg-[#f3eee5] pb-24 text-slate-900">
       {/* Revision Alert Banner */}
       {expiredRevisions.length > 0 && (
         <div className="bg-red-500/20 border-b border-red-500/30 px-4 py-3">
@@ -868,20 +882,20 @@ export default function AssetCardPage() {
         </div>
       )}
 
-      <div className="max-w-4xl mx-auto px-3 pt-4">
+      <div className="max-w-5xl mx-auto px-3 pt-4">
         {/* Breadcrumbs */}
         <div className="flex items-center text-sm text-slate-500 flex-wrap gap-1 mb-4">
-          <button onClick={() => navigate('/')} className="hover:text-blue-400 transition">
+          <button onClick={() => navigate('/')} className="hover:text-blue-700 transition">
             Dashboard
           </button>
           <ChevronRight className="w-4 h-4 text-slate-600" />
-          <button onClick={() => navigate('/kartoteka')} className="hover:text-blue-400 transition">
+          <button onClick={() => navigate('/kartoteka')} className="hover:text-blue-700 transition">
             Kartotéka
           </button>
           <ChevronRight className="w-4 h-4 text-slate-600" />
           <button
             onClick={() => navigate('/kartoteka')}
-            className="hover:text-blue-400 transition flex items-center gap-1"
+            className="hover:text-blue-700 transition flex items-center gap-1"
           >
             <Building2 className="w-3.5 h-3.5" />
             {buildingName}
@@ -896,34 +910,34 @@ export default function AssetCardPage() {
             </>
           )}
           <ChevronRight className="w-4 h-4 text-slate-600" />
-          <span className="text-white font-medium">{asset.name}</span>
+          <span className="text-slate-900 font-medium">{asset.name}</span>
         </div>
 
         {/* Header */}
-        <div className="flex items-center gap-4 mb-4">
+        <div className="rounded-2xl border border-[#e2d8c9] bg-white p-3 shadow-sm mb-3 flex items-center gap-3">
           <button
             onClick={goBackOneStep}
-            className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white transition flex-shrink-0"
+            className="w-11 h-11 rounded-xl bg-[#10263f] border border-[#10263f] flex items-center justify-center text-white transition flex-shrink-0"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div
-            className="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0"
+            className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
             style={{ backgroundColor: catCfg.color + '25' }}
           >
-            <IconComp className="w-8 h-8" style={{ color: catCfg.color }} />
+            <IconComp className="w-6 h-6" style={{ color: catCfg.color }} />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-3">
-              <h1 className="text-xl font-bold text-white truncate">{asset.name}</h1>
-              <div className={`w-4 h-4 rounded-full flex-shrink-0 ${st.dot}`} />
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg sm:text-xl font-black text-slate-950 truncate">{asset.name}</h1>
+              <div className={`w-3 h-3 rounded-full flex-shrink-0 ${st.dot}`} />
             </div>
             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
               {asset.code && (
-                <span className="text-xs text-slate-500 font-mono">{asset.code}</span>
+                <span className="text-xs text-slate-600 font-mono">{asset.code}</span>
               )}
               <span
-                className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                className="text-xs font-black px-2 py-1 rounded-full"
                 style={{ backgroundColor: st.color + '20', color: st.color }}
               >
                 {st.label}
@@ -938,14 +952,14 @@ export default function AssetCardPage() {
         </div>
 
         {/* Primary Action Buttons */}
-        <div className="flex gap-2 mb-2">
+        <div className="flex flex-wrap gap-2 mb-2 rounded-2xl border border-[#e2d8c9] bg-white p-2 shadow-sm">
           {canEditAsset && (
             <button
               onClick={() => { setIsEditing(!isEditing); setActiveTab('info'); }}
-              className={`flex-1 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition active:scale-[0.97] min-h-[48px] ${
+              className={`min-w-[132px] flex-1 rounded-xl px-3 text-sm font-black flex items-center justify-center gap-2 transition active:scale-[0.97] min-h-11 ${
                 isEditing
-                  ? 'bg-blue-500/15 border border-blue-500/30 text-blue-400'
-                  : 'bg-slate-500/15 border border-slate-500/30 text-slate-300 hover:bg-slate-500/25'
+                  ? 'bg-blue-50 border border-blue-200 text-blue-700'
+                  : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
               }`}
             >
               <Edit3 className="w-5 h-5" />
@@ -955,7 +969,7 @@ export default function AssetCardPage() {
           {canCreateTask && (
             <button
               onClick={() => setShowFaultModal(true)}
-              className="flex-1 py-3 bg-red-500/15 border border-red-500/30 text-red-400 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-red-500/25 transition active:scale-[0.97] min-h-[48px]"
+              className="min-w-[132px] flex-1 bg-red-50 border border-red-200 text-red-700 rounded-xl px-3 text-sm font-black flex items-center justify-center gap-2 hover:bg-red-100 transition active:scale-[0.97] min-h-11"
             >
               <AlertTriangle className="w-5 h-5" />
               Nahlásit
@@ -963,7 +977,7 @@ export default function AssetCardPage() {
           )}
           <button
             onClick={() => setActiveTab('info')}
-            className="flex-1 py-3 bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-indigo-500/25 transition active:scale-[0.97] min-h-[48px]"
+            className="min-w-[132px] flex-1 bg-blue-50 border border-blue-200 text-blue-700 rounded-xl px-3 text-sm font-black flex items-center justify-center gap-2 hover:bg-blue-100 transition active:scale-[0.97] min-h-11"
           >
             <FileText className="w-5 h-5" />
             Detaily
@@ -972,7 +986,7 @@ export default function AssetCardPage() {
           <div className="relative" style={{ flex: '0 0 auto' }}>
             <button
               onClick={() => setShowExportMenu(!showExportMenu)}
-              className="py-3 px-4 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-500/25 transition active:scale-[0.97] min-h-[48px]"
+              className="min-h-11 px-4 bg-emerald-700 border border-emerald-700 text-white rounded-xl font-black flex items-center justify-center gap-2 hover:bg-emerald-600 transition active:scale-[0.97]"
             >
               <Download className="w-5 h-5" />
             </button>
@@ -981,21 +995,21 @@ export default function AssetCardPage() {
                 <div className="fixed inset-0 z-40" onClick={() => setShowExportMenu(false)} />
                 <div
                   className="absolute right-0 top-full mt-2 z-50 rounded-xl shadow-lg overflow-hidden"
-                  style={{ background: '#1e293b', border: '1px solid #334155', minWidth: '180px' }}
+                  style={{ background: '#fff', border: '1px solid #e2e8f0', minWidth: '180px' }}
                 >
                   <button
                     onClick={handleExportPDF}
-                    className="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-white/5 transition"
-                    style={{ color: '#e2e8f0', fontSize: '0.9rem' }}
+                    className="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-slate-50 transition"
+                    style={{ color: '#0f172a', fontSize: '0.9rem' }}
                   >
                     <FileText className="w-4 h-4" style={{ color: '#ef4444' }} />
                     PDF export
                   </button>
-                  <div style={{ height: '1px', background: '#334155' }} />
+                  <div style={{ height: '1px', background: '#e2e8f0' }} />
                   <button
                     onClick={handleExportXLSX}
-                    className="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-white/5 transition"
-                    style={{ color: '#e2e8f0', fontSize: '0.9rem' }}
+                    className="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-slate-50 transition"
+                    style={{ color: '#0f172a', fontSize: '0.9rem' }}
                   >
                     <Table className="w-4 h-4" style={{ color: '#22c55e' }} />
                     Excel export
@@ -1006,11 +1020,11 @@ export default function AssetCardPage() {
           </div>
         </div>
         {/* Secondary Action Buttons */}
-        <div className="flex gap-2 mb-4">
+        <div className="flex flex-wrap gap-2 mb-4 rounded-2xl border border-[#e2d8c9] bg-white p-2 shadow-sm">
           {canCreateTask && (
             <button
               onClick={() => setShowTaskModal(true)}
-              className="flex-1 py-3 bg-blue-500/15 border border-blue-500/30 text-blue-400 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-500/25 transition active:scale-[0.97] min-h-[48px]"
+              className="min-w-[132px] flex-1 bg-blue-50 border border-blue-200 text-blue-700 rounded-xl px-3 text-sm font-black flex items-center justify-center gap-2 hover:bg-blue-100 transition active:scale-[0.97] min-h-11"
             >
               <PlusCircle className="w-5 h-5" />
               Nový úkol
@@ -1019,7 +1033,7 @@ export default function AssetCardPage() {
           {canEditAsset && revisions.length > 0 && (
             <button
               onClick={() => setShowRevisionModal(true)}
-              className="flex-1 py-3 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-500/25 transition active:scale-[0.97] min-h-[48px]"
+              className="min-w-[132px] flex-1 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl px-3 text-sm font-black flex items-center justify-center gap-2 hover:bg-emerald-100 transition active:scale-[0.97] min-h-11"
             >
               <Shield className="w-5 h-5" />
               Zapsat revizi
@@ -1028,7 +1042,7 @@ export default function AssetCardPage() {
           {isGearbox && canEditAsset && (
             <button
               onClick={() => setShowGearboxTemperature(true)}
-              className="flex-1 py-3 bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-cyan-500/25 transition active:scale-[0.97] min-h-[48px]"
+              className="min-w-[132px] flex-1 bg-cyan-50 border border-cyan-200 text-cyan-700 rounded-xl px-3 text-sm font-black flex items-center justify-center gap-2 hover:bg-cyan-100 transition active:scale-[0.97] min-h-11"
             >
               <Thermometer className="w-5 h-5" />
               Teplota
@@ -1038,7 +1052,7 @@ export default function AssetCardPage() {
             <button
               onClick={() => setShowGearboxAssign(true)}
               disabled={gearboxActionSaving}
-              className="flex-1 py-3 bg-violet-500/15 border border-violet-500/30 text-violet-300 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-violet-500/25 transition active:scale-[0.97] min-h-[48px] disabled:opacity-50"
+              className="min-w-[132px] flex-1 bg-violet-50 border border-violet-200 text-violet-700 rounded-xl px-3 text-sm font-black flex items-center justify-center gap-2 hover:bg-violet-100 transition active:scale-[0.97] min-h-11 disabled:opacity-50"
             >
               <Cog className="w-5 h-5" />
               Přiřadit
@@ -1048,17 +1062,27 @@ export default function AssetCardPage() {
             <button
               onClick={handleReturnGearboxToStock}
               disabled={gearboxActionSaving}
-              className="flex-1 py-3 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-500/25 transition active:scale-[0.97] min-h-[48px] disabled:opacity-50"
+              className="min-w-[132px] flex-1 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl px-3 text-sm font-black flex items-center justify-center gap-2 hover:bg-emerald-100 transition active:scale-[0.97] min-h-11 disabled:opacity-50"
             >
               <PackageCheck className="w-5 h-5" />
               Sklad
+            </button>
+          )}
+          {isGearbox && canAssignGearbox && (
+            <button
+              onClick={handleMoveGearboxToService}
+              disabled={gearboxActionSaving || assetV2?.gearboxStatus === 'service'}
+              className="min-w-[132px] flex-1 bg-amber-50 border border-amber-200 text-amber-700 rounded-xl px-3 text-sm font-black flex items-center justify-center gap-2 hover:bg-amber-100 transition active:scale-[0.97] min-h-11 disabled:opacity-50"
+            >
+              <Wrench className="w-5 h-5" />
+              Servis
             </button>
           )}
           {asset.category === 'extruder' && canCreateTask && (
             <button
               onClick={handlePrefilterChange}
               disabled={prefilterSaving}
-              className="flex-1 py-3 bg-purple-500/15 border border-purple-500/30 text-purple-400 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-purple-500/25 transition active:scale-[0.97] min-h-[48px] disabled:opacity-50"
+              className="min-w-[132px] flex-1 bg-purple-50 border border-purple-200 text-purple-700 rounded-xl px-3 text-sm font-black flex items-center justify-center gap-2 hover:bg-purple-100 transition active:scale-[0.97] min-h-11 disabled:opacity-50"
             >
               {prefilterSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Filter className="w-5 h-5" />}
               Předfiltr
@@ -1066,7 +1090,7 @@ export default function AssetCardPage() {
           )}
           <button
             onClick={printAssetPassport}
-            className="flex-1 py-3 bg-slate-500/15 border border-slate-500/30 text-slate-300 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-500/25 transition active:scale-[0.97] min-h-[48px]"
+            className="min-w-[132px] flex-1 bg-white border border-slate-200 text-slate-700 rounded-xl px-3 text-sm font-black flex items-center justify-center gap-2 hover:bg-slate-50 transition active:scale-[0.97] min-h-11"
           >
             <Printer className="w-5 h-5" />
             Tisk historie
@@ -1074,7 +1098,7 @@ export default function AssetCardPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 mb-4 border-b border-white/10 pb-2">
+        <div className="grid grid-cols-2 gap-2 mb-4 rounded-2xl border border-[#e2d8c9] bg-white p-2 shadow-sm sm:grid-cols-4">
           {([
             { key: 'history' as const, label: `Historie (${historyItems.length})` },
             { key: 'info' as const, label: 'Detaily' },
@@ -1084,10 +1108,10 @@ export default function AssetCardPage() {
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-[13px] font-semibold transition-all ${
+              className={`min-h-10 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-[13px] font-black transition-all ${
                 activeTab === tab.key
-                  ? 'bg-orange-500/15 text-orange-400'
-                  : 'text-slate-500 hover:text-slate-300'
+                  ? 'bg-[#10263f] text-white'
+                  : 'text-slate-500 hover:text-slate-900'
               }`}
             >
               {tab.label}
@@ -1325,13 +1349,26 @@ export default function AssetCardPage() {
                       Limity: varování od {assetV2.gearboxWarningTemperatureC ?? 70} °C, kritická od {assetV2.gearboxCriticalTemperatureC ?? 85} °C
                     </div>
                   </div>
-                  {assetV2.lastTemperatureC != null && (
-                    <div style={{ textAlign: 'right' }}>
+                  {(assetV2.lastTemperatureC != null || canReportGearboxProblem) && (
+                    <div style={{ textAlign: 'right', minWidth: 150 }}>
+                      {assetV2.lastTemperatureC != null && (
+                        <>
                       <div style={{ fontSize: 28, fontWeight: 800, color: tempState.color }}>{assetV2.lastTemperatureC} °C</div>
                       <div style={{ display: 'inline-flex', marginTop: 4, padding: '4px 8px', borderRadius: 999, fontSize: 11, fontWeight: 800, color: tempState.color, background: tempState.background, border: `1px solid ${tempState.border}` }}>
                         {tempState.label}
                       </div>
                       <div style={{ fontSize: 11, color: '#64748b' }}>{assetV2.lastTemperatureAt ? formatHistoryDate(assetV2.lastTemperatureAt) : 'poslední teplota'}</div>
+                        </>
+                      )}
+                      {canReportGearboxProblem && (
+                        <button
+                          type="button"
+                          onClick={() => setProblemOpen(true)}
+                          style={{ marginTop: assetV2.lastTemperatureC != null ? 10 : 0, minHeight: 44, width: '100%', borderRadius: 14, border: '1px solid #fecaca', background: '#fef2f2', color: '#b91c1c', fontWeight: 800 }}
+                        >
+                          NahlĂˇsit problĂ©m
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1352,7 +1389,7 @@ export default function AssetCardPage() {
                   </button>
                   )}
                 </div>
-                {canReportGearboxProblem && (
+                {false && canReportGearboxProblem && (
                   <button
                     type="button"
                     onClick={() => setProblemOpen(true)}
@@ -1860,7 +1897,7 @@ export default function AssetCardPage() {
             )}
 
             {/* Legacy info (Budova, Místnost — from old model) */}
-            <div className="bg-slate-800/40 rounded-2xl p-4 border border-slate-700/30">
+            <div className="card-b p-4">
               <h3 className="text-xs text-slate-500 uppercase font-bold mb-3">Umístění (legacy)</h3>
               <div className="grid grid-cols-2 gap-3">
                 <InfoBox label="Budova" value={buildingName} icon={<Building2 className="w-3.5 h-3.5 text-slate-500" />} />
@@ -1877,7 +1914,7 @@ export default function AssetCardPage() {
 
             {/* VZV Stanoviště */}
             {asset.category === 'forklift' && (
-              <div className="bg-slate-800/40 rounded-2xl p-4 border border-slate-700/30">
+              <div className="card-b p-4">
                 <h3 className="text-xs text-slate-500 uppercase font-bold mb-3">Stanoviště VZV</h3>
                 <div className="flex gap-2">
                   {['Expedice', 'Sklad A', 'Sklad B'].map((loc) => (
@@ -1902,7 +1939,7 @@ export default function AssetCardPage() {
 
             {/* Dokumentace VZV */}
             {asset.category === 'forklift' && (
-              <div className="bg-slate-800/40 rounded-2xl p-4 border border-slate-700/30">
+              <div className="card-b p-4">
                 <h3 className="text-xs text-slate-500 uppercase font-bold mb-3 flex items-center gap-2">
                   <FileText className="w-4 h-4" />
                   Dokumentace
@@ -1928,7 +1965,7 @@ export default function AssetCardPage() {
 
             {/* Control Points */}
             {asset.controlPoints && asset.controlPoints.length > 0 && (
-              <div className="bg-slate-800/40 rounded-2xl p-4 border border-slate-700/30">
+              <div className="card-b p-4">
                 <h3 className="text-xs text-slate-500 uppercase font-bold mb-3">Kontrolní body</h3>
                 <div className="space-y-2">
                   {asset.controlPoints.map((cp, i) => (
@@ -1951,7 +1988,7 @@ export default function AssetCardPage() {
 
             {/* Revision Status */}
             {revisions.length > 0 && (
-              <div className="bg-slate-800/40 rounded-2xl p-4 border border-slate-700/30">
+              <div className="card-b p-4">
                 <h3 className="text-xs text-slate-500 uppercase font-bold mb-3 flex items-center gap-2">
                   <Shield className="w-4 h-4" />
                   Stav revizí
@@ -1991,17 +2028,17 @@ export default function AssetCardPage() {
         {/* ═══ TAB: TASKS ═══ */}
         {activeTab === 'history' && (
           <div className="space-y-3">
-            <div className="bg-slate-800/40 rounded-2xl p-4 border border-slate-700/30">
-              <div className="flex items-center gap-2 bg-slate-900/70 border border-white/10 rounded-xl px-3 mb-3">
+            <div className="card-b p-4">
+              <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 mb-3">
                 <Search className="w-4 h-4 text-slate-500 flex-shrink-0" />
                 <input
                   value={historySearch}
                   onChange={(e) => setHistorySearch(e.target.value)}
                   placeholder="Hledat v historii: filtr, lozisko, jmeno technika..."
-                  className="w-full bg-transparent py-3 text-sm text-white placeholder-slate-600 outline-none"
+                  className="w-full bg-transparent py-3 text-sm text-slate-900 placeholder-slate-400 outline-none"
                 />
                 {historySearch && (
-                  <button onClick={() => setHistorySearch('')} className="text-slate-500 hover:text-white">
+                  <button onClick={() => setHistorySearch('')} className="text-slate-500 hover:text-slate-900">
                     <X className="w-4 h-4" />
                   </button>
                 )}
@@ -2021,8 +2058,8 @@ export default function AssetCardPage() {
                     onClick={() => setHistoryType(item.key)}
                     className={`min-h-[40px] rounded-lg text-[11px] font-bold border transition ${
                       historyType === item.key
-                        ? 'bg-orange-500/20 text-orange-300 border-orange-500/30'
-                        : 'bg-white/5 text-slate-500 border-white/10'
+                        ? 'bg-orange-50 text-orange-700 border-orange-200'
+                        : 'bg-white text-slate-600 border-slate-200'
                     }`}
                   >
                     {item.label}
@@ -2032,14 +2069,14 @@ export default function AssetCardPage() {
             </div>
 
             {historyItems.length === 0 ? (
-              <div className="text-center py-16 bg-slate-800/30 border border-slate-700/30 rounded-2xl">
+              <div className="text-center py-16 bg-white border border-slate-200 rounded-2xl">
                 <Clock className="w-12 h-12 text-slate-600 mx-auto mb-3" />
                 <p className="text-slate-500">Nic jsem v historii nenasel</p>
               </div>
             ) : (
               <div className="space-y-2">
                 {historyItems.map((item) => (
-                  <div key={item.id} className="bg-slate-800/40 rounded-xl border border-slate-700/30 p-4">
+                  <div key={item.id} className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
                     <div className="flex items-start gap-3">
                       <div className="w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0" style={{ background: item.color }} />
                       <div className="flex-1 min-w-0">
@@ -2049,9 +2086,9 @@ export default function AssetCardPage() {
                           </span>
                           <span className="text-[11px] text-slate-500">{formatHistoryDate(item.dateValue)}</span>
                         </div>
-                        <div className="text-sm font-semibold text-white leading-snug">{item.title}</div>
+                        <div className="text-sm font-semibold text-slate-950 leading-snug">{item.title}</div>
                         {item.detail && (
-                          <div className="text-xs text-slate-400 mt-1 leading-relaxed">{item.detail}</div>
+                          <div className="text-xs text-slate-600 mt-1 leading-relaxed">{item.detail}</div>
                         )}
                         {'linkWarning' in item && item.linkWarning && (
                           <div className="mt-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-[11px] font-semibold text-amber-200">
@@ -2094,7 +2131,7 @@ export default function AssetCardPage() {
                   return (
                     <div
                       key={task.id}
-                      className={`bg-slate-800/40 rounded-xl border border-slate-700/30 p-4 ${isDone ? 'opacity-50' : ''}`}
+                      className={`bg-white rounded-xl border border-slate-200 p-4 shadow-sm ${isDone ? 'opacity-60' : ''}`}
                     >
                       <div className="flex items-center gap-2 mb-1.5">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${pCfg.bg} ${pCfg.text}`}>
@@ -2111,7 +2148,7 @@ export default function AssetCardPage() {
                           }
                         </span>
                       </div>
-                      <h4 className="font-medium text-sm text-white">{task.title}</h4>
+                      <h4 className="font-medium text-sm text-slate-950">{task.title}</h4>
                       {task.assignedToName && (
                         <div className="text-xs text-blue-400 mt-1">→ {task.assignedToName}</div>
                       )}
@@ -2148,7 +2185,7 @@ export default function AssetCardPage() {
                   const statusLabel = isExpired ? 'Prošlá' : isExpiring ? 'Končí brzy' : 'Platná';
 
                   return (
-                    <div key={rev.id} className={`bg-slate-800/40 rounded-2xl border ${borderColor} p-4`}>
+                    <div key={rev.id} className={`bg-white rounded-2xl border ${borderColor} p-4 shadow-sm`}>
                       <div className="flex items-center gap-2 mb-3">
                         <span className="text-xl">{typeCfg.icon}</span>
                         <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
@@ -2160,13 +2197,13 @@ export default function AssetCardPage() {
                         </span>
                         <div className={`w-3 h-3 rounded-full flex-shrink-0 ml-auto ${dotColor}`} />
                       </div>
-                      <h4 className="font-medium text-white mb-3">{rev.title}</h4>
+                      <h4 className="font-medium text-slate-950 mb-3">{rev.title}</h4>
                       <div className="grid grid-cols-2 gap-2">
-                        <div className="bg-slate-700/30 rounded-xl p-2.5">
+                        <div className="bg-slate-50 rounded-xl p-2.5">
                           <div className="text-[10px] text-slate-500 mb-0.5">Poslední</div>
-                          <div className="text-xs font-medium text-white">{formatRevisionDate(rev.lastRevisionDate)}</div>
+                          <div className="text-xs font-medium text-slate-900">{formatRevisionDate(rev.lastRevisionDate)}</div>
                         </div>
-                        <div className="bg-slate-700/30 rounded-xl p-2.5">
+                        <div className="bg-slate-50 rounded-xl p-2.5">
                           <div className="text-[10px] text-slate-500 mb-0.5">Příští</div>
                           <div className={`text-xs font-bold ${textColor}`}>
                             {formatRevisionDate(rev.nextRevisionDate)}
@@ -2175,13 +2212,13 @@ export default function AssetCardPage() {
                             </span>
                           </div>
                         </div>
-                        <div className="bg-slate-700/30 rounded-xl p-2.5">
+                        <div className="bg-slate-50 rounded-xl p-2.5">
                           <div className="text-[10px] text-slate-500 mb-0.5">Firma</div>
-                          <div className="text-xs font-medium text-white">{rev.revisionCompany}</div>
+                          <div className="text-xs font-medium text-slate-900">{rev.revisionCompany}</div>
                         </div>
-                        <div className="bg-slate-700/30 rounded-xl p-2.5">
+                        <div className="bg-slate-50 rounded-xl p-2.5">
                           <div className="text-[10px] text-slate-500 mb-0.5">Č. zprávy</div>
-                          <div className="text-xs font-mono text-white">{rev.certificateNumber}</div>
+                          <div className="text-xs font-mono text-slate-900">{rev.certificateNumber}</div>
                         </div>
                       </div>
                     </div>

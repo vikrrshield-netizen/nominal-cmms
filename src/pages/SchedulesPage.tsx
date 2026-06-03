@@ -2,7 +2,7 @@
 // VIKRR — Asset Shield — Správa opakovaných úkolů (recurring_tasks CRUD)
 
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, Timestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
@@ -48,7 +48,7 @@ function useRecurringTasks() {
 // MAIN PAGE
 // ═══════════════════════════════════════════════════
 export default function SchedulesPage() {
-  const navigate = useNavigate();
+  const goBack = useBackNavigation('/');
   const { hasPermission } = useAuthContext();
   const { tasks, loading } = useRecurringTasks();
 
@@ -125,7 +125,7 @@ export default function SchedulesPage() {
 
         {/* Header */}
         <div className="flex items-center gap-3 mb-4">
-          <button onClick={() => navigate('/')} className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 hover:text-white transition">
+          <button onClick={() => goBack()} className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 hover:text-white transition">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="flex-1">

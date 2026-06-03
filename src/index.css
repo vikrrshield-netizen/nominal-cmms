@@ -1,128 +1,356 @@
-﻿/* VIKRR — Asset Shield — DARK THEME */
-html, body, #root { background-color: #0f172a !important; color: #e2e8f0 !important; }
-body { background-color: #0f172a; color: #e2e8f0; }
-
-body { background-color: #0f172a; color: #e2e8f0; }
+@import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
-/* ── VIKRR Brand Variables ── */
+@theme {
+  --font-sans: "Hanken Grotesk", system-ui, -apple-system, sans-serif;
+
+  --color-white: #ffffff;
+  --color-slate-50: #fbf9f4;
+  --color-slate-100: #f1ece3;
+  --color-slate-200: #e7e0d4;
+  --color-slate-300: #d5cec7;
+  --color-slate-400: #97a096;
+  --color-slate-500: #7a8780;
+  --color-slate-600: #5c6b61;
+  --color-slate-700: #3d4a43;
+  --color-slate-800: #26302b;
+  --color-slate-900: #1b2620;
+
+  --color-gray-50: #fbf9f4;
+  --color-gray-100: #f1ece3;
+  --color-gray-200: #e7e0d4;
+  --color-gray-300: #d5cec7;
+  --color-gray-400: #97a096;
+  --color-gray-500: #7a8780;
+  --color-gray-600: #5c6b61;
+  --color-gray-700: #3d4a43;
+  --color-gray-800: #26302b;
+  --color-gray-900: #1b2620;
+
+  --color-emerald-50: #e8f3ee;
+  --color-emerald-100: #d8efe4;
+  --color-emerald-200: #b6e0cd;
+  --color-emerald-500: #2e9e74;
+  --color-emerald-600: #1a6b4f;
+  --color-emerald-700: #1f7355;
+  --color-emerald-800: #134e3a;
+
+  --color-green-50: #e8f3ee;
+  --color-green-100: #d8efe4;
+  --color-green-500: #2e9e74;
+  --color-green-600: #1a6b4f;
+  --color-green-700: #1f7355;
+
+  --color-amber-50: #fbf1e2;
+  --color-amber-100: #f8e6cf;
+  --color-amber-500: #e8932b;
+  --color-amber-600: #d07e1e;
+  --color-amber-700: #9a5e16;
+
+  --color-yellow-50: #fbf1e2;
+  --color-yellow-100: #f8e6cf;
+  --color-yellow-500: #e8932b;
+
+  --color-orange-50: #fff7ed;
+  --color-orange-100: #ffedd5;
+  --color-orange-500: #e8932b;
+  --color-orange-600: #d07e1e;
+  --color-orange-700: #9a5e16;
+
+  --color-red-50: #fbeae6;
+  --color-red-100: #f6d8d0;
+  --color-red-500: #d7503a;
+  --color-red-600: #c0432f;
+  --color-red-700: #9e3322;
+
+  --color-blue-50: #e9f1f8;
+  --color-blue-100: #d6e5f1;
+  --color-blue-500: #2f77b5;
+  --color-blue-600: #2f77b5;
+  --color-blue-700: #245c8c;
+
+  --color-sky-50: #e9f1f8;
+  --color-sky-100: #d6e5f1;
+  --color-sky-500: #2f77b5;
+  --color-sky-600: #2f77b5;
+  --color-sky-700: #245c8c;
+
+  --color-purple-100: #ece2f4;
+  --color-purple-500: #8155b8;
+  --color-violet-50: #f5f3ff;
+  --color-violet-100: #ece2f4;
+  --color-violet-500: #8155b8;
+  --color-violet-600: #7047a4;
+  --color-violet-700: #5b3a86;
+
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.125rem;
+  --radius-3xl: 1.5rem;
+}
+
 :root {
-  --vikrr-deep-blue: #1e3a5f;
-  --vikrr-accent: #3b82f6;
-  --vikrr-gray: #64748b;
+  --vikrr-deep-blue: #1b2620;
+  --vikrr-accent: #1a6b4f;
+  --vikrr-gray: #7a8780;
+  --vik-bg: #f1ece3;
+  --vik-surface: #ffffff;
+  --vik-surface-2: #fbf9f4;
+  --vik-border: #e7e0d4;
+  --vik-text: #1b2620;
+  --vik-muted: #5c6b61;
+  --vik-primary: #1a6b4f;
+  --vik-primary-strong: #1a6b4f;
+  --vik-danger: #d7503a;
+  --vik-warning: #e8932b;
+  --vik-success: #2e9e74;
+  font-family: "Hanken Grotesk", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
 }
 
-/* ============================================
-   DARK OVERRIDE — force dark on light Tailwind classes
-   ============================================ */
-
-/* --- Backgrounds --- */
-.bg-white { background-color: rgba(30,41,59,0.95) !important; }
-
-.bg-gray-50  { background-color: rgba(30,41,59,0.80) !important; }
-.bg-gray-100 { background-color: rgba(30,41,59,0.85) !important; }
-.bg-gray-200 { background-color: rgba(51,65,85,0.70) !important; }
-
-.bg-slate-50  { background-color: rgba(30,41,59,0.80) !important; }
-.bg-slate-100 { background-color: rgba(30,41,59,0.85) !important; }
-.bg-slate-200 { background-color: rgba(51,65,85,0.70) !important; }
-
-/* Colored -50 light variants → transparent dark */
-.bg-green-50  { background-color: rgba(34,197,94,0.10) !important; }
-.bg-green-100 { background-color: rgba(34,197,94,0.15) !important; }
-
-.bg-yellow-50  { background-color: rgba(234,179,8,0.10) !important; }
-.bg-yellow-100 { background-color: rgba(234,179,8,0.15) !important; }
-
-.bg-red-50  { background-color: rgba(239,68,68,0.10) !important; }
-.bg-red-100 { background-color: rgba(239,68,68,0.15) !important; }
-
-.bg-blue-50  { background-color: rgba(59,130,246,0.10) !important; }
-.bg-blue-100 { background-color: rgba(59,130,246,0.15) !important; }
-
-.bg-orange-50  { background-color: rgba(249,115,22,0.10) !important; }
-.bg-orange-100 { background-color: rgba(249,115,22,0.15) !important; }
-
-.bg-purple-50  { background-color: rgba(168,85,247,0.10) !important; }
-.bg-purple-100 { background-color: rgba(168,85,247,0.15) !important; }
-
-.bg-indigo-50  { background-color: rgba(99,102,241,0.10) !important; }
-.bg-indigo-100 { background-color: rgba(99,102,241,0.15) !important; }
-
-/* --- Text colors --- */
-.text-gray-900 { color: #f1f5f9 !important; }
-.text-gray-800 { color: #e2e8f0 !important; }
-.text-gray-700 { color: #cbd5e1 !important; }
-.text-gray-600 { color: #94a3b8 !important; }
-
-.text-slate-900 { color: #f1f5f9 !important; }
-.text-slate-800 { color: #e2e8f0 !important; }
-.text-slate-700 { color: #cbd5e1 !important; }
-.text-slate-600 { color: #94a3b8 !important; }
-
-/* Colored text — dark shades lightened for dark bg */
-.text-blue-700   { color: #93c5fd !important; }
-.text-blue-800   { color: #93c5fd !important; }
-.text-emerald-700 { color: #6ee7b7 !important; }
-.text-emerald-800 { color: #a7f3d0 !important; }
-.text-red-700    { color: #fca5a5 !important; }
-.text-red-800    { color: #fca5a5 !important; }
-.text-amber-700  { color: #fcd34d !important; }
-.text-amber-800  { color: #fcd34d !important; }
-.text-orange-700 { color: #fdba74 !important; }
-
-/* --- Borders --- */
-.border-gray-200 { border-color: rgba(255,255,255,0.10) !important; }
-.border-gray-300 { border-color: rgba(255,255,255,0.15) !important; }
-.border-gray-100 { border-color: rgba(255,255,255,0.06) !important; }
-
-.border-slate-200 { border-color: rgba(255,255,255,0.10) !important; }
-.border-slate-300 { border-color: rgba(255,255,255,0.15) !important; }
-.border-slate-100 { border-color: rgba(255,255,255,0.06) !important; }
-
-/* Colored borders — tone down for dark bg */
-.border-blue-200    { border-color: rgba(59,130,246,0.25) !important; }
-.border-blue-300    { border-color: rgba(59,130,246,0.30) !important; }
-.border-emerald-200 { border-color: rgba(16,185,129,0.25) !important; }
-.border-red-200     { border-color: rgba(239,68,68,0.25) !important; }
-.border-amber-200   { border-color: rgba(245,158,11,0.25) !important; }
-.border-purple-300  { border-color: rgba(168,85,247,0.30) !important; }
-
-/* Colored hover backgrounds */
-.hover\:bg-emerald-200:hover { background-color: rgba(16,185,129,0.20) !important; }
-.hover\:bg-red-200:hover     { background-color: rgba(239,68,68,0.20) !important; }
-.hover\:bg-blue-100:hover    { background-color: rgba(59,130,246,0.20) !important; }
-.hover\:bg-slate-100:hover   { background-color: rgba(30,41,59,0.90) !important; }
-
-/* Divide utilities (uses border-color under the hood) */
-.divide-gray-200 > :not(:first-child) { border-color: rgba(255,255,255,0.10) !important; }
-.divide-gray-100 > :not(:first-child) { border-color: rgba(255,255,255,0.06) !important; }
-
-/* --- Ring / outline --- */
-.ring-gray-200 { --tw-ring-color: rgba(255,255,255,0.10) !important; }
-.ring-gray-300 { --tw-ring-color: rgba(255,255,255,0.15) !important; }
-
-/* --- Shadows on white cards — soften --- */
-.shadow-sm, .shadow { box-shadow: 0 1px 3px rgba(0,0,0,0.4) !important; }
-.shadow-md { box-shadow: 0 4px 6px rgba(0,0,0,0.5) !important; }
-.shadow-lg { box-shadow: 0 10px 15px rgba(0,0,0,0.5) !important; }
-
-/* --- Placeholder text --- */
-.placeholder-gray-400::placeholder { color: #64748b !important; }
-.placeholder-gray-500::placeholder { color: #64748b !important; }
-
-/* --- Scrollbar in dark context --- */
-::-webkit-scrollbar-thumb {
-  background: #475569;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
+html,
+body,
+#root {
+  min-height: 100%;
+  background-color: #f1ece3;
+  color: #1b2620;
 }
 
-/* Custom scrollbar */
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+body,
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
+  letter-spacing: 0;
+}
+
+h1,
+h2,
+h3,
+h4,
+.font-bold,
+.font-extrabold,
+.font-black {
+  letter-spacing: 0;
+}
+
+.font-black {
+  font-weight: 800;
+}
+
+.font-extrabold {
+  font-weight: 750;
+}
+
+input,
+textarea,
+select {
+  font-size: 16px;
+}
+
+.eyebrow {
+  color: #97a096;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.btn-b {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  border: 0;
+  border-radius: 13px;
+  background: #1a6b4f;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 800;
+  padding: 11px 18px;
+  box-shadow: 0 4px 0 #134e3a;
+  transition: transform 40ms ease, box-shadow 40ms ease, background-color 140ms ease;
+}
+
+.btn-b:hover {
+  background: #1f7355;
+}
+
+.btn-b:active {
+  transform: translateY(4px);
+  box-shadow: none;
+}
+
+.btn-b-ghost {
+  border: 1px solid #e7e0d4;
+  background: #ffffff;
+  color: #1a6b4f;
+  box-shadow: none;
+}
+
+.btn-b-danger {
+  background: #d7503a;
+  box-shadow: 0 4px 0 #9e3322;
+}
+
+.card-b {
+  border: 1px solid #e7e0d4;
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(40, 30, 15, 0.04), 0 6px 18px rgba(40, 30, 15, 0.04);
+}
+
+.vik-page {
+  min-height: 100vh;
+  background: var(--vik-bg);
+  color: var(--vik-text);
+}
+
+.vik-page-shell {
+  width: min(1180px, calc(100vw - 24px));
+  margin: 0 auto;
+}
+
+.vik-page-header {
+  border-bottom: 1px solid var(--vik-border);
+  background: rgba(251, 249, 244, 0.92);
+  backdrop-filter: blur(14px);
+}
+
+.vik-card {
+  border: 1px solid var(--vik-border);
+  border-radius: 18px;
+  background: var(--vik-surface);
+  box-shadow: 0 1px 2px rgba(40, 30, 15, 0.04), 0 6px 18px rgba(40, 30, 15, 0.04);
+}
+
+.vik-card-soft {
+  border: 1px solid var(--vik-border);
+  border-radius: 16px;
+  background: var(--vik-surface-2);
+}
+
+.vik-row-card {
+  border: 1px solid var(--vik-border);
+  border-radius: 16px;
+  background: var(--vik-surface);
+  transition: background-color 140ms ease, border-color 140ms ease, transform 140ms ease;
+}
+
+.vik-row-card:hover {
+  border-color: #b6e0cd;
+  background: #fbf9f4;
+}
+
+.vik-row-card:active {
+  transform: scale(0.995);
+}
+
+.vik-button {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--vik-border);
+  border-radius: 13px;
+  background: #ffffff;
+  color: var(--vik-text);
+  font-weight: 800;
+  padding: 0 14px;
+  transition: background-color 140ms ease, border-color 140ms ease, transform 140ms ease;
+}
+
+.vik-button:hover {
+  background: #fbf9f4;
+}
+
+.vik-button:active {
+  transform: scale(0.98);
+}
+
+.vik-button-primary {
+  border-color: #1a6b4f;
+  background: #1a6b4f;
+  color: #ffffff;
+}
+
+.vik-button-primary:hover {
+  background: #1f7355;
+}
+
+.vik-button-danger {
+  border-color: #d7503a;
+  background: #fbeae6;
+  color: #9e3322;
+}
+
+.vik-input {
+  min-height: 44px;
+  width: 100%;
+  border: 2px solid var(--vik-border);
+  border-radius: 13px;
+  background: #fbf9f4;
+  color: var(--vik-text);
+  outline: none;
+  padding: 10px 12px;
+}
+
+.vik-input:focus {
+  border-color: #1a6b4f;
+  box-shadow: 0 0 0 3px rgba(26, 107, 79, 0.12);
+}
+
+.vik-chip {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--vik-border);
+  border-radius: 999px;
+  background: #ffffff;
+  color: #5c6b61;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 0 10px;
+  white-space: nowrap;
+}
+
+.vik-chip-active {
+  border-color: #1a6b4f;
+  background: #e8f3ee;
+  color: #1a6b4f;
+}
+
+.vik-muted {
+  color: var(--vik-muted);
+}
+
+.dashboard-daylight {
+  background-color: #f1ece3 !important;
+  color: #1b2620 !important;
+}
+
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 10px;
+  height: 10px;
 }
 
 ::-webkit-scrollbar-track {
@@ -130,61 +358,43 @@ body { background-color: #0f172a; color: #e2e8f0; }
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 3px;
+  border: 3px solid transparent;
+  border-radius: 6px;
+  background: #d8cfc0;
+  background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #c3b8a6;
 }
 
-/* Prevent text selection on buttons */
 button {
   -webkit-tap-highlight-color: transparent;
   user-select: none;
 }
 
-/* Safe area for mobile */
-body {
-  padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
-}
-
-/* ═══════════════════════════════════════════
-   PRINT STYLES — Audit-ready PDF output
-   ═══════════════════════════════════════════ */
 @media print {
-  /* Reset dark theme for paper */
   html, body, #root { background: #fff !important; color: #000 !important; }
 
-  /* Hide UI chrome */
   .no-print,
   nav, header button, [class*="FAB"],
   [class*="backdrop"], [class*="blur"],
   [class*="shadow"], [class*="animate"],
   .fixed { display: none !important; }
 
-  /* Show print-only elements */
   .print-only { display: block !important; }
 
-  /* Tables: black borders, readable */
   .print-table { width: 100%; border-collapse: collapse; font-size: 10px; }
   .print-table th { background: #f1f5f9; text-align: left; padding: 4px 6px; border: 1px solid #000; font-size: 9px; text-transform: uppercase; }
   .print-table td { padding: 3px 6px; border: 1px solid #000; vertical-align: top; }
   .print-table td.wrap { max-width: 180px; word-wrap: break-word; white-space: pre-wrap; }
   .print-table tr:nth-child(even) { background: #f8fafc; }
 
-  /* Print header */
   .print-header { text-align: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #000; }
   .print-header h1 { font-size: 14px; margin: 0; }
   .print-header p { font-size: 10px; color: #475569; margin: 2px 0 0; }
 
-  /* Force colors to print */
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 
-  /* Page setup */
   @page { margin: 12mm; size: A4 landscape; }
 }
-
-
-

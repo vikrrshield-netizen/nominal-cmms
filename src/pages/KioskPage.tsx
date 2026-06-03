@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { addDoc, collection, limit, onSnapshot, orderBy, query, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, limit, onSnapshot, orderBy, query, serverTimestamp, updateDoc } from 'firebase/firestore';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -13,18 +13,24 @@ import {
   Camera,
   Filter,
   HelpCircle,
+  Heart,
   Lightbulb,
+  Lock,
   Loader2,
   LogOut,
+  MessageSquare,
   Package,
   Search,
   Send,
+  Shield,
   ShieldCheck,
   Thermometer,
+  Trash2,
   X,
 } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
+import { useEmployeeNames } from '../hooks/useEmployeeDirectory';
 import { createTask } from '../services/taskService';
 import { addWorkLog } from '../services/workLogService';
 import { addGearboxTemperatureLog, isGearboxAsset } from '../services/gearboxService';
@@ -39,10 +45,15 @@ interface QuickOption {
 
 interface ShiftNote {
   id: string;
+  authorId?: string;
   author: string;
   text: string;
   time: string;
   priority: string;
+  shift?: string;
+  recipient?: string;
+  acknowledgedBy?: Record<string, boolean>;
+  acknowledgedByName?: Record<string, string>;
 }
 
 interface PrefilterLog {
@@ -93,6 +104,35 @@ const QUICK_GEARBOX_ISSUES: QuickOption[] = [
   { id: 'other', label: 'Jiný problém' },
 ];
 
+const TRUSTBOX_CATEGORIES = [
+  {
+    id: 'safety',
+    label: 'Bezpečnost',
+    description: 'Ohrožení zdraví nebo nebezpečné praktiky',
+    icon: AlertTriangle,
+  },
+  {
+    id: 'harassment',
+    label: 'Obtěžování',
+    description: 'Šikana, diskriminace nebo nevhodné chování',
+    icon: Shield,
+  },
+  {
+    id: 'improvement',
+    label: 'Zlepšení',
+    description: 'Návrhy na zlepšení a nápady',
+    icon: Lightbulb,
+  },
+  {
+    id: 'other',
+    label: 'Ostatní',
+    description: 'Cokoliv jiného',
+    icon: MessageSquare,
+  },
+] as const;
+
+type TrustboxCategoryId = (typeof TRUSTBOX_CATEGORIES)[number]['id'];
+
 const ASSISTANT_TIPS = [
   { title: 'P1 - havárie', steps: ['Zastavit stroj.', 'Nahlásit poruchu přes kiosk.', 'Zavolat údržbu.', 'Nepouštět nikoho do rizikového místa.'] },
   { title: 'P2 - vážná závada', steps: ['Pokud je to bezpečné, dokončete sérii.', 'Nahlaste závadu.', 'Označte stroj.', 'Čekejte na pokyn údržby.'] },
@@ -118,6 +158,30 @@ const isControl = (asset: Asset) => isEntity(asset, ['kontrola', 'kontrolni']);
 const isExtruderAsset = (asset: Asset) => {
   const text = normalize(`${asset.name} ${asset.code} ${asset.entityType} ${asset.category}`);
   return text.includes('extruder') || text.includes('extrud');
+};
+
+// Předfiltr je hrubý filtr nad extruderem. VZT jednotky do výměn předfiltrů nepatří.
+const isPrefilterExtruderAsset = (asset: Asset) => {
+  if (!isExtruderAsset(asset)) return false;
+  if (normalize(asset.category) === 'hvac') return false;
+  const identity = normalize(`${asset.name} ${asset.code} ${asset.entityType} ${asset.category}`);
+  return !/(vzt|vzduchotech|klimatiz|rekuper)/.test(identity);
+};
+
+const isPrefilterAsset = (asset: Asset) => {
+  const text = normalize(`${asset.name} ${asset.code} ${asset.entityType} ${asset.category} ${asset.location} ${asset.areaName}`);
+  return text.includes('predfiltr') || (text.includes('filtr') && text.includes('extruder'));
+};
+
+const extruderNumber = (asset: Asset) => {
+  const text = normalize(`${asset.name} ${asset.code} ${asset.entityType} ${asset.category} ${asset.location} ${asset.areaName}`);
+  const numeric = text.match(/extruder\s*(\d+)/) || text.match(/\bex\s*(\d+)\b/);
+  if (numeric?.[1]) return Number(numeric[1]);
+  if (/\b(extruder|ex)\s*i\b/.test(text)) return 1;
+  if (/\b(extruder|ex)\s*ii\b/.test(text)) return 2;
+  if (/\b(extruder|ex)\s*iii\b/.test(text)) return 3;
+  if (/\b(extruder|ex)\s*iv\b/.test(text)) return 4;
+  return 0;
 };
 
 const getAssetBuilding = (asset: Asset, allAssets: Asset[]) => {
@@ -233,6 +297,7 @@ const getKioskDevicePriority = (
 export default function KioskPage() {
   const navigate = useNavigate();
   const { user, logout, canSeeBuilding } = useAuthContext();
+  const handoverRecipients = useEmployeeNames({ tenantId: user?.tenantId });
 
   const [activeView, setActiveView] = useState<ViewState>('MENU');
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -246,11 +311,13 @@ export default function KioskPage() {
   const [assetSearch, setAssetSearch] = useState('');
   const [selectedBuilding, setSelectedBuilding] = useState('');
   const [selectedAssetId, setSelectedAssetId] = useState('');
+  const [selectedPrefilterTargetIds, setSelectedPrefilterTargetIds] = useState<string[]>([]);
   const [prefilterAllExtruders, setPrefilterAllExtruders] = useState(false);
   const [breakdownFloor, setBreakdownFloor] = useState('');
   const [breakdownRoom, setBreakdownRoom] = useState('');
   const [selectedQuickOption, setSelectedQuickOption] = useState('');
   const [customText, setCustomText] = useState('');
+  const [trustboxCategory, setTrustboxCategory] = useState<TrustboxCategoryId | ''>('');
   const [prefilterDate, setPrefilterDate] = useState(new Date().toISOString().slice(0, 10));
   const [gearboxTemperature, setGearboxTemperature] = useState('');
   const [gearboxMeasuredAt, setGearboxMeasuredAt] = useState(() => new Date().toISOString().slice(0, 16));
@@ -266,11 +333,73 @@ export default function KioskPage() {
   const [prefilterLogs, setPrefilterLogs] = useState<PrefilterLog[]>([]);
   const [handoverText, setHandoverText] = useState('');
   const [handoverPriority, setHandoverPriority] = useState<'normal' | 'important'>('normal');
+  const [handoverShift, setHandoverShift] = useState<'morning' | 'afternoon'>('morning');
+  const [handoverRecipient, setHandoverRecipient] = useState('Všichni');
+  const [handoverRecipientSearch, setHandoverRecipientSearch] = useState('');
+  const [handoverRecipientStats, setHandoverRecipientStats] = useState<Record<string, number>>({});
+
+  const handoverUserKey = user?.uid || user?.id || 'kiosk';
+  const handoverStatsKey = `vikrshield:handoverRecipients:${handoverUserKey}`;
+
+  const normalizedHandoverRecipients = useMemo(
+    () => Array.from(new Set(handoverRecipients.map((name) => name.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'cs')),
+    [handoverRecipients],
+  );
+
+  const recentHandoverRecipients = useMemo(() => {
+    const seen = new Set<string>();
+    return shiftNotes
+      .map((note) => note.recipient || '')
+      .filter((recipient) => recipient && recipient !== 'Všichni')
+      .filter((recipient) => {
+        if (seen.has(recipient)) return false;
+        seen.add(recipient);
+        return true;
+      })
+      .slice(0, 6);
+  }, [shiftNotes]);
+
+  const favoriteHandoverRecipients = useMemo(
+    () =>
+      Object.entries(handoverRecipientStats)
+        .filter(([recipient]) => recipient && recipient !== 'Všichni')
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'cs'))
+        .map(([recipient]) => recipient)
+        .slice(0, 6),
+    [handoverRecipientStats],
+  );
+
+  const quickHandoverRecipients = useMemo(() => {
+    const seen = new Set<string>();
+    return ['Všichni', ...favoriteHandoverRecipients, ...recentHandoverRecipients]
+      .filter((recipient) => {
+        if (seen.has(recipient)) return false;
+        seen.add(recipient);
+        return true;
+      })
+      .slice(0, 8);
+  }, [favoriteHandoverRecipients, recentHandoverRecipients]);
+
+  const filteredHandoverRecipients = useMemo(() => {
+    const allRecipients = ['Všichni', ...normalizedHandoverRecipients];
+    const search = normalize(handoverRecipientSearch);
+    if (!search) return allRecipients.slice(0, 12);
+    return allRecipients.filter((recipient) => normalize(recipient).includes(search)).slice(0, 18);
+  }, [handoverRecipientSearch, normalizedHandoverRecipients]);
 
   useEffect(() => {
     const interval = window.setInterval(() => setCurrentTime(new Date()), 1000);
     return () => window.clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(handoverStatsKey);
+      setHandoverRecipientStats(stored ? JSON.parse(stored) : {});
+    } catch {
+      setHandoverRecipientStats({});
+    }
+  }, [handoverStatsKey]);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(
@@ -294,10 +423,15 @@ export default function KioskPage() {
             const createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : new Date();
             return {
               id: document.id,
+              authorId: data.authorId,
               author: data.author || 'Kiosk',
               text: data.text || '',
               time: createdAt.toLocaleString('cs-CZ', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' }),
               priority: data.priority || 'normal',
+              shift: data.shift || 'morning',
+              recipient: data.recipient || 'Všichni',
+              acknowledgedBy: data.acknowledgedBy || {},
+              acknowledgedByName: data.acknowledgedByName || {},
             };
           })
         );
@@ -351,7 +485,38 @@ export default function KioskPage() {
     const installed = gearboxAssets.filter((asset) => Boolean(asset.currentExtruderId || asset.currentExtruderName || asset.gearboxStatus === 'installed'));
     return installed.length ? installed : gearboxAssets;
   }, [gearboxAssets]);
-  const extruderAssets = useMemo(() => equipmentAssets.filter((asset) => isExtruderAsset(asset)), [equipmentAssets]);
+  const prefilterMachines = useMemo(() => equipmentAssets.filter((asset) => isPrefilterExtruderAsset(asset) && !isPrefilterAsset(asset)), [equipmentAssets]);
+  const extruderAssets = useMemo(() => equipmentAssets.filter(isPrefilterAsset), [equipmentAssets]);
+
+  const prefilterGroups = useMemo(() => {
+    type PrefilterGroup = { number: number; extruder?: Asset; prefilters: Asset[] };
+    const byNumber = new Map<number, PrefilterGroup>();
+    const ensure = (number: number) => {
+      const key = number || 99;
+      const existing = byNumber.get(key);
+      if (existing) return existing;
+      const created: PrefilterGroup = { number: key, prefilters: [] };
+      byNumber.set(key, created);
+      return created;
+    };
+
+    for (const extruder of prefilterMachines) {
+      const group = ensure(extruderNumber(extruder));
+      if (!group.extruder) group.extruder = extruder;
+    }
+
+    for (const prefilter of extruderAssets) {
+      ensure(extruderNumber(prefilter)).prefilters.push(prefilter);
+    }
+
+    return [...byNumber.values()]
+      .map((group) => ({
+        ...group,
+        prefilters: group.prefilters.sort((a, b) => assetLabel(a, assets).localeCompare(assetLabel(b, assets), 'cs')),
+      }))
+      .filter((group) => group.prefilters.length > 0)
+      .sort((a, b) => a.number - b.number);
+  }, [assets, extruderAssets, prefilterMachines]);
 
   const latestPrefilterByAsset = useMemo(() => {
     const map = new Map<string, PrefilterLog>();
@@ -447,16 +612,24 @@ export default function KioskPage() {
       .slice(0, 30);
   }, [assetSearch, assets, equipmentAssets, selectedBuilding]);
 
-  const filteredExtruderAssets = useMemo(() => {
+  const filteredPrefilterGroups = useMemo(() => {
     const queryText = normalize(assetSearch);
-    return extruderAssets
-      .filter((asset) => !selectedBuilding || getAssetBuilding(asset, assets) === selectedBuilding)
-      .filter((asset) => {
+    return prefilterGroups
+      .filter((group) => group.number >= 1 && group.number <= 4)
+      .map((group) => ({
+        ...group,
+        prefilters: group.prefilters.filter((asset) => {
+          if (!queryText) return true;
+          return normalize(`${assetLabel(asset, assets)} Extruder ${group.number}`).includes(queryText);
+        }),
+      }))
+      .filter((group) => {
+        if (group.prefilters.length === 0) return false;
         if (!queryText) return true;
-        return normalize(assetLabel(asset, assets)).includes(queryText);
+        return normalize(`extruder ${group.number}`).includes(queryText) || group.prefilters.length > 0;
       })
-      .slice(0, 40);
-  }, [assetSearch, assets, extruderAssets, selectedBuilding]);
+      .slice(0, 8);
+  }, [assetSearch, assets, prefilterGroups]);
 
   const breakdownAssets = useMemo(() => {
     const queryText = normalize(assetSearch);
@@ -502,14 +675,23 @@ export default function KioskPage() {
     [equipmentAssets, selectedAssetId]
   );
 
+  const selectedPrefilterTargets = useMemo(
+    () => selectedPrefilterTargetIds
+      .map((id) => extruderAssets.find((asset) => asset.id === id))
+      .filter((asset): asset is Asset => Boolean(asset)),
+    [extruderAssets, selectedPrefilterTargetIds]
+  );
+
   const resetForm = () => {
     setAssetSearch('');
     setSelectedAssetId('');
+    setSelectedPrefilterTargetIds([]);
     setPrefilterAllExtruders(false);
     setBreakdownFloor('');
     setBreakdownRoom('');
     setSelectedQuickOption('');
     setCustomText('');
+    setTrustboxCategory('');
     setPrefilterDate(new Date().toISOString().slice(0, 10));
     setGearboxTemperature('');
     setGearboxMeasuredAt(new Date().toISOString().slice(0, 16));
@@ -603,8 +785,8 @@ export default function KioskPage() {
     }
   };
 
-  const handlePrefilterSubmit = async () => {
-    const targets = prefilterAllExtruders ? extruderAssets : selectedAsset ? [selectedAsset] : [];
+  const handlePrefilterSubmit = async (explicitTargets?: Asset[]) => {
+    const targets = explicitTargets || (prefilterAllExtruders ? extruderAssets : selectedPrefilterTargets);
     if (isSubmitting || targets.length === 0) return;
     setIsSubmitting(true);
     setSubmitError('');
@@ -648,7 +830,13 @@ export default function KioskPage() {
           auditReady: true,
         });
       }));
-      showSuccessAndReset(prefilterAllExtruders ? `Výměna zapsána pro ${targets.length} extruderů` : 'Výměna zaznamenána');
+      setSelectedPrefilterTargetIds([]);
+      setPrefilterAllExtruders(false);
+      setPrefilterDate(new Date().toISOString().slice(0, 10));
+      setSuccessMessage(targets.length > 1 ? `Výměna zapsána pro ${targets.length} předfiltrů` : 'Výměna zaznamenána');
+      setShowSuccess(true);
+      setIsSubmitting(false);
+      window.setTimeout(() => setShowSuccess(false), 2500);
     } catch (err) {
       console.error('Kiosk prefilter error:', err);
       setSubmitError('Záznam se nepodařilo uložit.');
@@ -752,14 +940,14 @@ export default function KioskPage() {
     }
   };
 
-  const handleMessageSubmit = async (message: string) => {
-    if (isSubmitting || !message.trim()) return;
+  const handleMessageSubmit = async (message: string, category: TrustboxCategoryId | '') => {
+    if (isSubmitting || !message.trim() || !category) return;
     setIsSubmitting(true);
     setSubmitError('');
     try {
       await addDoc(collection(db, 'trustbox'), {
         message: message.trim(),
-        category: 'other',
+        category,
         status: 'new',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -772,21 +960,56 @@ export default function KioskPage() {
     }
   };
 
+  const selectHandoverRecipient = (recipient: string) => {
+    setHandoverRecipient(recipient);
+    setHandoverRecipientSearch('');
+  };
+
+  const rememberHandoverRecipient = (recipient: string) => {
+    if (!recipient || recipient === 'Všichni') return;
+    setHandoverRecipientStats((current) => {
+      const next = { ...current, [recipient]: (current[recipient] || 0) + 1 };
+      try {
+        window.localStorage.setItem(handoverStatsKey, JSON.stringify(next));
+      } catch {
+        // Local preference is optional; saving the note must not depend on it.
+      }
+      return next;
+    });
+  };
+
   const handleHandoverSubmit = async () => {
     if (isSubmitting || !handoverText.trim()) return;
+    const authorId = user?.uid || user?.id;
+    if (!authorId) {
+      setSubmitError('Nejde určit přihlášeného uživatele. Přihlaste terminál znovu.');
+      return;
+    }
     setIsSubmitting(true);
     setSubmitError('');
     try {
       await addDoc(collection(db, 'shiftNotes'), {
         text: handoverText.trim(),
+        authorId,
         author: user?.displayName || 'Kiosk',
         priority: handoverPriority,
+        shift: handoverShift,
+        recipient: handoverRecipient,
+        acknowledgedBy: {},
+        acknowledgedByName: {},
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
+      rememberHandoverRecipient(handoverRecipient);
       setHandoverText('');
       setHandoverPriority('normal');
-      showSuccessAndReset('Poznámka přidána');
+      setHandoverShift('morning');
+      setHandoverRecipient('Všichni');
+      setHandoverRecipientSearch('');
+      setSuccessMessage('Poznámka přidána');
+      setShowSuccess(true);
+      setIsSubmitting(false);
+      window.setTimeout(() => setShowSuccess(false), 2500);
     } catch (err) {
       console.error('Handover error:', err);
       setSubmitError('Poznámku se nepodařilo uložit.');
@@ -794,10 +1017,38 @@ export default function KioskPage() {
     }
   };
 
+  const handleHandoverAcknowledge = async (note: ShiftNote) => {
+    const userId = user?.uid || user?.id;
+    if (!userId) return;
+    try {
+      await updateDoc(doc(db, 'shiftNotes', note.id), {
+        [`acknowledgedBy.${userId}`]: true,
+        [`acknowledgedByName.${userId}`]: user?.displayName || 'Kiosk',
+        updatedAt: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error('Handover acknowledge error:', err);
+      setSubmitError('Potvrzení přečtení se nepodařilo uložit.');
+    }
+  };
+
+  const handleHandoverDelete = async (note: ShiftNote) => {
+    if (!window.confirm('Smazat tento zápis z předání směny?')) return;
+    try {
+      await deleteDoc(doc(db, 'shiftNotes', note.id));
+    } catch (err) {
+      console.error('Handover delete error:', err);
+      setSubmitError('Zápis se nepodařilo smazat.');
+    }
+  };
+
   const handleCancel = () => {
     resetForm();
     setHandoverText('');
     setHandoverPriority('normal');
+    setHandoverShift('morning');
+    setHandoverRecipient('Všichni');
+    setHandoverRecipientSearch('');
     setActiveView('MENU');
   };
 
@@ -1019,126 +1270,90 @@ export default function KioskPage() {
   );
 
   const renderPrefilterPicker = () => (
-    <div className="space-y-4">
-      <h3 className="text-xl text-slate-200 font-bold">1. Vyber extruder</h3>
-      <button
-        type="button"
-        onClick={() => {
-          setPrefilterAllExtruders(true);
-          setSelectedAssetId('');
-          setAssetSearch('');
-        }}
-        className={`w-full min-h-20 rounded-2xl border p-4 text-left transition active:scale-[0.99] ${
-          prefilterAllExtruders
-            ? 'bg-cyan-700 border-cyan-300 text-white'
-            : 'bg-cyan-950/40 border-cyan-500/30 text-cyan-100'
-        }`}
-      >
-        <div className="text-xl font-black">Všechny extrudery</div>
-        <div className="text-sm opacity-80">
-          Zapíše výměnu předfiltru ke každému extruderu s přiřazeným předfiltrem.
-          {prefilterAlerts.overdue.length > 0 && ` Chybí u ${prefilterAlerts.overdue.length} předfiltrů.`}
+    <div className="space-y-3">
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <h3 className="text-xl text-slate-100 font-black leading-tight">Předfiltry nad extrudery</h3>
+          <p className="mt-1 text-sm font-bold text-slate-300">Vyber extruder a potvrď výměnu jeho předfiltrů.</p>
         </div>
-      </button>
+        <span className="shrink-0 rounded-xl bg-cyan-500/15 px-3 py-2 text-sm font-black text-cyan-100">
+          {prefilterAlerts.overdue.length + prefilterAlerts.warning.length} čeká
+        </span>
+      </div>
 
-      {prefilterAllExtruders && (
-        <div className="flex items-center justify-between gap-3 bg-cyan-500/10 border border-cyan-400/30 rounded-2xl p-4">
-          <div>
-            <div className="text-white font-bold text-lg">Vybráno: všechny extrudery</div>
-            <div className="text-sm text-cyan-100/80">{extruderAssets.length} extruderů</div>
+      <label className="relative block">
+        <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+        <input
+          value={assetSearch}
+          onChange={(event) => setAssetSearch(event.target.value)}
+          placeholder="Hledat extruder..."
+          className="min-h-12 w-full rounded-2xl border border-white/10 bg-slate-950 py-3 pl-11 pr-3 text-base font-semibold text-white outline-none focus:border-cyan-400"
+        />
+      </label>
+
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        {filteredPrefilterGroups.length === 0 ? (
+          <div className="rounded-2xl border border-white/10 bg-slate-900 p-5 text-center text-base font-bold text-slate-400">
+            V kartotéce se nenašel žádný předfiltr extruderu.
           </div>
-          <button onClick={() => setPrefilterAllExtruders(false)} className="min-h-12 min-w-12 flex items-center justify-center p-2 rounded-xl bg-white/10 text-white">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-      )}
+        ) : (
+          filteredPrefilterGroups.map((group) => {
+            const groupStatuses = group.prefilters.map((asset) => getPrefilterStatus(asset));
+            const overdueCount = groupStatuses.filter((status) => status.state === 'overdue').length;
+            const warningCount = groupStatuses.filter((status) => status.state === 'warning').length;
+            const isOverdue = overdueCount > 0;
+            const isWarning = !isOverdue && warningCount > 0;
+            const tone = isOverdue
+              ? 'border-red-400/50 bg-red-600/15'
+              : isWarning
+                ? 'border-amber-400/45 bg-amber-500/12'
+                : 'border-emerald-400/30 bg-emerald-500/10';
+            const statusText = isOverdue
+              ? `${overdueCount} chybí`
+              : isWarning
+                ? `${warningCount} brzy`
+                : 'V pořádku';
 
-      {!prefilterAllExtruders && (
-        <>
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            <button
-              onClick={() => setSelectedBuilding('')}
-              className={`px-4 py-3 rounded-xl text-base font-bold whitespace-nowrap border ${!selectedBuilding ? 'bg-blue-600 text-white border-blue-400' : 'bg-slate-900 text-slate-300 border-white/10'}`}
-            >
-              Vše
-            </button>
-            {buildings.map((building) => (
-              <button
-                key={building}
-                onClick={() => setSelectedBuilding(building)}
-                className={`px-4 py-3 rounded-xl text-base font-bold whitespace-nowrap border ${selectedBuilding === building ? 'bg-blue-600 text-white border-blue-400' : 'bg-slate-900 text-slate-300 border-white/10'}`}
-              >
-                Budova {building}
-              </button>
-            ))}
-          </div>
+            return (
+              <div key={group.number} className={`rounded-2xl border p-3 ${tone}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-lg font-black leading-tight text-white">Extruder {group.number}</div>
+                    <div className="mt-1 text-sm font-bold text-slate-200">{group.prefilters.length} předfiltrů</div>
+                  </div>
+                  <span className={`shrink-0 rounded-xl px-2.5 py-1 text-xs font-black ${isOverdue ? 'bg-red-500/25 text-red-100' : isWarning ? 'bg-amber-500/20 text-amber-100' : 'bg-emerald-500/20 text-emerald-100'}`}>
+                    {statusText}
+                  </span>
+                </div>
 
-          <label className="relative block">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
-            <input
-              value={assetSearch}
-              onChange={(event) => {
-                setAssetSearch(event.target.value);
-                setSelectedAssetId('');
-              }}
-              placeholder="Hledat extruder nebo kód..."
-              className="w-full bg-slate-950 border border-white/10 text-white text-lg rounded-2xl py-4 pl-12 pr-4 outline-none focus:border-cyan-400"
-            />
-          </label>
-
-          {selectedAsset ? (
-            <div className="flex items-center justify-between gap-3 bg-emerald-500/10 border border-emerald-400/30 rounded-2xl p-4">
-              <div>
-                <div className="text-white font-bold text-lg">{selectedAsset.name}</div>
-                <div className="text-sm text-emerald-100/80">{assetLabel(selectedAsset, assets)}</div>
-                <div className="mt-2 text-sm font-black text-cyan-100">{getPrefilterStatus(selectedAsset).label}</div>
-              </div>
-              <button onClick={() => setSelectedAssetId('')} className="min-h-12 min-w-12 flex items-center justify-center p-2 rounded-xl bg-white/10 text-white">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[45vh] overflow-y-auto pr-1">
-              {filteredExtruderAssets.length === 0 ? (
-                <div className="col-span-full text-center text-slate-400 py-8 text-lg">V kartotéce se nenašel žádný extruder s předfiltrem.</div>
-              ) : (
-                filteredExtruderAssets.map((asset) => {
-                  const status = getPrefilterStatus(asset);
-                  const isOverdue = status.state === 'overdue';
-                  const isWarning = status.state === 'warning';
-                  return (
-                    <button
-                      key={asset.id}
-                      onClick={() => {
-                        setSelectedAssetId(asset.id);
-                        setAssetSearch('');
-                      }}
-                      className={`text-left active:scale-[0.99] border rounded-2xl p-4 transition min-h-[96px] ${
-                        isOverdue
-                          ? 'bg-red-600/20 hover:bg-red-600/30 border-red-400/50'
-                          : isWarning
-                            ? 'bg-amber-500/15 hover:bg-amber-500/25 border-amber-400/40'
-                            : 'bg-slate-900 hover:bg-slate-700 border-white/10'
-                      }`}
-                    >
-                      <div className="flex items-start gap-2">
-                        {(isOverdue || isWarning) && <AlertTriangle className={`mt-1 h-5 w-5 shrink-0 ${isOverdue ? 'text-red-200' : 'text-amber-200'}`} />}
-                        <div className="min-w-0">
-                          <div className="text-white text-lg font-black leading-snug break-words">{asset.name}</div>
-                          <div className="text-sm text-slate-300 mt-1 leading-snug break-words">{assetLabel(asset, assets)}</div>
-                          <div className={`mt-2 text-sm font-black ${isOverdue ? 'text-red-100' : isWarning ? 'text-amber-100' : 'text-emerald-100'}`}>
-                            {status.label}
-                          </div>
-                        </div>
+                <div className="mt-3 grid gap-2">
+                  {group.prefilters.map((asset) => {
+                    const status = getPrefilterStatus(asset);
+                    return (
+                      <div key={asset.id} className="flex min-h-10 items-center justify-between gap-2 rounded-xl bg-slate-950/55 px-3">
+                        <span className="min-w-0 truncate text-sm font-black text-white">{asset.name.replace(/^Předfiltr\s*/i, '')}</span>
+                        <span className={`shrink-0 text-xs font-black ${status.state === 'overdue' ? 'text-red-100' : status.state === 'warning' ? 'text-amber-100' : 'text-emerald-100'}`}>
+                          {status.label}
+                        </span>
                       </div>
-                    </button>
-                  );
-                })
-              )}
-            </div>
-          )}
-        </>
-      )}
+                    );
+                  })}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => void handlePrefilterSubmit(group.prefilters)}
+                  disabled={isSubmitting}
+                  className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-cyan-700 px-3 text-base font-black text-white active:scale-[0.98] disabled:opacity-50"
+                >
+                  <CheckCircle2 className="h-5 w-5" />
+                  Potvrdit výměnu
+                </button>
+              </div>
+            );
+          })
+        )}
+      </div>
     </div>
   );
 
@@ -1176,29 +1391,51 @@ export default function KioskPage() {
             const dailyStatus = getGearboxDailyTemperatureStatus(asset);
             const missing = dailyStatus.state !== 'ok';
             return (
-              <button
+              <div
                 key={asset.id}
-                onClick={() => {
-                  setSelectedAssetId(asset.id);
-                  setAssetSearch('');
-                }}
-                className={`text-left active:scale-[0.99] border rounded-2xl p-4 transition min-h-[98px] ${
+                className={`border rounded-2xl p-4 transition min-h-[98px] ${
                   missing
-                    ? 'bg-violet-600/20 hover:bg-violet-600/30 border-violet-300/50'
-                    : 'bg-slate-900 hover:bg-slate-700 border-white/10'
+                    ? 'bg-violet-600/20 border-violet-300/50'
+                    : 'bg-slate-900 border-white/10'
                 }`}
               >
-                <div className="flex items-start gap-2">
-                  {missing && <AlertTriangle className="mt-1 h-5 w-5 shrink-0 text-violet-100" />}
-                  <div className="min-w-0">
-                    <div className="text-white text-lg font-black leading-snug break-words">{asset.name}</div>
-                    <div className="text-sm text-slate-300 mt-1 leading-snug break-words">{asset.currentExtruderName || assetLabel(asset, assets)}</div>
-                    <div className={`mt-2 text-sm font-black ${missing ? 'text-violet-100' : 'text-emerald-100'}`}>
-                      {dailyStatus.label}
+                <div className="flex items-start justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedAssetId(asset.id);
+                      setAssetSearch('');
+                    }}
+                    className="min-w-0 flex-1 text-left active:scale-[0.99]"
+                  >
+                    <div className="flex min-w-0 items-start gap-2">
+                      {missing && <AlertTriangle className="mt-1 h-5 w-5 shrink-0 text-violet-100" />}
+                      <div className="min-w-0">
+                        <div className="text-white text-lg font-black leading-snug break-words">{asset.name}</div>
+                        <div className="text-sm text-slate-300 mt-1 leading-snug break-words">{asset.currentExtruderName || assetLabel(asset, assets)}</div>
+                        <div className={`mt-2 text-sm font-black ${missing ? 'text-violet-100' : 'text-emerald-100'}`}>
+                          {dailyStatus.label}
+                        </div>
+                      </div>
                     </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedAssetId(asset.id);
+                      setAssetSearch('');
+                      setGearboxProblemOpen(true);
+                      setGearboxProblemOption('');
+                      setGearboxProblemPriority('P2');
+                      setGearboxProblemNote('');
+                      setSubmitError('');
+                    }}
+                    className="shrink-0 rounded-xl border border-red-400/60 bg-red-500/20 px-3 py-2 text-xs font-black text-red-100 active:scale-[0.98]"
+                  >
+                    Problém
+                  </button>
                   </div>
-                </div>
-              </button>
+              </div>
             );
           })}
         {activeGearboxAssets.length === 0 && (
@@ -1222,7 +1459,7 @@ export default function KioskPage() {
           <MenuButton icon={<Thermometer className="w-12 h-12" />} label="Teplota převodovky" color="bg-violet-700 hover:bg-violet-600" badge={gearboxTemperatureAlerts.missing.length} onClick={() => setActiveView('GEARBOX_TEMP')} />
           <MenuButton icon={<Lightbulb className="w-12 h-12" />} label="Nápad" color="bg-emerald-700 hover:bg-emerald-600" onClick={() => setActiveView('IDEA')} />
           <MenuButton icon={<HelpCircle className="w-12 h-12" />} label="Jak postupovat" color="bg-amber-700 hover:bg-amber-600" onClick={() => setActiveView('ASSISTANT')} />
-          <MenuButton icon={<ShieldCheck className="w-12 h-12" />} label="Zpráva vedení" color="bg-purple-700 hover:bg-purple-600" onClick={() => setActiveView('MESSAGE')} />
+          <MenuButton icon={<ShieldCheck className="w-12 h-12" />} label="Schránka důvěry" color="bg-purple-700 hover:bg-purple-600" onClick={() => setActiveView('MESSAGE')} />
         </div>
       </div>
       <section className="rounded-2xl border border-white/10 bg-slate-900/55 p-2">
@@ -1379,25 +1616,7 @@ export default function KioskPage() {
   const renderPrefilter = () => (
     <FormWrapper title="Výměna předfiltru" onCancel={handleCancel}>
       {renderError()}
-      {!selectedAsset && !prefilterAllExtruders && renderPrefilterPicker()}
-      {(selectedAsset || prefilterAllExtruders) && (
-        <div className="space-y-5">
-          {renderPrefilterPicker()}
-          <label className="block">
-            <span className="block text-slate-200 text-base font-black mb-2">Datum výměny</span>
-            <input
-              type="date"
-              value={prefilterDate}
-              onChange={(event) => setPrefilterDate(event.target.value)}
-              className="w-full bg-slate-950 text-white text-xl p-4 rounded-2xl border border-white/10"
-            />
-          </label>
-          <button onClick={() => void handlePrefilterSubmit()} disabled={isSubmitting} className="w-full bg-cyan-700 hover:bg-cyan-600 disabled:opacity-50 text-white py-5 rounded-2xl text-xl font-bold flex items-center justify-center gap-3">
-            <CheckCircle2 className="w-6 h-6" />
-            Potvrdit výměnu
-          </button>
-        </div>
-      )}
+      {renderPrefilterPicker()}
     </FormWrapper>
   );
 
@@ -1409,20 +1628,31 @@ export default function KioskPage() {
         const temperature = currentGearboxTemperature();
         const status = temperatureStatus(selectedAsset, temperature);
         return (
-        <div className="space-y-5">
-          <div className="bg-violet-500/10 border border-violet-400/30 rounded-2xl p-4">
-            <div className="text-white text-xl font-bold">{selectedAsset.name}</div>
-            <div className="text-sm text-violet-100/80 mt-1">{selectedAsset.currentExtruderName || assetLabel(selectedAsset, assets)}</div>
-            <button onClick={() => setSelectedAssetId('')} className="mt-3 text-sm text-violet-200 underline">Vybrat jinou převodovku</button>
+        <div className="space-y-2">
+          <div className="rounded-xl border border-violet-400/30 bg-violet-500/10 p-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <div className="truncate text-base font-black leading-tight text-white">{selectedAsset.name}</div>
+                <div className="mt-0.5 truncate text-xs font-bold text-violet-100/80">{selectedAsset.currentExtruderName || assetLabel(selectedAsset, assets)}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setGearboxProblemOpen(true)}
+                className="min-h-9 shrink-0 rounded-lg border border-red-400/50 bg-red-500/15 px-3 text-xs font-black text-red-100 active:scale-[0.98]"
+              >
+                Problém
+              </button>
+            </div>
+            <button onClick={() => setSelectedAssetId('')} className="mt-1 text-xs font-bold text-violet-200 underline">Vybrat jinou převodovku</button>
           </div>
 
-          <div className={`rounded-3xl border ${status.border} ${status.bg} p-4`}>
+          <div className={`rounded-xl border ${status.border} ${status.bg} p-2.5`}>
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="text-sm font-bold text-slate-300">Teplota</div>
-                <div className="text-6xl font-black text-white leading-none">{temperature}<span className="text-3xl"> °C</span></div>
+                <div className="text-xs font-bold text-slate-300">Teplota</div>
+                <div className="text-4xl font-black leading-none text-white">{temperature}<span className="text-xl"> °C</span></div>
               </div>
-              <div className={`rounded-2xl border ${status.border} px-3 py-2 text-sm font-black ${status.color}`}>{status.label}</div>
+              <div className={`rounded-xl border ${status.border} px-3 py-1.5 text-xs font-black ${status.color}`}>{status.label}</div>
             </div>
             <input
               type="range"
@@ -1431,27 +1661,27 @@ export default function KioskPage() {
               step={1}
               value={temperature}
               onChange={(event) => setTemperatureValue(Number(event.target.value))}
-              className="mt-5 w-full accent-violet-500"
+              className="mt-2 w-full accent-violet-500"
             />
-            <div className="mt-3 grid grid-cols-4 gap-2">
+            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
               {[-5, -1, 1, 5].map((delta) => (
                 <button
                   key={delta}
                   type="button"
                   onClick={() => setTemperatureValue(temperature + delta)}
-                  className="min-h-12 rounded-xl border border-white/10 bg-slate-950/60 text-lg font-black text-white active:scale-[0.98]"
+                  className="min-h-10 rounded-lg border border-white/10 bg-slate-950/60 text-lg font-black text-white active:scale-[0.98]"
                 >
                   {delta > 0 ? `+${delta}` : delta}
                 </button>
               ))}
             </div>
-            <div className="mt-2 grid grid-cols-4 gap-2">
+            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
               {[50, 60, 70, 80].map((preset) => (
                 <button
                   key={preset}
                   type="button"
                   onClick={() => setTemperatureValue(preset)}
-                  className="min-h-12 rounded-xl border border-white/10 bg-white/5 text-sm font-bold text-slate-200 active:scale-[0.98]"
+                  className="min-h-10 rounded-lg border border-white/10 bg-white/5 text-sm font-bold text-slate-200 active:scale-[0.98]"
                 >
                   {preset} °C
                 </button>
@@ -1460,21 +1690,21 @@ export default function KioskPage() {
           </div>
 
           <label className="block">
-            <span className="block text-slate-200 text-base font-black mb-2">Datum a čas měření</span>
+            <span className="mb-1 block text-xs font-black text-slate-200">Datum a čas měření</span>
             <input
               type="datetime-local"
               value={gearboxMeasuredAt}
               onChange={(event) => setGearboxMeasuredAt(event.target.value)}
-              className="w-full bg-slate-950 text-white text-lg p-4 rounded-2xl border border-white/10"
+              className="w-full rounded-xl border border-white/10 bg-slate-950 p-2.5 text-base text-white"
             />
           </label>
           <label className="block">
-            <span className="block text-slate-200 text-base font-black mb-2">Poznámka</span>
+            <span className="mb-1 block text-xs font-black text-slate-200">Poznámka</span>
             <textarea
               value={gearboxNote}
               onChange={(event) => setGearboxNote(event.target.value)}
               placeholder="Volitelně: zvuk, únik oleje, vibrace..."
-              className="w-full h-28 bg-slate-950 text-white text-lg p-4 rounded-2xl border border-white/10 outline-none focus:border-violet-400 resize-none"
+              className="h-16 w-full resize-none rounded-xl border border-white/10 bg-slate-950 p-2.5 text-base text-white outline-none focus:border-violet-400"
             />
           </label>
           <div>
@@ -1489,7 +1719,7 @@ export default function KioskPage() {
             <button
               type="button"
               onClick={() => gearboxPhotoInputRef.current?.click()}
-              className="w-full border border-dashed border-white/20 text-slate-200 py-4 rounded-2xl font-bold flex items-center justify-center gap-3"
+              className="flex w-full items-center justify-center gap-3 rounded-xl border border-dashed border-white/20 py-2.5 font-bold text-slate-200"
             >
               <Camera className="w-5 h-5" />
               {gearboxPhotoFile ? gearboxPhotoFile.name : 'Přidat fotku'}
@@ -1498,18 +1728,18 @@ export default function KioskPage() {
           <button
             onClick={() => void handleGearboxTemperatureSubmit()}
             disabled={!gearboxMeasuredAt || isSubmitting}
-            className="w-full bg-violet-700 hover:bg-violet-600 disabled:opacity-50 text-white py-5 rounded-2xl text-xl font-bold flex items-center justify-center gap-3"
+            className="flex w-full items-center justify-center gap-3 rounded-xl bg-violet-700 py-3 text-base font-bold text-white hover:bg-violet-600 disabled:opacity-50"
           >
             <Thermometer className="w-6 h-6" />
             Zapsat teplotu
           </button>
 
-          <div className="border-t border-white/10 pt-4">
+          <div className="border-t border-white/10 pt-2">
             {!gearboxProblemOpen ? (
               <button
                 type="button"
                 onClick={() => setGearboxProblemOpen(true)}
-                className="w-full border border-red-400/40 bg-red-500/10 text-red-100 py-4 rounded-2xl font-bold flex items-center justify-center gap-3 active:scale-[0.98]"
+                className="flex w-full items-center justify-center gap-3 rounded-xl border border-red-400/40 bg-red-500/10 py-3 font-bold text-red-100 active:scale-[0.98]"
               >
                 <AlertTriangle className="w-5 h-5" />
                 Nahlásit problém
@@ -1603,13 +1833,65 @@ export default function KioskPage() {
   );
 
   const renderMessage = () => (
-    <FormWrapper title="Zpráva vedení" onCancel={handleCancel}>
+    <FormWrapper title="Schránka důvěry" onCancel={handleCancel}>
       {renderError()}
-      <p className="text-slate-300 text-center mb-4 text-base leading-snug">Zpráva se uloží bez jména operátora.</p>
-      <textarea value={customText} onChange={(event) => setCustomText(event.target.value)} placeholder="Vaše zpráva..." autoFocus className="w-full h-48 bg-slate-950 text-white text-xl p-4 rounded-2xl border-2 border-white/10 focus:border-purple-400 outline-none resize-none mb-4" />
-      <button onClick={() => void handleMessageSubmit(customText)} disabled={!customText.trim() || isSubmitting} className="w-full bg-purple-700 hover:bg-purple-600 disabled:opacity-50 text-white py-5 rounded-2xl text-xl font-bold flex items-center justify-center gap-3">
-        <ShieldCheck className="w-6 h-6" />
-        Odeslat zprávu
+      <div className="mb-5 text-center">
+        <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-500/20 text-purple-200">
+          <ShieldCheck className="h-8 w-8" />
+        </div>
+        <p className="text-base font-semibold text-slate-200">Anonymní prostor pro obavy, problémy nebo nápady.</p>
+        <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-bold text-emerald-200">
+          <Lock className="h-4 w-4" />
+          100% anonymní
+        </div>
+      </div>
+
+      <div className="mb-5">
+        <div className="mb-3 text-sm font-black uppercase tracking-wide text-slate-300">O čem chcete napsat?</div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {TRUSTBOX_CATEGORIES.map((category) => {
+            const Icon = category.icon;
+            const selected = trustboxCategory === category.id;
+            return (
+              <button
+                key={category.id}
+                type="button"
+                onClick={() => setTrustboxCategory(category.id)}
+                className={`min-h-24 rounded-2xl border-2 p-4 text-left transition ${
+                  selected
+                    ? 'border-purple-300 bg-purple-500/20 text-white'
+                    : 'border-white/10 bg-slate-900 text-slate-200 hover:border-purple-300/60'
+                }`}
+              >
+                <Icon className={`mb-3 h-6 w-6 ${selected ? 'text-purple-100' : 'text-slate-400'}`} />
+                <div className="text-lg font-black">{category.label}</div>
+                <div className="mt-1 text-sm font-semibold text-slate-400">{category.description}</div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <textarea
+        value={customText}
+        onChange={(event) => setCustomText(event.target.value)}
+        placeholder="Napište zprávu..."
+        className="mb-3 h-40 w-full resize-none rounded-2xl border-2 border-white/10 bg-slate-950 p-4 text-lg text-white outline-none placeholder:text-slate-500 focus:border-purple-400"
+      />
+      <div className="mb-5 rounded-2xl border border-white/10 bg-slate-900/80 p-4 text-sm font-semibold text-slate-300">
+        <div className="mb-1 flex items-center gap-2 font-black text-slate-100">
+          <Heart className="h-4 w-4 text-pink-300" />
+          Vaše bezpečí je prioritou.
+        </div>
+        Zpráva se uloží bez jména operátora. Přečtou ji pouze oprávněné osoby.
+      </div>
+      <button
+        onClick={() => void handleMessageSubmit(customText, trustboxCategory)}
+        disabled={!trustboxCategory || !customText.trim() || isSubmitting}
+        className="flex min-h-14 w-full items-center justify-center gap-3 rounded-2xl bg-purple-700 px-4 py-4 text-xl font-bold text-white hover:bg-purple-600 disabled:opacity-50"
+      >
+        <Send className="h-6 w-6" />
+        Odeslat anonymně
       </button>
     </FormWrapper>
   );
@@ -1637,29 +1919,120 @@ export default function KioskPage() {
   const renderHandover = () => (
     <FormWrapper title="Předání směny" onCancel={handleCancel}>
       {renderError()}
-      <div className="space-y-3 mb-4 max-h-[38vh] overflow-y-auto">
+      <div className="mb-3 grid max-h-[34vh] grid-cols-1 gap-2 overflow-y-auto md:grid-cols-2">
         {shiftNotes.length === 0 ? (
           <div className="text-center text-slate-400 py-8 text-lg">Zatím žádné poznámky</div>
         ) : (
-          shiftNotes.map((note) => (
-            <div key={note.id} className={`rounded-xl p-4 border ${note.priority === 'important' ? 'bg-red-950/40 border-red-500/30' : 'bg-slate-900 border-white/10'}`}>
-              <div className="flex items-center justify-between mb-1 gap-3">
+          shiftNotes.map((note) => {
+            const currentUserId = user?.uid || user?.id || '';
+            const acknowledged = Boolean(currentUserId && note.acknowledgedBy?.[currentUserId]);
+            const canDeleteNote = Boolean(currentUserId);
+            return (
+            <div key={note.id} className={`rounded-xl p-3 border ${note.priority === 'important' ? 'bg-red-950/40 border-red-500/30' : 'bg-slate-900 border-white/10'}`}>
+              <div className="flex items-center justify-between gap-3">
                 <span className="text-sm font-bold text-white">{note.author}</span>
                 <span className="text-sm text-slate-300">{note.time}</span>
               </div>
-              <p className="text-lg text-slate-300">{note.text}</p>
-              {note.priority === 'important' && <span className="inline-block mt-2 text-xs bg-red-500/20 text-red-200 px-2 py-1 rounded-full font-bold">Důležité</span>}
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                <span className="rounded-full bg-indigo-500/15 px-2 py-1 text-xs font-bold text-indigo-100">
+                  Pro: {note.recipient || 'Všichni'}
+                </span>
+                <span className="rounded-full bg-sky-500/15 px-2 py-1 text-xs font-bold text-sky-100">
+                  {note.shift === 'afternoon' ? 'Odpolední směna' : 'Ranní směna'}
+                </span>
+                {note.priority === 'important' && <span className="rounded-full bg-red-500/20 px-2 py-1 text-xs font-bold text-red-200">Důležité</span>}
+                {acknowledged && <span className="rounded-full bg-emerald-500/20 px-2 py-1 text-xs font-bold text-emerald-100">Přečteno</span>}
+              </div>
+              <p className="mt-2 text-base text-slate-200">{note.text}</p>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => void handleHandoverAcknowledge(note)}
+                  disabled={acknowledged}
+                  className="min-h-10 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-2 text-sm font-black text-emerald-100 disabled:opacity-60"
+                >
+                  <CheckCircle2 className="mr-2 inline h-4 w-4" />
+                  {acknowledged ? 'Přečteno' : 'Potvrdit'}
+                </button>
+                {canDeleteNote ? (
+                  <button
+                    type="button"
+                    onClick={() => void handleHandoverDelete(note)}
+                    className="min-h-10 rounded-xl border border-red-400/30 bg-red-500/10 px-2 text-sm font-black text-red-100"
+                  >
+                    <Trash2 className="mr-2 inline h-4 w-4" />
+                    Smazat
+                  </button>
+                ) : (
+                  <div className="min-h-10 rounded-xl border border-white/10 bg-slate-950/40 px-2 py-2.5 text-center text-sm font-bold text-slate-400">
+                    {Object.keys(note.acknowledgedBy || {}).length} přečtení
+                  </div>
+                )}
+              </div>
             </div>
-          ))
+          );
+          })
         )}
       </div>
       <div className="border-t border-white/10 pt-4">
+        <div className="mb-2 grid grid-cols-2 gap-2">
+          <button onClick={() => setHandoverShift('morning')} className={`py-3 rounded-xl text-base font-bold transition ${handoverShift === 'morning' ? 'bg-sky-600 text-white' : 'bg-slate-900 text-slate-300'}`}>Ranní směna</button>
+          <button onClick={() => setHandoverShift('afternoon')} className={`py-3 rounded-xl text-base font-bold transition ${handoverShift === 'afternoon' ? 'bg-sky-600 text-white' : 'bg-slate-900 text-slate-300'}`}>Odpolední směna</button>
+        </div>
         <div className="grid grid-cols-2 gap-2 mb-3">
           <button onClick={() => setHandoverPriority('normal')} className={`py-3 rounded-xl text-lg font-bold transition ${handoverPriority === 'normal' ? 'bg-slate-600 text-white' : 'bg-slate-900 text-slate-300'}`}>Běžný zápis</button>
           <button onClick={() => setHandoverPriority('important')} className={`py-3 rounded-xl text-lg font-bold transition ${handoverPriority === 'important' ? 'bg-red-600 text-white' : 'bg-slate-900 text-slate-300'}`}>Důležité</button>
         </div>
-        <textarea value={handoverText} onChange={(event) => setHandoverText(event.target.value)} placeholder="Zpráva pro další směnu..." className="w-full h-32 bg-slate-950 text-white text-xl p-4 rounded-2xl border-2 border-white/10 focus:border-indigo-400 outline-none resize-none mb-3" />
-        <button onClick={() => void handleHandoverSubmit()} disabled={!handoverText.trim() || isSubmitting} className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white py-5 rounded-2xl text-xl font-bold flex items-center justify-center gap-3">
+        <div className="mb-3 rounded-2xl border border-white/10 bg-slate-950/50 p-3">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <span className="text-sm font-black uppercase text-slate-300">Komu</span>
+            <span className="truncate rounded-full bg-indigo-500/15 px-3 py-1 text-sm font-black text-indigo-100">
+              {handoverRecipient}
+            </span>
+          </div>
+          <div className="mb-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {quickHandoverRecipients.map((recipient) => (
+              <button
+                key={recipient}
+                type="button"
+                onClick={() => selectHandoverRecipient(recipient)}
+                className={`min-h-10 rounded-xl border px-2 text-sm font-black ${handoverRecipient === recipient ? 'border-indigo-300 bg-indigo-600 text-white' : 'border-white/10 bg-slate-900 text-slate-300'}`}
+              >
+                <span className="block truncate">{recipient}</span>
+              </button>
+            ))}
+          </div>
+          <label className="relative block">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+            <input
+              value={handoverRecipientSearch}
+              onChange={(event) => setHandoverRecipientSearch(event.target.value)}
+              placeholder="Hledat osobu..."
+              className="min-h-11 w-full rounded-xl border border-white/10 bg-slate-900 py-2 pl-10 pr-3 text-base font-semibold text-white outline-none focus:border-indigo-400"
+            />
+          </label>
+          {(handoverRecipientSearch || !quickHandoverRecipients.includes(handoverRecipient)) && (
+            <div className="mt-2 grid max-h-40 grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3">
+              {filteredHandoverRecipients.map((recipient) => (
+                <button
+                  key={recipient}
+                  type="button"
+                  onClick={() => selectHandoverRecipient(recipient)}
+                  className={`min-h-10 rounded-xl border px-2 text-sm font-black ${handoverRecipient === recipient ? 'border-indigo-300 bg-indigo-600 text-white' : 'border-white/10 bg-slate-900 text-slate-300'}`}
+                >
+                  <span className="block truncate">{recipient}</span>
+                </button>
+              ))}
+              {filteredHandoverRecipients.length === 0 && (
+                <div className="col-span-2 rounded-xl border border-white/10 bg-slate-900 px-3 py-3 text-center text-sm font-bold text-slate-400 sm:col-span-3">
+                  Nikdo nenalezen
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        <textarea value={handoverText} onChange={(event) => setHandoverText(event.target.value)} placeholder="Zpráva pro další směnu..." className="w-full h-24 bg-slate-950 text-white text-lg p-3 rounded-2xl border-2 border-white/10 focus:border-indigo-400 outline-none resize-none mb-3" />
+        <button onClick={() => void handleHandoverSubmit()} disabled={!handoverText.trim() || isSubmitting} className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white py-4 rounded-2xl text-lg font-bold flex items-center justify-center gap-3">
           <Send className="w-6 h-6" />
           Přidat poznámku
         </button>

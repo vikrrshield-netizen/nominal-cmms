@@ -2,7 +2,7 @@
 // VIKRR — Asset Shield — Bulk asset importer (v2 tenant-aware)
 //
 // Validates rows, resolves parent-child hierarchy, and batch-writes
-// into tenants/{tenantId}/assets collection.
+// into the canonical top-level assets collection.
 
 import { collection, serverTimestamp, writeBatch, doc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
@@ -50,7 +50,7 @@ function normalizeCriticality(raw?: unknown): AssetCriticality {
 }
 
 /**
- * Validates and imports asset rows into Firestore tenant collection.
+ * Validates and imports asset rows into Firestore assets collection.
  * Resolves parent-child hierarchy via parentName field.
  * Uses batched writes for efficiency (max 500 per batch).
  */
@@ -86,7 +86,7 @@ export async function importAssets(
 
   // 3. Import in 2 passes — roots first, then children
   const nameToIdMap = new Map<string, string>(); // name → Firestore doc ID
-  const tenantCollection = collection(db, 'tenants', tenantId, 'assets');
+  const assetsCollection = collection(db, 'assets');
   const BATCH_SIZE = 500;
   let imported = 0;
   let failed = 0;
@@ -102,7 +102,7 @@ export async function importAssets(
         const name = String(row.name || '').trim();
         if (!name) { failed++; continue; }
 
-        const ref = doc(tenantCollection);
+        const ref = doc(assetsCollection);
         batch.set(ref, {
           name,
           code: row.code ? String(row.code).trim() : '',
@@ -148,14 +148,14 @@ export async function importAssets(
 
         // Resolve parent by name
         const parentName = String(row.parentName || '').trim().toLowerCase();
-        let parentId: string | null = nameToIdMap.get(parentName) || null;
+        const parentId: string | null = nameToIdMap.get(parentName) || null;
 
         if (!parentId && parentName) {
           // Warning: parent not found, import as root
           errors.push(`Řádek "${name}": nadřazený „${row.parentName}" nenalezen — importováno jako root`);
         }
 
-        const ref = doc(tenantCollection);
+        const ref = doc(assetsCollection);
         batch.set(ref, {
           name,
           code: row.code ? String(row.code).trim() : '',

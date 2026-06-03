@@ -37,13 +37,20 @@ export interface CreateTaskInput {
   inspectionLogId?: string;
   assetId?: string;
   assetName?: string;
+  relatedAssetId?: string;
+  relatedAssetName?: string;
+  relatedAssetRole?: string;
   buildingId?: string;
   assigneeId?: string;
   assigneeName?: string;
   assigneeColor?: string;
+  assignedWorkerNames?: string[];
   plannedDate?: Date;
   dueDate?: Date;
   estimatedMinutes?: number;
+  foodSafetyRisk?: boolean;
+  foodSafetyHazardType?: string;
+  foodSafetyImpact?: string;
   createdById: string;
   createdByName: string;
 }
@@ -57,11 +64,15 @@ export interface UpdateTaskInput {
   assigneeId?: string;
   assigneeName?: string;
   assigneeColor?: string;
+  assignedWorkerNames?: string[];
   plannedDate?: Date;
   dueDate?: Date;
   estimatedMinutes?: number;
   actualMinutes?: number;
   resolution?: string;
+  foodSafetyRisk?: boolean;
+  foodSafetyHazardType?: string;
+  foodSafetyImpact?: string;
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -121,13 +132,20 @@ export async function createTask(input: CreateTaskInput): Promise<string> {
   if (input.inspectionLogId) taskData.inspectionLogId = input.inspectionLogId;
   if (input.assetId) taskData.assetId = input.assetId;
   if (input.assetName) taskData.assetName = input.assetName;
+  if (input.relatedAssetId) taskData.relatedAssetId = input.relatedAssetId;
+  if (input.relatedAssetName) taskData.relatedAssetName = input.relatedAssetName;
+  if (input.relatedAssetRole) taskData.relatedAssetRole = input.relatedAssetRole;
   if (input.buildingId) taskData.buildingId = input.buildingId;
   if (input.assigneeId) taskData.assigneeId = input.assigneeId;
   if (input.assigneeName) taskData.assigneeName = input.assigneeName;
   if (input.assigneeColor) taskData.assigneeColor = input.assigneeColor;
+  if (input.assignedWorkerNames) taskData.assignedWorkerNames = input.assignedWorkerNames;
   if (input.plannedDate) taskData.plannedDate = Timestamp.fromDate(input.plannedDate);
   if (input.dueDate) taskData.dueDate = Timestamp.fromDate(input.dueDate);
   if (input.estimatedMinutes) taskData.estimatedMinutes = input.estimatedMinutes;
+  if (input.foodSafetyRisk !== undefined) taskData.foodSafetyRisk = input.foodSafetyRisk;
+  if (input.foodSafetyHazardType) taskData.foodSafetyHazardType = input.foodSafetyHazardType;
+  if (input.foodSafetyImpact) taskData.foodSafetyImpact = input.foodSafetyImpact;
 
   const docRef = await addDoc(collection(db, COLLECTION), taskData);
   return docRef.id;
@@ -147,11 +165,15 @@ export async function updateTask(taskId: string, input: UpdateTaskInput): Promis
   if (input.assigneeId !== undefined) updateData.assigneeId = input.assigneeId;
   if (input.assigneeName !== undefined) updateData.assigneeName = input.assigneeName;
   if (input.assigneeColor !== undefined) updateData.assigneeColor = input.assigneeColor;
+  if (input.assignedWorkerNames !== undefined) updateData.assignedWorkerNames = input.assignedWorkerNames;
   if (input.plannedDate !== undefined) updateData.plannedDate = Timestamp.fromDate(input.plannedDate);
   if (input.dueDate !== undefined) updateData.dueDate = Timestamp.fromDate(input.dueDate);
   if (input.estimatedMinutes !== undefined) updateData.estimatedMinutes = input.estimatedMinutes;
   if (input.actualMinutes !== undefined) updateData.actualMinutes = input.actualMinutes;
   if (input.resolution !== undefined) updateData.resolution = input.resolution;
+  if (input.foodSafetyRisk !== undefined) updateData.foodSafetyRisk = input.foodSafetyRisk;
+  if (input.foodSafetyHazardType !== undefined) updateData.foodSafetyHazardType = input.foodSafetyHazardType;
+  if (input.foodSafetyImpact !== undefined) updateData.foodSafetyImpact = input.foodSafetyImpact;
   
   await updateDoc(doc(db, COLLECTION, taskId), updateData);
 }

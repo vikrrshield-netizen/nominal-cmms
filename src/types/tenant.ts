@@ -63,11 +63,27 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     ],
   },
   {
+    module: 'gearboxes',
+    label: 'Převodovky',
+    permissions: [
+      { key: 'gearbox.temperature.write', label: 'Zapsat teplotu', description: 'Zapsat provozní teplotu převodovky bez správy celé karty' },
+      { key: 'gearbox.manage', label: 'Spravovat', description: 'Správa převodovek, servis a limity' },
+    ],
+  },
+  {
     module: 'fleet',
     label: 'Vozidla',
     permissions: [
       { key: 'fleet.read', label: 'Číst', description: 'Zobrazit vozový park' },
       { key: 'fleet.manage', label: 'Spravovat', description: 'Editovat vozidla' },
+    ],
+  },
+  {
+    module: 'hvac',
+    label: 'Vzduchotechnika',
+    permissions: [
+      { key: 'hvac.read', label: 'Číst', description: 'Zobrazit vzduchotechniku, filtry a historii výměn' },
+      { key: 'hvac.manage', label: 'Spravovat', description: 'Správa karet VZT, vazeb na sklad a limitů filtrů' },
     ],
   },
   {

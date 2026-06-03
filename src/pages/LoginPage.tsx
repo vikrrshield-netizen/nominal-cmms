@@ -3,6 +3,7 @@
 
 import { useState } from 'react';
 import { useAuthContext } from '../context/AuthContext';
+import { isSandboxLoginEnabled } from '../lib/firebase';
 import { Shield, Delete, LogIn } from 'lucide-react';
 import appConfig from '../appConfig';
 
@@ -77,6 +78,9 @@ export default function LoginPage() {
         </div>
         {error && (
           <p className="text-red-500 text-center text-sm animate-pulse">Nesprávný PIN</p>
+        )}
+        {isSandboxLoginEnabled && !error && (
+          <p className="text-blue-300 text-center text-xs">Demo režim: PIN 0000</p>
         )}
       </div>
 

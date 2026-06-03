@@ -2,7 +2,7 @@
 // Nominal CMMS — Production Planning: Extrusion & Packaging
 
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import {
   collection, addDoc, updateDoc, doc, onSnapshot,
   orderBy, query, serverTimestamp, Timestamp,
@@ -206,7 +206,7 @@ function formatDate(d: Date): string {
 // ═══════════════════════════════════════════════════════════════════
 
 export default function ProductionPage() {
-  const navigate = useNavigate();
+  const goBack = useBackNavigation('/');
   const { user, hasPermission } = useAuthContext();
   const canManage = hasPermission('production.manage');
 
@@ -345,7 +345,7 @@ export default function ProductionPage() {
       <div className="bg-slate-800/80 backdrop-blur-sm border-b border-slate-700/50 px-4 py-4 sticky top-0 z-20">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
-            <button onClick={() => navigate('/')} className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition">
+            <button onClick={() => goBack()} className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition">
               <ArrowLeft className="w-5 h-5 text-slate-400" />
             </button>
             <div>

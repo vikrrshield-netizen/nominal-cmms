@@ -35,8 +35,9 @@ export default function RevisionsPage() {
   const [selectedRevision, setSelectedRevision] = useState<Revision | null>(null);
   // showLogModal — reserved for future use
 
-  const canEdit = hasPermission('revisions.edit');
-  const canExport = hasPermission('reports.export');
+  const canEdit = hasPermission('asset.update') || hasPermission('wo.update') || hasPermission('admin.manage');
+  const canDelete = hasPermission('admin.manage');
+  const canExport = hasPermission('report.export');
 
   // ─────────────────────────────────────────
   // FILTERING
@@ -62,7 +63,7 @@ export default function RevisionsPage() {
   // ─────────────────────────────────────────
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="vik-page flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
       </div>
     );
@@ -72,7 +73,7 @@ export default function RevisionsPage() {
   // RENDER
   // ─────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
+    <div className="vik-page pb-24">
       {/* Expired Alert */}
       {stats.expired > 0 && (
         <div className="bg-red-500 text-white px-4 py-3 flex items-center gap-3">
@@ -85,15 +86,16 @@ export default function RevisionsPage() {
       )}
 
       {/* Header */}
-      <div className="bg-white border-b px-4 py-4">
-        <Breadcrumb items={[
-          { label: 'Dashboard', onClick: () => navigate('/') },
-          { label: 'Revize' },
-        ]} />
-        <div className="flex justify-between items-center">
+      <div className="vik-page-header px-4 py-4">
+        <div className="vik-page-shell">
+          <Breadcrumb items={[
+            { label: 'Dashboard', onClick: () => navigate('/') },
+            { label: 'Revize' },
+          ]} />
+        <div className="flex justify-between items-center gap-3">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-              <Shield className="w-6 h-6 text-blue-600" />
+            <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+              <Shield className="w-6 h-6 text-blue-400" />
               Revize
             </h1>
             {alertCount > 0 && (
@@ -120,28 +122,29 @@ export default function RevisionsPage() {
                 }));
                 exportXLSX('revisions', data, { filename: `NOMINAL_revize_${new Date().toISOString().slice(0, 10)}.xlsx` });
               }}
-              className="bg-slate-800 text-white px-3 py-2 rounded-lg font-medium flex items-center gap-2 hover:bg-slate-700"
+              className="vik-button"
             >
               <Download className="w-4 h-4" />
               <span className="hidden sm:inline">Export</span>
             </button>
           )}
         </div>
+        </div>
       </div>
 
-      <div className="p-4 space-y-4">
+      <div className="vik-page-shell p-4 space-y-4">
         {/* Semafor Stats */}
         <div className="grid grid-cols-4 gap-2">
           <button
             onClick={() => setFilterStatus('all')}
-            className={`bg-white p-3 rounded-xl border text-center ${filterStatus === 'all' ? 'border-blue-500' : ''}`}
+            className={`vik-card-soft p-3 text-center ${filterStatus === 'all' ? 'border-blue-500' : ''}`}
           >
-            <div className="text-2xl font-bold text-slate-800">{stats.total}</div>
-            <div className="text-xs text-slate-500">Celkem</div>
+            <div className="text-2xl font-bold text-white">{stats.total}</div>
+            <div className="text-xs vik-muted">Celkem</div>
           </button>
           <button
             onClick={() => setFilterStatus('valid')}
-            className={`bg-white p-3 rounded-xl border text-center ${filterStatus === 'valid' ? 'border-emerald-500' : ''}`}
+            className={`vik-card-soft p-3 text-center ${filterStatus === 'valid' ? 'border-emerald-500' : ''}`}
           >
             <CheckCircle2 className="w-5 h-5 text-emerald-500 mx-auto mb-1" />
             <div className="text-2xl font-bold text-emerald-600">{stats.valid}</div>
@@ -149,7 +152,7 @@ export default function RevisionsPage() {
           </button>
           <button
             onClick={() => setFilterStatus('expiring')}
-            className={`bg-white p-3 rounded-xl border text-center ${filterStatus === 'expiring' ? 'border-amber-500' : ''}`}
+            className={`vik-card-soft p-3 text-center ${filterStatus === 'expiring' ? 'border-amber-500' : ''}`}
           >
             <AlertTriangle className="w-5 h-5 text-amber-500 mx-auto mb-1" />
             <div className="text-2xl font-bold text-amber-600">{stats.expiring}</div>
@@ -157,7 +160,7 @@ export default function RevisionsPage() {
           </button>
           <button
             onClick={() => setFilterStatus('expired')}
-            className={`bg-white p-3 rounded-xl border text-center ${filterStatus === 'expired' ? 'border-red-500' : ''}`}
+            className={`vik-card-soft p-3 text-center ${filterStatus === 'expired' ? 'border-red-500' : ''}`}
           >
             <AlertTriangle className="w-5 h-5 text-red-500 mx-auto mb-1 animate-pulse" />
             <div className="text-2xl font-bold text-red-600">{stats.expired}</div>
@@ -173,7 +176,7 @@ export default function RevisionsPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Hledat revizi, zařízení, firmu..."
-            className="w-full pl-10 pr-4 py-2 border rounded-xl focus:border-blue-500 outline-none"
+            className="vik-input pl-10 pr-4"
           />
         </div>
 
@@ -181,8 +184,8 @@ export default function RevisionsPage() {
         <div className="flex gap-2 overflow-x-auto pb-1">
           <button
             onClick={() => setFilterType('all')}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition ${
-              filterType === 'all' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-600'
+            className={`vik-chip ${
+              filterType === 'all' ? 'vik-chip-active' : ''
             }`}
           >
             Vše
@@ -191,8 +194,8 @@ export default function RevisionsPage() {
             <button
               key={key}
               onClick={() => setFilterType(key)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition flex items-center gap-1 ${
-                filterType === key ? 'bg-slate-800 text-white' : 'bg-white border text-slate-600'
+              className={`vik-chip ${
+                filterType === key ? 'vik-chip-active' : ''
               }`}
             >
               <span>{cfg.icon}</span>
@@ -226,6 +229,7 @@ export default function RevisionsPage() {
           revision={selectedRevision}
           onClose={() => setSelectedRevision(null)}
           canEdit={canEdit}
+          canDelete={canDelete}
           onLog={(data) => {
             logRevision(selectedRevision.id, data).then(() => setSelectedRevision(null));
           }}
@@ -247,7 +251,7 @@ function RevisionCard({ revision, onClick }: { revision: Revision; onClick: () =
   return (
     <button
       onClick={onClick}
-      className={`w-full bg-white p-4 rounded-xl border shadow-sm text-left hover:shadow-md transition ${
+      className={`w-full vik-row-card p-4 text-left ${
         revision.status === 'expired' ? 'border-red-300' : ''
       }`}
     >
@@ -265,8 +269,8 @@ function RevisionCard({ revision, onClick }: { revision: Revision; onClick: () =
             </span>
             <span className="text-xs text-slate-400">{typeCfg.label}</span>
           </div>
-          <h4 className="font-medium text-slate-800 truncate">{revision.title}</h4>
-          <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
+          <h4 className="font-medium text-white truncate">{revision.title}</h4>
+          <div className="flex items-center gap-3 mt-1 text-xs vik-muted">
             <span>{revision.assetName}</span>
             <span>•</span>
             <span className="flex items-center gap-1">
@@ -295,10 +299,11 @@ function RevisionCard({ revision, onClick }: { revision: Revision; onClick: () =
   );
 }
 
-function RevisionDetailModal({ revision, onClose, canEdit, onLog }: {
+function RevisionDetailModal({ revision, onClose, canEdit, canDelete, onLog }: {
   revision: Revision;
   onClose: () => void;
   canEdit: boolean;
+  canDelete: boolean;
   onLog: (data: { date: Date; certificateNumber: string }) => void;
 }) {
   const statusCfg = STATUS_CONFIG[revision.status];
@@ -325,22 +330,22 @@ function RevisionDetailModal({ revision, onClose, canEdit, onLog }: {
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-t-3xl md:rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+      <div className="vik-card rounded-t-2xl md:rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         {/* Header */}
-        <div className="sticky top-0 bg-white border-b p-4 flex items-center justify-between">
+        <div className="sticky top-0 bg-slate-900/95 border-b border-white/10 p-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <span className="text-3xl">{typeCfg.icon}</span>
             <span className={`px-2 py-1 rounded-lg text-sm font-bold ${statusCfg.bgColor} ${statusCfg.color}`}>
               {statusCfg.label}
             </span>
           </div>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100">
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-white/10">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <div className="p-4 space-y-4">
-          <h2 className="text-xl font-bold text-slate-800">{revision.title}</h2>
+          <h2 className="text-xl font-bold text-white">{revision.title}</h2>
 
           {/* Status big display */}
           <div className={`p-6 rounded-xl text-center ${statusCfg.bgColor}`}>
@@ -354,19 +359,19 @@ function RevisionDetailModal({ revision, onClose, canEdit, onLog }: {
 
           {/* Info grid */}
           <div className="grid grid-cols-2 gap-3">
-            <div className="bg-slate-50 p-3 rounded-xl">
+            <div className="vik-card-soft p-3">
               <div className="text-xs text-slate-500 mb-1">Zařízení</div>
               <div className="font-medium text-sm">{revision.assetName}</div>
             </div>
-            <div className="bg-slate-50 p-3 rounded-xl">
+            <div className="vik-card-soft p-3">
               <div className="text-xs text-slate-500 mb-1">Umístění</div>
               <div className="font-medium text-sm">{revision.buildingId} — {revision.areaName}</div>
             </div>
-            <div className="bg-slate-50 p-3 rounded-xl">
+            <div className="vik-card-soft p-3">
               <div className="text-xs text-slate-500 mb-1">Interval</div>
               <div className="font-medium text-sm">{revision.intervalMonths} měsíců</div>
             </div>
-            <div className="bg-slate-50 p-3 rounded-xl">
+            <div className="vik-card-soft p-3">
               <div className="text-xs text-slate-500 mb-1">Typ</div>
               <div className="font-medium text-sm">{typeCfg.icon} {typeCfg.label}</div>
             </div>
@@ -374,11 +379,11 @@ function RevisionDetailModal({ revision, onClose, canEdit, onLog }: {
 
           {/* Dates */}
           <div className="grid grid-cols-2 gap-3">
-            <div className="bg-slate-50 p-3 rounded-xl">
+            <div className="vik-card-soft p-3">
               <div className="text-xs text-slate-500 mb-1">Poslední revize</div>
               <div className="font-medium">{formatRevisionDate(revision.lastRevisionDate)}</div>
             </div>
-            <div className={`p-3 rounded-xl ${revision.status === 'expired' ? 'bg-red-50 border border-red-200' : 'bg-slate-50'}`}>
+            <div className={`vik-card-soft p-3 ${revision.status === 'expired' ? 'border-red-500/40' : ''}`}>
               <div className="text-xs text-slate-500 mb-1">Příští revize</div>
               <div className={`font-bold ${statusCfg.color}`}>
                 {formatRevisionDate(revision.nextRevisionDate)}
@@ -387,19 +392,19 @@ function RevisionDetailModal({ revision, onClose, canEdit, onLog }: {
           </div>
 
           {/* Company & Certificate */}
-          <div className="bg-slate-50 p-3 rounded-xl">
+          <div className="vik-card-soft p-3">
             <div className="text-xs text-slate-500 mb-1">Revizní firma</div>
             <div className="font-medium">{revision.revisionCompany}</div>
             <div className="text-sm text-slate-500">{revision.technicianName}</div>
           </div>
-          <div className="bg-slate-50 p-3 rounded-xl">
+          <div className="vik-card-soft p-3">
             <div className="text-xs text-slate-500 mb-1">Číslo revizní zprávy</div>
             <div className="font-mono font-medium">{revision.certificateNumber}</div>
           </div>
 
           {/* Notes */}
           {revision.notes && (
-            <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl">
+            <div className="vik-card-soft border-amber-500/30 p-3">
               <div className="text-xs text-amber-700 font-bold mb-1">Poznámka</div>
               <div className="text-sm text-amber-800">{revision.notes}</div>
             </div>
@@ -408,31 +413,33 @@ function RevisionDetailModal({ revision, onClose, canEdit, onLog }: {
           {/* Export PDF */}
           <button
             onClick={handleExportPDF}
-            className="w-full py-3 bg-slate-700 text-white rounded-xl font-bold hover:bg-slate-600 flex items-center justify-center gap-2"
+            className="vik-button w-full"
           >
             <Download className="w-5 h-5" />
             Export PDF
           </button>
 
           {/* Delete */}
-          <button
-            onClick={async () => {
-              if (window.confirm(`Opravdu smazat revizi "${revision.title}"?`)) {
-                await deleteDoc(doc(db, 'revisions', revision.id));
-                onClose();
-              }
-            }}
-            className="w-full py-2.5 bg-red-50 text-red-600 rounded-xl font-medium hover:bg-red-100 flex items-center justify-center gap-2 border border-red-200"
-          >
-            <Trash2 className="w-4 h-4" />
-            Smazat revizi
-          </button>
+          {canDelete && (
+            <button
+              onClick={async () => {
+                if (window.confirm(`Opravdu smazat revizi "${revision.title}"?`)) {
+                  await deleteDoc(doc(db, 'revisions', revision.id));
+                  onClose();
+                }
+              }}
+              className="vik-button vik-button-danger w-full"
+            >
+              <Trash2 className="w-4 h-4" />
+              Smazat revizi
+            </button>
+          )}
 
           {/* Log new revision */}
           {canEdit && !showLogForm && (
             <button
               onClick={() => setShowLogForm(true)}
-              className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 flex items-center justify-center gap-2"
+              className="vik-button vik-button-primary w-full"
             >
               <Shield className="w-5 h-5" />
               Zapsat novou revizi
@@ -440,25 +447,25 @@ function RevisionDetailModal({ revision, onClose, canEdit, onLog }: {
           )}
 
           {showLogForm && (
-            <div className="border-t pt-4 space-y-3">
+            <div className="border-t border-white/10 pt-4 space-y-3">
               <div className="text-sm font-bold text-slate-700">Zápis nové revize</div>
               <input
                 type="date"
                 value={logDate}
                 onChange={(e) => setLogDate(e.target.value)}
-                className="w-full p-3 border rounded-xl outline-none"
+                className="vik-input"
               />
               <input
                 type="text"
                 value={logCert}
                 onChange={(e) => setLogCert(e.target.value)}
                 placeholder="Číslo revizní zprávy"
-                className="w-full p-3 border rounded-xl focus:border-blue-500 outline-none"
+                className="vik-input"
               />
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowLogForm(false)}
-                  className="flex-1 py-2 bg-slate-100 text-slate-600 rounded-xl font-medium"
+                  className="vik-button flex-1"
                 >
                   Zrušit
                 </button>
@@ -469,7 +476,7 @@ function RevisionDetailModal({ revision, onClose, canEdit, onLog }: {
                     }
                   }}
                   disabled={!logCert.trim()}
-                  className="flex-1 py-2 bg-blue-600 text-white rounded-xl font-medium disabled:opacity-50"
+                  className="vik-button vik-button-primary flex-1 disabled:opacity-50"
                 >
                   Potvrdit
                 </button>

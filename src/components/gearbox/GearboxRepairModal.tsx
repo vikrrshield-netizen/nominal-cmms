@@ -1,6 +1,6 @@
 // src/components/gearbox/GearboxRepairModal.tsx
 // VIKRSHIELD — Sdílený modal pro zápis opravy / úpravy / kontroly převodovky.
-// Používá se v modulu převodovek. Zapisuje work log přes addWorkLog.
+// Používá se v GearboxesPage i AssetCardPage. Zapisuje work log přes addWorkLog.
 
 import { useState } from 'react';
 import { Loader2, Wrench, X } from 'lucide-react';
@@ -63,25 +63,25 @@ export default function GearboxRepairModal({ asset, user, onClose, onSaved }: {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-0 sm:items-center sm:p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/35 p-0 backdrop-blur-sm sm:items-center sm:p-4" onClick={onClose}>
       <div
-        className="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl border border-white/10 bg-slate-950 text-slate-100 shadow-2xl sm:max-w-lg sm:rounded-2xl"
+        className="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl border border-[var(--vik-border)] bg-white text-slate-950 shadow-2xl sm:max-w-lg sm:rounded-2xl"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-white/10 bg-slate-950/95 p-4 backdrop-blur">
+        <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-[var(--vik-border)] bg-white/95 p-4 backdrop-blur">
           <div className="min-w-0">
             <div className="text-xs font-bold uppercase tracking-widest text-amber-300">Oprava / úprava</div>
-            <h3 className="mt-1 truncate text-lg font-black text-white">{asset.name}</h3>
-            <div className="text-sm text-slate-400">{asset.currentExtruderName || asset.location || 'Sklad ND'}</div>
+            <h3 className="mt-1 truncate text-lg font-black text-slate-950">{asset.name}</h3>
+            <div className="text-sm text-slate-600">{asset.currentExtruderName || asset.location || 'Sklad ND'}</div>
           </div>
-          <button type="button" onClick={onClose} className="rounded-xl border border-white/10 p-2 text-slate-300 hover:bg-white/10">
+          <button type="button" onClick={onClose} className="rounded-xl border border-[var(--vik-border)] bg-[var(--vik-surface-2)] p-2 text-slate-600 hover:bg-white">
             <X className="h-5 w-5" />
           </button>
         </div>
 
         <div className="space-y-4 p-4">
           <div>
-            <div className="mb-2 text-sm font-black text-white">Typ záznamu</div>
+            <div className="mb-2 text-sm font-black text-slate-950">Typ záznamu</div>
             <div className="grid grid-cols-3 gap-2">
               {repairOptions.map((option) => (
                 <button
@@ -90,8 +90,8 @@ export default function GearboxRepairModal({ asset, user, onClose, onSaved }: {
                   onClick={() => setType(option.id)}
                   className={`min-h-12 rounded-xl border px-3 text-sm font-black ${
                     type === option.id
-                      ? 'border-amber-400/60 bg-amber-500/20 text-white'
-                      : 'border-white/10 bg-white/[0.04] text-slate-300'
+                      ? 'border-amber-300 bg-amber-100 text-amber-800'
+                      : 'border-[var(--vik-border)] bg-[var(--vik-surface-2)] text-slate-700'
                   }`}
                 >
                   {option.label}
@@ -101,22 +101,22 @@ export default function GearboxRepairModal({ asset, user, onClose, onSaved }: {
           </div>
 
           <label className="block">
-            <span className="mb-2 block text-sm font-black text-white">Datum a čas</span>
+            <span className="mb-2 block text-sm font-black text-slate-950">Datum a čas</span>
             <input
               type="datetime-local"
               value={performedAt}
               onChange={(event) => setPerformedAt(event.target.value)}
-              className="w-full rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-base text-white outline-none focus:border-amber-400"
+              className="w-full rounded-xl border border-[var(--vik-border)] bg-[var(--vik-surface-2)] px-4 py-3 text-base text-slate-950 outline-none focus:border-amber-400"
             />
           </label>
 
           <label className="block">
-            <span className="mb-2 block text-sm font-black text-white">Co bylo provedeno</span>
+            <span className="mb-2 block text-sm font-black text-slate-950">Co bylo provedeno</span>
             <textarea
               value={note}
               onChange={(event) => setNote(event.target.value)}
               placeholder="Popis opravy / úpravy / kontroly převodovky"
-              className="h-32 w-full resize-none rounded-xl border border-white/10 bg-slate-900 p-4 text-base text-white outline-none focus:border-amber-400"
+              className="h-32 w-full resize-none rounded-xl border border-[var(--vik-border)] bg-[var(--vik-surface-2)] p-4 text-base text-slate-950 outline-none focus:border-amber-400"
             />
           </label>
 

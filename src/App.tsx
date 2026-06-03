@@ -1,41 +1,46 @@
-// src/App.tsx
+﻿// src/App.tsx
 // VIKRR — Asset Shield — Hlavní aplikace s routingem
 
+import { lazy, Suspense, useEffect, type ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuthContext } from './context/AuthContext';
 import { LoadingSpinner } from './components/ui';
-import ToastContainer from './components/ui/Toast';
+import AppCoach from './components/ui/AppCoach';
+import ToastContainer, { showToast } from './components/ui/Toast';
+import { AppErrorBoundary, AppErrorListeners } from './components/AppErrorBoundary';
+import { useTenantSettings } from './hooks/useTenantSettings';
+import { listenForForegroundPush } from './services/pushNotificationService';
 
-// Pages
-import LoginPage from './pages/LoginPage';
-import DashboardPage from './pages/DashboardPage';
-import KioskPage from './pages/KioskPage';
-import BuildingInspectionPage from './pages/BuildingInspectionPage';
-import TasksPage from './pages/TasksPage';
-import InventoryPage from './pages/InventoryPage';
-import FleetPage from './pages/FleetPage';
-import GearboxesPage from './pages/GearboxesPage';
-import RevisionsPage from './pages/RevisionsPage';
-import AssetCardPage from './pages/AssetCardPage';
-import CalendarPage from './pages/CalendarPage';
-import WastePage from './pages/WastePage';
-import TrustBoxPage from './pages/TrustBoxPage';
-import MapPage from './pages/MapPage';
-import ReportsPage from './pages/ReportsPage';
-import AdminPage from './pages/AdminPage';
-import AIAssistantPage from './pages/AIAssistantPage';
-import NotificationsPage from './pages/NotificationsPage';
-import LouparnaPage from './pages/LouparnaPage';
-import InspectionsPage from './pages/InspectionsPage';
-import NoticeboardPage from './pages/NoticeboardPage';
-import AcademyPage from './pages/AcademyPage';
-import SchedulesPage from './pages/SchedulesPage';
-import PersonalDiaryPage from './pages/PersonalDiaryPage';
-import ProductionPage from './pages/ProductionPage';
-import WarehousePage from './pages/WarehousePage';
-import ShiftPlannerPage from './pages/ShiftPlannerPage';
-import SettingsPage from './pages/SettingsPage';
-import KartotekaPage from './pages/KartotekaPage';
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const KioskPage = lazy(() => import('./pages/KioskPage'));
+const BuildingInspectionPage = lazy(() => import('./pages/BuildingInspectionPage'));
+const TasksPage = lazy(() => import('./pages/TasksPage'));
+const InventoryPage = lazy(() => import('./pages/InventoryPage'));
+const FleetPage = lazy(() => import('./pages/FleetPage'));
+const VzvPage = lazy(() => import('./pages/VzvPage'));
+const HvacPage = lazy(() => import('./pages/HvacPage'));
+const GearboxesPage = lazy(() => import('./pages/GearboxesPage'));
+const RevisionsPage = lazy(() => import('./pages/RevisionsPage'));
+const AssetCardPage = lazy(() => import('./pages/AssetCardPage'));
+const CalendarPage = lazy(() => import('./pages/CalendarPage'));
+const TrustBoxPage = lazy(() => import('./pages/TrustBoxPage'));
+const MapPage = lazy(() => import('./pages/MapPage'));
+const ReportsPage = lazy(() => import('./pages/ReportsPage'));
+const AdminPage = lazy(() => import('./pages/AdminPage'));
+const AIAssistantPage = lazy(() => import('./pages/AIAssistantPage'));
+const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
+const InspectionsPage = lazy(() => import('./pages/InspectionsPage'));
+const NoticeboardPage = lazy(() => import('./pages/NoticeboardPage'));
+const AcademyPage = lazy(() => import('./pages/AcademyPage'));
+const SchedulesPage = lazy(() => import('./pages/SchedulesPage'));
+const PersonalDiaryPage = lazy(() => import('./pages/PersonalDiaryPage'));
+const WorkDiaryPage = lazy(() => import('./pages/WorkDiaryPage'));
+const ProductionPage = lazy(() => import('./pages/ProductionPage'));
+const WarehousePage = lazy(() => import('./pages/WarehousePage'));
+const ShiftPlannerPage = lazy(() => import('./pages/ShiftPlannerPage'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const KartotekaPage = lazy(() => import('./pages/KartotekaPage'));
 
 // ═══════════════════════════════════════════════════════════════════
 // PROTECTED ROUTE WRAPPER
@@ -48,6 +53,86 @@ function SandboxBanner() {
     <div className="bg-blue-600 text-white text-center py-2 text-sm font-bold tracking-wider sticky top-0 z-50 shadow-lg shadow-blue-600/30">
       UČŇOVSKÝ TRENAŽÉR — Změny se neukládají
     </div>
+  );
+}
+
+function PageLoading() {
+  return (
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+      <LoadingSpinner size="lg" text="Načítám modul..." />
+    </div>
+  );
+}
+
+function NoAccessPage({ title = 'Sem nemáš přístup', message }: { title?: string; message?: string }) {
+  return (
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
+      <div className="max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 text-white shadow-xl">
+        <p className="text-sm font-bold uppercase tracking-wider text-blue-300">Oprávnění</p>
+        <h1 className="mt-2 text-2xl font-black">{title}</h1>
+        <p className="mt-3 text-slate-300">
+          {message || 'Tahle část aplikace není povolená pro tvoji roli. Pokud ji potřebuješ, musí ti správce upravit oprávnění.'}
+        </p>
+        <a
+          href="/"
+          className="mt-5 inline-flex rounded-xl bg-blue-600 px-4 py-3 font-bold text-white hover:bg-blue-500"
+        >
+          Zpět na dashboard
+        </a>
+      </div>
+    </div>
+  );
+}
+
+function RequirePermission({
+  children,
+  moduleId,
+  permissions = [],
+  roles = [],
+}: {
+  children: ReactNode;
+  moduleId?: string;
+  permissions?: string[];
+  roles?: string[];
+}) {
+  const { user, hasPermission } = useAuthContext();
+  const { tenants, loading } = useTenantSettings();
+  const tenant = tenants.find((item) => item.id === user?.tenantId);
+  const moduleAllowed = !moduleId || loading || !tenant || tenant.activeModules.includes(moduleId);
+  const allowedByRole = !!user && roles.includes(user.role);
+  const allowedByPermission = permissions.length === 0 || permissions.some((permission) => hasPermission(permission));
+
+  if (!moduleAllowed) {
+    return (
+      <NoAccessPage
+        title="Modul je vypnutý"
+        message="Tenhle modul je v administraci vypnutý pro celou firmu. Zapnout ho může správce v nastavení modulů."
+      />
+    );
+  }
+
+  if (allowedByRole || allowedByPermission) {
+    return <>{children}</>;
+  }
+
+  return <NoAccessPage />;
+}
+
+function ProtectedPage({
+  children,
+  moduleId,
+  permissions,
+  roles,
+}: {
+  children: ReactNode;
+  moduleId?: string;
+  permissions?: string[];
+  roles?: string[];
+}) {
+  return (
+    <RequirePermission moduleId={moduleId} permissions={permissions} roles={roles}>
+      {children}
+    </RequirePermission>
   );
 }
 
@@ -65,49 +150,87 @@ function ProtectedRoutes() {
 
   // Not authenticated → Login
   if (!isAuthenticated) {
-    return <LoginPage />;
+    return (
+      <Suspense fallback={<PageLoading />}>
+        <LoginPage />
+      </Suspense>
+    );
   }
 
   // Kiosk mode → dedicated page
   if (isKiosk) {
-    return <KioskPage />;
+    return (
+      <Suspense fallback={<PageLoading />}>
+        <KioskPage />
+      </Suspense>
+    );
   }
 
   // Normal app routes
   return (
-    <Routes>
-      <Route path="/" element={<DashboardPage />} />
-      <Route path="/inspection" element={<BuildingInspectionPage />} />
-      <Route path="/tasks" element={<TasksPage />} />
-      <Route path="/inventory" element={<InventoryPage />} />
-      <Route path="/fleet" element={<FleetPage />} />
-      <Route path="/gearboxes" element={<GearboxesPage />} />
-      <Route path="/revisions" element={<RevisionsPage />} />
-      <Route path="/asset/:assetId" element={<AssetCardPage />} />
-      <Route path="/calendar" element={<CalendarPage />} />
-      <Route path="/waste" element={<WastePage />} />
-      <Route path="/trustbox" element={<TrustBoxPage />} />
-      <Route path="/map" element={<MapPage />} />
-      <Route path="/reports" element={<ReportsPage />} />
-      <Route path="/admin" element={<AdminPage />} />
-      <Route path="/ai" element={<AIAssistantPage />} />
-      <Route path="/notifications" element={<NotificationsPage />} />
-      <Route path="/louparna" element={<LouparnaPage />} />
-      <Route path="/kiosk" element={<KioskPage />} />
-      <Route path="/inspections" element={<InspectionsPage />} />
-      <Route path="/noticeboard" element={<NoticeboardPage />} />
-      <Route path="/academy" element={<AcademyPage />} />
-      <Route path="/schedules" element={<SchedulesPage />} />
-      <Route path="/notes" element={<PersonalDiaryPage />} />
-      <Route path="/production" element={<ProductionPage />} />
-      <Route path="/warehouse" element={<WarehousePage />} />
-      <Route path="/shifts" element={<ShiftPlannerPage />} />
-      <Route path="/settings" element={<SettingsPage />} />
-      <Route path="/kartoteka" element={<KartotekaPage />} />
-      {/* Fallback */}
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <Suspense fallback={<PageLoading />}>
+      <Routes>
+        <Route path="/" element={<DashboardPage />} />
+        <Route path="/inspection" element={<ProtectedPage moduleId="inspections" permissions={['asset.read', 'weekly.modify']}><BuildingInspectionPage /></ProtectedPage>} />
+        <Route path="/tasks" element={<ProtectedPage moduleId="tasks" permissions={['wo.read']}><TasksPage /></ProtectedPage>} />
+        <Route path="/inventory" element={<ProtectedPage permissions={['inv.consume', 'inv.restock', 'inv.manage', 'inv.order']}><InventoryPage /></ProtectedPage>} />
+        <Route path="/fleet" element={<ProtectedPage moduleId="fleet" permissions={['fleet.read', 'fleet.manage']}><FleetPage /></ProtectedPage>} />
+        <Route path="/vzv" element={<ProtectedPage moduleId="fleet" permissions={['fleet.read', 'fleet.manage']}><VzvPage /></ProtectedPage>} />
+        <Route path="/hvac" element={<ProtectedPage permissions={['asset.read', 'hvac.read', 'hvac.manage']}><HvacPage /></ProtectedPage>} />
+        <Route path="/gearboxes" element={<ProtectedPage permissions={['asset.read', 'gearbox.temperature.write', 'gearbox.manage']}><GearboxesPage /></ProtectedPage>} />
+        <Route path="/revisions" element={<ProtectedPage moduleId="revisions" permissions={['asset.read']}><RevisionsPage /></ProtectedPage>} />
+        <Route path="/asset/:assetId" element={<ProtectedPage permissions={['asset.read']}><AssetCardPage /></ProtectedPage>} />
+        <Route path="/calendar" element={<ProtectedPage moduleId="calendar" permissions={['wo.read', 'schedule.manage']}><CalendarPage /></ProtectedPage>} />
+        <Route path="/waste" element={<Navigate to="/" replace />} />
+        <Route path="/trustbox" element={<ProtectedPage permissions={['secretbox.view']}><TrustBoxPage /></ProtectedPage>} />
+        <Route path="/map" element={<ProtectedPage permissions={['asset.read']}><MapPage /></ProtectedPage>} />
+        <Route path="/reports" element={<ProtectedPage permissions={['report.read', 'audit.read']}><ReportsPage /></ProtectedPage>} />
+        <Route
+          path="/admin"
+          element={(
+            <RequirePermission moduleId="admin" permissions={['admin.view', 'admin.manage']} roles={['SUPERADMIN', 'VEDENI', 'MAJITEL']}>
+              <AdminPage />
+            </RequirePermission>
+          )}
+        />
+        <Route path="/ai" element={<ProtectedPage moduleId="ai" permissions={['ai.use']}><AIAssistantPage /></ProtectedPage>} />
+        <Route path="/notifications" element={<NotificationsPage />} />
+        <Route path="/louparna" element={<Navigate to="/" replace />} />
+        <Route path="/kiosk" element={<KioskPage />} />
+        <Route path="/inspections" element={<ProtectedPage moduleId="inspections" permissions={['asset.read', 'weekly.modify']}><InspectionsPage /></ProtectedPage>} />
+        <Route path="/noticeboard" element={<NoticeboardPage />} />
+        <Route path="/academy" element={<AcademyPage />} />
+        <Route path="/schedules" element={<ProtectedPage permissions={['schedule.manage']}><SchedulesPage /></ProtectedPage>} />
+        <Route path="/notes" element={<PersonalDiaryPage />} />
+        <Route path="/work-diary" element={<ProtectedPage permissions={['wo.read', 'wo.update', 'wo.create']}><WorkDiaryPage /></ProtectedPage>} />
+        <Route path="/production" element={<ProtectedPage moduleId="production" permissions={['production.manage']}><ProductionPage /></ProtectedPage>} />
+        <Route path="/warehouse" element={<ProtectedPage moduleId="warehouse" permissions={['warehouse.view']}><WarehousePage /></ProtectedPage>} />
+        <Route path="/shifts" element={<ProtectedPage moduleId="shifts" permissions={['shifts.view']}><ShiftPlannerPage /></ProtectedPage>} />
+        <Route path="/settings" element={<ProtectedPage permissions={['admin.view', 'admin.manage']}><SettingsPage /></ProtectedPage>} />
+        <Route path="/kartoteka" element={<ProtectedPage permissions={['asset.read']}><KartotekaPage /></ProtectedPage>} />
+        {/* Fallback */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+      <AppCoach />
+    </Suspense>
   );
+}
+
+function ForegroundPushListener() {
+  const { isAuthenticated } = useAuthContext();
+
+  useEffect(() => {
+    if (!isAuthenticated) return undefined;
+    let cleanup: (() => void) | undefined;
+    listenForForegroundPush((payload) => {
+      showToast(`${payload.title}: ${payload.body}`, 'success');
+    }).then((unsubscribe) => {
+      cleanup = unsubscribe;
+    });
+    return () => cleanup?.();
+  }, [isAuthenticated]);
+
+  return null;
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -118,8 +241,12 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <AppErrorListeners />
+        <ForegroundPushListener />
         <SandboxBanner />
-        <ProtectedRoutes />
+        <AppErrorBoundary>
+          <ProtectedRoutes />
+        </AppErrorBoundary>
         <ToastContainer />
       </AuthProvider>
     </BrowserRouter>

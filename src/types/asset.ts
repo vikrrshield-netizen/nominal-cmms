@@ -88,7 +88,7 @@ export interface Asset {
 }
 
 // Legacy category config (backward compat)
-export type AssetCategory = 'extruder' | 'mixer' | 'packer' | 'compressor' | 'boiler' | 'forklift' | 'agri' | 'other';
+export type AssetCategory = 'extruder' | 'mixer' | 'packer' | 'compressor' | 'boiler' | 'forklift' | 'hvac' | 'agri' | 'other';
 export const ASSET_CATEGORY_CONFIG: Record<string, { label: string; icon: string }> = {
   extruder:   { label: 'Extruder',    icon: '🏭' },
   mixer:      { label: 'Míchačka',    icon: '🔄' },
@@ -96,6 +96,7 @@ export const ASSET_CATEGORY_CONFIG: Record<string, { label: string; icon: string
   compressor: { label: 'Kompresor',   icon: '💨' },
   boiler:     { label: 'Kotel',       icon: '🔥' },
   forklift:   { label: 'VZV',         icon: '🚜' },
+  hvac:        { label: 'Vzduchotechnika', icon: '💨' },
   agri:       { label: 'Zemědělská',  icon: '🌾' },
   other:      { label: 'Ostatní',     icon: '⚙️' },
 };

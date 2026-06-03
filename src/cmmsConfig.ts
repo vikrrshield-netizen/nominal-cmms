@@ -15,6 +15,7 @@ export const cmmsConfig = {
   ],
   workTypes: [
     { id: 'udrzba', label: 'Údržba' },
+    { id: 'porucha', label: 'Porucha' },
     { id: 'projekt_milan', label: 'Projekt/Milan' },
     { id: 'revize', label: 'Revize' },
     { id: 'sanitace', label: 'Sanitace' },

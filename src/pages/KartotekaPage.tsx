@@ -5,12 +5,17 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { addDoc, collection, doc, serverTimestamp, setDoc, Timestamp } from 'firebase/firestore';
 import {
   ArrowLeft, Building2, Search, Upload, Plus, X,
   ChevronRight, ChevronDown, FileText, Loader2, Pencil, Trash2,
+  ClipboardCheck, Cog,
 } from 'lucide-react';
+import { db } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import { assetService } from '../services/assetService';
+import { isGearboxAsset } from '../services/gearboxService';
 import { importAssets } from '../utils/importers/importAssets';
 import type { Asset, AssetStatus, AssetCriticality } from '../types/asset';
 import { ASSET_STATUS_CONFIG, CRITICALITY_CONFIG } from '../types/asset';
@@ -44,34 +49,251 @@ const ENTITY_COLORS: Record<string, string> = {
   'Kancelář':  '#a855f7',
 };
 
-function getEntityColor(entityType: string): string {
-  return ENTITY_COLORS[entityType] || '#3b82f6';
+function safeText(value: unknown): string {
+  return typeof value === 'string' ? value : '';
+}
+
+function getEntityColor(entityType: string | undefined): string {
+  return ENTITY_COLORS[entityType || ''] || '#3b82f6';
 }
 
 // ── Helpers ──────────────────────────────────────────────────────
-type FilterKey = 'all' | 'broken' | 'maintenance' | 'stopped' | 'operational';
+type FilterKey = 'all' | 'broken' | 'maintenance' | 'stopped' | 'operational' | 'gearbox';
+type CreateKind = 'building' | 'room' | 'asset' | 'gearbox' | 'inspection';
+type InspectionFrequency = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
 
-function collectAncestorIds(assetId: string, allAssets: Asset[]): string[] {
+const INSPECTION_FREQUENCY_OPTIONS: Array<{ value: InspectionFrequency; label: string }> = [
+  { value: 'daily', label: 'Denně' },
+  { value: 'weekly', label: 'Týdně' },
+  { value: 'monthly', label: 'Měsíčně' },
+  { value: 'quarterly', label: 'Čtvrtletně' },
+  { value: 'yearly', label: 'Ročně' },
+];
+
+const ASSET_TYPE_OPTIONS = [
+  'Zařízení',
+  'Extruder',
+  'Převodovka',
+  'Kogenerační jednotka',
+  'Kotel',
+  'Čerpadlo',
+  'Dopravník',
+  'Ventilátor',
+  'Kompresor',
+  'Rozvaděč',
+  'Měřidlo',
+  'Ostatní',
+];
+
+type DisplayAsset = Asset & {
+  isVirtual?: boolean;
+  virtualKind?: 'building' | 'room';
+  sourceBuildingId?: string;
+  sourceAreaName?: string;
+};
+
+function slug(value: string) {
+  return safeText(value).toLowerCase().trim().replace(/[^a-z0-9]+/gi, '_') || 'unknown';
+}
+
+function normalizeText(value: unknown): string {
+  return safeText(value)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+function isBuildingAsset(asset: Asset) {
+  const type = normalizeText(asset.entityType);
+  return type === 'budova' || type === 'hala' || type === 'areal';
+}
+
+function isRoomAsset(asset: Asset) {
+  const type = normalizeText(asset.entityType);
+  return type === 'mistnost' || type === 'mistnosti' || type === 'prostor';
+}
+
+function inferBuildingIdFromText(...values: string[]) {
+  const joined = values.join(' ').toUpperCase();
+  const explicit = joined.match(/\bBUDOVA\s*([A-Z0-9]{1,3})\b/);
+  if (explicit) return explicit[1];
+  const compact = joined.match(/\b([A-Z])\b/);
+  return compact?.[1] || '';
+}
+
+function getBuildingLabel(asset: Asset) {
+  return asset.buildingId ? `Budova ${asset.buildingId}` : 'Bez budovy';
+}
+
+function getRoomLabel(asset: Asset) {
+  return safeText(asset.areaName) || safeText(asset.location) || '';
+}
+
+function rootIconLabel(asset: DisplayAsset): string {
+  if (asset.virtualKind === 'building' || isBuildingAsset(asset)) {
+    return safeText(asset.sourceBuildingId || asset.buildingId || inferBuildingIdFromText(safeText(asset.name), safeText(asset.code))).slice(0, 2).toUpperCase() || 'B';
+  }
+  return (safeText(asset.name) || '?').charAt(0).toUpperCase();
+}
+
+function getCreateKindName(kind: CreateKind) {
+  if (kind === 'building') return 'Budova';
+  if (kind === 'room') return 'Místnost';
+  if (kind === 'gearbox') return 'Převodovka';
+  if (kind === 'inspection') return 'Kontrola';
+  return 'Zařízení';
+}
+
+function getCreateKindHelp(kind: CreateKind) {
+  if (kind === 'building') return 'Hlavní budova nebo hala v areálu.';
+  if (kind === 'room') return 'Místnost nebo prostor uvnitř budovy.';
+  if (kind === 'gearbox') return 'Samostatná karta převodovky s historií a umístěním.';
+  if (kind === 'inspection') return 'Pravidelná kontrola, která se propíše do modulu Kontroly.';
+  return 'Stroj, zařízení nebo věc, na kterou se bude zapisovat práce.';
+}
+
+function getParentOptionLabel(asset: DisplayAsset, allAssets: DisplayAsset[]) {
+  const names = [...collectAncestorIds(asset.id, allAssets).reverse(), asset.id]
+    .map((id) => allAssets.find((item) => item.id === id)?.name)
+    .filter(Boolean);
+  return names.join(' / ') || asset.name;
+}
+
+function makeVirtualNode(input: {
+  id: string;
+  parentId: string | null;
+  tenantId: string;
+  name: string;
+  entityType: string;
+  kind: 'building' | 'room';
+  buildingId?: string;
+  areaName?: string;
+}): DisplayAsset {
+  return {
+    id: input.id,
+    tenantId: input.tenantId,
+    parentId: input.parentId,
+    name: input.name,
+    entityType: input.entityType,
+    code: '',
+    status: 'operational',
+    criticality: 'low',
+    buildingId: input.buildingId,
+    areaName: input.areaName,
+    isVirtual: true,
+    virtualKind: input.kind,
+    sourceBuildingId: input.buildingId,
+    sourceAreaName: input.areaName,
+  };
+}
+
+function buildRoomTree(realAssets: Asset[], tenantId: string): DisplayAsset[] {
+  const result: DisplayAsset[] = [];
+  const virtual = new Map<string, DisplayAsset>();
+  const realIds = new Set(realAssets.map((asset) => asset.id));
+  const realBuildingById = new Map(
+    realAssets
+      .filter((asset) => isBuildingAsset(asset) && asset.buildingId)
+      .map((asset) => [asset.buildingId as string, asset])
+  );
+  const realRoomByKey = new Map(
+    realAssets
+      .filter((asset) => isRoomAsset(asset))
+      .map((asset) => [`${asset.buildingId || ''}:${slug(asset.areaName || asset.name)}`, asset])
+  );
+
+  const ensureVirtual = (node: DisplayAsset) => {
+    if (!virtual.has(node.id)) {
+      virtual.set(node.id, node);
+      result.push(node);
+    }
+  };
+
+  for (const asset of realAssets) {
+    if (isBuildingAsset(asset) || isRoomAsset(asset)) {
+      result.push(asset);
+      continue;
+    }
+
+    if (asset.parentId && realIds.has(asset.parentId)) {
+      result.push(asset);
+      continue;
+    }
+
+    const roomName = getRoomLabel(asset).trim();
+    const buildingLabel = getBuildingLabel(asset);
+    const buildingId = asset.buildingId || '';
+    const realBuilding = buildingId ? realBuildingById.get(buildingId) : undefined;
+
+    if (!roomName && !buildingId) {
+      result.push(asset);
+      continue;
+    }
+
+    const buildingNodeId = realBuilding?.id || `virtual-building:${slug(buildingLabel)}`;
+    if (!realBuilding) {
+      ensureVirtual(makeVirtualNode({
+        id: buildingNodeId,
+        parentId: null,
+        tenantId,
+        name: buildingLabel,
+        entityType: 'Budova',
+        kind: 'building',
+        buildingId,
+      }));
+    }
+
+    if (roomName) {
+      const realRoom = realRoomByKey.get(`${buildingId}:${slug(roomName)}`);
+      const roomNodeId = realRoom?.id || `virtual-room:${slug(buildingLabel)}:${slug(roomName)}`;
+      if (!realRoom) ensureVirtual(makeVirtualNode({
+        id: roomNodeId,
+        parentId: buildingNodeId,
+        tenantId,
+        name: roomName,
+        entityType: 'Místnost',
+        kind: 'room',
+        buildingId,
+        areaName: roomName,
+      }));
+      result.push({ ...asset, parentId: roomNodeId });
+    } else {
+      result.push({ ...asset, parentId: buildingNodeId });
+    }
+  }
+
+  return result;
+}
+
+function collectAncestorIds(assetId: string, allAssets: DisplayAsset[]): string[] {
   const ids: string[] = [];
+  const seen = new Set<string>([assetId]);
   let current = allAssets.find((a) => a.id === assetId);
-  while (current?.parentId) {
+  while (current?.parentId && !seen.has(current.parentId)) {
     ids.push(current.parentId);
+    seen.add(current.parentId);
     current = allAssets.find((a) => a.id === current!.parentId);
   }
   return ids;
 }
 
 /** Count descendants recursively, grouped by status */
-function countDescendants(parentId: string, allAssets: Asset[]) {
+function countDescendants(parentId: string, allAssets: DisplayAsset[], visited = new Set<string>()) {
   let total = 0, broken = 0, maintenance = 0, operational = 0, stopped = 0;
-  const children = allAssets.filter((a) => a.parentId === parentId);
+  if (visited.has(parentId)) return { total, broken, maintenance, operational, stopped };
+
+  const nextVisited = new Set(visited);
+  nextVisited.add(parentId);
+  const children = allAssets.filter((a) => a.parentId === parentId && !nextVisited.has(a.id));
   for (const c of children) {
-    total++;
-    if (c.status === 'broken') broken++;
-    else if (c.status === 'maintenance') maintenance++;
-    else if (c.status === 'stopped') stopped++;
-    else operational++;
-    const sub = countDescendants(c.id, allAssets);
+    if (!c.isVirtual) {
+      total++;
+      if (c.status === 'broken') broken++;
+      else if (c.status === 'maintenance') maintenance++;
+      else if (c.status === 'stopped') stopped++;
+      else operational++;
+    }
+    const sub = countDescendants(c.id, allAssets, nextVisited);
     total += sub.total;
     broken += sub.broken;
     maintenance += sub.maintenance;
@@ -81,45 +303,44 @@ function countDescendants(parentId: string, allAssets: Asset[]) {
   return { total, broken, maintenance, operational, stopped };
 }
 
-/** Get worst status from descendants */
-function worstStatus(parentId: string, allAssets: Asset[]): AssetStatus {
-  const c = countDescendants(parentId, allAssets);
-  if (c.broken > 0) return 'broken';
-  if (c.maintenance > 0) return 'maintenance';
-  if (c.stopped > 0) return 'stopped';
-  return 'operational';
-}
-
 // ═══════════════════════════════════════════════════════════════════
 // CHILD TREE NODE — recursive list item for non-root assets
 // ═══════════════════════════════════════════════════════════════════
 interface TreeNodeProps {
-  asset: Asset;
-  allAssets: Asset[];
+  asset: DisplayAsset;
+  allAssets: DisplayAsset[];
   depth: number;
   expanded: Set<string>;
   onToggle: (id: string) => void;
-  onDetail: (asset: Asset) => void;
+  onDetail: (asset: DisplayAsset) => void;
   onAddChild: (parentId: string) => void;
-  onDelete: (asset: Asset) => void;
+  onDelete: (asset: DisplayAsset) => void;
+  canCreateAsset: boolean;
+  visited?: Set<string>;
 }
 
-function TreeNode({ asset, allAssets, depth, expanded, onToggle, onDetail, onAddChild, onDelete }: TreeNodeProps) {
+function TreeNode({ asset, allAssets, depth, expanded, onToggle, onDetail, onAddChild, onDelete, canCreateAsset, visited }: TreeNodeProps) {
+  const currentPath = new Set(visited);
+  currentPath.add(asset.id);
   const children = allAssets
-    .filter((a) => a.parentId === asset.id)
-    .sort((a, b) => a.name.localeCompare(b.name, 'cs'));
+    .filter((a) => a.parentId === asset.id && !currentPath.has(a.id))
+    .sort((a, b) => safeText(a.name).localeCompare(safeText(b.name), 'cs'));
   const hasChildren = children.length > 0;
   const isExpanded = expanded.has(asset.id);
   const statusColor = STATUS_HEX[asset.status] || '#6b7280';
   const desc = countDescendants(asset.id, allAssets);
 
   return (
-    <div className="k-tree-node">
+    <div className={`k-tree-node ${asset.virtualKind ? `is-${asset.virtualKind}` : 'is-asset'}`}>
       {/* Row */}
-      <div className="k-tree-row" style={{ paddingLeft: `${depth * 24 + 12}px` }}>
+      <div
+        className="k-tree-row"
+        style={{ paddingLeft: `${depth * 24 + 12}px` }}
+        onClick={() => hasChildren ? onToggle(asset.id) : onDetail(asset)}
+      >
         {/* Expand/collapse button */}
         {hasChildren ? (
-          <button className="k-tree-expand" onClick={() => onToggle(asset.id)}>
+          <button className="k-tree-expand" onClick={(e) => { e.stopPropagation(); onToggle(asset.id); }}>
             {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
           </button>
         ) : (
@@ -130,12 +351,7 @@ function TreeNode({ asset, allAssets, depth, expanded, onToggle, onDetail, onAdd
         <span className="k-tree-dot" style={{ backgroundColor: statusColor }} />
 
         {/* Asset name */}
-        <span className="k-tree-name">{asset.name}</span>
-
-        {/* Entity type badge */}
-        {asset.entityType && (
-          <span className="k-tree-badge">{asset.entityType}</span>
-        )}
+        <span className="k-tree-name">{safeText(asset.name) || 'Bez názvu'}</span>
 
         {/* Descendant issue counts */}
         {hasChildren && (desc.broken > 0 || desc.maintenance > 0) && (
@@ -151,28 +367,30 @@ function TreeNode({ asset, allAssets, depth, expanded, onToggle, onDetail, onAdd
         )}
 
         {/* Action: Edit (navigate to detail) */}
-        <button
+        {!asset.isVirtual && <button
           className="k-tree-action k-tree-action-edit"
           onClick={(e) => { e.stopPropagation(); onDetail(asset); }}
           title="Upravit"
         >
           <Pencil size={14} />
-        </button>
+        </button>}
 
         {/* Action: Add child */}
-        <button
-          className="k-tree-action k-tree-action-add"
-          onClick={(e) => { e.stopPropagation(); onAddChild(asset.id); }}
-          title="Přidat potomka"
-        >
-          <Plus size={14} />
-        </button>
+        {canCreateAsset && (
+          <button
+            className="k-tree-action k-tree-action-add"
+            onClick={(e) => { e.stopPropagation(); onAddChild(asset.id); }}
+            title="Přidat potomka"
+          >
+            <Plus size={14} />
+          </button>
+        )}
 
-        {/* Action: Open detail (Rodný list) */}
+        {/* Action: Open detail card */}
         <button
           className="k-tree-action k-tree-action-detail"
           onClick={(e) => { e.stopPropagation(); onDetail(asset); }}
-          title="Rodný list"
+          title="Otevřít kartu"
         >
           <FileText size={14} />
         </button>
@@ -201,6 +419,8 @@ function TreeNode({ asset, allAssets, depth, expanded, onToggle, onDetail, onAdd
               onDetail={onDetail}
               onAddChild={onAddChild}
               onDelete={onDelete}
+              canCreateAsset={canCreateAsset}
+              visited={currentPath}
             />
           ))}
         </div>
@@ -213,88 +433,130 @@ function TreeNode({ asset, allAssets, depth, expanded, onToggle, onDetail, onAdd
 // ROOT CARD — large card for top-level items (MapPage style)
 // ═══════════════════════════════════════════════════════════════════
 interface RootCardProps {
-  asset: Asset;
-  allAssets: Asset[];
+  asset: DisplayAsset;
+  allAssets: DisplayAsset[];
   expanded: Set<string>;
   onToggle: (id: string) => void;
-  onDetail: (asset: Asset) => void;
+  onDetail: (asset: DisplayAsset) => void;
   onAddChild: (parentId: string) => void;
-  onDelete: (asset: Asset) => void;
+  onDelete: (asset: DisplayAsset) => void;
+  canCreateAsset: boolean;
 }
 
-function RootCard({ asset, allAssets, expanded, onToggle, onDetail, onAddChild, onDelete }: RootCardProps) {
+function RootCard({ asset, allAssets, expanded, onToggle, onDetail, onAddChild, onDelete, canCreateAsset }: RootCardProps) {
   const color = getEntityColor(asset.entityType);
   const children = allAssets
     .filter((a) => a.parentId === asset.id)
-    .sort((a, b) => a.name.localeCompare(b.name, 'cs'));
+    .sort((a, b) => safeText(a.name).localeCompare(safeText(b.name), 'cs'));
   const hasChildren = children.length > 0;
   const isExpanded = expanded.has(asset.id);
   const desc = countDescendants(asset.id, allAssets);
-  const ws = worstStatus(asset.id, allAssets);
   const dotClass = STATUS_DOT[asset.status] || 'bg-slate-400';
 
   return (
-    <div className="k-root-wrapper">
+    <div className={`k-root-wrapper ${isExpanded ? 'is-expanded' : ''}`}>
       {/* Card */}
       <div
         className="k-root-card"
-        onClick={() => onDetail(asset)}
         style={{
-          background: `linear-gradient(145deg, ${color}12, ${color}04)`,
-          borderColor: `${color}25`,
-          cursor: 'pointer',
+          background: '#ffffff',
+          borderColor: '#e7dfd2',
+          boxShadow: `inset 4px 0 0 ${color}cc`,
         }}
       >
         {/* Status dot (top-right) */}
         <div className={`k-root-status-dot ${dotClass}`} />
 
-        {/* Top row: icon + info + actions */}
+        {/* Top row: icon + název(rozbalit) + Rodný list + akce */}
         <div className="k-root-top">
           {/* Icon box */}
           <div
             className="k-root-icon"
-            style={{ background: `${color}20`, color }}
+            style={{ background: `${color}18`, color, border: `1px solid ${color}35` }}
           >
-            {asset.name.charAt(0).toUpperCase()}
+            {rootIconLabel(asset)}
           </div>
 
-          {/* Info */}
-          <div className="k-root-info">
-            <span className="k-root-name">{asset.name}</span>
-            {asset.entityType && (
-              <span className="k-root-type">{asset.entityType}</span>
+          {/* Název = rozbalit/sbalit větev (jinak otevře rodný list) */}
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); hasChildren ? onToggle(asset.id) : onDetail(asset); }}
+            title={hasChildren ? (isExpanded ? 'Sbalit' : 'Rozbalit') : 'Otevřít rodný list'}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              background: 'transparent', border: 'none', padding: 0,
+              cursor: 'pointer', color: 'inherit', textAlign: 'left', minWidth: 0,
+            }}
+          >
+            {hasChildren && (
+              <span style={{ color: '#64748b', display: 'flex' }}>
+                {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+              </span>
             )}
-            {asset.code && (
-              <span className="k-root-code">{asset.code}</span>
+            <span className="k-root-info">
+              <span className="k-root-name">
+                {safeText(asset.name) || 'Bez názvu'}
+                {hasChildren && (
+                  <span style={{ color: '#94a3b8', fontWeight: 600 }}> ({children.length})</span>
+                )}
+              </span>
+              <span className="k-root-type">{safeText(asset.entityType) || 'Položka'}</span>
+              {asset.code && (
+                <span className="k-root-code">{asset.code}</span>
+              )}
+            </span>
+          </button>
+
+          {/* Rodný list — hned vedle názvu */}
+          <div className="k-root-stats k-root-stats-inline">
+            <span className="k-root-stat">
+              {desc.total} položek
+            </span>
+            {desc.operational > 0 && (
+              <span className="k-root-stat">
+                <span style={{ color: '#22c55e' }}>●</span> {desc.operational}
+              </span>
+            )}
+            {desc.maintenance > 0 && (
+              <span className="k-root-stat">
+                <span style={{ color: '#eab308' }}>●</span> {desc.maintenance}
+              </span>
+            )}
+            {desc.broken > 0 && (
+              <span className="k-root-stat k-root-stat-alert">
+                <span style={{ color: '#ef4444' }}>●</span> {desc.broken}
+              </span>
+            )}
+            {desc.stopped > 0 && (
+              <span className="k-root-stat">
+                <span style={{ color: '#6b7280' }}>●</span> {desc.stopped}
+              </span>
             )}
           </div>
 
-          {/* Actions cluster */}
-          <div className="k-root-actions">
-            <button
-              className="k-root-action-btn"
-              onClick={(e) => { e.stopPropagation(); onDetail(asset); }}
-              title="Upravit"
-              style={{ color: '#f59e0b', borderColor: '#f59e0b30' }}
-            >
-              <Pencil size={16} />
-            </button>
-            <button
-              className="k-root-action-btn"
-              onClick={(e) => { e.stopPropagation(); onAddChild(asset.id); }}
-              title="Přidat potomka"
-              style={{ color: '#22c55e', borderColor: '#22c55e30' }}
-            >
-              <Plus size={16} />
-            </button>
-            <button
-              className="k-root-action-btn"
-              onClick={(e) => { e.stopPropagation(); onDetail(asset); }}
-              title="Rodný list"
-              style={{ color: '#3b82f6', borderColor: '#3b82f630' }}
-            >
-              <FileText size={16} />
-            </button>
+          <button
+            className="k-root-action-btn"
+            onClick={(e) => { e.stopPropagation(); onDetail(asset); }}
+            title="Otevřít rodný list"
+            style={{ color: '#3b82f6', borderColor: '#3b82f630' }}
+          >
+            <FileText size={16} />
+            <span className="k-action-label">Rodný list</span>
+          </button>
+
+          {/* Akce — vpravo */}
+          <div className="k-root-actions" style={{ marginLeft: 'auto' }}>
+            {canCreateAsset && (
+              <button
+                className="k-root-action-btn"
+                onClick={(e) => { e.stopPropagation(); onAddChild(asset.id); }}
+                title="Přidat potomka"
+                style={{ color: '#38bdf8', borderColor: '#38bdf830' }}
+              >
+                <Plus size={16} />
+                <span className="k-action-label">Přidat</span>
+              </button>
+            )}
             <button
               className="k-root-action-btn"
               onClick={(e) => { e.stopPropagation(); onDelete(asset); }}
@@ -302,6 +564,7 @@ function RootCard({ asset, allAssets, expanded, onToggle, onDetail, onAddChild, 
               style={{ color: '#ef4444', borderColor: '#ef444430' }}
             >
               <Trash2 size={16} />
+              <span className="k-action-label">Smazat</span>
             </button>
           </div>
         </div>
@@ -333,22 +596,6 @@ function RootCard({ asset, allAssets, expanded, onToggle, onDetail, onAddChild, 
           )}
         </div>
 
-        {/* Expand toggle bar */}
-        {hasChildren && (
-          <button className="k-root-expand" onClick={(e) => { e.stopPropagation(); onToggle(asset.id); }}>
-            {isExpanded ? (
-              <>
-                <ChevronDown size={16} />
-                <span>Skrýt ({children.length})</span>
-              </>
-            ) : (
-              <>
-                <ChevronRight size={16} />
-                <span>Zobrazit ({children.length})</span>
-              </>
-            )}
-          </button>
-        )}
       </div>
 
       {/* Expanded children list */}
@@ -365,6 +612,8 @@ function RootCard({ asset, allAssets, expanded, onToggle, onDetail, onAddChild, 
               onDetail={onDetail}
               onAddChild={onAddChild}
               onDelete={onDelete}
+              canCreateAsset={canCreateAsset}
+              visited={new Set([asset.id])}
             />
           ))}
         </div>
@@ -378,8 +627,10 @@ function RootCard({ asset, allAssets, expanded, onToggle, onDetail, onAddChild, 
 // ═══════════════════════════════════════════════════════════════════
 export default function KartotekaPage() {
   const navigate = useNavigate();
-  const { user } = useAuthContext();
+  const goBack = useBackNavigation('/');
+  const { user, isSandbox } = useAuthContext();
   const tenantId = user?.tenantId ?? 'main_firm';
+  const canCreateAsset = !isSandbox && ['SUPERADMIN', 'MAJITEL', 'VEDENI', 'UDRZBA', 'VYROBA'].includes(user?.role || '');
 
   // ── Data state ───
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -393,16 +644,25 @@ export default function KartotekaPage() {
   const [showImport, setShowImport] = useState(false);
 
   // ── Delete state ───
-  const [deleteTarget, setDeleteTarget] = useState<Asset | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DisplayAsset | null>(null);
 
   // ── Create modal state ───
   const [showCreate, setShowCreate] = useState(false);
+  const [createKind, setCreateKind] = useState<CreateKind>('asset');
   const [createParentId, setCreateParentId] = useState<string | null>(null);
+  const [createParentChoiceId, setCreateParentChoiceId] = useState('');
+  const [createBuildingId, setCreateBuildingId] = useState('');
+  const [createAreaName, setCreateAreaName] = useState('');
+  const [createFloor, setCreateFloor] = useState('');
+  const [createInspection, setCreateInspection] = useState(false);
+  const [createInspectionFrequency, setCreateInspectionFrequency] = useState<InspectionFrequency>('monthly');
   const [createSaving, setCreateSaving] = useState(false);
   const [createForm, setCreateForm] = useState({
     name: '',
     entityType: '',
     code: '',
+    description: '',
+    category: 'budova',
     status: 'operational' as AssetStatus,
     criticality: 'medium' as AssetCriticality,
   });
@@ -434,23 +694,155 @@ export default function KartotekaPage() {
     return result;
   };
 
+  const createInspectionPoint = async (input: {
+    roomCode: string;
+    roomName: string;
+    buildingId: string;
+    floor?: string;
+    description: string;
+    category?: string;
+    assetId?: string;
+    frequency?: InspectionFrequency;
+  }) => {
+    const building = input.buildingId || 'D';
+    const floor = input.floor || '1.NP';
+    const frequency = input.frequency || 'monthly';
+    const checkPoints = input.description || 'Vizuální kontrola';
+    const month = new Date().toISOString().slice(0, 7);
+    const templateId = input.assetId
+      ? `kartoteka_${input.assetId}`
+      : `kartoteka_${slug(`${building}_${floor}_${input.roomCode}_${input.roomName}_${checkPoints}`).slice(0, 80)}`;
+    const logId = `${templateId}_${month}`;
+    const now = serverTimestamp();
+
+    await addDoc(collection(db, 'inspections'), {
+      roomCode: input.roomCode,
+      roomName: input.roomName,
+      floor,
+      buildingId: building,
+      description: checkPoints,
+      category: input.category || 'budova',
+      sourceAssetId: input.assetId || null,
+      frequency,
+      status: 'pending',
+      lastInspectedAt: null,
+      lastInspectedBy: null,
+      issueNote: null,
+      createdAt: Timestamp.now(),
+    });
+
+    await setDoc(doc(db, 'inspection_templates', templateId), {
+      templateId,
+      building,
+      floor,
+      roomName: input.roomName,
+      roomCode: input.roomCode,
+      checkPoints,
+      frequency,
+      category: input.category || 'budova',
+      sourceAssetId: input.assetId || null,
+      source: 'kartoteka',
+      isDeleted: false,
+      sortOrder: Date.now(),
+      createdByName: user?.displayName || 'Kartoteka',
+      updatedAt: now,
+      createdAt: now,
+    }, { merge: true });
+
+    await setDoc(doc(db, 'inspection_logs', logId), {
+      templateId,
+      month,
+      building,
+      floor,
+      roomName: input.roomName,
+      roomCode: input.roomCode,
+      checkPoints,
+      frequency,
+      sortOrder: Date.now(),
+      status: 'pending',
+      defectNote: '',
+      inspectionNote: '',
+      completedBy: '',
+      completedAt: null,
+      isDeleted: false,
+      sourceAssetId: input.assetId || null,
+      createdByName: user?.displayName || 'Kartoteka',
+      createdAt: now,
+      updatedAt: now,
+    }, { merge: true });
+  };
+
   // ── Create asset handler ───
   const handleCreate = async () => {
     if (!createForm.name.trim() || !tenantId) return;
+    if (!canCreateAsset) {
+      showToast(isSandbox
+        ? 'Demo režim neukládá do databáze. Přihlas se skutečným PINem údržby nebo vedení.'
+        : 'Tvoje role nemá právo vytvářet položky v kartotéce.',
+        'error'
+      );
+      return;
+    }
     setCreateSaving(true);
     try {
-      await assetService.add(tenantId, {
+      const parent = createParentId ? assets.find((asset) => asset.id === createParentId) : null;
+      const parentIsRoom = !!parent && isRoomAsset(parent);
+      const buildingId = createBuildingId
+        || parent?.buildingId
+        || (createKind === 'building' ? inferBuildingIdFromText(createForm.code, createForm.name) : '');
+      const roomName = createKind === 'room' ? createForm.name.trim() : (createAreaName || parent?.name || createForm.name.trim());
+      const roomCode = createForm.code.trim() || (buildingId ? `${buildingId} - ${roomName}` : roomName);
+
+      if (createKind === 'inspection') {
+        await createInspectionPoint({
+          roomCode,
+          roomName,
+          buildingId: buildingId || 'D',
+          floor: createFloor || parent?.floor,
+          description: createForm.description.trim() || createForm.name.trim(),
+          category: createForm.category,
+          assetId: parent?.id,
+          frequency: createInspectionFrequency,
+        });
+        showToast('Kontrola vytvořena v modulu Kontroly', 'success');
+        setShowCreate(false);
+        resetCreateForm();
+        setCreateSaving(false);
+        return;
+      }
+
+      const newAssetId = await assetService.add(tenantId, {
         tenantId,
         name: createForm.name.trim(),
-        entityType: createForm.entityType.trim() || 'Zařízení',
+        entityType: createForm.entityType.trim()
+          || (createKind === 'building' ? 'Budova' : createKind === 'room' ? 'Místnost' : 'Zařízení'),
         code: createForm.code.trim() || null,
         status: createForm.status,
         criticality: createForm.criticality,
-        parentId: createParentId,
+        parentId: createKind === 'building' ? null : createParentId,
+        buildingId: buildingId || undefined,
+        areaName: createKind === 'room' ? createForm.name.trim() : (createAreaName || undefined),
+        floor: createFloor || parent?.floor || undefined,
+        location: parentIsRoom ? parent?.name : undefined,
+        category: createKind === 'gearbox' ? 'gearbox' : undefined,
+        gearboxStatus: createKind === 'gearbox' ? 'in_stock' : undefined,
       } as Omit<Asset, 'id'>);
+
+      if (createKind === 'room' && createInspection) {
+        await createInspectionPoint({
+          roomCode,
+          roomName,
+          buildingId: buildingId || 'D',
+          floor: createFloor,
+          description: createForm.description.trim() || 'Vizuální kontrola místnosti',
+          category: createForm.category,
+          assetId: newAssetId,
+          frequency: createInspectionFrequency,
+        });
+      }
       const parentName = createParentId
         ? assets.find((a) => a.id === createParentId)?.name
-        : null;
+        : createAreaName || (createBuildingId ? `Budova ${createBuildingId}` : null);
       showToast(
         parentName
           ? `Vytvořeno pod "${parentName}"`
@@ -461,32 +853,83 @@ export default function KartotekaPage() {
       resetCreateForm();
       reloadAssets();
       // Auto-expand parent so user sees the new child
-      if (createParentId) {
-        setExpanded((prev) => new Set([...prev, createParentId]));
+      if (createParentId || createAreaName || createBuildingId) {
+        const branchId = createAreaName
+          ? `virtual-room:${slug(createBuildingId ? `Budova ${createBuildingId}` : 'Bez budovy')}:${slug(createAreaName)}`
+          : createBuildingId ? `virtual-building:${slug(`Budova ${createBuildingId}`)}` : createParentId;
+        if (branchId) setExpanded((prev) => new Set([...prev, branchId]));
       }
     } catch (err) {
       console.error('[Kartoteka] create error:', err);
-      showToast('Chyba při vytváření', 'error');
+      const code = typeof err === 'object' && err && 'code' in err ? String(err.code) : '';
+      showToast(
+        code.includes('permission-denied')
+          ? 'Databáze zápis odmítla: nemáš oprávnění pro vytvoření položky v kartotéce.'
+          : 'Chyba při vytváření. Zkus obnovit stránku a zadat položku znovu.',
+        'error'
+      );
     }
     setCreateSaving(false);
   };
 
   const resetCreateForm = () => {
     setCreateForm({
-      name: '', entityType: '', code: '',
+      name: '', entityType: '', code: '', description: '', category: 'budova',
       status: 'operational', criticality: 'medium',
     });
+    setCreateKind('asset');
     setCreateParentId(null);
+    setCreateParentChoiceId('');
+    setCreateBuildingId('');
+    setCreateAreaName('');
+    setCreateFloor('');
+    setCreateInspection(false);
+    setCreateInspectionFrequency('monthly');
   };
 
-  const openCreateModal = (parentId: string | null) => {
-    resetCreateForm();           // FIRST: reset form (sets parentId=null)
-    setCreateParentId(parentId); // THEN: set correct parentId
+  const openCreateModal = (parentId: string | null, kind?: CreateKind) => {
+    if (!canCreateAsset) {
+      showToast(isSandbox
+        ? 'Demo režim neukládá do databáze. Přihlas se skutečným PINem údržby nebo vedení.'
+        : 'Tvoje role nemá právo vytvářet položky v kartotéce.',
+        'error'
+      );
+      return;
+    }
+    resetCreateForm();
+    const parent = parentId ? treeAssets.find((asset) => asset.id === parentId) : null;
+    const nextKind = kind || (!parent ? 'building' : isBuildingAsset(parent) ? 'room' : 'asset');
+    setCreateKind(nextKind);
+    if (parent?.isVirtual) {
+      setCreateParentId(null);
+      setCreateParentChoiceId(parent.id);
+      setCreateBuildingId(parent.sourceBuildingId || parent.buildingId || '');
+      setCreateAreaName(parent.virtualKind === 'room' ? (parent.sourceAreaName || parent.areaName || parent.name) : '');
+    } else {
+      setCreateParentId(parentId);
+      setCreateParentChoiceId(parentId || '');
+      setCreateBuildingId(parent?.buildingId || '');
+      setCreateAreaName(parent && isRoomAsset(parent) ? parent.name || parent.areaName || '' : parent?.areaName || '');
+      setCreateFloor(parent?.floor || '');
+    }
+    setCreateForm((prev) => ({
+      ...prev,
+      entityType: nextKind === 'building' ? 'Budova' : nextKind === 'room' ? 'Místnost' : nextKind === 'gearbox' ? 'Převodovka' : nextKind === 'inspection' ? 'Kontrola' : '',
+      category: nextKind === 'inspection' ? 'budova' : prev.category,
+      description: nextKind === 'inspection' ? 'Vizuální kontrola místnosti' : '',
+    }));
+    if (nextKind === 'asset') {
+      setCreateForm((prev) => ({ ...prev, entityType: 'Zařízení' }));
+    }
     setShowCreate(true);
   };
 
   // ── Delete handler ───
-  const handleDelete = useCallback((asset: Asset) => {
+  const handleDelete = useCallback((asset: DisplayAsset) => {
+    if (asset.isVirtual) {
+      showToast('Toto je jen větev stromu, ne skutečná karta ke smazání.', 'error');
+      return;
+    }
     const childCount = assets.filter((a) => a.parentId === asset.id).length;
     if (childCount > 0) {
       showToast(`Nelze smazat — má ${childCount} potomků. Nejdřív smaž potomky.`, 'error');
@@ -519,9 +962,121 @@ export default function KartotekaPage() {
   }, []);
 
   // ── Navigate to detail ───
-  const handleDetail = useCallback((asset: Asset) => {
-    navigate(`/asset/${asset.id}`);
-  }, [navigate]);
+  const resolveVirtualAsset = useCallback((asset: DisplayAsset): Asset | null => {
+    if (!asset.isVirtual) return asset;
+
+    const sourceBuildingId = safeText(asset.sourceBuildingId || asset.buildingId || inferBuildingIdFromText(safeText(asset.name), safeText(asset.code))).toUpperCase();
+    const normalizedName = normalizeText(asset.name);
+    const normalizedArea = normalizeText(asset.sourceAreaName || asset.areaName || asset.name);
+
+    if (asset.virtualKind === 'building') {
+      return assets.find((candidate) => {
+        if (!isBuildingAsset(candidate)) return false;
+        const candidateBuildingId = safeText(candidate.buildingId || inferBuildingIdFromText(safeText(candidate.name), safeText(candidate.code))).toUpperCase();
+        const candidateCode = safeText(candidate.code).toUpperCase();
+        return Boolean(
+          (sourceBuildingId && (candidateBuildingId === sourceBuildingId || candidateCode === sourceBuildingId))
+          || normalizeText(candidate.name) === normalizedName
+        );
+      }) || null;
+    }
+
+    if (asset.virtualKind === 'room') {
+      return assets.find((candidate) => {
+        if (!isRoomAsset(candidate)) return false;
+        const candidateBuildingId = safeText(candidate.buildingId || inferBuildingIdFromText(safeText(candidate.name), safeText(candidate.code))).toUpperCase();
+        const sameBuilding = !sourceBuildingId || candidateBuildingId === sourceBuildingId;
+        const candidateArea = normalizeText(candidate.areaName || candidate.name || candidate.location);
+        return sameBuilding && candidateArea === normalizedArea;
+      }) || null;
+    }
+
+    return null;
+  }, [assets]);
+
+  const createRealBuildingFromVirtual = useCallback(async (asset: DisplayAsset): Promise<string | null> => {
+    if (!tenantId || asset.virtualKind !== 'building') return null;
+    if (!canCreateAsset) {
+      showToast(isSandbox
+        ? 'Demo režim neukládá do databáze. Přihlas se skutečným PINem údržby nebo vedení.'
+        : 'Tvoje role nemá právo vytvářet budovy v kartotéce.',
+        'error'
+      );
+      return null;
+    }
+
+    const buildingId = safeText(
+      asset.sourceBuildingId
+      || asset.buildingId
+      || inferBuildingIdFromText(safeText(asset.name), safeText(asset.code))
+    ).toUpperCase();
+    const name = safeText(asset.name) || (buildingId ? `Budova ${buildingId}` : 'Budova');
+
+    try {
+      const newAssetId = await assetService.add(tenantId, {
+        tenantId,
+        parentId: null,
+        name,
+        entityType: 'Budova',
+        code: buildingId || undefined,
+        buildingId: buildingId || undefined,
+        status: 'operational',
+        criticality: 'medium',
+        notes: 'Karta budovy vytvořená z kartotéky.',
+      });
+
+      setAssets((prev) => [
+        ...prev,
+        {
+          id: newAssetId,
+          tenantId,
+          parentId: null,
+          name,
+          entityType: 'Budova',
+          code: buildingId || undefined,
+          buildingId: buildingId || undefined,
+          status: 'operational',
+          criticality: 'medium',
+          notes: 'Karta budovy vytvořená z kartotéky.',
+        },
+      ]);
+      showToast(`Budova "${name}" dostala vlastní kartu`, 'success');
+      return newAssetId;
+    } catch (err) {
+      console.error('[Kartoteka] create virtual building card error:', err);
+      const code = typeof err === 'object' && err && 'code' in err ? String(err.code) : '';
+      showToast(
+        code.includes('permission-denied')
+          ? 'Databáze zápis odmítla: nemáš oprávnění založit kartu budovy.'
+          : 'Nepodařilo se založit kartu budovy. Zkus to prosím znovu.',
+        'error'
+      );
+      return null;
+    }
+  }, [canCreateAsset, isSandbox, tenantId]);
+
+  const handleDetail = useCallback(async (asset: DisplayAsset) => {
+    if (asset.isVirtual) {
+      const realAsset = resolveVirtualAsset(asset);
+      if (realAsset) {
+        navigate(`/asset/${realAsset.id}`, { state: { from: '/kartoteka' } });
+        return;
+      }
+      if (asset.virtualKind === 'building') {
+        const newAssetId = await createRealBuildingFromVirtual(asset);
+        if (newAssetId) {
+          navigate(`/asset/${newAssetId}`, { state: { from: '/kartoteka' } });
+        }
+        return;
+      }
+      showToast(
+        'Tahle položka je zatím jen větev stromu. Založ ji jako skutečnou kartu, aby šla otevřít.',
+        'error'
+      );
+      return;
+    }
+    navigate(`/asset/${asset.id}`, { state: { from: '/kartoteka' } });
+  }, [createRealBuildingFromVirtual, navigate, resolveVirtualAsset]);
 
   // ── Counts ───
   const counts = useMemo(() => ({
@@ -530,23 +1085,31 @@ export default function KartotekaPage() {
     maintenance: assets.filter((a) => a.status === 'maintenance').length,
     broken:      assets.filter((a) => a.status === 'broken').length,
     stopped:     assets.filter((a) => a.status === 'stopped').length,
+    gearboxes:   assets.filter((a) => isGearboxAsset(a)).length,
   }), [assets]);
+
+  const treeAssets = useMemo(() => buildRoomTree(assets, tenantId), [assets, tenantId]);
 
   // ── Filtering (search + status) ───
   const { visibleAssets } = useMemo(() => {
-    let matching = assets;
+    let matching = treeAssets;
 
     if (search.trim()) {
       const q = search.toLowerCase();
       matching = matching.filter(
-        (a) => a.name.toLowerCase().includes(q) ||
-               a.entityType.toLowerCase().includes(q) ||
-               (a.code && a.code.toLowerCase().includes(q))
+        (a) => safeText(a.name).toLowerCase().includes(q) ||
+               safeText(a.entityType).toLowerCase().includes(q) ||
+               safeText(a.code).toLowerCase().includes(q) ||
+               safeText(a.areaName).toLowerCase().includes(q) ||
+               safeText(a.location).toLowerCase().includes(q) ||
+               safeText(a.buildingId).toLowerCase().includes(q)
       );
     }
 
     if (filter !== 'all') {
-      matching = matching.filter((a) => a.status === filter);
+      matching = filter === 'gearbox'
+        ? matching.filter((a) => a.isVirtual || isGearboxAsset(a))
+        : matching.filter((a) => a.isVirtual || a.status === filter);
     }
 
     // Include ancestors so tree stays intact
@@ -554,22 +1117,71 @@ export default function KartotekaPage() {
       const idSet = new Set<string>();
       for (const a of matching) {
         idSet.add(a.id);
-        for (const ancestorId of collectAncestorIds(a.id, assets)) {
+        for (const ancestorId of collectAncestorIds(a.id, treeAssets)) {
           idSet.add(ancestorId);
         }
       }
-      return { visibleAssets: assets.filter((a) => idSet.has(a.id)) };
+      return { visibleAssets: treeAssets.filter((a) => idSet.has(a.id)) };
     }
 
-    return { visibleAssets: assets };
-  }, [assets, search, filter]);
+    return { visibleAssets: treeAssets };
+  }, [treeAssets, search, filter]);
 
-  const rootAssets = useMemo(
-    () => visibleAssets
-      .filter((a) => a.parentId === null)
-      .sort((a, b) => a.name.localeCompare(b.name, 'cs')),
-    [visibleAssets]
+  const rootAssets = useMemo(() => {
+    const visibleIds = new Set(visibleAssets.map((a) => a.id));
+    return visibleAssets
+      .filter((a) => !a.parentId || !visibleIds.has(a.parentId))
+      .sort((a, b) => safeText(a.name).localeCompare(safeText(b.name), 'cs'));
+  }, [visibleAssets]);
+
+  const createParentOptions = useMemo(() => {
+    return treeAssets
+      .filter((asset) => {
+        if (createKind === 'building') return false;
+        if (createKind === 'room') return isBuildingAsset(asset);
+        if (createKind === 'inspection') return isBuildingAsset(asset) || isRoomAsset(asset);
+        return true;
+      })
+      .sort((a, b) => getParentOptionLabel(a, treeAssets).localeCompare(getParentOptionLabel(b, treeAssets), 'cs'));
+  }, [createKind, treeAssets]);
+
+  const selectedCreateParent = useMemo(
+    () => createParentChoiceId ? treeAssets.find((asset) => asset.id === createParentChoiceId) : null,
+    [createParentChoiceId, treeAssets]
   );
+
+  const applyCreateParent = useCallback((parentId: string) => {
+    const parent = parentId ? treeAssets.find((asset) => asset.id === parentId) : null;
+    setCreateParentChoiceId(parentId);
+    if (!parent) {
+      setCreateParentId(null);
+      setCreateBuildingId('');
+      setCreateAreaName('');
+      setCreateFloor('');
+      return;
+    }
+
+    if (parent.isVirtual) {
+      setCreateParentId(null);
+      setCreateBuildingId(parent.sourceBuildingId || parent.buildingId || '');
+      setCreateAreaName(parent.virtualKind === 'room' ? (parent.sourceAreaName || parent.areaName || parent.name) : '');
+      setCreateFloor(parent.floor || '');
+      return;
+    }
+
+    setCreateParentId(parent.id);
+    setCreateBuildingId(parent.buildingId || '');
+    setCreateAreaName(isRoomAsset(parent) ? parent.name || parent.areaName || '' : parent.areaName || '');
+    setCreateFloor(parent.floor || '');
+  }, [treeAssets]);
+
+  const expandVisibleTree = useCallback(() => {
+    setExpanded(new Set(visibleAssets.map((item) => item.id)));
+  }, [visibleAssets]);
+
+  const collapseTree = useCallback(() => {
+    setExpanded(new Set());
+  }, []);
 
   // ── Auto-expand when filtering ───
   useEffect(() => {
@@ -590,8 +1202,20 @@ export default function KartotekaPage() {
 
   // ── Determine parent name for modal title ───
   const createParentName = createParentId
-    ? assets.find((a) => a.id === createParentId)?.name ?? ''
-    : '';
+    ? treeAssets.find((a) => a.id === createParentId)?.name ?? ''
+    : createAreaName || (createBuildingId ? `Budova ${createBuildingId}` : '');
+
+  const createModalTitle = createParentName
+    ? `Nová položka pod "${createParentName}"`
+    : `Nová položka: ${getCreateKindName(createKind)}`;
+
+  const createDefaultType = createAreaName ? 'Zařízení' : '';
+
+  useEffect(() => {
+    if (showCreate && createDefaultType && !createForm.entityType.trim()) {
+      setCreateForm((prev) => ({ ...prev, entityType: createDefaultType }));
+    }
+  }, [createDefaultType, createForm.entityType, showCreate]);
 
   // ═══════════════════════════════════════════════════════════════
   // RENDER
@@ -600,20 +1224,22 @@ export default function KartotekaPage() {
     <div className="kartoteka-page">
       {/* ── Header ── */}
       <div className="k-header">
-        <button className="k-back-btn" onClick={() => navigate('/')}>
+        <button className="k-back-btn" onClick={() => goBack()}>
           <ArrowLeft size={20} />
         </button>
         <Building2 size={22} style={{ color: '#3b82f6' }} />
         <span className="k-title">Kartotéka</span>
 
         {/* Add root asset */}
-        <button
-          className="k-add-btn"
-          onClick={() => openCreateModal(null)}
-          title="Přidat kořenový prvek"
-        >
-          <Plus size={18} />
-        </button>
+        {canCreateAsset && (
+          <button
+            className="k-add-btn"
+            onClick={() => openCreateModal(null)}
+            title="Přidat kořenový prvek"
+          >
+            <Plus size={18} />
+          </button>
+        )}
 
         {/* Import */}
         <button className="k-import-btn" onClick={() => setShowImport(true)}>
@@ -646,6 +1272,24 @@ export default function KartotekaPage() {
       </div>
 
       {/* ── Search ── */}
+      {canCreateAsset && (
+        <div className="k-create-toolbar" aria-label="Rychle pridat polozku">
+          <span className="k-create-label">Přidat</span>
+          <button className="k-create-btn" onClick={() => openCreateModal(null, 'building')}>
+            <Building2 size={16} /> Budova
+          </button>
+          <button className="k-create-btn" onClick={() => openCreateModal(null, 'room')}>
+            <Plus size={16} /> Místnost
+          </button>
+          <button className="k-create-btn" onClick={() => openCreateModal(null, 'inspection')}>
+            <ClipboardCheck size={16} /> Kontrola
+          </button>
+          <button className="k-create-btn" onClick={() => openCreateModal(null, 'gearbox')}>
+            <Cog size={16} /> Převodovka
+          </button>
+        </div>
+      )}
+
       <div className="k-search">
         <div className="k-search-wrap">
           <Search size={18} className="k-search-icon" />
@@ -674,6 +1318,21 @@ export default function KartotekaPage() {
             {f.label}
           </button>
         ))}
+        <button
+          className={`filter-chip${filter === 'gearbox' ? ' active' : ''}`}
+          onClick={() => setFilter(filter === 'gearbox' ? 'all' : 'gearbox')}
+        >
+          Převodovky ({counts.gearboxes})
+        </button>
+      </div>
+
+      <div className="k-tree-tools">
+        <button type="button" onClick={expandVisibleTree}>
+          Rozbalit vše
+        </button>
+        <button type="button" onClick={collapseTree}>
+          Sbalit vše
+        </button>
       </div>
 
       {/* ── Loading state ── */}
@@ -692,9 +1351,11 @@ export default function KartotekaPage() {
         <div className="k-empty">
           <Building2 size={48} />
           <span>Žádné záznamy v kartotéce</span>
-          <button className="k-empty-action" onClick={() => openCreateModal(null)}>
-            <Plus size={16} /> Přidat první položku
-          </button>
+          {canCreateAsset && (
+            <button className="k-empty-action" onClick={() => openCreateModal(null)}>
+              <Plus size={16} /> Přidat první položku
+            </button>
+          )}
         </div>
       )}
 
@@ -718,6 +1379,7 @@ export default function KartotekaPage() {
                   onDetail={handleDetail}
                   onAddChild={openCreateModal}
                   onDelete={handleDelete}
+                  canCreateAsset={canCreateAsset}
                 />
               ))}
             </div>
@@ -773,9 +1435,7 @@ export default function KartotekaPage() {
             {/* Header */}
             <div className="k-modal-header">
               <h2 className="k-modal-title">
-                {createParentId
-                  ? `Nová položka pod "${createParentName}"`
-                  : 'Nový kořenový prvek'}
+                {createModalTitle}
               </h2>
               <button className="k-modal-close" onClick={() => setShowCreate(false)}>
                 <X size={20} />
@@ -784,6 +1444,41 @@ export default function KartotekaPage() {
 
             {/* Form body */}
             <div className="k-modal-body">
+              <div className="k-row">
+                {([
+                  ['building', 'Budova'],
+                  ['room', 'Místnost'],
+                  ['asset', 'Zařízení'],
+                  ['gearbox', 'Převodovka'],
+                  ['inspection', 'Kontrola'],
+                ] as [CreateKind, string][]).map(([kind, label]) => (
+                  <button
+                    key={kind}
+                    type="button"
+                    className="filter-chip"
+                    style={{
+                      background: createKind === kind ? 'rgba(59, 130, 246, 0.22)' : 'rgba(255,255,255,0.05)',
+                      borderColor: createKind === kind ? 'rgba(59, 130, 246, 0.55)' : 'rgba(255,255,255,0.08)',
+                      color: createKind === kind ? '#bfdbfe' : '#94a3b8',
+                      flex: 1,
+                    }}
+                    onClick={() => {
+                      setCreateKind(kind);
+                      setCreateForm((prev) => ({
+                        ...prev,
+                        entityType: kind === 'building' ? 'Budova' : kind === 'room' ? 'Místnost' : kind === 'gearbox' ? 'Převodovka' : kind === 'inspection' ? 'Kontrola' : 'Zařízení',
+                      }));
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="k-form-note">
+                <strong>{getCreateKindName(createKind)}</strong>: {getCreateKindHelp(createKind)}
+              </div>
+
               <label className="k-field">
                 <span className="k-label">Název *</span>
                 <input
@@ -797,15 +1492,52 @@ export default function KartotekaPage() {
               </label>
 
               <label className="k-field">
-                <span className="k-label">Typ entity</span>
-                <input
+                <span className="k-label">Kam to patří</span>
+                <select
                   className="k-input"
-                  type="text"
-                  placeholder="např. Budova, Linka, Stroj…"
-                  value={createForm.entityType}
-                  onChange={(e) => setCreateForm({ ...createForm, entityType: e.target.value })}
-                />
+                  value={createParentChoiceId}
+                  onChange={(e) => applyCreateParent(e.target.value)}
+                >
+                  <option value="">Samostatně / bez nadřazené položky</option>
+                  {createParentOptions.map((asset) => (
+                    <option key={asset.id} value={asset.id}>
+                      {getParentOptionLabel(asset, treeAssets)}
+                    </option>
+                  ))}
+                </select>
+                <span className="k-help-text">
+                  {selectedCreateParent
+                    ? `Uloží se pod: ${getParentOptionLabel(selectedCreateParent, treeAssets)}`
+                    : createKind === 'building'
+                      ? 'Budova je hlavní karta, proto se nezařazuje pod jinou položku.'
+                      : 'Když vybereš místnost nebo zařízení, nová položka se uloží přímo pod ni.'}
+                </span>
               </label>
+
+              {createKind === 'asset' && (
+                <label className="k-field">
+                  <span className="k-label">Druh zařízení</span>
+                  <input
+                    className="k-input"
+                    type="text"
+                    list="asset-type-options"
+                    placeholder="vyber nebo napiš např. Kogenerační jednotka"
+                    value={createForm.entityType}
+                    onChange={(e) => setCreateForm({ ...createForm, entityType: e.target.value })}
+                  />
+                  <datalist id="asset-type-options">
+                    {ASSET_TYPE_OPTIONS.map((option) => (
+                      <option key={option} value={option} />
+                    ))}
+                  </datalist>
+                </label>
+              )}
+
+              {createKind === 'inspection' && (
+                <div className="k-form-note">
+                  Tohle není zařízení. Je to plán kontroly, který se zobrazí v modulu Kontroly.
+                </div>
+              )}
 
               <label className="k-field">
                 <span className="k-label">Kód</span>
@@ -818,6 +1550,106 @@ export default function KartotekaPage() {
                 />
               </label>
 
+              <div className="k-row">
+                <label className="k-field">
+                  <span className="k-label">Budova</span>
+                  <input
+                    className="k-input"
+                    type="text"
+                    placeholder="např. D"
+                    value={createBuildingId}
+                    onChange={(e) => setCreateBuildingId(e.target.value.toUpperCase())}
+                  />
+                </label>
+                <label className="k-field">
+                  <span className="k-label">Patro</span>
+                  <input
+                    className="k-input"
+                    type="text"
+                    placeholder="např. 1.NP"
+                    value={createFloor}
+                    onChange={(e) => setCreateFloor(e.target.value)}
+                  />
+                </label>
+              </div>
+
+              {(createKind === 'asset' || createKind === 'inspection') && (
+                <label className="k-field">
+                  <span className="k-label">Místnost / umístění</span>
+                  <input
+                    className="k-input"
+                    type="text"
+                    placeholder="např. Údržba, mycí centrum"
+                    value={createAreaName}
+                    onChange={(e) => setCreateAreaName(e.target.value)}
+                  />
+                </label>
+              )}
+
+              {(createKind === 'inspection' || (createKind === 'room' && createInspection)) && (
+                <>
+                  <label className="k-field">
+                    <span className="k-label">Kategorie kontroly</span>
+                    <select
+                      className="k-input"
+                      value={createForm.category}
+                      onChange={(e) => setCreateForm({ ...createForm, category: e.target.value })}
+                    >
+                      <option value="budova">Budova</option>
+                      <option value="hygiena">Hygiena</option>
+                      <option value="výroba">Výroba</option>
+                      <option value="energie">Energie</option>
+                      <option value="sklad">Sklad</option>
+                      <option value="údržba">Údržba</option>
+                    </select>
+                  </label>
+
+                  <label className="k-field">
+                    <span className="k-label">Opakování kontroly</span>
+                    <select
+                      className="k-input"
+                      value={createInspectionFrequency}
+                      onChange={(e) => setCreateInspectionFrequency(e.target.value as InspectionFrequency)}
+                    >
+                      {INSPECTION_FREQUENCY_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="k-field">
+                    <span className="k-label">Co kontrolovat</span>
+                    <textarea
+                      className="k-input"
+                      rows={3}
+                      placeholder="např. podlaha, dveře, světla, čistota..."
+                      value={createForm.description}
+                      onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })}
+                    />
+                  </label>
+                </>
+              )}
+
+              {createKind === 'room' && (
+                <button
+                  type="button"
+                  className="filter-chip"
+                  style={{
+                    width: '100%',
+                    justifyContent: 'flex-start',
+                    background: createInspection ? 'rgba(245, 158, 11, 0.18)' : 'rgba(255,255,255,0.05)',
+                    borderColor: createInspection ? 'rgba(245, 158, 11, 0.45)' : 'rgba(255,255,255,0.08)',
+                    color: createInspection ? '#fde68a' : '#94a3b8',
+                  }}
+                  onClick={() => setCreateInspection((value) => !value)}
+                >
+                  {createInspection ? '✓' : '○'} Rovnou založit pravidelnou kontrolu této místnosti
+                </button>
+              )}
+
+              {createKind !== 'inspection' && (
               <div className="k-row">
                 <label className="k-field">
                   <span className="k-label">Stav</span>
@@ -844,6 +1676,7 @@ export default function KartotekaPage() {
                   </select>
                 </label>
               </div>
+              )}
             </div>
 
             {/* Footer */}

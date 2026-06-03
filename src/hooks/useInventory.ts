@@ -19,7 +19,7 @@ import { db } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
 import type {
   InventoryItem, InventoryTransaction, PurchaseOrder,
-  TransactionType
+  TransactionType, NewInventoryItemInput
 } from '../types/inventory';
 import { calcItemStatus } from '../types/inventory';
 
@@ -110,6 +110,7 @@ export function useInventory() {
         performedBy: user.uid,
         performedByName: user.displayName,
         performedAt: Timestamp.now(),
+        createdAt: Timestamp.now(),
         quantityAfter: newQuantity,
         ...(opts?.taskId && { taskId: opts.taskId }),
         ...(opts?.taskTitle && { taskTitle: opts.taskTitle }),
@@ -181,7 +182,7 @@ export function useInventory() {
       // 1. Dokončit task
       const taskRef = doc(db, 'tasks', taskId);
       batch.update(taskRef, {
-        status: 'done',
+        status: 'completed',
         completedAt: Timestamp.now(),
         completedBy: user.displayName,
         usedParts: parts,
@@ -216,6 +217,7 @@ export function useInventory() {
           performedBy: user.uid,
           performedByName: user.displayName,
           performedAt: Timestamp.now(),
+          createdAt: Timestamp.now(),
           quantityAfter: Math.max(0, newQty),
         });
 
@@ -247,7 +249,7 @@ export function useInventory() {
         documentId: taskId,
         timestamp: Timestamp.now(),
         changes: {
-          status: 'done',
+          status: 'completed',
           usedParts: parts.map((p) => `${p.partName} x${p.quantity}`),
         },
       });
@@ -255,6 +257,39 @@ export function useInventory() {
       await batch.commit();
     },
     [user, items]
+  );
+
+  /** Ruční vytvoření nové skladové položky */
+  const createItem = useCallback(
+    async (data: NewInventoryItemInput) => {
+      if (!user) throw new Error('Nepřihlášen');
+
+      const payload: Record<string, unknown> = {
+        name: data.name,
+        code: data.code,
+        category: data.category,
+        quantity: data.quantity,
+        unit: data.unit,
+        minQuantity: data.minQuantity,
+        location: data.location,
+        status: calcItemStatus(data.quantity, data.minQuantity),
+        compatibleAssetIds: [],
+        compatibleAssetNames: [],
+        linkedMachineIds: [],
+        isDeleted: false,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+
+      if (data.supplier) payload.supplier = data.supplier;
+      if (data.unitPrice != null) payload.unitPrice = data.unitPrice;
+      if (data.currency) payload.currency = data.currency;
+      if (data.note) payload.note = data.note;
+
+      const ref = await addDoc(collection(db, 'inventory'), payload);
+      return ref.id;
+    },
+    [user]
   );
 
   /** Vytvořit objednávku */
@@ -339,6 +374,7 @@ export function useInventory() {
     receiveItem,
     adjustItem,
     completeTaskWithParts,
+    createItem,
     createOrder,
     approveOrder,
   };

@@ -2,7 +2,7 @@
 // Nominal CMMS — Production Warehouse: Příjem, Zásoby, Expedice
 
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import {
   collection, addDoc, updateDoc, doc, onSnapshot,
   orderBy, query, serverTimestamp, Timestamp,
@@ -171,7 +171,7 @@ function useShipments() {
 // ═══════════════════════════════════════════════════════════════════
 
 export default function WarehousePage() {
-  const navigate = useNavigate();
+  const goBack = useBackNavigation('/');
   const { user, hasPermission } = useAuthContext();
   const canView = hasPermission('warehouse.view');
 
@@ -208,7 +208,7 @@ export default function WarehousePage() {
           <Package className="w-16 h-16 text-red-400 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-white mb-2">Přístup odepřen</h2>
           <p className="text-slate-400 mb-4">Nemáte oprávnění pro Sklad výroby</p>
-          <button onClick={() => navigate('/')} className="px-6 py-2 bg-slate-700 text-white rounded-xl hover:bg-slate-600">Zpět</button>
+          <button onClick={() => goBack()} className="px-6 py-2 bg-slate-700 text-white rounded-xl hover:bg-slate-600">Zpět</button>
         </div>
       </div>
     );
@@ -295,7 +295,7 @@ export default function WarehousePage() {
       <div className="bg-slate-800/80 backdrop-blur-sm border-b border-slate-700/50 px-4 py-4 sticky top-0 z-20">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
-            <button onClick={() => navigate('/')} className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition">
+            <button onClick={() => goBack()} className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition">
               <ArrowLeft className="w-5 h-5 text-slate-400" />
             </button>
             <div>

@@ -24,12 +24,12 @@ export interface WorkOrder {
 }
 
 export const WO_STATUS_CONFIG: Record<WOStatus, { label: string; color: string; icon: string }> = {
-  new: { label: 'Nový', color: 'bg-blue-500', icon: '🆕' },
-  assigned: { label: 'Přiřazen', color: 'bg-purple-500', icon: '👤' },
-  in_progress: { label: 'V řešení', color: 'bg-amber-500', icon: '🔧' },
-  waiting_parts: { label: 'Čeká na díly', color: 'bg-orange-500', icon: '📦' },
-  done: { label: 'Hotovo', color: 'bg-green-500', icon: '✅' },
-  cancelled: { label: 'Zrušeno', color: 'bg-slate-500', icon: '❌' },
+  new: { label: 'Nový', color: 'bg-blue-500', icon: 'N' },
+  assigned: { label: 'Přiřazen', color: 'bg-purple-500', icon: 'U' },
+  in_progress: { label: 'V řešení', color: 'bg-amber-500', icon: 'R' },
+  waiting_parts: { label: 'Čeká na díly', color: 'bg-orange-500', icon: 'D' },
+  done: { label: 'Hotovo', color: 'bg-green-500', icon: 'OK' },
+  cancelled: { label: 'Zrušeno', color: 'bg-slate-500', icon: 'X' },
 };
 
 export const WO_PRIORITY_CONFIG: Record<WOPriority, { label: string; color: string; description: string }> = {
@@ -40,8 +40,8 @@ export const WO_PRIORITY_CONFIG: Record<WOPriority, { label: string; color: stri
 };
 
 export const WO_TYPE_CONFIG: Record<WOType, { label: string; icon: string }> = {
-  breakdown: { label: 'Porucha', icon: '🔧' },
-  preventive: { label: 'Preventivní', icon: '📅' },
-  inspection: { label: 'Kontrola', icon: '🔍' },
-  improvement: { label: 'Zlepšení', icon: '💡' },
+  breakdown: { label: 'Porucha', icon: 'P' },
+  preventive: { label: 'Preventivní', icon: 'PM' },
+  inspection: { label: 'Kontrola', icon: 'K' },
+  improvement: { label: 'Zlepšení', icon: 'Z' },
 };

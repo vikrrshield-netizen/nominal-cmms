@@ -15,9 +15,8 @@ export const WIDGET_DEFINITIONS: WidgetDefinition[] = [
   { id: 'map',         type: 'tile',   label: 'Mapa areálu',      icon: '🗺️', gradient: 'from-blue-500 to-indigo-600',    defaultSize: '1x1', component: 'TileWidget' },
   { id: 'revisions',   type: 'tile',   label: 'Revize',           icon: '🔍', gradient: 'from-purple-500 to-violet-600',  defaultSize: '1x1', component: 'TileWidget' },
   { id: 'inventory',   type: 'tile',   label: 'Sklad ND',         icon: '📦', gradient: 'from-emerald-500 to-teal-600',   defaultSize: '1x1', component: 'TileWidget' },
-  { id: 'waste',       type: 'action', label: 'Odpady',           icon: '♻️', gradient: 'from-yellow-500 to-amber-600',   defaultSize: '1x1', component: 'TileWidget' },
   { id: 'fleet',       type: 'tile',   label: 'Vozidla',          icon: '🚗', gradient: 'from-cyan-500 to-blue-600',      defaultSize: '1x1', component: 'TileWidget' },
-  { id: 'louparna',    type: 'tile',   label: 'Loupárna',         icon: '🌾', gradient: 'from-lime-500 to-green-600',     defaultSize: '1x1', component: 'TileWidget' },
+  { id: 'hvac',        type: 'tile',   label: 'Vzduchotechnika',  icon: '💨', gradient: 'from-sky-500 to-cyan-600',       defaultSize: '1x1', component: 'TileWidget' },
   { id: 'inspections', type: 'tile',   label: 'Kontroly',         icon: '✅', gradient: 'from-teal-500 to-emerald-600',   defaultSize: '1x1', component: 'TileWidget' },
   { id: 'calendar',    type: 'tile',   label: 'Kalendář',         icon: '📅', gradient: 'from-indigo-500 to-purple-600',  defaultSize: '1x1', component: 'TileWidget' },
   { id: 'ai',          type: 'action', label: 'VIKRR AI',         icon: '🤖', gradient: 'from-pink-500 to-rose-600',      defaultSize: '1x1', component: 'TileWidget', requiredPermission: 'ai.use' },
@@ -67,25 +66,25 @@ function makeInstances(ids: string[]): WidgetInstance[] {
 // Admin roles see everything including full-width widgets above tiles
 const ADMIN_ORDER = [
   'semaphore', 'top5', 'lemon',
-  'fault', 'tasks', 'map', 'revisions', 'inventory', 'waste',
-  'fleet', 'louparna', 'inspections', 'calendar', 'ai', 'reports',
+  'fault', 'tasks', 'revisions', 'inventory',
+  'fleet', 'hvac', 'inspections', 'calendar', 'ai', 'reports',
   'idea', 'request', 'noticeboard', 'academy', 'production', 'warehouse', 'shifts', 'admin',
 ];
 
 const VYROBA_ORDER = [
-  'fault', 'tasks', 'production', 'warehouse', 'shifts', 'map', 'inspections', 'calendar', 'louparna',
-  'waste', 'inventory', 'revisions', 'noticeboard', 'idea', 'request', 'academy',
+  'fault', 'tasks', 'production', 'warehouse', 'shifts', 'inspections', 'calendar',
+  'inventory', 'hvac', 'revisions', 'noticeboard', 'idea', 'request', 'academy',
 ];
 
 const UDRZBA_ORDER = [
   'semaphore', 'top5',
-  'fault', 'tasks', 'production', 'warehouse', 'shifts', 'map', 'revisions', 'inventory', 'waste',
-  'fleet', 'louparna', 'inspections', 'calendar', 'ai',
+  'fault', 'tasks', 'production', 'warehouse', 'shifts', 'revisions', 'inventory',
+  'fleet', 'hvac', 'inspections', 'calendar', 'ai',
   'idea', 'request', 'noticeboard', 'academy',
 ];
 
 const SKLADNIK_ORDER = [
-  'inventory', 'tasks', 'fault', 'map', 'noticeboard', 'idea', 'request', 'academy',
+  'inventory', 'hvac', 'tasks', 'fault', 'noticeboard', 'idea', 'request', 'academy',
 ];
 
 const DEFAULT_CONFIGS: Record<UserRole, string[]> = {

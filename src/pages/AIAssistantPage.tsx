@@ -2,7 +2,7 @@
 // VIKRR — Asset Shield — Search & VIKRR AI
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import { useAuthContext } from '../context/AuthContext';
 import appConfig from '../appConfig';
 import VoiceMemoRecorder from '../components/ui/VoiceMemoRecorder';
@@ -150,7 +150,7 @@ const QUICK_COMMANDS = [
 // ═══════════════════════════════════════════════════════════════════
 
 export default function AIAssistantPage() {
-  const navigate = useNavigate();
+  const goBack = useBackNavigation('/');
   const { user } = useAuthContext();
   
   const [messages, setMessages] = useState<Message[]>([
@@ -174,7 +174,7 @@ export default function AIAssistantPage() {
   const ocrInputRef = useRef<HTMLInputElement>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const recognitionRef = useRef<any>(null);
 
   // handleSend — must be declared before useEffect that uses it
@@ -211,7 +211,7 @@ export default function AIAssistantPage() {
 
   // Initialize speech recognition
   useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const W = window as any;
     const SpeechRecognitionClass = W.webkitSpeechRecognition || W.SpeechRecognition;
     if (SpeechRecognitionClass) {
@@ -220,7 +220,7 @@ export default function AIAssistantPage() {
       recognition.interimResults = false;
       recognition.lang = 'cs-CZ';
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       recognition.onresult = (event: any) => {
         const transcript = event.results[0][0].transcript;
         setInput(transcript);
@@ -292,7 +292,7 @@ export default function AIAssistantPage() {
       <header className="relative z-10 p-4 border-b border-white/10">
         <div className="flex items-center gap-4">
           <button 
-            onClick={() => navigate('/')}
+            onClick={() => goBack()}
             className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition"
           >
             <ArrowLeft className="w-5 h-5 text-slate-400" />

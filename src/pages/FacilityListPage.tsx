@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react';
 import { db } from '../lib/firebase';
 import { collection, getDocs } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import { Home, MapPin, ChevronRight, Building2, ArrowLeft } from 'lucide-react';
 
 const FacilityListPage = () => {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const goBack = useBackNavigation('/');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -29,7 +31,7 @@ const FacilityListPage = () => {
   return (
     <div className="p-4 pb-24 bg-slate-50 min-h-screen">
       <div className="flex items-center gap-3 mb-6">
-        <button onClick={() => navigate('/')} className="p-2 rounded-xl bg-white/10 border border-white/10 hover:bg-white/20 transition">
+        <button onClick={() => goBack()} className="p-2 rounded-xl bg-white/10 border border-white/10 hover:bg-white/20 transition">
           <ArrowLeft className="w-5 h-5 text-slate-400" />
         </button>
         <h1 className="text-2xl font-bold flex items-center gap-2">

@@ -35,6 +35,7 @@ interface DashboardGridProps {
   isAdmin: boolean;
   // Slot rendered between TOP widgets and tile grid
   afterTopSlot?: React.ReactNode;
+  hiddenWidgetIds?: string[];
 }
 
 // ═══════════════════════════════════════════════════════
@@ -67,10 +68,11 @@ export default function DashboardGrid({
   onTileClick,
   isAdmin,
   afterTopSlot,
+  hiddenWidgetIds = [],
 }: DashboardGridProps) {
   // Sorted visible widgets
   const visible = widgets
-    .filter(w => w.visible)
+    .filter(w => w.visible && !hiddenWidgetIds.includes(w.widgetId))
     .sort((a, b) => a.position - b.position);
 
   // Split into full-width widgets and tile widgets

@@ -3,8 +3,8 @@
 // Sila + Výroba + Plevy + Stanice
 
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../context/AuthContext';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import {
   useLouparna, MACHINE_STATUS_CONFIG,
   getSiloLevelColor, formatTs,
@@ -33,7 +33,7 @@ const MATERIALS = [
 // ═══════════════════════════════════════════
 
 export default function LouparnaPage() {
-  const navigate = useNavigate();
+  const goBack = useBackNavigation('/map');
   const { hasPermission } = useAuthContext();
   const {
     silos, batches, wasteTickets, machines, loading,
@@ -103,7 +103,7 @@ export default function LouparnaPage() {
       <header className="bg-slate-800 border-b border-slate-700 px-4 py-4">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => navigate('/map')}
+            onClick={() => goBack('/map')}
             className="p-2 hover:bg-slate-700 rounded-lg transition"
           >
             <ArrowLeft className="w-5 h-5" />

@@ -28,3 +28,7 @@ serviceAccountKey.json
 .env.local
 *.local
 .firebase/
+.codex-deploy/
+zaloha/
+functions/lib/
+*.bak

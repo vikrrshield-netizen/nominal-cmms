@@ -38,6 +38,12 @@ service firebase.storage {
       allow write: if isSignedIn();
     }
 
+    // Gearbox temperature / camera checks
+    match /gearbox_checks/{gearboxId}/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
     // Temporary uploads
     match /temp/{userId}/{allPaths=**} {
       allow read, write: if isSignedIn() && request.auth.uid == userId;

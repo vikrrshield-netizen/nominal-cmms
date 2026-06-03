@@ -1,4 +1,4 @@
-import { collection, addDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp, limit } from 'firebase/firestore';
+import { collection, addDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp, limit, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import type { WorkLog } from '../types/workLog';
 
@@ -17,14 +17,36 @@ export const addWorkLog = async (input: Omit<WorkLog, 'id' | 'createdAt'>): Prom
   return docRef.id;
 };
 
+export const linkWorkLogToTask = async (logId: string, taskId: string, taskTitle: string): Promise<void> => {
+  await updateDoc(doc(db, COLLECTION, logId), {
+    taskId,
+    taskTitle,
+  });
+};
+
+export const updateWorkLog = async (
+  logId: string,
+  input: Partial<Omit<WorkLog, 'id' | 'createdAt'>>
+): Promise<void> => {
+  const cleanInput = Object.fromEntries(
+    Object.entries(input)
+      .filter(([, value]) => value !== undefined)
+      .map(([key, value]) => [key, value instanceof Date ? Timestamp.fromDate(value) : value])
+  );
+
+  await updateDoc(doc(db, COLLECTION, logId), {
+    ...cleanInput,
+    updatedAt: serverTimestamp(),
+  });
+};
+
 export const subscribeToWorkLogs = (
   workOrderId: string,
   callback: (logs: WorkLog[]) => void
 ): (() => void) => {
   const q = query(
     collection(db, COLLECTION),
-    where('workOrderId', '==', workOrderId),
-    orderBy('createdAt', 'desc')
+    where('workOrderId', '==', workOrderId)
   );
   
   return onSnapshot(q, (snapshot) => {
@@ -32,10 +54,14 @@ export const subscribeToWorkLogs = (
       id: doc.id,
       ...doc.data(),
       createdAt: doc.data().createdAt instanceof Timestamp ? doc.data().createdAt.toDate() : new Date(),
-    } as WorkLog));
+      performedAt: doc.data().performedAt instanceof Timestamp ? doc.data().performedAt.toDate() : undefined,
+      updatedAt: doc.data().updatedAt instanceof Timestamp ? doc.data().updatedAt.toDate() : undefined,
+    } as WorkLog))
+      .sort((a, b) => (b.createdAt?.getTime?.() || 0) - (a.createdAt?.getTime?.() || 0));
     callback(logs);
   });
 };
+
 export const subscribeToRecentWorkLogs = (
   callback: (logs: WorkLog[]) => void,
   maxItems = 100

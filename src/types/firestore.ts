@@ -82,11 +82,15 @@ export interface TaskDoc {
   assetId?: string;
   assetName?: string;
   buildingId?: BuildingId;
+  sourceRefType?: 'inspection_log' | 'manual' | 'asset' | 'work_log';
+  sourceRefId?: string;
+  inspectionLogId?: string;
   
   // Přiřazení
   assigneeId?: string;
   assigneeName?: string;
   assigneeColor?: string;
+  assignedWorkerNames?: string[];
   
   // Vytvořeno
   createdById: string;
@@ -117,6 +121,8 @@ export interface TaskDoc {
   closedByName?: string;
   closedAt?: Timestamp;
   resolution?: string;
+  completedBy?: string;
+  completedByNames?: string[];
 }
 
 // ═══════════════════════════════════════════════════════════════════

@@ -4,7 +4,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
 import { doc, getDoc, collection, onSnapshot } from 'firebase/firestore';
-import { db, signInWithPin, signOut, onAuthChange } from '../lib/firebase';
+import { db, signInWithPin, signOut, onAuthChange, isFirebaseConfigured, isSandboxLoginEnabled } from '../lib/firebase';
 import { ROLE_META, ROLE_PERMISSIONS, type UserRole, type RoleMeta, type Permission } from '../types/user';
 import type { Role, UserScope, CustomPermissions } from '../types/rbac';
 import { computeEffectivePermissions, canAccessBuilding, canAccessArea } from '../types/rbac';
@@ -73,12 +73,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [allRoles, setAllRoles] = useState<Role[]>([]);
-  const [isSandbox, setIsSandbox] = useState(() => sessionStorage.getItem('nominal-sandbox') === 'true');
+  const [isSandbox, setIsSandbox] = useState(() => (
+    isSandboxLoginEnabled && sessionStorage.getItem('nominal-sandbox') === 'true'
+  ));
 
   // ─────────────────────────────────────────
   // Load all roles (realtime)
   // ─────────────────────────────────────────
   useEffect(() => {
+    if (!isFirebaseConfigured) {
+      setAllRoles([]);
+      return;
+    }
+
     const unsub = onSnapshot(
       collection(db, 'roles'),
       (snap) => {
@@ -99,7 +106,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const unsubscribe = onAuthChange(async (firebaseUser) => {
       if (firebaseUser) {
-        const sandboxActive = sessionStorage.getItem('nominal-sandbox') === 'true';
+        const sandboxActive = isSandboxLoginEnabled && sessionStorage.getItem('nominal-sandbox') === 'true';
+        if (!isSandboxLoginEnabled) {
+          sessionStorage.removeItem('nominal-sandbox');
+          setIsSandbox(false);
+        }
+        if (sandboxActive || !isFirebaseConfigured) {
+          setUser({
+            id: firebaseUser.uid,
+            uid: firebaseUser.uid,
+            displayName: 'Ucen (Demo)',
+            role: 'UDRZBA',
+            pin: '',
+            tenantId: 'main_firm',
+            roleIds: [],
+            primaryRoleId: '',
+            customPermissions: DEFAULT_CUSTOM,
+            scope: DEFAULT_SCOPE,
+          });
+          setIsLoading(false);
+          return;
+        }
+
         try {
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           if (userDoc.exists()) {
@@ -175,7 +203,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const hasPermission = useCallback(
     (perm: string): boolean => {
       if (!user) return false;
-      // Check dynamic RBAC first
+      // Individuální odebrání má přednost — i před rolí (jinak by revoke na frontendu neúčinkoval).
+      if (user.customPermissions?.revoked?.includes(perm)) return false;
+      // Check dynamic RBAC first (role + granted − revoked)
       if (permissions.includes(perm)) return true;
       // Always also check legacy hardcoded role (belt + suspenders)
       const legacyPerms = ROLE_PERMISSIONS[user.role];
@@ -219,7 +249,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // ─────────────────────────────────────────
   const login = async (pin: string): Promise<boolean> => {
     try {
-      if (pin === '0000') {
+      if (pin === '0000' && isSandboxLoginEnabled) {
         sessionStorage.setItem('nominal-sandbox', 'true');
         setIsSandbox(true);
       } else {
@@ -250,7 +280,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const roleMeta = user ? ROLE_META[user.role] : null;
   const isKiosk = user?.role === 'OPERATOR' && !isSandbox;
   const isReadOnly = user?.role === 'MAJITEL';
-  const canViewSecretBox = hasPermission('trustbox.read');
+  const canViewSecretBox = hasPermission('secretbox.view');
 
   // ─────────────────────────────────────────
   // Provider

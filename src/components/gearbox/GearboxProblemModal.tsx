@@ -1,6 +1,6 @@
 // src/components/gearbox/GearboxProblemModal.tsx
 // VIKRSHIELD — Sdílený modal pro nahlášení problému / poruchy / podezření u převodovky.
-// Používá se v modulu převodovek. Vytváří úkol přes createTask (ne work log).
+// Používá se v GearboxesPage i AssetCardPage. Vytváří úkol přes createTask (ne work log).
 
 import { useState } from 'react';
 import { AlertTriangle, Loader2, Send, X } from 'lucide-react';
@@ -70,31 +70,31 @@ export default function GearboxProblemModal({ asset, user, onClose, onSaved }: {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-0 sm:items-center sm:p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/35 p-0 backdrop-blur-sm sm:items-center sm:p-4" onClick={onClose}>
       <div
-        className="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl border border-white/10 bg-slate-950 text-slate-100 shadow-2xl sm:max-w-lg sm:rounded-2xl"
+        className="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl border border-[var(--vik-border)] bg-white text-slate-950 shadow-2xl sm:max-w-lg sm:rounded-2xl"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-white/10 bg-slate-950/95 p-4 backdrop-blur">
+        <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-[var(--vik-border)] bg-white/95 p-4 backdrop-blur">
           <div className="min-w-0">
             <div className="text-xs font-bold uppercase tracking-widest text-red-300">Nahlásit problém</div>
-            <h3 className="mt-1 truncate text-lg font-black text-white">{asset.name}</h3>
-            <div className="text-sm text-slate-400">{asset.currentExtruderName || asset.location || 'Sklad ND'}</div>
+            <h3 className="mt-1 truncate text-lg font-black text-slate-950">{asset.name}</h3>
+            <div className="text-sm text-slate-600">{asset.currentExtruderName || asset.location || 'Sklad ND'}</div>
           </div>
-          <button type="button" onClick={onClose} className="rounded-xl border border-white/10 p-2 text-slate-300 hover:bg-white/10">
+          <button type="button" onClick={onClose} className="rounded-xl border border-[var(--vik-border)] bg-[var(--vik-surface-2)] p-2 text-slate-600 hover:bg-white">
             <X className="h-5 w-5" />
           </button>
         </div>
 
         <div className="space-y-4 p-4">
           <div>
-            <div className="mb-2 text-sm font-black text-white">Závažnost</div>
+            <div className="mb-2 text-sm font-black text-slate-950">Závažnost</div>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => setPriority('P2')}
                 className={`min-h-12 rounded-xl border px-3 text-sm font-black ${
-                  priority === 'P2' ? 'border-amber-400/60 bg-amber-500/20 text-white' : 'border-white/10 bg-white/[0.04] text-slate-300'
+                  priority === 'P2' ? 'border-amber-300 bg-amber-100 text-amber-800' : 'border-[var(--vik-border)] bg-[var(--vik-surface-2)] text-slate-700'
                 }`}
               >
                 Závada / podezření (P2)
@@ -103,7 +103,7 @@ export default function GearboxProblemModal({ asset, user, onClose, onSaved }: {
                 type="button"
                 onClick={() => setPriority('P1')}
                 className={`min-h-12 rounded-xl border px-3 text-sm font-black ${
-                  priority === 'P1' ? 'border-red-400/60 bg-red-500/20 text-white' : 'border-white/10 bg-white/[0.04] text-slate-300'
+                  priority === 'P1' ? 'border-red-300 bg-red-100 text-red-800' : 'border-[var(--vik-border)] bg-[var(--vik-surface-2)] text-slate-700'
                 }`}
               >
                 Porucha / havárie (P1)
@@ -112,7 +112,7 @@ export default function GearboxProblemModal({ asset, user, onClose, onSaved }: {
           </div>
 
           <div>
-            <div className="mb-2 text-sm font-black text-white">Co se děje</div>
+            <div className="mb-2 text-sm font-black text-slate-950">Co se děje</div>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {GEARBOX_ISSUES.map((issue) => (
                 <button
@@ -120,7 +120,7 @@ export default function GearboxProblemModal({ asset, user, onClose, onSaved }: {
                   type="button"
                   onClick={() => setOption(issue.label)}
                   className={`min-h-12 rounded-xl border px-3 text-sm font-black ${
-                    option === issue.label ? 'border-red-400/60 bg-red-500/20 text-white' : 'border-white/10 bg-white/[0.04] text-slate-300'
+                    option === issue.label ? 'border-red-300 bg-red-100 text-red-800' : 'border-[var(--vik-border)] bg-[var(--vik-surface-2)] text-slate-700'
                   }`}
                 >
                   {issue.label}
@@ -130,14 +130,14 @@ export default function GearboxProblemModal({ asset, user, onClose, onSaved }: {
           </div>
 
           <label className="block">
-            <span className="mb-2 block text-sm font-black text-white">
+            <span className="mb-2 block text-sm font-black text-slate-950">
               {option === 'Jiný problém' ? 'Popište problém' : 'Poznámka (volitelně)'}
             </span>
             <textarea
               value={note}
               onChange={(event) => setNote(event.target.value)}
               placeholder="Co se děje s převodovkou?"
-              className="h-28 w-full resize-none rounded-xl border border-white/10 bg-slate-900 p-4 text-base text-white outline-none focus:border-red-400"
+              className="h-28 w-full resize-none rounded-xl border border-[var(--vik-border)] bg-[var(--vik-surface-2)] p-4 text-base text-slate-950 outline-none focus:border-red-400"
             />
           </label>
 
@@ -151,7 +151,7 @@ export default function GearboxProblemModal({ asset, user, onClose, onSaved }: {
             Odeslat hlášení
           </button>
 
-          <div className="flex items-start gap-2 text-xs text-slate-400">
+          <div className="flex items-start gap-2 text-xs text-slate-600">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
             Vytvoří se úkol pro údržbu. Oprava se zapisuje zvlášť přes „Oprava / úprava“.
           </div>

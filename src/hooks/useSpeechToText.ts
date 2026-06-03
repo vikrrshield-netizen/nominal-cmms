@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 type SpeechRecognitionInstance = any;
 
 export function useSpeechToText() {
@@ -13,7 +13,7 @@ export function useSpeechToText() {
   const recognitionRef = useRef<SpeechRecognitionInstance>(null);
 
   useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const W = window as any;
     const SpeechRecognitionClass = W.webkitSpeechRecognition || W.SpeechRecognition;
     if (!SpeechRecognitionClass) return;
@@ -23,7 +23,7 @@ export function useSpeechToText() {
     recognition.interimResults = false;
     recognition.lang = 'cs-CZ';
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     recognition.onresult = (event: any) => {
       const text = event.results[0][0].transcript;
       setTranscript(text);

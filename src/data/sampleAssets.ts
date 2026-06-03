@@ -1,5 +1,5 @@
 // Legacy sample data — any[] kvůli chybějícím v2 polím (tenantId, entityType, parentId)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 export const SAMPLE_ASSETS: any[] = [
   {
     id: 'EXT-001',

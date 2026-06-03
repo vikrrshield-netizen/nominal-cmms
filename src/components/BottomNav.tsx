@@ -2,28 +2,33 @@
 // VIKRR — Asset Shield — Bottom Navigation (Dark Glassmorphism)
 
 import { Link, useLocation } from 'react-router-dom';
+import { useAuthContext } from '../context/AuthContext';
 import {
   LayoutDashboard,
   ClipboardList,
-  Map,
+  Building2,
+  FileText,
   Truck,
-  Search,
 } from 'lucide-react';
 
 const navItems = [
-  { path: '/', icon: LayoutDashboard, label: 'Přehled' },
-  { path: '/tasks', icon: ClipboardList, label: 'Úkoly' },
-  { path: '/map', icon: Map, label: 'Mapa' },
-  { path: '/fleet', icon: Truck, label: 'Vozidla' },
-  { path: '/ai', icon: Search, label: 'Hledat' },
+  { path: '/', icon: LayoutDashboard, label: 'Přehled', permissions: [] },
+  { path: '/tasks', icon: ClipboardList, label: 'Úkoly', permissions: ['wo.read', 'wo.create', 'wo.update'] },
+  { path: '/work-diary', icon: FileText, label: 'Deník', permissions: ['wo.read', 'wo.create', 'wo.update'] },
+  { path: '/kartoteka', icon: Building2, label: 'Kartotéka', permissions: ['asset.read'] },
+  { path: '/vzv', icon: Truck, label: 'VZV', permissions: ['fleet.read', 'fleet.manage'] },
 ];
 
 export default function BottomNav() {
   const location = useLocation();
+  const { hasPermission } = useAuthContext();
+  const visibleItems = navItems.filter((item) => (
+    item.permissions.length === 0 || item.permissions.some((permission) => hasPermission(permission))
+  ));
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-slate-900/90 backdrop-blur-xl border-t border-white/10 px-2 py-2 flex justify-around items-center z-50">
-      {navItems.map((item) => {
+      {visibleItems.map((item) => {
         const Icon = item.icon;
         const isActive = item.path === '/'
           ? location.pathname === '/'

@@ -1,9 +1,10 @@
 // src/pages/NotificationsPage.tsx
 // VIKRR — Asset Shield — Centrum notifikací (Firestore-backed)
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../context/AuthContext';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import { showToast } from '../components/ui/Toast';
 import {
   collection, query, where, orderBy, onSnapshot,
@@ -12,28 +13,30 @@ import {
 import { db } from '../lib/firebase';
 import {
   Bell, BellOff, ArrowLeft, Check, CheckCheck, Trash2,
-  Calendar, Wrench, Package,
-  Clock, ChevronRight, Settings, X, Loader2,
+  Calendar, Wrench, Package, Thermometer, ClipboardCheck,
+  Clock, ChevronRight, Settings, X, Loader2, Smartphone,
 } from 'lucide-react';
+import { enablePushNotifications } from '../services/pushNotificationService';
 
 // ═══════════════════════════════════════════════════════════════════
 // TYPES
 // ═══════════════════════════════════════════════════════════════════
 
-type NotificationType = 'task' | 'revision' | 'inventory' | 'system' | 'reminder';
+type NotificationType = 'task' | 'revision' | 'inventory' | 'system' | 'reminder' | 'gearbox' | 'inspection';
 type NotificationPriority = 'low' | 'medium' | 'high' | 'critical';
 
 interface Notification {
   id: string;
-  userId: string;
+  userId?: string;
   type: NotificationType;
   priority: NotificationPriority;
   title: string;
   message: string;
-  createdAt: Timestamp;
+  createdAt: Timestamp | null;
   read: boolean;
   actionUrl?: string;
   actionLabel?: string;
+  generated?: boolean;
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -46,6 +49,8 @@ const TYPE_CONFIG: Record<NotificationType, { icon: typeof Bell; color: string; 
   inventory: { icon: Package, color: 'bg-emerald-500', label: 'Sklad' },
   system: { icon: Settings, color: 'bg-slate-500', label: 'Systém' },
   reminder: { icon: Clock, color: 'bg-purple-500', label: 'Upomínka' },
+  gearbox: { icon: Thermometer, color: 'bg-violet-500', label: 'Převodovka' },
+  inspection: { icon: ClipboardCheck, color: 'bg-amber-500', label: 'Kontrola' },
 };
 
 const PRIORITY_CONFIG: Record<NotificationPriority, { color: string; pulse: boolean }> = {
@@ -55,17 +60,42 @@ const PRIORITY_CONFIG: Record<NotificationPriority, { color: string; pulse: bool
   critical: { color: 'bg-red-500', pulse: true },
 };
 
+function startOfDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function inspectionIsDue(log: any, now: Date): boolean {
+  if (log.isDeleted === true || log.status === 'defect') return false;
+  if (log.status === 'pending') return true;
+  const completedAt = log.completedAt?.toDate?.();
+  if (!completedAt) return true;
+  const due = startOfDay(completedAt);
+  const frequency = String(log.frequency || 'monthly');
+  if (frequency === 'daily') due.setDate(due.getDate() + 1);
+  else if (frequency === 'weekly') due.setDate(due.getDate() + 7);
+  else if (frequency === 'quarterly') due.setMonth(due.getMonth() + 3);
+  else if (frequency === 'yearly') due.setFullYear(due.getFullYear() + 1);
+  else due.setMonth(due.getMonth() + 1);
+  return due <= startOfDay(now);
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // COMPONENT
 // ═══════════════════════════════════════════════════════════════════
 
 export default function NotificationsPage() {
   const navigate = useNavigate();
+  const goBack = useBackNavigation('/');
   const { user } = useAuthContext();
   const uid = user?.uid || user?.id || '';
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [assets, setAssets] = useState<any[]>([]);
+  const [gearboxTemperatures, setGearboxTemperatures] = useState<any[]>([]);
+  const [inspectionLogs, setInspectionLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pushSaving, setPushSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'all' | 'unread'>('all');
   const [filterType, setFilterType] = useState<NotificationType | 'all'>('all');
 
@@ -84,9 +114,155 @@ export default function NotificationsPage() {
     return () => unsub();
   }, [uid]);
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  useEffect(() => {
+    const unsubs = [
+      onSnapshot(collection(db, 'tasks'), (snap) => setTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })))),
+      onSnapshot(collection(db, 'assets'), (snap) => setAssets(snap.docs.map(d => ({ id: d.id, ...d.data() })))),
+      onSnapshot(collection(db, 'gearbox_temperature_logs'), (snap) => setGearboxTemperatures(snap.docs.map(d => ({ id: d.id, ...d.data() })))),
+      onSnapshot(collection(db, 'inspection_logs'), (snap) => setInspectionLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })))),
+    ];
+    return () => unsubs.forEach((unsub) => unsub());
+  }, []);
 
-  const filteredNotifications = notifications.filter(n => {
+  const toDate = (value: any): Date | null => {
+    if (!value) return null;
+    if (value instanceof Date) return value;
+    if (value.toDate) return value.toDate();
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  };
+
+  const generatedAlerts = useMemo<Notification[]>(() => {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const fiveDaysAgo = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const currentMonth = now.toISOString().slice(0, 7);
+    const closedStatuses = new Set(['completed', 'cancelled', 'done']);
+    const alerts: Notification[] = [];
+
+    tasks.forEach((task) => {
+      if (closedStatuses.has(String(task.status))) return;
+      const due = toDate(task.dueDate || task.plannedDate);
+      if (due && due < todayStart) {
+        alerts.push({
+          id: `auto-task-overdue-${task.id}`,
+          type: 'task',
+          priority: task.priority === 'P1' ? 'critical' : 'high',
+          title: `Ukol po terminu: ${task.title || task.code || 'bez nazvu'}`,
+          message: [task.assetName, task.buildingId ? `Budova ${task.buildingId}` : '', `Termin: ${due.toLocaleDateString('cs-CZ')}`].filter(Boolean).join(' | '),
+          createdAt: Timestamp.fromDate(due),
+          read: false,
+          actionUrl: '/tasks',
+          actionLabel: 'Otevrit ukoly',
+          generated: true,
+        });
+        return;
+      }
+      if (task.priority === 'P1') {
+        alerts.push({
+          id: `auto-task-p1-${task.id}`,
+          type: 'task',
+          priority: 'high',
+          title: `Dulezity ukol: ${task.title || task.code || 'bez nazvu'}`,
+          message: [task.assetName, task.description].filter(Boolean).join(' | ').slice(0, 180),
+          createdAt: toDate(task.createdAt) ? Timestamp.fromDate(toDate(task.createdAt)!) : null,
+          read: false,
+          actionUrl: '/tasks',
+          actionLabel: 'Otevrit ukoly',
+          generated: true,
+        });
+      }
+    });
+
+    gearboxTemperatures.forEach((log) => {
+      const temperature = Number(log.temperatureC);
+      if (!Number.isFinite(temperature) || temperature < 75) return;
+      const measuredAt = toDate(log.measuredAt || log.createdAt) || now;
+      alerts.push({
+        id: `auto-gearbox-temp-${log.id}`,
+        type: 'gearbox',
+        priority: temperature >= 90 ? 'critical' : 'high',
+          title: `Vysoká teplota převodovky: ${temperature} °C`,
+        message: [log.gearboxName, log.extruderName, log.note].filter(Boolean).join(' | '),
+        createdAt: Timestamp.fromDate(measuredAt),
+        read: false,
+        actionUrl: '/reports',
+        actionLabel: 'Otevrit reporty',
+        generated: true,
+      });
+    });
+
+    const latestTemperatureByGearbox = new Map<string, Date>();
+    gearboxTemperatures.forEach((log) => {
+      const gearboxId = String(log.gearboxId || '');
+      const measuredAt = toDate(log.measuredAt || log.createdAt);
+      if (!gearboxId || !measuredAt) return;
+      const previous = latestTemperatureByGearbox.get(gearboxId);
+      if (!previous || measuredAt > previous) latestTemperatureByGearbox.set(gearboxId, measuredAt);
+    });
+
+    assets
+      .filter((asset) => !asset.isDeleted)
+      .filter((asset) => {
+        const value = `${asset.entityType || ''} ${asset.category || ''} ${asset.name || ''}`.toLowerCase();
+        return value.includes('prevodov') || value.includes('gearbox') || asset.gearboxStatus;
+      })
+      .filter((asset) => asset.gearboxStatus === 'installed' || asset.currentExtruderId)
+      .forEach((asset) => {
+        const last = latestTemperatureByGearbox.get(asset.id) || toDate(asset.lastTemperatureAt);
+        if (last && last >= fiveDaysAgo) return;
+        const isMissing = !last || last < sevenDaysAgo;
+        alerts.push({
+          id: `auto-gearbox-stale-${asset.id}`,
+          type: 'gearbox',
+          priority: isMissing ? 'critical' : 'medium',
+          title: `${isMissing ? 'Chybí měření' : 'Stav měření: brzy vyprší'} - ${asset.name}`,
+          message: asset.currentExtruderName
+            ? `Převodovka je namontovaná na ${asset.currentExtruderName}. ${isMissing ? 'Nemá měření 7 nebo více dní.' : 'Poslední měření je starší než 5 dní.'}`
+            : isMissing ? 'Převodovka nemá aktuální záznam teploty.' : 'Poslední měření převodovky brzy vyprší.',
+          createdAt: last ? Timestamp.fromDate(last) : null,
+          read: false,
+          actionUrl: '/kiosk',
+          actionLabel: 'Zadat teplotu',
+          generated: true,
+        });
+      });
+
+    const pendingInspections = inspectionLogs.filter((log) =>
+      log.month === currentMonth && inspectionIsDue(log, now)
+    );
+    if (pendingInspections.length > 0) {
+      alerts.push({
+        id: `auto-inspection-pending-${currentMonth}`,
+        type: 'inspection',
+        priority: 'medium',
+        title: `Kontroly k provedeni: ${pendingInspections.length}`,
+        message: `Je cas projit ${pendingInspections.length} kontrol. Otevri kontrolu, potvrd OK nebo zapis zavadu.`,
+        createdAt: Timestamp.fromDate(todayStart),
+        read: false,
+        actionUrl: '/inspections',
+        actionLabel: 'Provest kontroly',
+        generated: true,
+      });
+    }
+
+    const priorityScore: Record<NotificationPriority, number> = { critical: 4, high: 3, medium: 2, low: 1 };
+    return alerts.sort((a, b) => {
+      const byPriority = priorityScore[b.priority] - priorityScore[a.priority];
+      if (byPriority) return byPriority;
+      return (toDate(b.createdAt)?.getTime() || 0) - (toDate(a.createdAt)?.getTime() || 0);
+    }).slice(0, 30);
+  }, [assets, gearboxTemperatures, inspectionLogs, tasks]);
+
+  const allNotifications = useMemo(
+    () => [...generatedAlerts, ...notifications],
+    [generatedAlerts, notifications]
+  );
+
+  const unreadCount = allNotifications.filter(n => !n.read).length;
+
+  const filteredNotifications = allNotifications.filter(n => {
     if (activeTab === 'unread' && n.read) return false;
     if (filterType !== 'all' && n.type !== filterType) return false;
     return true;
@@ -127,6 +303,20 @@ export default function NotificationsPage() {
     showToast('Testovací notifikace odeslána', 'success');
   };
 
+  const enablePush = async () => {
+    if (!user) return;
+    setPushSaving(true);
+    const result = await enablePushNotifications({
+      id: user.id,
+      uid: user.uid,
+      displayName: user.displayName,
+      role: user.role,
+      tenantId: user.tenantId,
+    });
+    setPushSaving(false);
+    showToast(result.ok ? 'Upozornění v telefonu jsou zapnutá' : result.message, result.ok ? 'success' : 'error');
+  };
+
   const formatTime = (ts: Timestamp | null) => {
     if (!ts) return '';
     const date = ts.toDate ? ts.toDate() : new Date(ts as any);
@@ -151,8 +341,8 @@ export default function NotificationsPage() {
       <div className="relative z-10 pb-24">
         {/* Header */}
         <header className="p-6">
-          <button onClick={() => navigate('/')} className="flex items-center gap-2 text-slate-400 hover:text-white mb-4 transition">
-            <ArrowLeft className="w-5 h-5" /> Dashboard
+          <button onClick={() => goBack()} className="flex items-center gap-2 text-slate-400 hover:text-white mb-4 transition">
+            <ArrowLeft className="w-5 h-5" /> Zpět
           </button>
 
           <div className="flex items-center justify-between mb-6">
@@ -173,7 +363,7 @@ export default function NotificationsPage() {
               </div>
             </div>
 
-            {notifications.length > 0 && (
+            {allNotifications.length > 0 && (
               <div className="flex gap-2">
                 {unreadCount > 0 && (
                   <button onClick={markAllAsRead} className="flex items-center gap-1 px-3 py-2 bg-white/5 text-slate-400 rounded-xl hover:bg-white/10 text-sm">
@@ -190,7 +380,7 @@ export default function NotificationsPage() {
           {/* Tabs */}
           <div className="flex gap-1 bg-white/5 p-1 rounded-xl">
             {[
-              { id: 'all' as const, label: 'Vše', count: notifications.length },
+              { id: 'all' as const, label: 'Vše', count: allNotifications.length },
               { id: 'unread' as const, label: 'Nepřečtené', count: unreadCount },
             ].map(tab => (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)}
@@ -204,6 +394,20 @@ export default function NotificationsPage() {
               </button>
             ))}
           </div>
+          <button
+            type="button"
+            onClick={enablePush}
+            disabled={pushSaving}
+            className="mt-3 w-full rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-left text-emerald-100 hover:bg-emerald-500/15 disabled:opacity-60"
+          >
+            <span className="flex items-center gap-3">
+              {pushSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Smartphone className="w-5 h-5" />}
+              <span>
+                <span className="block text-sm font-bold">Zapnout upozornění v telefonu</span>
+                <span className="block text-xs text-emerald-100/75">Telefon si vyžádá povolení. Potom může aplikace pípnout i mimo otevřenou stránku.</span>
+              </span>
+            </span>
+          </button>
         </header>
 
         <div className="px-6 space-y-4">
@@ -268,21 +472,23 @@ export default function NotificationsPage() {
                           <p className="text-sm text-slate-400 mt-1">{notification.message}</p>
                           <div className="flex items-center gap-2 mt-3">
                             {notification.actionUrl && (
-                              <button onClick={() => { markAsRead(notification.id); navigate(notification.actionUrl!); }}
+                              <button onClick={() => { if (!notification.generated) markAsRead(notification.id); navigate(notification.actionUrl!); }}
                                 className="flex items-center gap-1 px-3 py-1.5 bg-white/10 text-white rounded-lg text-sm hover:bg-white/20 transition">
                                 {notification.actionLabel || 'Zobrazit'}<ChevronRight className="w-4 h-4" />
                               </button>
                             )}
-                            {!notification.read && (
+                            {!notification.read && !notification.generated && (
                               <button onClick={() => markAsRead(notification.id)}
                                 className="flex items-center gap-1 px-3 py-1.5 text-slate-400 rounded-lg text-sm hover:text-white transition">
                                 <Check className="w-4 h-4" /> Přečteno
                               </button>
                             )}
-                            <button onClick={() => deleteNotification(notification.id)}
-                              className="p-1.5 text-slate-500 hover:text-red-400 transition ml-auto">
-                              <X className="w-4 h-4" />
-                            </button>
+                            {!notification.generated && (
+                              <button onClick={() => deleteNotification(notification.id)}
+                                className="p-1.5 text-slate-500 hover:text-red-400 transition ml-auto">
+                                <X className="w-4 h-4" />
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>

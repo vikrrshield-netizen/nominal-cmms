@@ -27,6 +27,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { useAuthContext } from '../context/AuthContext';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import { createTask } from '../services/taskService';
 import BottomSheet, { FormField, FormFooter } from '../components/ui/BottomSheet';
 import { showToast } from '../components/ui/Toast';
@@ -594,7 +595,7 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onDelete, on
     setEditStatus(asset.status);
     setEditRoom(asset.areaName || '');
     setIsEditing(false);
-  }, [asset.id]);
+  }, [asset.id, asset.name, asset.status, asset.areaName]);
 
   const roomOptions = useMemo(() => {
     if (!allAssets) return [];
@@ -1284,6 +1285,7 @@ function GlobalSearchResults({ assets, buildings, search, onSelectAsset, onSelec
 // MAIN PAGE — Drill-down: Buildings → Rooms → Machines
 // ═══════════════════════════════════════════════
 export default function MapPage() {
+  const goBack = useBackNavigation('/');
   const { assets, loading } = useAssets();
   const [drillLevel, setDrillLevel] = useState<DrillLevel>('buildings');
   const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(null);
@@ -1626,7 +1628,7 @@ export default function MapPage() {
         {/* Header */}
         <div className="flex items-center gap-3 mb-3">
           <button
-            onClick={() => window.location.href = '/'}
+            onClick={() => goBack()}
             className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 hover:text-white transition"
           >
             <ArrowLeft className="w-5 h-5" />

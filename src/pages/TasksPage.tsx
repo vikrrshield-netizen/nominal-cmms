@@ -1,11 +1,12 @@
-// src/pages/TasksPage.tsx
+﻿// src/pages/TasksPage.tsx
 // VIKRR — Asset Shield — Úkoly (responsive grid: 1col mobil, 2col tablet, 3col PC)
 
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { collection, onSnapshot, doc, updateDoc, addDoc, deleteDoc, Timestamp, serverTimestamp } from 'firebase/firestore';
+import { useState, useEffect, useMemo } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { collection, onSnapshot, doc, updateDoc, addDoc, deleteDoc, Timestamp, serverTimestamp, writeBatch, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import { useFormDraft } from '../hooks/useFormDraft';
 import CompleteTaskModal from '../components/ui/CompleteTaskModal';
 import {
@@ -21,15 +22,26 @@ import {
   CalendarDays,
   PauseCircle,
   CheckCircle2,
+  Clock,
+  ClipboardList,
+  FileText,
+  MapPin,
+  Search,
+  User,
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 import { cmmsConfig } from '../cmmsConfig';
+import { addWorkLog, subscribeToWorkLogs } from '../services/workLogService';
+import type { WorkLog } from '../types/workLog';
 import FAB from '../components/ui/FAB';
 import EmptyState from '../components/ui/EmptyState';
 import BottomSheet, { FormField, FormFooter } from '../components/ui/BottomSheet';
 import MicButton from '../components/ui/MicButton';
+import { assetService } from '../services/assetService';
+import type { Asset } from '../types/asset';
+import { isGearboxAsset } from '../services/gearboxService';
 
 // ═══════════════════════════════════════════════════
 // TYPES
@@ -42,6 +54,7 @@ interface Task {
   priority: string;
   assignedTo?: string;
   assignedToName?: string;
+  assignedWorkerNames?: string[];
   assetId?: string;
   assetName?: string;
   createdAt?: any;
@@ -49,10 +62,150 @@ interface Task {
   plannedDate?: string;
   completedAt?: any;
   completedBy?: string;
+  completedByNames?: string[];
   isDone?: boolean;
   resolution?: string;
   durationMinutes?: number;
+  result?: string;
+  auditNote?: string;
+  source?: string;
+  workType?: string;
+  location?: string;
+  dueDate?: any;
+  inspectionLogId?: string;
+  sourceRefId?: string;
+  sourceRefType?: string;
+  relatedAssetId?: string;
+  relatedAssetName?: string;
+  relatedAssetRole?: string;
+  lastUpdate?: string;
+  lastUpdateAt?: any;
+  lastUpdateBy?: string;
 }
+
+interface SourceWorkLog {
+  id: string;
+  userName?: string;
+  content?: string;
+  location?: string;
+  assetName?: string;
+  hoursWorked?: number;
+  performedAt?: any;
+  createdAt?: any;
+}
+
+type TaskSuggestMode = 'location' | 'asset' | null;
+
+function normalizeLookup(value: unknown) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function isBuildingAsset(asset: Asset) {
+  const type = normalizeLookup(asset.entityType);
+  return type === 'budova' || type === 'hala' || type === 'areal' || type === 'building';
+}
+
+function isRoomAsset(asset: Asset) {
+  const type = normalizeLookup(asset.entityType);
+  return type === 'mistnost' || type === 'room' || type === 'prostor';
+}
+
+function taskAssetBuilding(asset: Asset, allAssets: Asset[] = []) {
+  if (asset.buildingId?.trim()) return asset.buildingId.trim().toUpperCase();
+  let parentId = asset.parentId;
+  while (parentId) {
+    const parent = allAssets.find((item) => item.id === parentId);
+    if (!parent) break;
+    if (parent.buildingId?.trim()) return parent.buildingId.trim().toUpperCase();
+    const match = parent.name?.match(/\bBudova\s+([A-Z0-9]{1,4})\b/i);
+    if (match?.[1]) return match[1].toUpperCase();
+    parentId = parent.parentId;
+  }
+  const direct = `${asset.name || ''} ${asset.code || ''}`.match(/\bBudova\s+([A-Z0-9]{1,4})\b/i);
+  return direct?.[1]?.toUpperCase() || '';
+}
+
+function taskCleanLocationPart(value?: string | null, buildingCode?: string | null) {
+  const code = buildingCode?.trim();
+  let text = String(value || '').trim().replace(/\s+/g, ' ');
+  if (!text) return '';
+  text = text.replace(/^budova\s+[a-z0-9]{1,4}\s*[-–—:/]\s*/i, '');
+  if (code) {
+    const escapedCode = code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    text = text.replace(new RegExp(`^${escapedCode}\\s*[-–—:/]\\s*`, 'i'), '');
+  }
+  return text.trim();
+}
+
+function taskLocationParts(selectedLocation: string) {
+  const text = selectedLocation.trim();
+  const buildingMatch = text.match(/\bbudova\s+([a-z0-9]{1,4})\b/i) || text.match(/^([a-z0-9]{1,4})\s*[-–—:/]\s*/i);
+  const buildingCode = buildingMatch?.[1]?.toUpperCase() || '';
+  const roomLabel = taskCleanLocationPart(text, buildingCode);
+  const normalizedRoom = normalizeLookup(roomLabel);
+  const normalizedBuilding = normalizeLookup(buildingCode ? `Budova ${buildingCode}` : '');
+  const hasSpecificRoom = normalizedRoom.length >= 2 && normalizedRoom !== normalizedBuilding && !/^budova\s+[a-z0-9]{1,4}$/.test(normalizedRoom);
+  return { buildingCode, normalizedRoom, hasSpecificRoom };
+}
+
+function taskAssetRoomCandidateLabels(asset: Asset, allAssets: Asset[] = []) {
+  const building = taskAssetBuilding(asset, allAssets);
+  const parents: Asset[] = [];
+  let parentId = asset.parentId;
+  while (parentId) {
+    const parent = allAssets.find((item) => item.id === parentId);
+    if (!parent || parents.some((item) => item.id === parent.id)) break;
+    parents.push(parent);
+    parentId = parent.parentId;
+  }
+
+  const byKey = new Map<string, string>();
+  [
+    taskCleanLocationPart(asset.areaName, building),
+    taskCleanLocationPart(asset.location, building),
+    ...parents.flatMap((parent) => {
+      const parentBuilding = taskAssetBuilding(parent, allAssets) || building;
+      return [
+        isRoomAsset(parent) ? taskCleanLocationPart(parent.name, parentBuilding) : '',
+        taskCleanLocationPart(parent.areaName, parentBuilding),
+        taskCleanLocationPart(parent.location, parentBuilding),
+      ];
+    }),
+  ]
+    .forEach((value) => {
+      const cleanValue = String(value || '').trim();
+      const key = normalizeLookup(cleanValue);
+      if (cleanValue && !byKey.has(key)) byKey.set(key, cleanValue);
+    });
+  return Array.from(byKey.values());
+}
+
+function taskAssetRoomCandidates(asset: Asset, allAssets: Asset[] = []) {
+  return taskAssetRoomCandidateLabels(asset, allAssets).map((value) => normalizeLookup(value));
+}
+
+function taskAssetLocation(asset: Asset, allAssets: Asset[] = []) {
+  const building = taskAssetBuilding(asset, allAssets);
+  const room = taskAssetRoomCandidateLabels(asset, allAssets)[0] || '';
+  return [building ? `Budova ${building}` : '', room].filter(Boolean).join(' - ');
+}
+
+function taskAssetMatchesLocation(asset: Asset, selectedLocation: string, allAssets: Asset[] = []) {
+  const parts = taskLocationParts(selectedLocation);
+  if (!parts.buildingCode && !parts.normalizedRoom) return true;
+  const building = taskAssetBuilding(asset, allAssets);
+  if (parts.buildingCode && building && building !== parts.buildingCode) return false;
+  if (parts.hasSpecificRoom) {
+    return taskAssetRoomCandidates(asset, allAssets).some((candidate) => candidate === parts.normalizedRoom);
+  }
+  return !parts.buildingCode || building === parts.buildingCode;
+}
+
+const taskSuggestionPanelClass = 'mt-2 max-h-[min(22rem,52vh)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl';
 
 // ═══════════════════════════════════════════════════
 // PRIORITY CONFIG
@@ -65,14 +218,14 @@ const PRIORITY_CONFIG: Record<string, { bg: string; border: string; color: strin
 };
 
 const STATUS_BADGES: Record<string, { label: string; bg: string; text: string }> = {
-  backlog:      { label: 'Nový',         bg: 'bg-red-500/20',     text: 'text-red-400' },
-  planned:      { label: 'Plánovaný',    bg: 'bg-blue-500/20',    text: 'text-blue-400' },
-  in_progress:  { label: 'V řešení',     bg: 'bg-amber-500/20',   text: 'text-amber-400' },
-  paused:       { label: 'Čeká na díl',  bg: 'bg-cyan-500/20',    text: 'text-cyan-400' },
-  completed:    { label: 'Hotovo',        bg: 'bg-emerald-500/20', text: 'text-emerald-400' },
-  done:         { label: 'Hotovo',        bg: 'bg-emerald-500/20', text: 'text-emerald-400' },
-  deferred:     { label: 'Odloženo',      bg: 'bg-violet-500/20',  text: 'text-violet-400' },
-  cancelled:    { label: 'Zrušeno',       bg: 'bg-slate-500/20',   text: 'text-slate-400' },
+  backlog:      { label: 'Nový',         bg: 'bg-red-100',     text: 'text-red-700' },
+  planned:      { label: 'Plánovaný',    bg: 'bg-blue-100',    text: 'text-blue-700' },
+  in_progress:  { label: 'V řešení',     bg: 'bg-amber-100',   text: 'text-amber-800' },
+  paused:       { label: 'Čeká na díl',  bg: 'bg-cyan-100',    text: 'text-cyan-800' },
+  completed:    { label: 'Hotovo',        bg: 'bg-emerald-100', text: 'text-emerald-800' },
+  done:         { label: 'Hotovo',        bg: 'bg-emerald-100', text: 'text-emerald-800' },
+  deferred:     { label: 'Odloženo',      bg: 'bg-violet-100',  text: 'text-violet-800' },
+  cancelled:    { label: 'Zrušeno',       bg: 'bg-slate-100',   text: 'text-slate-700' },
 };
 
 // ═══════════════════════════════════════════════════
@@ -92,6 +245,105 @@ function timeAgo(date: any): string {
   return `${days}d`;
 }
 
+function toDate(value: any): Date | null {
+  if (!value) return null;
+  if (value.toDate) return value.toDate();
+  if (value instanceof Date) return value;
+  return new Date(value);
+}
+
+function formatDateTime(value: any): string {
+  const date = toDate(value);
+  if (!date) return '';
+  return date.toLocaleDateString('cs-CZ', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    + ' '
+    + date.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatMinutes(minutes?: number) {
+  if (!minutes) return '';
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest ? `${hours} h ${rest} min` : `${hours} h`;
+}
+
+function normalizePersonKey(name: string): string {
+  return name
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .toLocaleLowerCase('cs-CZ');
+}
+
+function personNameScore(name: string): number {
+  const nonAscii = [...name].filter((char) => char.charCodeAt(0) > 127).length;
+  const hasReplacement = name.includes('?') || name.includes('�');
+  return nonAscii * 10 + name.length - (hasReplacement ? 1000 : 0);
+}
+
+function uniqueNames(names: Array<string | null | undefined>): string[] {
+  const byKey = new Map<string, string>();
+  for (const rawName of names) {
+    const cleanName = String(rawName || '').trim().replace(/\s+/g, ' ');
+    if (!cleanName) continue;
+    const key = normalizePersonKey(cleanName);
+    const existing = byKey.get(key);
+    if (!existing || personNameScore(cleanName) > personNameScore(existing)) {
+      byKey.set(key, cleanName);
+    }
+  }
+  return [...byKey.values()];
+}
+
+function taskWorkerNames(task: Task): string[] {
+  return uniqueNames([
+    ...(Array.isArray(task.completedByNames) ? task.completedByNames : []),
+    task.completedBy,
+    ...(Array.isArray(task.assignedWorkerNames) ? task.assignedWorkerNames : []),
+    task.assignedToName,
+    task.assignedTo,
+  ]);
+}
+
+function taskWorkerLabel(task: Task): string {
+  const names = taskWorkerNames(task);
+  return names.length ? names.join(', ') : '—';
+}
+
+function taskResultLabel(value?: string) {
+  if (value === 'fixed') return 'Opraveno';
+  if (value === 'monitor') return 'Sledovat';
+  if (value === 'not_fixable') return 'Nelze opravit';
+  if (value === 'handover') return 'Předat dál';
+  return '';
+}
+
+function isDiaryTask(task: Task): boolean {
+  if (task.sourceRefType === 'work_log') return true;
+  if (task.sourceRefType === 'manual' && task.sourceRefId && task.description?.toLowerCase().includes('deniku udrzby')) return true;
+  return false;
+}
+
+function workTypeLabel(value?: string) {
+  if (!value) return '';
+  return cmmsConfig.workTypes.find((item) => item.id === value)?.label || value;
+}
+
+function taskProblemText(task: Task) {
+  return (task.description || task.title || '').trim();
+}
+
+function taskActionText(task: Task) {
+  const parts = [
+    workTypeLabel(task.workType),
+    task.assetName ? `Zařízení: ${task.assetName}` : '',
+    task.location ? `Místo: ${task.location}` : '',
+  ].filter(Boolean);
+  return parts.join(' · ') || 'Není vybrané zařízení ani místo';
+}
+
 // ═══════════════════════════════════════════════════
 // SUMMARY BAR
 // ═══════════════════════════════════════════════════
@@ -103,7 +355,7 @@ function TaskSummary({ tasks }: { tasks: Task[] }) {
   const done = tasks.filter((t) => t.status === 'done' || t.status === 'completed').length;
 
   return (
-    <div className="grid grid-cols-5 gap-1.5 mb-4">
+    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-4">
       {[
         { value: p1, label: 'Havárie', color: '#f87171' },
         { value: p2, label: 'Tento týden', color: '#fbbf24' },
@@ -113,11 +365,11 @@ function TaskSummary({ tasks }: { tasks: Task[] }) {
       ].map((s) => (
         <div
           key={s.label}
-          className="text-center py-2 px-1 rounded-xl"
-          style={{ background: `${s.color}10`, border: `1px solid ${s.color}15` }}
+          className="vik-card-soft text-center py-2 px-1"
+          style={{ borderColor: `${s.color}28` }}
         >
           <div className="text-lg font-bold" style={{ color: s.color }}>{s.value}</div>
-          <div className="text-[10px] text-slate-500">{s.label}</div>
+          <div className="text-[10px] vik-muted">{s.label}</div>
         </div>
       ))}
     </div>
@@ -160,16 +412,93 @@ function useTechnicians() {
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'users'), (snap) => {
       const DISPATCH_ROLES = ['UDRZBA', 'SKLADNIK', 'SUPERADMIN'];
-      setTechs(
-        snap.docs
-          .map((d) => ({ id: d.id, displayName: d.data().displayName || '?', role: d.data().role || '' }))
-          .filter((u) => DISPATCH_ROLES.includes(u.role))
-          .sort((a, b) => a.displayName.localeCompare(b.displayName))
-      );
+      const users = snap.docs
+          .map((d) => {
+            const data = d.data();
+            return {
+              id: d.id,
+              displayName: data.displayName || '?',
+              role: data.role || '',
+              active: data.active !== false && data.isActive !== false,
+            };
+          })
+          .filter((u) => u.active && DISPATCH_ROLES.includes(u.role));
+      const byName = new Map<string, Technician>();
+      for (const technician of users) {
+        const key = normalizePersonKey(technician.displayName);
+        const existing = byName.get(key);
+        if (!existing || personNameScore(technician.displayName) > personNameScore(existing.displayName)) {
+          byName.set(key, technician);
+        }
+      }
+      setTechs([...byName.values()].sort((a, b) => a.displayName.localeCompare(b.displayName, 'cs-CZ')));
     });
     return () => unsub();
   }, []);
   return techs;
+}
+
+function WorkerMultiSelect({
+  label,
+  selected,
+  onChange,
+  options,
+  required,
+}: {
+  label: string;
+  selected: string[];
+  onChange: (value: string[]) => void;
+  options: string[];
+  required?: boolean;
+}) {
+  const sourceOptions = options.length > 0 ? options : selected;
+  const allOptions = uniqueNames([...sourceOptions, ...selected]);
+  const toggle = (name: string) => {
+    const key = normalizePersonKey(name);
+    onChange(selected.some((item) => normalizePersonKey(item) === key)
+      ? selected.filter((item) => normalizePersonKey(item) !== key)
+      : uniqueNames([...selected, name])
+    );
+  };
+
+  return (
+    <div className="mb-4">
+      <label className="block text-sm text-slate-600 font-medium mb-2">
+        {label} {required && <span className="text-red-400">*</span>}
+      </label>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {allOptions.map((name) => {
+          const active = selected.some((item) => normalizePersonKey(item) === normalizePersonKey(name));
+          return (
+            <button
+              key={name}
+              type="button"
+              onClick={() => toggle(name)}
+              className={`min-h-[44px] px-3 py-2 rounded-xl border text-left text-sm font-semibold transition ${
+                active
+                  ? 'bg-emerald-50 border-emerald-500 text-emerald-900'
+                  : 'bg-white border-slate-200 text-slate-700 active:bg-slate-50'
+              }`}
+            >
+              <span className="inline-flex items-center gap-2">
+                <span className={`w-4 h-4 rounded border flex items-center justify-center text-[10px] ${
+                  active ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-400 text-transparent'
+                }`}>
+                  ✓
+                </span>
+                {name}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      {selected.length > 0 && (
+        <div className="mt-2 text-xs text-slate-600">
+          Vybráno: <span className="text-slate-200">{selected.join(', ')}</span>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ═══════════════════════════════════════════════════
@@ -186,16 +515,21 @@ const TAB_OPTIONS: { key: FilterTab; label: string; color: string }[] = [
 // ═══════════════════════════════════════════════════
 // TASK CARD (standardized)
 // ═══════════════════════════════════════════════════
-function TaskCard({ task, onClick, onEdit, onDelete }: { task: Task; onClick: () => void; onEdit: () => void; onDelete: () => void }) {
+function TaskCard({ task, onClick, onEdit, onDelete, onAddLog, onComplete }: { task: Task; onClick: () => void; onEdit: () => void; onDelete: () => void; onAddLog: () => void; onComplete: () => void }) {
   const pc = PRIORITY_CONFIG[task.priority] || PRIORITY_CONFIG.P3;
   const sb = STATUS_BADGES[task.status] || STATUS_BADGES.backlog;
-  const assignee = task.assignedToName || task.assignedTo || '—';
-  const initials = assignee !== '—' ? assignee.split(' ').filter(Boolean).map(w => w[0] || '').join('').slice(0, 2) || '?' : '?';
+  const assignee = taskWorkerLabel(task);
+  const initials = assignee !== '—' ? assignee.split(/[,\s]+/).filter(Boolean).map(w => w[0] || '').join('').slice(0, 2) || '?' : '?';
   const isActive = task.status === 'in_progress';
+  const isDone = task.status === 'done' || task.status === 'completed';
+  const diaryTask = isDiaryTask(task);
+  const problem = taskProblemText(task);
+  const action = taskActionText(task);
+  const typeLabel = workTypeLabel(task.workType);
 
   return (
-    <div className={`bg-slate-800/60 rounded-xl border flex flex-col overflow-hidden ${pc.borderLeft} ${
-      isActive ? 'border-amber-500/50 ring-1 ring-amber-500/30' : 'border-slate-700/50'
+    <div className={`vik-row-card bg-white flex flex-col overflow-hidden ${pc.borderLeft} ${
+      isActive ? 'border-amber-500/50 ring-1 ring-amber-500/30' : ''
     }`}>
       {/* Active technician bar */}
       {isActive && assignee !== '—' && (
@@ -207,26 +541,57 @@ function TaskCard({ task, onClick, onEdit, onDelete }: { task: Task; onClick: ()
       )}
 
       {/* CLICKABLE BODY */}
-      <button onClick={onClick} className="w-full px-2.5 py-2 text-left hover:bg-slate-700/40 transition">
+      <button onClick={onClick} className="w-full px-3 py-3 text-left hover:bg-slate-50 transition">
         {/* HEADER: Priority + Status + Time */}
-        <div className="flex items-center gap-1.5 mb-1">
-          <span className="text-[9px] font-bold px-1 py-px rounded" style={{ background: `${pc.color}20`, color: pc.color }}>
+        <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+          <span className="text-[10px] font-bold px-2 py-1 rounded-lg" style={{ background: `${pc.color}20`, color: pc.color }}>
             {task.priority}
           </span>
-          <span className={`text-[9px] font-bold px-1 py-px rounded ${sb.bg} ${sb.text}`}>{sb.label}</span>
-          <span className="text-[10px] text-slate-600 ml-auto">{timeAgo(task.createdAt)}</span>
+          <span className={`text-[10px] font-bold px-2 py-1 rounded-lg ${sb.bg} ${sb.text}`}>{sb.label}</span>
+          {typeLabel && (
+            <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-slate-700 text-white">
+              {typeLabel}
+            </span>
+          )}
+          {diaryTask && (
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-0.5">
+              <ClipboardList className="w-2.5 h-2.5" /> z deníku
+            </span>
+          )}
+          <span className="text-xs font-medium text-slate-500 ml-auto">{timeAgo(task.createdAt)}</span>
         </div>
 
         {/* TITLE */}
-        <h4 className="text-[13px] font-semibold text-white leading-tight mb-1 line-clamp-2">{task.title}</h4>
+        <h4 className="text-base font-black text-slate-950 leading-tight mb-2 line-clamp-2">{task.title}</h4>
+
+        <div className="space-y-2 mb-3">
+          <div className="rounded-xl border border-red-200 bg-red-50 p-2.5">
+            <div className="text-[10px] font-black uppercase tracking-wide text-red-600 mb-1">Problém</div>
+            <div className="text-sm font-semibold text-slate-900 line-clamp-3">{problem || 'Bez popisu problému.'}</div>
+          </div>
+          <div className="rounded-xl border border-blue-200 bg-blue-50 p-2.5">
+            <div className="text-[10px] font-black uppercase tracking-wide text-blue-600 mb-1">Týká se</div>
+            <div className="text-sm font-semibold text-slate-900 line-clamp-2">{action}</div>
+          </div>
+          {task.lastUpdate && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-2.5">
+              <div className="flex items-center justify-between gap-2 text-[10px] font-black uppercase tracking-wide text-amber-600 mb-1">
+                <span>Poslední aktualizace</span>
+                {task.lastUpdateAt && <span className="normal-case tracking-normal text-amber-700">{timeAgo(task.lastUpdateAt)}</span>}
+              </div>
+              <div className="text-sm font-semibold text-slate-900 line-clamp-2">{task.lastUpdate}</div>
+              {task.lastUpdateBy && <div className="text-xs font-medium text-slate-600 mt-1">{task.lastUpdateBy}</div>}
+            </div>
+          )}
+        </div>
 
         {/* META: Assignee + Asset — single dense line */}
-        <div className="flex items-center gap-2 text-[10px] text-slate-500">
+        <div className="flex flex-wrap items-center gap-2 text-[13px] text-slate-600">
           <div className="flex items-center gap-1 min-w-0">
-            <div className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 ${isActive ? 'bg-amber-500/30' : 'bg-slate-700'}`}>
-              <span className={`text-[7px] font-bold ${isActive ? 'text-amber-300' : 'text-slate-400'}`}>{initials}</span>
+            <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${isActive ? 'bg-amber-100 border border-amber-300' : 'bg-slate-700'}`}>
+              <span className={`text-[8px] font-black ${isActive ? 'text-amber-700' : 'text-white'}`}>{initials}</span>
             </div>
-            <span className={`truncate ${isActive ? 'text-amber-400 font-medium' : ''}`}>{assignee}</span>
+            <span className={`truncate ${isActive ? 'text-amber-700 font-bold' : 'font-medium'}`}>{assignee}</span>
           </div>
           {task.assetName && (
             <div className="flex items-center gap-0.5 min-w-0">
@@ -234,20 +599,48 @@ function TaskCard({ task, onClick, onEdit, onDelete }: { task: Task; onClick: ()
               <span className="truncate">{task.assetName}</span>
             </div>
           )}
+          {task.dueDate && (
+            <div className="flex items-center gap-0.5 min-w-0">
+              <CalendarDays className="w-3 h-3 flex-shrink-0" />
+              <span>{formatDateTime(task.dueDate)}</span>
+            </div>
+          )}
         </div>
+        {diaryTask && (
+          <div className="mt-2 text-xs font-medium text-amber-700 flex items-center gap-1">
+            <FileText className="w-3 h-3" />
+            <span>původní zápis je v detailu úkolu</span>
+          </div>
+        )}
       </button>
 
-      {/* ACTION FOOTER — icon-only buttons, 44px touch targets */}
-      <div className="border-t border-slate-700/30 px-2 py-1 flex items-center justify-end gap-1">
+      {/* ACTION FOOTER — primární akce (zápis/dokončit) + edit/smazat */}
+      <div className="border-t border-slate-200 px-2 py-1.5 flex items-center gap-1 bg-white">
+        {!isDone && (
+          <>
+            <button
+              onClick={(e) => { e.stopPropagation(); onAddLog(); }}
+              className="flex-1 min-h-11 rounded-lg flex items-center justify-center gap-1.5 border border-sky-200 bg-sky-50 text-sky-700 text-xs font-bold hover:bg-sky-100 transition"
+            >
+              <FileText className="w-4 h-4" /> Zápis
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); onComplete(); }}
+              className="flex-1 min-h-11 rounded-lg flex items-center justify-center gap-1.5 border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs font-bold hover:bg-emerald-100 transition"
+            >
+              <CheckCircle2 className="w-4 h-4" /> Dokončit
+            </button>
+          </>
+        )}
         <button
           onClick={(e) => { e.stopPropagation(); onEdit(); }}
-          className="w-11 h-11 rounded-lg flex items-center justify-center bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition"
+          className="w-11 h-11 shrink-0 rounded-lg flex items-center justify-center border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 transition"
         >
           <Edit2 className="w-4 h-4" />
         </button>
         <button
           onClick={(e) => { e.stopPropagation(); onDelete(); }}
-          className="w-11 h-11 rounded-lg flex items-center justify-center bg-red-500/10 text-red-400 hover:bg-red-500/20 transition"
+          className="w-11 h-11 shrink-0 rounded-lg flex items-center justify-center border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition"
         >
           <Trash2 className="w-4 h-4" />
         </button>
@@ -260,7 +653,8 @@ function TaskCard({ task, onClick, onEdit, onDelete }: { task: Task; onClick: ()
 // MAIN PAGE
 // ═══════════════════════════════════════════════════
 export default function TasksPage() {
-  const navigate = useNavigate();
+  const goBack = useBackNavigation('/');
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuthContext();
   const { tasks, loading } = useTasks();
   const technicians = useTechnicians();
@@ -268,9 +662,15 @@ export default function TasksPage() {
   const [actionsTask, setActionsTask] = useState<Task | null>(null);
   const [completingTask, setCompletingTask] = useState<Task | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [loggingTask, setLoggingTask] = useState<Task | null>(null);
+  const [logText, setLogText] = useState('');
+  const [savingLog, setSavingLog] = useState(false);
   const [filterTab, setFilterTab] = useState<FilterTab>('active');
   const [filterPriority, setFilterPriority] = useState<string | null>(null);
   const [filterTechnician, setFilterTechnician] = useState<string | null>(null);
+  const [openedTaskFromUrl, setOpenedTaskFromUrl] = useState<string | null>(null);
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [suggestMode, setSuggestMode] = useState<TaskSuggestMode>(null);
 
   // Form state with draft persistence
   const [form, setForm, clearDraft] = useFormDraft('new_task', {
@@ -278,18 +678,141 @@ export default function TasksPage() {
     description: '',
     priority: 'P3',
     assignee: '',
+    assignedWorkerNames: [] as string[],
     workType: '',
+    location: '',
+    assetName: '',
+    assetId: '',
   });
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const tenantId = user?.tenantId || 'main_firm';
+    assetService.getAll(tenantId)
+      .then((items) => setAssets(items))
+      .catch((err) => {
+        console.error('[Tasks] Asset suggestions failed:', err);
+        setAssets([]);
+      });
+  }, [user?.tenantId]);
+
+  useEffect(() => {
+    if (searchParams.get('new') !== '1') return;
+    setShowNewTask(true);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('new');
+    setSearchParams(nextParams, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  useEffect(() => {
+    const taskId = searchParams.get('task');
+    if (!taskId || loading || openedTaskFromUrl === taskId) return;
+    const task = tasks.find((item) => item.id === taskId);
+    if (task) {
+      setActionsTask(task);
+      setOpenedTaskFromUrl(taskId);
+      setSearchParams({}, { replace: true });
+    }
+  }, [loading, openedTaskFromUrl, searchParams, setSearchParams, tasks]);
 
   // Counts for tabs
   const activeCount = tasks.filter((t) => t.status !== 'done' && t.status !== 'completed').length;
   const mineCount = tasks.filter((t) =>
-    (t.assignedToName === user?.displayName || t.assignedTo === user?.displayName) &&
+    taskWorkerNames(t).includes(user?.displayName || '') &&
     t.status !== 'done' && t.status !== 'completed'
   ).length;
   const doneCount = tasks.filter((t) => t.status === 'done' || t.status === 'completed').length;
   const tabCounts: Record<FilterTab, number> = { active: activeCount, mine: mineCount, done: doneCount };
+
+  const equipmentAssets = useMemo(() => (
+    assets
+      .filter((asset) => !asset.isDeleted)
+      .filter((asset) => !isBuildingAsset(asset) && !isRoomAsset(asset))
+      .sort((a, b) => a.name.localeCompare(b.name, 'cs'))
+  ), [assets]);
+
+  const locationOptions = useMemo(() => {
+    const byKey = new Map<string, string>();
+    const add = (value?: string | null) => {
+      const label = String(value || '').trim().replace(/\s+/g, ' ');
+      if (!label) return;
+      const key = normalizeLookup(label);
+      if (!byKey.has(key)) byKey.set(key, label);
+    };
+    assets
+      .filter((asset) => !asset.isDeleted)
+      .forEach((asset) => {
+        if (isBuildingAsset(asset)) add(asset.name);
+        if (isRoomAsset(asset)) add(taskAssetLocation(asset, assets) || asset.name);
+        add(taskAssetLocation(asset, assets));
+      });
+    return Array.from(byKey.values()).sort((a, b) => a.localeCompare(b, 'cs')).slice(0, 60);
+  }, [assets]);
+
+  const filteredLocationOptions = useMemo(() => {
+    const q = normalizeLookup(form.location);
+    return locationOptions
+      .filter((label) => !q || normalizeLookup(label).includes(q))
+      .slice(0, 20);
+  }, [form.location, locationOptions]);
+
+  const filteredAssetOptions = useMemo(() => {
+    const q = normalizeLookup(form.assetName);
+    const scoped = form.location?.trim()
+      ? equipmentAssets.filter((asset) => taskAssetMatchesLocation(asset, form.location, assets))
+      : equipmentAssets;
+    return scoped
+      .filter((asset) => {
+        const text = normalizeLookup([asset.name, asset.code, asset.entityType, taskAssetLocation(asset, assets)].filter(Boolean).join(' '));
+        return !q || text.includes(q);
+      })
+      .slice(0, 25);
+  }, [assets, equipmentAssets, form.assetName, form.location]);
+
+  const selectedTaskAsset = useMemo(() => {
+    if (form.assetId) return assets.find((asset) => asset.id === form.assetId);
+    const q = normalizeLookup(form.assetName);
+    if (!q) return undefined;
+    return equipmentAssets.find((asset) =>
+      normalizeLookup(asset.name) === q ||
+      normalizeLookup(asset.code || '') === q ||
+      normalizeLookup(`${asset.name} ${asset.code || ''}`) === q
+    );
+  }, [assets, equipmentAssets, form.assetId, form.assetName]);
+
+  const selectedTaskGearboxExtruderName = selectedTaskAsset && isGearboxAsset(selectedTaskAsset)
+    ? selectedTaskAsset.currentExtruderName || ''
+    : '';
+
+  const resolveTaskAsset = async (task: Task): Promise<Asset | undefined> => {
+    if (!task.assetId) return undefined;
+    const local = assets.find((asset) => asset.id === task.assetId);
+    if (local) return local;
+    const snap = await getDoc(doc(db, 'assets', task.assetId));
+    return snap.exists() ? ({ id: snap.id, ...snap.data() } as Asset) : undefined;
+  };
+
+  const selectTaskLocation = (value: string) => {
+    const selectedAsset = form.assetId ? assets.find((asset) => asset.id === form.assetId) : undefined;
+    setForm(prev => ({
+      ...prev,
+      location: value,
+      ...(selectedAsset && !taskAssetMatchesLocation(selectedAsset, value, assets)
+        ? { assetName: '', assetId: '' }
+        : {}),
+    }));
+    setSuggestMode(null);
+  };
+
+  const selectTaskAsset = (asset: Asset) => {
+    setForm(prev => ({
+      ...prev,
+      assetName: asset.name,
+      assetId: asset.id,
+      location: prev.location || taskAssetLocation(asset, assets),
+    }));
+    setSuggestMode(null);
+  };
 
   // Filtered & sorted tasks
   const filteredTasks = (() => {
@@ -298,7 +821,7 @@ export default function TasksPage() {
     switch (filterTab) {
       case 'mine':
         result = result.filter((t) =>
-          (t.assignedToName === user?.displayName || t.assignedTo === user?.displayName) &&
+          taskWorkerNames(t).includes(user?.displayName || '') &&
           t.status !== 'done' && t.status !== 'completed'
         );
         break;
@@ -315,7 +838,7 @@ export default function TasksPage() {
     }
 
     if (filterTechnician) {
-      result = result.filter((t) => t.assignedToName === filterTechnician || t.assignedTo === filterTechnician);
+      result = result.filter((t) => taskWorkerNames(t).includes(filterTechnician));
     }
 
     const order: Record<string, number> = { P1: 0, P2: 1, P3: 2, P4: 3 };
@@ -326,6 +849,8 @@ export default function TasksPage() {
     if (!form.title.trim()) return;
     setSaving(true);
     try {
+      const gearboxExtruderId = selectedTaskAsset && isGearboxAsset(selectedTaskAsset) ? selectedTaskAsset.currentExtruderId || '' : '';
+      const gearboxExtruderName = selectedTaskAsset && isGearboxAsset(selectedTaskAsset) ? selectedTaskAsset.currentExtruderName || '' : '';
       await addDoc(collection(db, 'tasks'), {
         title: form.title.trim(),
         description: form.description.trim() || '',
@@ -334,8 +859,18 @@ export default function TasksPage() {
         type: 'corrective',
         source: 'web',
         workType: form.workType || null,
+        location: form.location?.trim() || null,
+        assetId: form.assetId || null,
+        assetName: form.assetName?.trim() || null,
+        ...(gearboxExtruderId ? {
+          relatedAssetId: gearboxExtruderId,
+          relatedAssetName: gearboxExtruderName,
+          relatedAssetRole: 'mounted_extruder',
+        } : {}),
         assigneeId: form.assignee || null,
-        assigneeName: form.assignee || null,
+        assigneeName: (form.assignedWorkerNames[0] || form.assignee) || null,
+        assignedToName: (form.assignedWorkerNames[0] || form.assignee) || null,
+        assignedWorkerNames: uniqueNames([...(form.assignedWorkerNames || []), form.assignee]),
         isDone: false,
         createdAt: Timestamp.now(),
         updatedAt: serverTimestamp(),
@@ -351,14 +886,14 @@ export default function TasksPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900">
-      <div className="max-w-5xl mx-auto px-3 pt-4 pb-24">
+    <div className="vik-page">
+      <div className="vik-page-shell px-3 pt-4 pb-24">
 
         {/* Header */}
         <div className="flex items-center gap-3 mb-3">
           <button
-            onClick={() => navigate('/')}
-            className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 hover:text-white transition"
+            onClick={() => goBack()}
+            className="vik-button w-10 h-10 p-0"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
@@ -384,14 +919,14 @@ export default function TasksPage() {
                     t.title,
                     t.assetName || '—',
                     t.completedAt ? (t.completedAt.toDate ? t.completedAt.toDate() : new Date(t.completedAt)).toLocaleDateString('cs-CZ') : '—',
-                    t.completedBy || t.assignedToName || '—',
+                    taskWorkerLabel(t),
                   ]),
                   styles: { fontSize: 8 },
                   headStyles: { fillColor: [30, 41, 59] },
                 });
                 pdf.save(`NOMINAL_hotove_${new Date().toISOString().slice(0, 10)}.pdf`);
               }}
-              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition"
+              className="vik-button w-10 h-10 p-0"
               title="Export PDF"
             >
               <Download className="w-5 h-5 text-slate-400" />
@@ -404,15 +939,15 @@ export default function TasksPage() {
         <TaskSummary tasks={tasks} />
 
         {/* Tab filters */}
-        <div className="flex gap-1 mb-3 border-b border-white/10 pb-2">
+        <div className="flex gap-2 mb-3 border-b border-white/10 pb-2 overflow-x-auto">
           {TAB_OPTIONS.map((tab) => (
             <button
               key={tab.key}
               onClick={() => setFilterTab(tab.key)}
-              className={`px-4 py-2 rounded-lg text-[13px] font-semibold transition-all ${
+              className={`vik-chip ${
                 filterTab === tab.key
-                  ? 'bg-orange-500/15 text-orange-400'
-                  : 'text-slate-500 hover:text-slate-300'
+                  ? 'vik-chip-active'
+                  : ''
               }`}
             >
               {tab.label}
@@ -422,11 +957,11 @@ export default function TasksPage() {
         </div>
 
         {/* Compact filters — priority + technician in one row */}
-        <div className="flex gap-2 mb-4">
+        <div className="flex flex-col sm:flex-row gap-2 mb-4">
           <select
             value={filterPriority || ''}
             onChange={(e) => setFilterPriority(e.target.value || null)}
-            className="flex-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-semibold text-slate-300 focus:outline-none focus:border-orange-500/40 transition"
+            className="vik-input flex-1 text-sm font-semibold"
           >
             <option value="">Priorita: Vše</option>
             <option value="P1">P1 — Havárie</option>
@@ -438,7 +973,7 @@ export default function TasksPage() {
             <select
               value={filterTechnician || ''}
               onChange={(e) => setFilterTechnician(e.target.value || null)}
-              className="flex-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-semibold text-slate-300 focus:outline-none focus:border-orange-500/40 transition"
+              className="vik-input flex-1 text-sm font-semibold"
             >
               <option value="">Technik: Všichni</option>
               {technicians.map((t) => (
@@ -462,9 +997,9 @@ export default function TasksPage() {
             onAction={() => setShowNewTask(true)}
           />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
             {filteredTasks.map((task) => (
-              <TaskCard key={task.id} task={task} onClick={() => setActionsTask(task)} onEdit={() => setEditingTask(task)} onDelete={async () => {
+              <TaskCard key={task.id} task={task} onClick={() => setActionsTask(task)} onEdit={() => setEditingTask(task)} onAddLog={() => { setLogText(''); setLoggingTask(task); }} onComplete={() => setCompletingTask(task)} onDelete={async () => {
                 if (window.confirm(`Smazat úkol "${task.title}"?`)) {
                   await deleteDoc(doc(db, 'tasks', task.id));
                 }
@@ -479,6 +1014,7 @@ export default function TasksPage() {
 
       {/* New Task Modal */}
       <BottomSheet title="Nový úkol" isOpen={showNewTask} onClose={() => setShowNewTask(false)}>
+        <div className="-mx-2 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-slate-950 shadow-inner sm:-mx-1">
         <FormField label="Název" value={form.title} onChange={(v) => setForm(prev => ({ ...prev, title: v }))} placeholder="Co je potřeba udělat?" required />
         <div className="flex gap-2 items-end">
           <div className="flex-1">
@@ -488,17 +1024,15 @@ export default function TasksPage() {
             <MicButton onTranscript={(t) => setForm(prev => ({ ...prev, description: prev.description ? prev.description + ' ' + t : t }))} />
           </div>
         </div>
-        <FormField
-          label="Přiřadit"
-          value={form.assignee}
-          onChange={(v) => setForm(prev => ({ ...prev, assignee: v }))}
-          type="select"
-          options={[
-            { value: 'Zdeněk Mička', label: 'Zdeněk Mička' },
-            { value: 'Petr Volf', label: 'Petr Volf' },
-            { value: 'Filip Novák', label: 'Filip Novák' },
-            { value: 'Vilém', label: 'Vilém' },
-          ]}
+        <WorkerMultiSelect
+          label="Kdo na tom bude dělat"
+          selected={form.assignedWorkerNames || []}
+          onChange={(value) => setForm(prev => ({
+            ...prev,
+            assignedWorkerNames: value,
+            assignee: value[0] || '',
+          }))}
+          options={technicians.map((t) => t.displayName)}
         />
         <FormField
           label="Typ práce"
@@ -508,6 +1042,103 @@ export default function TasksPage() {
           required
           options={cmmsConfig.workTypes.map(w => ({ value: w.id, label: w.label }))}
         />
+        <div className="space-y-3">
+          <label className="block">
+            <span className="text-sm font-semibold text-slate-600">Kde</span>
+            <div className="relative mt-2">
+              <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+              <input
+                value={form.location || ''}
+                onChange={(event) => {
+                  setForm(prev => ({ ...prev, location: event.target.value, assetId: '' }));
+                  setSuggestMode('location');
+                }}
+                onFocus={() => setSuggestMode('location')}
+                placeholder="Budova D - Extrudovna II"
+                autoComplete="off"
+                className="w-full min-h-14 rounded-2xl border border-slate-300 bg-white py-4 pl-12 pr-4 text-base font-bold text-slate-950 outline-none placeholder:text-slate-400 focus:border-emerald-600"
+              />
+            </div>
+            {suggestMode === 'location' && filteredLocationOptions.length > 0 && (
+              <div className={taskSuggestionPanelClass}>
+                {filteredLocationOptions.map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => selectTaskLocation(option)}
+                    className="w-full min-h-14 rounded-xl px-4 py-3 text-left text-base font-black leading-snug text-slate-950 active:bg-emerald-50"
+                  >
+                    <span className="flex items-start gap-3">
+                      <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-blue-300" />
+                      <span className="break-words">{option}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </label>
+
+          <label className="block">
+            <span className="text-sm font-semibold text-slate-600">Zařízení / věc</span>
+            {form.location?.trim() && (
+              <span className="mt-1 block text-xs font-bold text-emerald-700">
+                Nabízím jen zařízení podle zvolené místnosti.
+              </span>
+            )}
+            <div className="relative mt-2">
+              <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+              <input
+                value={form.assetName || ''}
+                onChange={(event) => {
+                  setForm(prev => ({ ...prev, assetName: event.target.value, assetId: '' }));
+                  setSuggestMode('asset');
+                }}
+                onFocus={() => setSuggestMode('asset')}
+                placeholder="Extruder, dopravník, převodovka..."
+                autoComplete="off"
+                className="w-full min-h-14 rounded-2xl border border-slate-300 bg-white py-4 pl-12 pr-4 text-base font-bold text-slate-950 outline-none placeholder:text-slate-400 focus:border-emerald-600"
+              />
+            </div>
+            {suggestMode === 'asset' && filteredAssetOptions.length > 0 && (
+              <div className={taskSuggestionPanelClass}>
+                {filteredAssetOptions.map((asset) => (
+                  <button
+                    key={asset.id}
+                    type="button"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => selectTaskAsset(asset)}
+                    className="w-full min-h-16 rounded-xl px-4 py-3 text-left active:bg-emerald-50"
+                  >
+                    <span className="flex items-start gap-3">
+                      <Wrench className="mt-0.5 h-5 w-5 shrink-0 text-blue-300" />
+                      <span className="min-w-0">
+                        <span className="block text-base font-black leading-snug text-slate-950 break-words">{asset.name}</span>
+                        <span className="mt-1 block text-sm leading-snug text-slate-600 break-words">
+                          {[asset.code, taskAssetLocation(asset, assets)].filter(Boolean).join(' | ') || asset.entityType}
+                        </span>
+                      </span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {suggestMode === 'asset' && form.location?.trim() && filteredAssetOptions.length === 0 && (
+              <div className="mt-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-900">
+                V této místnosti zatím nevidím žádné zařízení z kartotéky.
+              </div>
+            )}
+            {selectedTaskAsset && isGearboxAsset(selectedTaskAsset) && selectedTaskGearboxExtruderName && (
+              <div className="mt-2 rounded-xl border border-violet-200 bg-violet-50 px-3 py-3 text-sm font-semibold text-violet-900">
+                <div className="font-black">Sledovaná převodovka</div>
+                <div className="mt-1">Je namontovaná na: {selectedTaskGearboxExtruderName}</div>
+                <div className="mt-1 text-xs font-bold text-violet-700">
+                  Úkol i pozdější zápisy se uloží do historie převodovky i extruderu.
+                </div>
+              </div>
+            )}
+          </label>
+        </div>
         <FormField
           label="Priorita"
           value={form.priority}
@@ -523,6 +1154,7 @@ export default function TasksPage() {
           loading={saving}
           disabled={!form.title.trim()}
         />
+        </div>
       </BottomSheet>
 
       {/* Task Actions Sheet */}
@@ -531,6 +1163,7 @@ export default function TasksPage() {
           task={actionsTask}
           userName={user?.displayName || 'Neznámý'}
           onClose={() => setActionsTask(null)}
+          onEdit={() => { setEditingTask(actionsTask); setActionsTask(null); }}
           onComplete={() => { setCompletingTask(actionsTask); setActionsTask(null); }}
           onStatusChange={async (updates) => {
             await updateDoc(doc(db, 'tasks', actionsTask.id), {
@@ -546,27 +1179,210 @@ export default function TasksPage() {
       {completingTask && (
         <CompleteTaskModal
           taskTitle={completingTask.title}
+          defaultWorkers={taskWorkerNames(completingTask)}
+          workerOptions={technicians.map((t) => t.displayName)}
           onConfirm={async (data) => {
-            await updateDoc(doc(db, 'tasks', completingTask.id), {
-              status: 'done',
+            const completedByNames = uniqueNames([...(data.completedByNames || []), data.completedByName, user?.displayName]);
+            const completedByName = completedByNames.join(', ') || user?.displayName || 'Neznamy';
+            const assignedWorkerNames = uniqueNames([...taskWorkerNames(completingTask), ...completedByNames]);
+            const performedAt = data.performedDate ? Timestamp.fromDate(new Date(`${data.performedDate}T12:00:00`)) : serverTimestamp();
+            const resultLabel = taskResultLabel(data.result);
+            const diaryContent = [
+              data.resolution,
+              resultLabel ? `Výsledek: ${resultLabel}` : '',
+              data.auditNote ? `Audit: ${data.auditNote}` : '',
+            ].filter(Boolean).join('\n');
+            const batch = writeBatch(db);
+            const taskRef = doc(db, 'tasks', completingTask.id);
+            const workLogRef = doc(collection(db, 'workLogs'));
+            const taskAsset = await resolveTaskAsset(completingTask);
+            const linkedExtruderId = taskAsset && isGearboxAsset(taskAsset)
+              ? taskAsset.currentExtruderId || completingTask.relatedAssetId || ''
+              : '';
+            const linkedExtruderName = taskAsset && isGearboxAsset(taskAsset)
+              ? taskAsset.currentExtruderName || completingTask.relatedAssetName || ''
+              : '';
+            const workLogData: Record<string, unknown> = {
+              workOrderId: completingTask.id,
+              taskId: completingTask.id,
+              taskTitle: completingTask.title,
+              userId: user?.id || 'unknown',
+              userName: completedByName,
+              workerNames: completedByNames,
+              completedByNames,
+              type: 'time_log',
+              content: diaryContent,
+              auditReady: true,
+              performedAt,
+              createdAt: serverTimestamp(),
+              result: data.result,
+              auditNote: data.auditNote,
+            };
+            if (completingTask.assetId) workLogData.assetId = completingTask.assetId;
+            if (taskAsset?.name || completingTask.assetName) workLogData.assetName = taskAsset?.name || completingTask.assetName;
+            if (data.workType) workLogData.workType = data.workType;
+            if (data.durationMinutes) {
+              workLogData.hoursWorked = data.durationMinutes / 60;
+            }
+            if (taskAsset && isGearboxAsset(taskAsset) && linkedExtruderId && linkedExtruderName) {
+              const shadowWorkLogRef = doc(collection(db, 'workLogs'));
+              workLogData.relatedWorkLogId = shadowWorkLogRef.id;
+              workLogData.relatedWorkLogRole = 'gearbox_source';
+              workLogData.relatedAssetId = linkedExtruderId;
+              workLogData.relatedAssetName = linkedExtruderName;
+
+              batch.set(shadowWorkLogRef, {
+                ...workLogData,
+                assetId: linkedExtruderId,
+                assetName: linkedExtruderName,
+                location: linkedExtruderName,
+                workType: 'gearbox_related_work',
+                relatedWorkLogId: workLogRef.id,
+                relatedWorkLogRole: 'extruder_shadow',
+                relatedAssetId: taskAsset.id,
+                relatedAssetName: taskAsset.name,
+                content: [
+                  `Dokončen úkol na převodovce: ${taskAsset.name}`,
+                  taskAsset.code ? `Kód převodovky: ${taskAsset.code}` : '',
+                  `Převodovka byla sledovaná na extruderu: ${linkedExtruderName}`,
+                  diaryContent,
+                ].filter(Boolean).join('\n'),
+              });
+            }
+
+            batch.update(taskRef, {
+              status: 'completed',
               isDone: true,
               resolution: data.resolution,
               durationMinutes: data.durationMinutes,
               workType: data.workType || null,
+              result: data.result,
+              auditNote: data.auditNote || null,
               completedAt: serverTimestamp(),
-              completedBy: data.completedByName || user?.displayName || 'Neznámý',
+              completedBy: completedByName,
+              completedByNames,
+              assignedWorkerNames,
+              assignedToName: assignedWorkerNames[0] || completedByName,
+              ...(linkedExtruderId ? {
+                relatedAssetId: linkedExtruderId,
+                relatedAssetName: linkedExtruderName,
+                relatedAssetRole: 'mounted_extruder',
+              } : {}),
               updatedAt: serverTimestamp(),
             });
+            batch.set(workLogRef, workLogData);
+            await batch.commit();
             setCompletingTask(null);
           }}
           onClose={() => setCompletingTask(null)}
         />
       )}
 
+      {/* Quick Log Modal — rychlý zápis k úkolu z kartičky */}
+      {loggingTask && (
+        <BottomSheet title="Přidat zápis" isOpen onClose={() => { setLoggingTask(null); setLogText(''); }}>
+          <div className="mb-3 rounded-xl bg-slate-100 border border-slate-200 p-3 text-sm font-semibold text-slate-900">
+            {loggingTask.title}
+          </div>
+          <FormField
+            label="Zápis"
+            value={logText}
+            onChange={setLogText}
+            type="textarea"
+            placeholder="Co se udělalo / poznámka k úkolu..."
+            required
+          />
+          <button
+            type="button"
+            disabled={savingLog || !logText.trim()}
+            onClick={async () => {
+              const text = logText.trim();
+              if (!loggingTask || !text) return;
+              setSavingLog(true);
+              try {
+                const taskAsset = await resolveTaskAsset(loggingTask);
+                const linkedExtruderId = taskAsset && isGearboxAsset(taskAsset)
+                  ? taskAsset.currentExtruderId || loggingTask.relatedAssetId || ''
+                  : '';
+                const linkedExtruderName = taskAsset && isGearboxAsset(taskAsset)
+                  ? taskAsset.currentExtruderName || loggingTask.relatedAssetName || ''
+                  : '';
+                const createdLogId = await addWorkLog({
+                  workOrderId: loggingTask.id,
+                  taskId: loggingTask.id,
+                  taskTitle: loggingTask.title,
+                  assetId: loggingTask.assetId,
+                  assetName: taskAsset?.name || loggingTask.assetName,
+                  location: loggingTask.location,
+                  userId: user?.id || 'unknown',
+                  userName: user?.displayName || 'Neznámý',
+                  type: 'note',
+                  content: text,
+                  ...(taskAsset && isGearboxAsset(taskAsset) && linkedExtruderId && linkedExtruderName ? {
+                    relatedWorkLogRole: 'gearbox_source' as const,
+                    relatedAssetId: linkedExtruderId,
+                    relatedAssetName: linkedExtruderName,
+                  } : {}),
+                });
+                if (taskAsset && isGearboxAsset(taskAsset) && linkedExtruderId && linkedExtruderName) {
+                  const relatedLogId = await addWorkLog({
+                    workOrderId: loggingTask.id,
+                    taskId: loggingTask.id,
+                    taskTitle: loggingTask.title,
+                    assetId: linkedExtruderId,
+                    assetName: linkedExtruderName,
+                    location: linkedExtruderName,
+                    userId: user?.id || 'unknown',
+                    userName: user?.displayName || 'Neznámý',
+                    type: 'note',
+                    workType: 'gearbox_related_work',
+                    relatedWorkLogId: createdLogId,
+                    relatedWorkLogRole: 'extruder_shadow',
+                    relatedAssetId: taskAsset.id,
+                    relatedAssetName: taskAsset.name,
+                    content: [
+                      `Zápis k úkolu na převodovce: ${taskAsset.name}`,
+                      taskAsset.code ? `Kód převodovky: ${taskAsset.code}` : '',
+                      `Převodovka je sledovaná na extruderu: ${linkedExtruderName}`,
+                      text,
+                    ].filter(Boolean).join('\n'),
+                  });
+                  await updateDoc(doc(db, 'workLogs', createdLogId), {
+                    relatedWorkLogId: relatedLogId,
+                    updatedAt: serverTimestamp(),
+                  });
+                }
+                await updateDoc(doc(db, 'tasks', loggingTask.id), {
+                  lastUpdate: text,
+                  lastUpdateAt: serverTimestamp(),
+                  lastUpdateBy: user?.displayName || 'Neznámý',
+                  ...(linkedExtruderId ? {
+                    relatedAssetId: linkedExtruderId,
+                    relatedAssetName: linkedExtruderName,
+                    relatedAssetRole: 'mounted_extruder',
+                  } : {}),
+                  updatedAt: serverTimestamp(),
+                });
+                setLoggingTask(null);
+                setLogText('');
+              } catch (err) {
+                console.error('[TasksPage] quick log failed:', err);
+              } finally {
+                setSavingLog(false);
+              }
+            }}
+            className="w-full min-h-12 rounded-xl bg-sky-600 text-white font-bold disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            <FileText className="w-5 h-5" /> Uložit zápis
+          </button>
+        </BottomSheet>
+      )}
+
       {/* Edit Task Sheet */}
       {editingTask && (
         <EditTaskSheet
           task={editingTask}
+          workerOptions={technicians.map((t) => t.displayName)}
           onClose={() => setEditingTask(null)}
           onSave={async (updates) => {
             await updateDoc(doc(db, 'tasks', editingTask.id), {
@@ -584,8 +1400,9 @@ export default function TasksPage() {
 // ═══════════════════════════════════════════════════
 // EDIT TASK SHEET
 // ═══════════════════════════════════════════════════
-function EditTaskSheet({ task, onClose, onSave }: {
+function EditTaskSheet({ task, workerOptions, onClose, onSave }: {
   task: Task;
+  workerOptions: string[];
   onClose: () => void;
   onSave: (updates: Record<string, unknown>) => Promise<void>;
 }) {
@@ -593,7 +1410,7 @@ function EditTaskSheet({ task, onClose, onSave }: {
   const [description, setDescription] = useState(task.description || '');
   const [priority, setPriority] = useState(task.priority);
   const [status, setStatus] = useState(task.status);
-  const [assignee, setAssignee] = useState(task.assignedToName || task.assignedTo || '');
+  const [assignedWorkers, setAssignedWorkers] = useState(taskWorkerNames(task));
   const [workType, setWorkType] = useState((task as any).workType || '');
   const [saving, setSaving] = useState(false);
 
@@ -606,7 +1423,8 @@ function EditTaskSheet({ task, onClose, onSave }: {
         description: description.trim(),
         priority,
         status,
-        assignedToName: assignee || undefined,
+        assignedWorkerNames: assignedWorkers,
+        assignedToName: assignedWorkers[0] || null,
         workType: workType || null,
       });
     } catch (err) {
@@ -655,17 +1473,11 @@ function EditTaskSheet({ task, onClose, onSave }: {
         required
         options={cmmsConfig.workTypes.map(w => ({ value: w.id, label: w.label }))}
       />
-      <FormField
-        label="Přiřadit"
-        value={assignee}
-        onChange={setAssignee}
-        type="select"
-        options={[
-          { value: 'Zdeněk Mička', label: 'Zdeněk Mička' },
-          { value: 'Petr Volf', label: 'Petr Volf' },
-          { value: 'Filip Novák', label: 'Filip Novák' },
-          { value: 'Vilém', label: 'Vilém' },
-        ]}
+      <WorkerMultiSelect
+        label="Kdo na tom bude dělat"
+        selected={assignedWorkers}
+        onChange={setAssignedWorkers}
+        options={workerOptions}
       />
       <FormFooter
         onCancel={onClose}
@@ -681,19 +1493,46 @@ function EditTaskSheet({ task, onClose, onSave }: {
 // ═══════════════════════════════════════════════════
 // TASK ACTIONS SHEET (status transitions)
 // ═══════════════════════════════════════════════════
-function TaskActionsSheet({ task, userName, onClose, onComplete, onStatusChange }: {
+function TaskActionsSheet({ task, userName, onClose, onEdit, onComplete, onStatusChange }: {
   task: Task;
   userName: string;
   onClose: () => void;
+  onEdit: () => void;
   onComplete: () => void;
   onStatusChange: (updates: Record<string, unknown>) => Promise<void>;
 }) {
+  const navigate = useNavigate();
   const [showPlanner, setShowPlanner] = useState(false);
   const [plannedDate, setPlannedDate] = useState('');
   const [saving, setSaving] = useState(false);
+  const [sourceLog, setSourceLog] = useState<SourceWorkLog | null>(null);
+  const [updates, setUpdates] = useState<WorkLog[]>([]);
+  const [updateText, setUpdateText] = useState('');
+  const [savingUpdate, setSavingUpdate] = useState(false);
 
   const isDone = task.status === 'done' || task.status === 'completed';
   const isInProgress = task.status === 'in_progress';
+  const diaryTask = isDiaryTask(task);
+
+  useEffect(() => {
+    let cancelled = false;
+    setSourceLog(null);
+    if (!diaryTask || !task.sourceRefId) return;
+    getDoc(doc(db, 'workLogs', task.sourceRefId))
+      .then((snapshot) => {
+        if (!cancelled && snapshot.exists()) {
+          setSourceLog({ id: snapshot.id, ...snapshot.data() } as SourceWorkLog);
+        }
+      })
+      .catch((err) => {
+        console.error('[TasksPage] Source work log failed:', err);
+      });
+    return () => { cancelled = true; };
+  }, [diaryTask, task.sourceRefId]);
+
+  useEffect(() => {
+    return subscribeToWorkLogs(task.id, setUpdates);
+  }, [task.id]);
 
   const doAction = async (updates: Record<string, unknown>) => {
     setSaving(true);
@@ -701,21 +1540,153 @@ function TaskActionsSheet({ task, userName, onClose, onComplete, onStatusChange 
     setSaving(false);
   };
 
+  const saveUpdate = async (text = updateText) => {
+    const cleanText = text.trim();
+    if (!cleanText) return;
+    setSavingUpdate(true);
+    try {
+      await addWorkLog({
+        workOrderId: task.id,
+        taskId: task.id,
+        taskTitle: task.title,
+        userId: userName || 'unknown',
+        userName: userName || 'Neznámý',
+        type: 'note',
+        content: cleanText,
+      });
+      await updateDoc(doc(db, 'tasks', task.id), {
+        lastUpdate: cleanText,
+        lastUpdateAt: serverTimestamp(),
+        lastUpdateBy: userName,
+        updatedAt: serverTimestamp(),
+      });
+      setUpdateText('');
+    } finally {
+      setSavingUpdate(false);
+    }
+  };
+
   const sb = STATUS_BADGES[task.status] || STATUS_BADGES.backlog;
   const pc = PRIORITY_CONFIG[task.priority] || PRIORITY_CONFIG.P3;
 
   return (
-    <BottomSheet title="Akce úkolu" isOpen onClose={onClose}>
+    <BottomSheet title="Detail úkolu" isOpen onClose={onClose}>
+      <div className="-mx-2 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-slate-950 shadow-inner sm:-mx-1">
       {/* Task info */}
-      <div className="bg-slate-700/50 rounded-xl p-3.5 mb-5">
-        <div className="flex items-center gap-2 mb-1.5">
-          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: `${pc.color}20`, color: pc.color }}>
-            {task.priority}
-          </span>
-          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-lg ${sb.bg} ${sb.text}`}>{sb.label}</span>
+      <div className="rounded-xl border border-slate-200 bg-white p-3.5 mb-5">
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: `${pc.color}20`, color: pc.color }}>
+              {task.priority}
+            </span>
+            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-lg ${sb.bg} ${sb.text}`}>{sb.label}</span>
+          </div>
+          <button
+            type="button"
+            onClick={onEdit}
+            className="px-3 py-2 rounded-xl bg-amber-50 border border-amber-300 text-amber-800 text-xs font-bold active:scale-95"
+          >
+            Upravit
+          </button>
         </div>
-        <div className="text-white font-semibold">{task.title}</div>
-        {task.description && <div className="text-xs text-slate-400 mt-1 line-clamp-2">{task.description}</div>}
+        <div className="text-slate-950 font-semibold">{task.title}</div>
+        {task.description && <div className="text-xs text-slate-600 mt-1 line-clamp-2">{task.description}</div>}
+      </div>
+
+      {diaryTask && (
+        <div className="mb-4 rounded-xl bg-amber-500/10 border border-amber-500/25 p-3.5">
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <div className="flex items-center gap-2 text-amber-800 font-bold text-sm">
+              <ClipboardList className="w-4 h-4" />
+              Vzniklo z deníku údržby
+            </div>
+            {task.sourceRefId && (
+              <button
+                type="button"
+                onClick={() => navigate(`/work-diary?log=${task.sourceRefId}`)}
+                className="px-2.5 py-1.5 rounded-lg bg-amber-500 text-slate-950 text-xs font-bold active:scale-95"
+              >
+                Otevřít zápis
+              </button>
+            )}
+          </div>
+          {sourceLog ? (
+            <div className="space-y-2 text-xs text-slate-700">
+              <div className="flex flex-wrap gap-x-3 gap-y-1 text-slate-600">
+                {sourceLog.userName && <span className="flex items-center gap-1"><User className="w-3 h-3" />{sourceLog.userName}</span>}
+                {(sourceLog.performedAt || sourceLog.createdAt) && <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{formatDateTime(sourceLog.performedAt || sourceLog.createdAt)}</span>}
+                {sourceLog.location && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{sourceLog.location}</span>}
+                {sourceLog.hoursWorked && <span>{formatMinutes(Math.round(sourceLog.hoursWorked * 60))}</span>}
+              </div>
+              {sourceLog.assetName && <div className="font-bold text-amber-800">{sourceLog.assetName}</div>}
+              <div className="whitespace-pre-wrap leading-relaxed">{sourceLog.content || 'Bez popisu'}</div>
+            </div>
+          ) : (
+            <div className="text-xs text-slate-600">
+              Původní zápis se načítá, nebo už není dostupný. Základní text je uložený v popisu úkolu.
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="mb-4 rounded-xl border border-slate-200 bg-white p-3.5">
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div>
+            <div className="text-sm font-bold text-slate-950">Aktualizace úkolu</div>
+            <div className="text-xs text-slate-600">Krátké průběžné poznámky k otevřenému úkolu.</div>
+          </div>
+          <span className="text-xs font-bold px-2 py-1 rounded-lg bg-slate-100 text-slate-700">
+            {updates.length}
+          </span>
+        </div>
+
+        {!isDone && (
+          <div className="space-y-2 mb-3">
+            <textarea
+              value={updateText}
+              onChange={(event) => setUpdateText(event.target.value)}
+              placeholder="Např. čekáme na díl, rozebráno, objednáno, domluveno s výrobou..."
+              className="w-full min-h-[92px] rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 outline-none placeholder:text-slate-400 focus:border-emerald-600"
+            />
+            <div className="grid grid-cols-2 gap-2">
+              {['Čeká na díl', 'Objednáno', 'Domluveno s výrobou', 'Bude pokračovat'].map((label) => (
+                <button
+                  key={label}
+                  type="button"
+                  disabled={savingUpdate}
+                  onClick={() => saveUpdate(label)}
+                  className="min-h-10 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-700 active:scale-95 disabled:opacity-50"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              disabled={!updateText.trim() || savingUpdate}
+              onClick={() => saveUpdate()}
+              className="w-full min-h-12 rounded-xl bg-blue-500 text-white text-sm font-bold active:scale-95 disabled:opacity-40"
+            >
+              {savingUpdate ? 'Ukládám...' : 'Přidat aktualizaci'}
+            </button>
+          </div>
+        )}
+
+        <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+          {updates.length === 0 ? (
+            <div className="text-xs text-slate-500">Zatím tu není žádná aktualizace.</div>
+          ) : (
+            updates.slice(0, 8).map((update) => (
+              <div key={update.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <div className="flex items-center justify-between gap-2 text-[11px] text-slate-500 mb-1">
+                  <span className="font-bold text-slate-700">{update.userName || 'Neznámý'}</span>
+                  <span>{formatDateTime(update.createdAt)}</span>
+                </div>
+                <div className="text-sm text-slate-800 whitespace-pre-wrap">{update.content}</div>
+              </div>
+            ))
+          )}
+        </div>
       </div>
 
       {/* Date picker (conditionally shown) */}
@@ -729,7 +1700,7 @@ function TaskActionsSheet({ task, userName, onClose, onComplete, onStatusChange 
             type="date"
             value={plannedDate}
             onChange={(e) => setPlannedDate(e.target.value)}
-            className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-base focus:outline-none focus:border-blue-500/50 transition min-h-[48px]"
+            className="w-full px-4 py-3 rounded-xl bg-white border border-slate-300 text-slate-950 text-base focus:outline-none focus:border-blue-500/50 transition min-h-[48px]"
           />
           <button
             disabled={!plannedDate || saving}
@@ -748,7 +1719,16 @@ function TaskActionsSheet({ task, userName, onClose, onComplete, onStatusChange 
           {!isInProgress && (
             <button
               disabled={saving}
-              onClick={() => doAction({ status: 'in_progress', startedAt: serverTimestamp(), assignedToName: userName, updatedBy: userName })}
+              onClick={() => {
+                const names = uniqueNames([...taskWorkerNames(task), userName]);
+                doAction({
+                  status: 'in_progress',
+                  startedAt: serverTimestamp(),
+                  assignedWorkerNames: names,
+                  assignedToName: names[0] || userName,
+                  updatedBy: userName,
+                });
+              }}
               className="w-full py-4 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 font-bold text-base flex items-center justify-center gap-2.5 active:scale-[0.97] transition disabled:opacity-40"
             >
               <Play className="w-5 h-5" /> Přebírám
@@ -790,6 +1770,9 @@ function TaskActionsSheet({ task, userName, onClose, onComplete, onStatusChange 
           Tento úkol je dokončen
         </div>
       )}
+      </div>
     </BottomSheet>
   );
 }
+
+

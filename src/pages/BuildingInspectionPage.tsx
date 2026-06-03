@@ -1,11 +1,13 @@
 // src/pages/BuildingInspectionPage.tsx
-// VIKRR — Asset Shield — Kontrola budov (Firestore LIVE + CRUD)
+// VIKRR — Asset Shield — Kontroly (Firestore LIVE + CRUD)
 
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, onSnapshot, doc, updateDoc, addDoc, deleteDoc, writeBatch, Timestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
+import { useBackNavigation } from '../hooks/useBackNavigation';
+import { useEmployeeNames } from '../hooks/useEmployeeDirectory';
 import {
   ArrowLeft,
   Loader2,
@@ -20,6 +22,7 @@ import {
   User,
   Clock,
   ClipboardCheck,
+  ClipboardList,
   Printer,
 } from 'lucide-react';
 
@@ -42,7 +45,18 @@ interface InspectionPoint {
   lastInspectedAt?: any;
   lastInspectedBy?: string;
   issueNote?: string;
+  taskId?: string;
   order?: number;
+}
+
+function safeText(value: unknown, fallback = ''): string {
+  return typeof value === 'string' ? value : fallback;
+}
+
+function safeInspectionStatus(value: unknown): InspectionPoint['status'] {
+  return value === 'ok' || value === 'issue' || value === 'missing' || value === 'pending'
+    ? value
+    : 'pending';
 }
 
 // ═══════════════════════════════════════════════════
@@ -54,15 +68,6 @@ const STATUS_STYLES: Record<string, { bg: string; border: string; badge: string;
   issue: { bg: 'bg-red-500/10', border: 'border-red-500/25', badge: 'bg-red-500/20 text-red-400', label: 'Závada' },
   missing: { bg: 'bg-amber-500/10', border: 'border-amber-500/25', badge: 'bg-amber-500/20 text-amber-400', label: 'Chybí' },
 };
-
-const INSPECTORS = [
-  { value: 'Vilém', label: 'Vilém' },
-  { value: 'Zdeněk Mička', label: 'Zdeněk Mička' },
-  { value: 'Petr Volf', label: 'Petr Volf' },
-  { value: 'Filip Novák', label: 'Filip Novák' },
-  { value: 'Martina', label: 'Martina' },
-  { value: 'Pavla Drápelová', label: 'Pavla Drápelová' },
-];
 
 const BUILDINGS = [
   { value: 'A', label: 'A — Administrativa' },
@@ -95,7 +100,24 @@ function useInspections() {
       collection(db, 'inspections'),
       (snap) => {
         const data = snap.docs
-          .map((d) => ({ id: d.id, ...d.data() } as InspectionPoint))
+          .map((d) => {
+            const raw = d.data();
+            return {
+              id: d.id,
+              roomCode: safeText(raw.roomCode),
+              roomName: safeText(raw.roomName, 'Bez nazvu'),
+              floor: safeText(raw.floor, 'Bez patra'),
+              buildingId: safeText(raw.buildingId),
+              description: safeText(raw.description),
+              category: safeText(raw.category) || undefined,
+              status: safeInspectionStatus(raw.status),
+              lastInspectedAt: raw.lastInspectedAt,
+              lastInspectedBy: safeText(raw.lastInspectedBy),
+              issueNote: safeText(raw.issueNote),
+              taskId: safeText(raw.taskId) || undefined,
+              order: typeof raw.order === 'number' ? raw.order : 99,
+            } satisfies InspectionPoint;
+          })
           .sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
         setPoints(data);
         setLoading(false);
@@ -127,16 +149,44 @@ function timeAgo(date: any): string {
   return `${Math.floor(hours / 24)}d`;
 }
 
+function normalizeText(value: unknown): string {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+function buildingLabel(buildingId: string): string {
+  return BUILDINGS.find((b) => b.value === buildingId)?.label || `Budova ${buildingId}`;
+}
+
+function parseBuildingSearch(search: string): { buildingId: string | null; roomQuery: string } {
+  const raw = search.trim();
+  if (!raw) return { buildingId: null, roomQuery: '' };
+
+  const firstToken = raw.split(/\s+/)[0].toUpperCase();
+  const exactBuilding = BUILDINGS.find((building) => building.value === firstToken);
+  if (!exactBuilding) return { buildingId: null, roomQuery: raw };
+
+  return {
+    buildingId: exactBuilding.value,
+    roomQuery: raw.slice(firstToken.length).trim(),
+  };
+}
+
+type TaskFilter = 'all' | 'with_task' | 'without_task';
+
 // ═══════════════════════════════════════════════════
 // INSPECTION CARD
 // ═══════════════════════════════════════════════════
-function InspectionCard({ point, onOk, onIssue, onReset, onEdit, onDelete, isAdmin }: {
+function InspectionCard({ point, onOk, onIssue, onReset, onEdit, onDelete, onOpenTask, isAdmin }: {
   point: InspectionPoint;
   onOk: () => void;
   onIssue: () => void;
   onReset: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onOpenTask: () => void;
   isAdmin: boolean;
 }) {
   const style = STATUS_STYLES[point.status] || STATUS_STYLES.pending;
@@ -176,6 +226,17 @@ function InspectionCard({ point, onOk, onIssue, onReset, onEdit, onDelete, isAdm
         <div className="px-2.5 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 mb-3">
           <p className="text-[11px] text-red-400">⚠ {point.issueNote}</p>
         </div>
+      )}
+
+      {point.taskId && (
+        <button
+          type="button"
+          onClick={onOpenTask}
+          className="w-full mb-3 px-3 py-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold flex items-center justify-center gap-2 active:scale-[0.98]"
+        >
+          <ClipboardList className="w-4 h-4" />
+          Otevřít úkol k závadě
+        </button>
       )}
 
       {/* Inspector info */}
@@ -265,20 +326,32 @@ function FilterChip({ label, active, onClick, color }: { label: string; active: 
 // ═══════════════════════════════════════════════════
 export default function BuildingInspectionPage() {
   const navigate = useNavigate();
+  const goBack = useBackNavigation('/');
   const { user } = useAuthContext();
   const { points, loading } = useInspections();
+  const employeeNames = useEmployeeNames({ tenantId: user?.tenantId || 'main_firm' });
 
   const isAdmin = user?.role === 'SUPERADMIN' || user?.role === 'VEDENI';
 
   // Filters
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
   const [filterBuilding, setFilterBuilding] = useState<string | null>(null);
+  const [filterFloor, setFilterFloor] = useState<string | null>(null);
+  const [filterCategory, setFilterCategory] = useState<string | null>(null);
+  const [filterTask, setFilterTask] = useState<TaskFilter>('all');
   const [selectedInspector, setSelectedInspector] = useState<string>(user?.displayName || '');
   const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    if (!selectedInspector && user?.displayName) {
+      setSelectedInspector(user.displayName);
+    }
+  }, [selectedInspector, user?.displayName]);
 
   // Modals
   const [showIssueModal, setShowIssueModal] = useState<InspectionPoint | null>(null);
   const [issueNote, setIssueNote] = useState('');
+  const [createTaskFromIssue, setCreateTaskFromIssue] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState<InspectionPoint | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<InspectionPoint | null>(null);
@@ -291,22 +364,30 @@ export default function BuildingInspectionPage() {
   const [formDescription, setFormDescription] = useState('');
   const [formCategory, setFormCategory] = useState('');
   const [saving, setSaving] = useState(false);
+  const searchScope = useMemo(() => parseBuildingSearch(search), [search]);
+  const effectiveBuildingFilter = filterBuilding || searchScope.buildingId;
 
   // Filter logic
   const filtered = useMemo(() => {
     let result = points;
     if (filterStatus) result = result.filter((p) => p.status === filterStatus || (filterStatus === 'pending' && p.status === 'missing'));
-    if (filterBuilding) result = result.filter((p) => p.buildingId === filterBuilding);
-    if (search.trim()) {
-      const q = search.toLowerCase();
+    if (effectiveBuildingFilter) result = result.filter((p) => p.buildingId === effectiveBuildingFilter);
+    if (filterFloor) result = result.filter((p) => safeText(p.floor) === filterFloor);
+    if (filterCategory) result = result.filter((p) => safeText(p.category) === filterCategory);
+    if (filterTask === 'with_task') result = result.filter((p) => !!p.taskId);
+    if (filterTask === 'without_task') result = result.filter((p) => p.status === 'issue' && !p.taskId);
+    if (searchScope.roomQuery.trim()) {
+      const q = normalizeText(searchScope.roomQuery);
       result = result.filter((p) =>
-        p.roomCode.toLowerCase().includes(q) ||
-        p.roomName.toLowerCase().includes(q) ||
-        p.description.toLowerCase().includes(q)
+        normalizeText(p.roomCode).includes(q) ||
+        normalizeText(p.roomName).includes(q) ||
+        normalizeText(p.description).includes(q) ||
+        normalizeText(p.floor).includes(q) ||
+        normalizeText(p.category).includes(q)
       );
     }
     return result;
-  }, [points, filterStatus, filterBuilding, search]);
+  }, [points, filterStatus, effectiveBuildingFilter, filterFloor, filterCategory, filterTask, searchScope.roomQuery]);
 
   // Progress
   const done = points.filter((p) => p.status === 'ok' || p.status === 'issue').length;
@@ -326,19 +407,55 @@ export default function BuildingInspectionPage() {
   const openIssueModal = (point: InspectionPoint) => {
     setShowIssueModal(point);
     setIssueNote(point.issueNote || '');
+    setCreateTaskFromIssue(!point.taskId);
   };
 
   const submitIssue = async () => {
     if (!showIssueModal || !issueNote.trim()) return;
     const inspector = selectedInspector || user?.displayName || 'Unknown';
-    await updateDoc(doc(db, 'inspections', showIssueModal.id), {
-      status: 'issue',
-      issueNote: issueNote.trim(),
-      lastInspectedBy: inspector,
-      lastInspectedAt: Timestamp.now(),
-    });
-    setShowIssueModal(null);
-    setIssueNote('');
+    const now = Timestamp.now();
+    let taskId = showIssueModal.taskId || '';
+    setSaving(true);
+    try {
+      if (createTaskFromIssue && !taskId) {
+        const taskRef = await addDoc(collection(db, 'tasks'), {
+          title: `Závada: ${showIssueModal.roomCode} ${showIssueModal.roomName}`,
+          description: [
+            `Vzniklo z kontroly budovy ${buildingLabel(showIssueModal.buildingId)}.`,
+            `Místnost: ${showIssueModal.roomCode} - ${showIssueModal.roomName}`,
+            `Co se kontroluje: ${showIssueModal.description}`,
+            `Závada: ${issueNote.trim()}`,
+          ].join('\n'),
+          status: 'backlog',
+          priority: 'P2',
+          type: 'corrective',
+          source: 'inspection',
+          sourceRefType: 'manual',
+          sourceRefId: showIssueModal.id,
+          inspectionPointId: showIssueModal.id,
+          buildingId: showIssueModal.buildingId,
+          createdAt: now,
+          updatedAt: now,
+          createdById: user?.uid || user?.id || 'unknown',
+          createdByName: inspector,
+          isDone: false,
+        });
+        taskId = taskRef.id;
+      }
+
+      await updateDoc(doc(db, 'inspections', showIssueModal.id), {
+        status: 'issue',
+        issueNote: issueNote.trim(),
+        taskId: taskId || null,
+        lastInspectedBy: inspector,
+        lastInspectedAt: now,
+      });
+      setShowIssueModal(null);
+      setIssueNote('');
+    } catch (err) {
+      console.error('[Inspection] Submit issue failed:', err);
+    }
+    setSaving(false);
   };
 
   const resetPoint = async (point: InspectionPoint) => {
@@ -362,12 +479,12 @@ export default function BuildingInspectionPage() {
   };
 
   const openEditModal = (point: InspectionPoint) => {
-    setFormRoomCode(point.roomCode);
-    setFormRoomName(point.roomName);
-    setFormFloor(point.floor);
-    setFormBuilding(point.buildingId);
-    setFormDescription(point.description);
-    setFormCategory(point.category || '');
+    setFormRoomCode(safeText(point.roomCode));
+    setFormRoomName(safeText(point.roomName));
+    setFormFloor(safeText(point.floor));
+    setFormBuilding(safeText(point.buildingId));
+    setFormDescription(safeText(point.description));
+    setFormCategory(safeText(point.category));
     setShowEditModal(point);
   };
 
@@ -440,9 +557,9 @@ export default function BuildingInspectionPage() {
   const [completing, setCompleting] = useState(false);
 
   const completeArea = async () => {
-    if (!filterBuilding || completing) return;
+    if (!effectiveBuildingFilter || completing) return;
     const inspector = selectedInspector || user?.displayName || 'Unknown';
-    const areaPoints = points.filter((p) => p.buildingId === filterBuilding);
+    const areaPoints = points.filter((p) => p.buildingId === effectiveBuildingFilter);
     if (areaPoints.length === 0) return;
 
     setCompleting(true);
@@ -464,8 +581,8 @@ export default function BuildingInspectionPage() {
       // Write master log to inspection_logs
       const issueCount = areaPoints.filter((p) => p.status === 'issue').length;
       await addDoc(collection(db, 'inspection_logs'), {
-        areaId: filterBuilding,
-        areaLabel: BUILDINGS.find((b) => b.value === filterBuilding)?.label || filterBuilding,
+        areaId: effectiveBuildingFilter,
+        areaLabel: buildingLabel(effectiveBuildingFilter),
         timestamp: now,
         inspectorUid: user?.uid || user?.id || '',
         inspectorName: inspector,
@@ -485,16 +602,16 @@ export default function BuildingInspectionPage() {
   };
 
   // Can complete: building filter active, has pending points or all reviewed
-  const canComplete = filterBuilding && !completing && points.some((p) => p.buildingId === filterBuilding);
+  const canComplete = effectiveBuildingFilter && !completing && points.some((p) => p.buildingId === effectiveBuildingFilter);
 
   // ─── PRINT INSPECTION REPORT ───
   const printInspectionReport = () => {
     const now = new Date().toLocaleDateString('cs-CZ');
     const inspector = selectedInspector || user?.displayName || '—';
-    const scope = filterBuilding
-      ? BUILDINGS.find((b) => b.value === filterBuilding)?.label || `Budova ${filterBuilding}`
+    const scope = effectiveBuildingFilter
+      ? buildingLabel(effectiveBuildingFilter)
       : 'Všechny budovy';
-    const data = filterBuilding ? points.filter((p) => p.buildingId === filterBuilding) : points;
+    const data = effectiveBuildingFilter ? points.filter((p) => p.buildingId === effectiveBuildingFilter) : points;
     const okCount = data.filter((p) => p.status === 'ok').length;
     const issueCount = data.filter((p) => p.status === 'issue').length;
     const pendingCount = data.filter((p) => p.status === 'pending' || p.status === 'missing').length;
@@ -505,13 +622,13 @@ export default function BuildingInspectionPage() {
         ? (p.lastInspectedAt.toDate ? p.lastInspectedAt.toDate().toLocaleDateString('cs-CZ') : '')
         : '';
       return `<tr>
-        <td>${p.roomCode}</td>
-        <td>${p.roomName}</td>
-        <td>${p.floor}</td>
+        <td>${safeText(p.roomCode)}</td>
+        <td>${safeText(p.roomName, 'Bez nazvu')}</td>
+        <td>${safeText(p.floor, 'Bez patra')}</td>
         <td>${p.category || '—'}</td>
-        <td class="wrap">${p.description}</td>
+        <td class="wrap">${safeText(p.description)}</td>
         <td style="font-weight:bold;color:${p.status === 'ok' ? '#16a34a' : p.status === 'issue' ? '#dc2626' : '#d97706'}">${st.label}</td>
-        <td class="wrap">${p.issueNote || ''}</td>
+        <td class="wrap">${safeText(p.issueNote)}</td>
         <td>${p.lastInspectedBy || '—'}</td>
         <td>${inspDate}</td>
       </tr>`;
@@ -565,7 +682,30 @@ export default function BuildingInspectionPage() {
   };
 
   // Unique buildings from data
-  const activeBuildings = [...new Set(points.map((p) => p.buildingId))].sort();
+  const activeBuildings = [...new Set(points.map((p) => safeText(p.buildingId)).filter(Boolean))].sort();
+  const buildingCounts = activeBuildings.reduce<Record<string, number>>((acc, buildingId) => {
+    acc[buildingId] = points.filter((point) => point.buildingId === buildingId).length;
+    return acc;
+  }, {});
+  const scopePoints = effectiveBuildingFilter ? points.filter((point) => point.buildingId === effectiveBuildingFilter) : points;
+  const floorOptions = [...new Set(scopePoints.map((p) => safeText(p.floor)).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'cs'));
+  const categoryOptions = [...new Set(scopePoints.map((p) => safeText(p.category)).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'cs'));
+  const activeFilterCount = [
+    filterStatus,
+    effectiveBuildingFilter,
+    filterFloor,
+    filterCategory,
+    filterTask !== 'all' ? filterTask : null,
+    search.trim() ? search.trim() : null,
+  ].filter(Boolean).length;
+  const clearAllFilters = () => {
+    setFilterStatus(null);
+    setFilterBuilding(null);
+    setFilterFloor(null);
+    setFilterCategory(null);
+    setFilterTask('all');
+    setSearch('');
+  };
 
   return (
     <div className="min-h-screen bg-slate-900">
@@ -573,13 +713,13 @@ export default function BuildingInspectionPage() {
 
         {/* Header */}
         <div className="flex items-center gap-3 mb-3">
-          <button onClick={() => navigate('/')} className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 hover:text-white transition">
+          <button onClick={() => goBack()} className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 hover:text-white transition">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="flex-1">
             <h1 className="text-xl font-bold text-white flex items-center gap-2">
               <Building2 className="w-5 h-5 text-teal-400" />
-              Kontrola budov
+              Kontroly
             </h1>
             <p className="text-xs text-slate-500">{done}/{points.length} zkontrolováno · {progress}%</p>
           </div>
@@ -608,12 +748,53 @@ export default function BuildingInspectionPage() {
             className="flex-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-teal-500/50 transition appearance-none"
           >
             <option value="">-- Vyberte inspektora --</option>
-            {INSPECTORS.map((i) => <option key={i.value} value={i.value}>{i.label}</option>)}
+            {[...new Set([user?.displayName || '', ...employeeNames].filter(Boolean))]
+              .sort((a, b) => a.localeCompare(b, 'cs-CZ'))
+              .map((name) => <option key={name} value={name}>{name}</option>)}
           </select>
         </div>
 
         {/* Summary */}
         <InspectionSummary points={points} />
+
+        {/* Building filter */}
+        <div className="mb-3">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-[11px] uppercase tracking-wider text-slate-500 font-bold">Budovy</div>
+            {effectiveBuildingFilter && (
+              <button
+                type="button"
+                onClick={clearAllFilters}
+                className="text-[11px] text-slate-400 px-2 py-1 rounded-lg bg-white/5 active:scale-95"
+              >
+                Zobrazit vše
+              </button>
+            )}
+          </div>
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+            {activeBuildings.map((bid) => {
+              const active = effectiveBuildingFilter === bid;
+              return (
+                <button
+                  key={bid}
+                  type="button"
+                  onClick={() => {
+                    setFilterBuilding(active ? null : bid);
+                    setSearch('');
+                  }}
+                  className={`min-h-[54px] rounded-xl border px-2 py-2 text-left transition active:scale-[0.98] ${
+                    active
+                      ? 'bg-orange-500/20 border-orange-400/60 text-orange-200'
+                      : 'bg-white/5 border-white/10 text-slate-300'
+                  }`}
+                >
+                  <div className="text-base font-bold leading-none">{bid}</div>
+                  <div className="text-[10px] text-slate-400 mt-1">{buildingCounts[bid] || 0} místností</div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
         {/* Search */}
         <div className="relative mb-3">
@@ -622,10 +803,16 @@ export default function BuildingInspectionPage() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Hledat místnost, kód..."
+            placeholder="Napiš D pro budovu D, nebo D 1.25 pro místnost..."
             className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-slate-600 focus:outline-none focus:border-teal-500/50 transition"
           />
         </div>
+        {searchScope.buildingId && !filterBuilding && (
+          <div className="mb-3 rounded-xl bg-orange-500/10 border border-orange-500/25 px-3 py-2 text-xs text-orange-200">
+            Zobrazuji {buildingLabel(searchScope.buildingId)}
+            {searchScope.roomQuery ? `, hledám "${searchScope.roomQuery}"` : ''}
+          </div>
+        )}
 
         {/* Filters */}
         <div className="flex gap-1.5 mb-2 overflow-x-auto">
@@ -634,11 +821,41 @@ export default function BuildingInspectionPage() {
           <FilterChip label="OK" active={filterStatus === 'ok'} onClick={() => setFilterStatus(filterStatus === 'ok' ? null : 'ok')} color="#34d399" />
           <FilterChip label="Závady" active={filterStatus === 'issue'} onClick={() => setFilterStatus(filterStatus === 'issue' ? null : 'issue')} color="#f87171" />
         </div>
-        <div className="flex gap-1.5 mb-4 overflow-x-auto">
-          <FilterChip label="Vše" active={!filterBuilding} onClick={() => setFilterBuilding(null)} color="#94a3b8" />
+        <div className="flex gap-1.5 mb-2 overflow-x-auto">
+          <FilterChip label="Budovy: vše" active={!effectiveBuildingFilter} onClick={() => { setFilterBuilding(null); setSearch(''); }} color="#94a3b8" />
           {activeBuildings.map((bid) => (
-            <FilterChip key={bid} label={`Budova ${bid}`} active={filterBuilding === bid} onClick={() => setFilterBuilding(filterBuilding === bid ? null : bid)} color="#f97316" />
+            <FilterChip key={bid} label={`Budova ${bid}`} active={effectiveBuildingFilter === bid} onClick={() => { setFilterBuilding(effectiveBuildingFilter === bid ? null : bid); setSearch(''); }} color="#f97316" />
           ))}
+        </div>
+        {floorOptions.length > 0 && (
+          <div className="flex gap-1.5 mb-2 overflow-x-auto">
+            <FilterChip label="Patro: vše" active={!filterFloor} onClick={() => setFilterFloor(null)} color="#94a3b8" />
+            {floorOptions.map((floor) => (
+              <FilterChip key={floor} label={floor} active={filterFloor === floor} onClick={() => setFilterFloor(filterFloor === floor ? null : floor)} color="#38bdf8" />
+            ))}
+          </div>
+        )}
+        {categoryOptions.length > 0 && (
+          <div className="flex gap-1.5 mb-2 overflow-x-auto">
+            <FilterChip label="Kategorie: vše" active={!filterCategory} onClick={() => setFilterCategory(null)} color="#94a3b8" />
+            {categoryOptions.map((category) => (
+              <FilterChip key={category} label={category} active={filterCategory === category} onClick={() => setFilterCategory(filterCategory === category ? null : category)} color="#a78bfa" />
+            ))}
+          </div>
+        )}
+        <div className="flex gap-1.5 mb-4 overflow-x-auto">
+          <FilterChip label="Úkol: vše" active={filterTask === 'all'} onClick={() => setFilterTask('all')} color="#94a3b8" />
+          <FilterChip label="S úkolem" active={filterTask === 'with_task'} onClick={() => setFilterTask(filterTask === 'with_task' ? 'all' : 'with_task')} color="#f59e0b" />
+          <FilterChip label="Závada bez úkolu" active={filterTask === 'without_task'} onClick={() => setFilterTask(filterTask === 'without_task' ? 'all' : 'without_task')} color="#ef4444" />
+          {activeFilterCount > 0 && (
+            <button
+              type="button"
+              onClick={clearAllFilters}
+              className="px-3 py-1.5 rounded-lg text-[12px] font-semibold flex-shrink-0 bg-white/5 border border-white/10 text-slate-300 active:scale-95"
+            >
+              Vyčistit ({activeFilterCount})
+            </button>
+          )}
         </div>
 
         {/* Complete Area — shown when building filter is active */}
@@ -653,7 +870,7 @@ export default function BuildingInspectionPage() {
             ) : (
               <ClipboardCheck className="w-5 h-5" />
             )}
-            {completing ? 'Ukládám...' : `Hotovo — Uzavřít budovu ${filterBuilding}`}
+            {completing ? 'Ukládám...' : `Hotovo — Uzavřít budovu ${effectiveBuildingFilter}`}
           </button>
         )}
 
@@ -666,7 +883,7 @@ export default function BuildingInspectionPage() {
           <EmptyState
             icon={<Building2 className="w-12 h-12" />}
             title="Žádné kontrolní body"
-            subtitle={search || filterStatus || filterBuilding ? 'Zkus jiný filtr' : 'Přidej první kontrolní bod'}
+            subtitle={activeFilterCount > 0 ? 'Zkus vyčistit nebo změnit filtr' : 'Přidej první kontrolní bod'}
             actionLabel="Přidat bod"
             onAction={openAddModal}
           />
@@ -681,6 +898,7 @@ export default function BuildingInspectionPage() {
                 onReset={() => resetPoint(point)}
                 onEdit={() => openEditModal(point)}
                 onDelete={() => setShowDeleteConfirm(point)}
+                onOpenTask={() => navigate(`/tasks?task=${point.taskId}`)}
                 isAdmin={isAdmin}
               />
             ))}
@@ -703,7 +921,39 @@ export default function BuildingInspectionPage() {
               <div className="text-[12px] text-slate-400 mt-1">{showIssueModal.description}</div>
             </div>
             <FormField label="Popis závady" value={issueNote} onChange={setIssueNote} type="textarea" placeholder="Co je špatně?" required />
-            <SubmitButton label="Nahlásit závadu" onClick={submitIssue} color="red" />
+            {showIssueModal.taskId ? (
+              <button
+                type="button"
+                onClick={() => navigate(`/tasks?task=${showIssueModal.taskId}`)}
+                className="w-full mb-3 py-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-sm font-bold flex items-center justify-center gap-2 active:scale-95"
+              >
+                <ClipboardList className="w-4 h-4" />
+                Úkol už je založený - otevřít
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setCreateTaskFromIssue((value) => !value)}
+                className={`w-full mb-3 px-3 py-3 rounded-xl border text-left transition active:scale-[0.98] ${
+                  createTaskFromIssue
+                    ? 'bg-amber-500/15 border-amber-500/35 text-amber-200'
+                    : 'bg-white/5 border-white/10 text-slate-300'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className={`w-5 h-5 rounded border flex items-center justify-center text-xs ${
+                    createTaskFromIssue ? 'bg-amber-500 border-amber-300 text-slate-950' : 'border-slate-500 text-transparent'
+                  }`}>
+                    ✓
+                  </span>
+                  <span className="text-sm font-bold">Rovnou založit úkol do úkolníčku</span>
+                </div>
+                <div className="text-xs text-slate-400 mt-1 pl-7">
+                  Závada pak bude dohledatelná v úkolech a reportech.
+                </div>
+              </button>
+            )}
+            <SubmitButton label={createTaskFromIssue && !showIssueModal.taskId ? 'Nahlásit závadu a založit úkol' : 'Nahlásit závadu'} onClick={submitIssue} loading={saving} color="red" />
           </>
         )}
       </BottomSheet>

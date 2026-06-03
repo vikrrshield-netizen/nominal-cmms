@@ -57,7 +57,8 @@ export const STATUS_CONFIG: Record<RevisionStatus, { label: string; color: strin
 
 const EXPIRING_THRESHOLD_DAYS = 30;
 
-export function computeRevisionStatus(nextDate: Timestamp): RevisionStatus {
+export function computeRevisionStatus(nextDate: Timestamp | null | undefined): RevisionStatus {
+  if (!nextDate || typeof nextDate.toDate !== 'function') return 'expired';
   const next = nextDate.toDate();
   const now = new Date();
   const diffMs = next.getTime() - now.getTime();
@@ -68,7 +69,8 @@ export function computeRevisionStatus(nextDate: Timestamp): RevisionStatus {
   return 'valid';
 }
 
-export function daysUntilRevision(nextDate: Timestamp): number {
+export function daysUntilRevision(nextDate: Timestamp | null | undefined): number {
+  if (!nextDate || typeof nextDate.toDate !== 'function') return -1;
   const next = nextDate.toDate();
   return Math.round((next.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
 }
@@ -96,13 +98,15 @@ export function useRevisions(filterAssetId?: string) {
         let items = snap.docs
           .map((d) => {
             const data = d.data();
+            const nextRevisionDate = data.nextRevisionDate || data.nextRevisionAt || null;
+            const lastRevisionDate = data.lastRevisionDate || data.lastRevisionAt || null;
             // Dynamický přepočet statusu
-            const computedStatus = data.nextRevisionDate
-              ? computeRevisionStatus(data.nextRevisionDate)
-              : 'expired';
+            const computedStatus = computeRevisionStatus(nextRevisionDate);
             return {
               id: d.id,
               ...data,
+              nextRevisionDate,
+              lastRevisionDate,
               status: computedStatus,
             } as Revision;
           })
@@ -154,7 +158,9 @@ export function useRevisions(filterAssetId?: string) {
       // Update revize
       await updateDoc(doc(db, 'revisions', revisionId), {
         lastRevisionDate: Timestamp.fromDate(data.date),
+        lastRevisionAt: Timestamp.fromDate(data.date),
         nextRevisionDate: Timestamp.fromDate(nextDate),
+        nextRevisionAt: Timestamp.fromDate(nextDate),
         certificateNumber: data.certificateNumber,
         ...(data.technicianName && { technicianName: data.technicianName }),
         ...(data.notes && { notes: data.notes }),

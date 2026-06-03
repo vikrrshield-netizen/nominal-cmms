@@ -2,10 +2,10 @@
 // Nominal CMMS — Module-specific settings (Nastavení)
 
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import {
   ArrowLeft, Settings2, Package, Factory, Truck,
-  ClipboardCheck, Recycle, BarChart3, Users,
+  ClipboardCheck, BarChart3, Users,
 } from 'lucide-react';
 import { useAuthContext } from '../context/AuthContext';
 
@@ -27,7 +27,6 @@ const SETTINGS_TABS: SettingsTab[] = [
   { id: 'production', label: 'Výroba', icon: Factory, color: 'text-orange-400', module: 'production' },
   { id: 'fleet', label: 'Vozidla', icon: Truck, color: 'text-cyan-400', module: 'fleet' },
   { id: 'inspections', label: 'Kontroly', icon: ClipboardCheck, color: 'text-emerald-400', module: 'inspections' },
-  { id: 'waste', label: 'Odpady', icon: Recycle, color: 'text-yellow-400', module: 'waste' },
   { id: 'reports', label: 'Reporty', icon: BarChart3, color: 'text-purple-400', module: 'reports' },
   { id: 'shifts', label: 'Směny', icon: Users, color: 'text-violet-400', module: 'shifts' },
 ];
@@ -123,15 +122,6 @@ function InspectionSettings() {
   );
 }
 
-function WasteSettings() {
-  return (
-    <div className="space-y-4">
-      <SettingsCard title="Typy odpadů" description="Kategorie odpadu pro evidenci a semafor" />
-      <SettingsCard title="Kontejnery" description="Evidence sběrných nádob a jejich umístění" />
-    </div>
-  );
-}
-
 function ReportSettings() {
   return (
     <div className="space-y-4">
@@ -162,7 +152,6 @@ const TAB_CONTENT: Record<string, () => React.ReactElement> = {
   production: ProductionSettings,
   fleet: FleetSettings,
   inspections: InspectionSettings,
-  waste: WasteSettings,
   reports: ReportSettings,
   shifts: ShiftSettings,
 };
@@ -172,7 +161,7 @@ const TAB_CONTENT: Record<string, () => React.ReactElement> = {
 // ═══════════════════════════════════════════════════════
 
 export default function SettingsPage() {
-  const navigate = useNavigate();
+  const goBack = useBackNavigation('/');
   const { hasPermission } = useAuthContext();
   const [activeTab, setActiveTab] = useState('general');
 
@@ -185,7 +174,7 @@ export default function SettingsPage() {
           <Settings2 className="w-16 h-16 text-red-400 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-white mb-2">Přístup odepřen</h2>
           <p className="text-slate-400 mb-4">Nemáte oprávnění k nastavení</p>
-          <button onClick={() => navigate('/')} className="px-6 py-2 bg-slate-700 text-white rounded-xl hover:bg-slate-600">Zpět</button>
+          <button onClick={() => goBack()} className="px-6 py-2 bg-slate-700 text-white rounded-xl hover:bg-slate-600">Zpět</button>
         </div>
       </div>
     );
@@ -198,7 +187,7 @@ export default function SettingsPage() {
       {/* Header */}
       <div className="bg-slate-800/80 backdrop-blur-sm border-b border-slate-700/50 px-4 py-4 sticky top-0 z-20">
         <div className="flex items-center gap-3 mb-3">
-          <button onClick={() => navigate('/')} className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition">
+          <button onClick={() => goBack()} className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition">
             <ArrowLeft className="w-5 h-5 text-slate-400" />
           </button>
           <div>

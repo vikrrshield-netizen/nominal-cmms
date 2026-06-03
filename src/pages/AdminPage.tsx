@@ -2,23 +2,23 @@
 // VIKRR — Asset Shield — Administrace uživatelů a nastavení
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { collection, doc, setDoc, addDoc, updateDoc, onSnapshot, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { collection, doc, setDoc, addDoc, updateDoc, onSnapshot, serverTimestamp, Timestamp, query, orderBy, limit } from 'firebase/firestore';
 import { initializeApp, deleteApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword, signOut as firebaseSignOut } from 'firebase/auth';
 import { db, firebaseConfig } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
+import { useBackNavigation } from '../hooks/useBackNavigation';
 import {
   Users, Shield, Edit2, Trash2, Save,
   X, ArrowLeft, AlertTriangle, Eye, EyeOff, UserPlus,
   Lock, Unlock, History, Building2, Settings2, Plus, Check, Loader2, LayoutGrid, Briefcase,
-  Upload, FileSpreadsheet, Download, CheckCircle2,
+  Upload, FileSpreadsheet, Download, CheckCircle2, Bug,
 } from 'lucide-react';
 import { parseExcelFile } from '../utils/importers/excelImporter';
 import type { ParseResult } from '../utils/importers/excelImporter';
 import { showToast } from '../components/ui/Toast';
 import { exportMigrationData, downloadMigrationJson } from '../utils/vikrr_migration';
-import { MODULE_DEFINITIONS } from '../types/user';
+import { MODULE_DEFINITIONS, ROLE_PERMISSIONS } from '../types/user';
 import { PERMISSION_GROUPS } from '../types/tenant';
 import { useTenantSettings } from '../hooks/useTenantSettings';
 import { useTenantRoles } from '../hooks/useTenantRoles';
@@ -41,6 +41,32 @@ interface AdminUser {
   createdAt: string;
   lastLogin?: string;
   positionId?: string;
+  customPermissions: AdminCustomPermissions;
+  scope: AdminUserScope;
+}
+
+interface AdminCustomPermissions {
+  granted: string[];
+  revoked: string[];
+}
+
+interface AdminUserScope {
+  buildings: string[];
+  areas: string[];
+}
+
+interface AppErrorLog {
+  id: string;
+  action: string;
+  severity: string;
+  message: string;
+  stack?: string;
+  componentStack?: string;
+  path?: string;
+  userName?: string;
+  userRole?: string;
+  createdAt?: Timestamp;
+  handled?: boolean;
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -66,12 +92,66 @@ const BUILDINGS = [
   { id: 'L', name: 'Loupárna' },
 ];
 
+const DEFAULT_CUSTOM_PERMISSIONS: AdminCustomPermissions = { granted: [], revoked: [] };
+const DEFAULT_USER_SCOPE: AdminUserScope = { buildings: ['*'], areas: ['*'] };
+
+const normalizeStringList = (value: unknown): string[] => (
+  Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
+);
+
+const normalizeCustomPermissions = (value: unknown): AdminCustomPermissions => {
+  if (!value || typeof value !== 'object') return DEFAULT_CUSTOM_PERMISSIONS;
+  const source = value as { granted?: unknown; revoked?: unknown };
+  return {
+    granted: normalizeStringList(source.granted),
+    revoked: normalizeStringList(source.revoked),
+  };
+};
+
+const normalizeUserScope = (value: unknown): AdminUserScope => {
+  if (!value || typeof value !== 'object') return DEFAULT_USER_SCOPE;
+  const source = value as { buildings?: unknown; areas?: unknown };
+  const buildings = normalizeStringList(source.buildings);
+  const areas = normalizeStringList(source.areas);
+  return {
+    buildings: buildings.length ? buildings : ['*'],
+    areas: areas.length ? areas : ['*'],
+  };
+};
+
+const uniqueStrings = (items: string[]) => Array.from(new Set(items.filter(Boolean)));
+
+const getBasePermissionsForRole = (role: UserRole): string[] => ROLE_PERMISSIONS[role] || [];
+
+const getEffectivePermissionsForUser = (role: UserRole, custom: AdminCustomPermissions): string[] => {
+  const merged = uniqueStrings([...getBasePermissionsForRole(role), ...custom.granted]);
+  return merged.filter(permission => !custom.revoked.includes(permission));
+};
+
+const getPermissionLabel = (permissionKey: string) => {
+  for (const group of PERMISSION_GROUPS) {
+    const match = group.permissions.find(permission => permission.key === permissionKey);
+    if (match) return `${group.label}: ${match.label}`;
+  }
+  return permissionKey;
+};
+
+const getPermissionGroupLabel = (permissionKey: string) => {
+  const group = PERMISSION_GROUPS.find(item => item.permissions.some(permission => permission.key === permissionKey));
+  return group?.label || 'Ostatní';
+};
+
+const allKnownPermissions = () => uniqueStrings([
+  ...Object.values(ROLE_PERMISSIONS).flat(),
+  ...PERMISSION_GROUPS.flatMap(group => group.permissions.map(permission => permission.key)),
+]).sort((a, b) => getPermissionLabel(a).localeCompare(getPermissionLabel(b), 'cs'));
+
 // ═══════════════════════════════════════════════════════════════════
 // COMPONENT
 // ═══════════════════════════════════════════════════════════════════
 
 export default function AdminPage() {
-  const navigate = useNavigate();
+  const goBack = useBackNavigation('/');
   const { hasPermission, user: authUser } = useAuthContext();
 
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -95,7 +175,7 @@ export default function AdminPage() {
             email: data.email || '',
             phone: data.phone || '',
             building: data.buildingId || '',
-            active: data.active !== false,
+            active: data.active !== false && data.isActive !== false,
             createdAt: data.createdAt instanceof Timestamp
               ? data.createdAt.toDate().toISOString().split('T')[0]
               : '',
@@ -103,11 +183,13 @@ export default function AdminPage() {
               ? data.lastLoginAt.toDate().toISOString().split('T')[0]
               : undefined,
             positionId: data.positionId || '',
+            customPermissions: normalizeCustomPermissions(data.customPermissions),
+            scope: normalizeUserScope(data.scope),
           };
         }).sort((a, b) => a.displayName.localeCompare(b.displayName, 'cs'));
 
         // Only update state if data actually changed (prevents unnecessary re-renders)
-        const hash = loaded.map(u => `${u.id}:${u.displayName}:${u.pin}:${u.role}:${u.active}:${u.building}:${u.positionId}`).join('|');
+        const hash = loaded.map(u => `${u.id}:${u.displayName}:${u.pin}:${u.role}:${u.active}:${u.building}:${u.positionId}:${JSON.stringify(u.customPermissions)}:${JSON.stringify(u.scope)}`).join('|');
         if (hash !== usersHashRef.current) {
           usersHashRef.current = hash;
           setUsers(loaded);
@@ -127,7 +209,7 @@ export default function AdminPage() {
     return () => unsub();
   }, []);
   const [showNewUserModal, setShowNewUserModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<'users' | 'roles' | 'modules' | 'positions' | 'config' | 'audit' | 'import'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'roles' | 'modules' | 'positions' | 'config' | 'audit' | 'errors' | 'import'>('users');
   const [filterRole, setFilterRole] = useState<UserRole | 'ALL'>('ALL');
 
   // Access: admin.view = read-only, admin.manage = full edit
@@ -142,7 +224,7 @@ export default function AdminPage() {
           <h2 className="text-xl font-bold text-white mb-2">Přístup odepřen</h2>
           <p className="text-slate-400 mb-4">Nemáte oprávnění k administraci</p>
           <button
-            onClick={() => navigate('/')}
+            onClick={() => goBack()}
             className="px-6 py-2 bg-slate-700 text-white rounded-xl hover:bg-slate-600"
           >
             Zpět na Dashboard
@@ -152,17 +234,20 @@ export default function AdminPage() {
     );
   }
 
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   const filteredUsers = useMemo(
     () => users.filter(u => filterRole === 'ALL' || u.role === filterRole),
     [users, filterRole]
   );
 
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   const handleDeleteUser = useCallback(async (userId: string) => {
     if (confirm('Opravdu deaktivovat tohoto uživatele?')) {
       const userName = users.find(u => u.id === userId)?.displayName || '';
       try {
         await updateDoc(doc(db, 'users', userId), {
           active: false,
+          isActive: false,
           updatedAt: serverTimestamp(),
           updatedBy: authUser?.uid || '',
         });
@@ -174,12 +259,14 @@ export default function AdminPage() {
     }
   }, [users, authUser?.uid]);
 
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   const handleToggleActive = useCallback(async (userId: string) => {
     const targetUser = users.find(u => u.id === userId);
     if (!targetUser) return;
     try {
       await updateDoc(doc(db, 'users', userId), {
         active: !targetUser.active,
+        isActive: !targetUser.active,
         updatedAt: serverTimestamp(),
         updatedBy: authUser?.uid || '',
       });
@@ -201,7 +288,7 @@ export default function AdminPage() {
         {/* Header */}
         <header className="p-6">
           <button 
-            onClick={() => navigate('/')}
+            onClick={() => goBack()}
             className="flex items-center gap-2 text-slate-400 hover:text-white mb-4 transition"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -246,6 +333,7 @@ export default function AdminPage() {
               { id: 'positions', label: 'Pozice', icon: Briefcase },
               { id: 'config', label: 'Konfigurace', icon: Settings2 },
               { id: 'import', label: 'Import', icon: Upload },
+              { id: 'errors', label: 'Chyby', icon: Bug },
               { id: 'audit', label: 'Audit log', icon: History },
             ].map(tab => (
               <button
@@ -367,6 +455,10 @@ export default function AdminPage() {
           {activeTab === 'audit' && (
             <AuditTrailTab />
           )}
+
+          {activeTab === 'errors' && (
+            <ErrorMonitorTab />
+          )}
         </div>
       </div>
 
@@ -417,6 +509,8 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
     email: user.email || '',
     phone: user.phone || '',
     building: user.building || '',
+    customPermissions: normalizeCustomPermissions(user.customPermissions),
+    scope: normalizeUserScope(user.scope),
   });
 
   const roleCfg = ROLE_CONFIG[user.role];
@@ -431,6 +525,10 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
         email: formData.email.trim() || '',
         phone: formData.phone.trim() || '',
         buildingId: formData.building || '',
+        customPermissions: formData.customPermissions,
+        scope: formData.scope,
+        active: user.active,
+        isActive: user.active,
         updatedAt: serverTimestamp(),
         updatedBy: authUser?.uid || '',
       });
@@ -527,6 +625,8 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
                 )}
               </div>
 
+              <WorkerPermissionsPanel user={user} />
+
               {/* Actions — only for admin.manage */}
               {canEdit && (
                 <>
@@ -556,7 +656,7 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
                     className="w-full flex items-center justify-center gap-2 p-3 bg-red-500/20 text-red-400 rounded-xl"
                   >
                     <Trash2 className="w-4 h-4" />
-                    Smazat uživatele
+                    Deaktivovat uživatele
                   </button>
                 </>
               )}
@@ -622,6 +722,17 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
                 </select>
               </div>
 
+              <PermissionOverrideEditor
+                role={formData.role}
+                value={formData.customPermissions}
+                onChange={(customPermissions) => setFormData(prev => ({ ...prev, customPermissions }))}
+              />
+
+              <UserScopeEditor
+                value={formData.scope}
+                onChange={(scope) => setFormData(prev => ({ ...prev, scope }))}
+              />
+
               <div className="flex gap-2 pt-4">
                 <button
                   onClick={() => setIsEditing(false)}
@@ -642,6 +753,348 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
             </>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function WorkerPermissionsPanel({ user }: { user: AdminUser }) {
+  const basePermissions = getBasePermissionsForRole(user.role);
+  const custom = normalizeCustomPermissions(user.customPermissions);
+  const effectivePermissions = getEffectivePermissionsForUser(user.role, custom);
+  const visiblePermissions = effectivePermissions.slice(0, 18);
+  const hiddenCount = Math.max(0, effectivePermissions.length - visiblePermissions.length);
+  const scopeBuildings = user.scope?.buildings?.includes('*')
+    ? 'Všechny budovy'
+    : (user.scope?.buildings || []).join(', ') || 'Neurčeno';
+
+  return (
+    <div className="bg-white/5 rounded-xl p-4 border border-white/10 space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-sm font-bold text-white">Práva pracovníka</div>
+          <div className="text-xs text-slate-400">
+            Role dává {basePermissions.length} práv, výsledně má {effectivePermissions.length}.
+          </div>
+        </div>
+        <div className="text-right text-xs text-slate-400">
+          <div>Rozsah</div>
+          <div className="font-semibold text-slate-200">{scopeBuildings}</div>
+        </div>
+      </div>
+
+      {(custom.granted.length > 0 || custom.revoked.length > 0) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div className="rounded-lg bg-emerald-500/10 border border-emerald-400/20 p-2">
+            <div className="text-[11px] uppercase font-bold text-emerald-300 mb-1">Individuálně přidáno</div>
+            <div className="text-sm text-emerald-100">{custom.granted.length || 'nic'}</div>
+          </div>
+          <div className="rounded-lg bg-red-500/10 border border-red-400/20 p-2">
+            <div className="text-[11px] uppercase font-bold text-red-300 mb-1">Individuálně odebráno</div>
+            <div className="text-sm text-red-100">{custom.revoked.length || 'nic'}</div>
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-1.5">
+        {visiblePermissions.map(permission => (
+          <span
+            key={permission}
+            className={`rounded-full px-2 py-1 text-[11px] font-semibold ${
+              custom.granted.includes(permission)
+                ? 'bg-emerald-500/20 text-emerald-200 border border-emerald-400/30'
+                : 'bg-white/10 text-slate-200 border border-white/10'
+            }`}
+            title={permission}
+          >
+            {getPermissionLabel(permission)}
+          </span>
+        ))}
+        {hiddenCount > 0 && (
+          <span className="rounded-full px-2 py-1 text-[11px] font-semibold bg-white/10 text-slate-400 border border-white/10">
+            +{hiddenCount} dalších
+          </span>
+        )}
+      </div>
+
+      {custom.revoked.length > 0 && (
+        <div className="pt-2 border-t border-white/10">
+          <div className="text-[11px] uppercase font-bold text-red-300 mb-1">Zakázaná práva</div>
+          <div className="flex flex-wrap gap-1.5">
+            {custom.revoked.map(permission => (
+              <span key={permission} className="rounded-full px-2 py-1 text-[11px] font-semibold bg-red-500/15 text-red-200 border border-red-400/20">
+                {getPermissionLabel(permission)}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PermissionOverrideEditor({
+  role,
+  value,
+  onChange,
+}: {
+  role: UserRole;
+  value: AdminCustomPermissions;
+  onChange: (value: AdminCustomPermissions) => void;
+}) {
+  const [filter, setFilter] = useState('');
+  const custom = normalizeCustomPermissions(value);
+  const basePermissions = getBasePermissionsForRole(role);
+  const effectivePermissions = getEffectivePermissionsForUser(role, custom);
+  const normalizedFilter = filter.trim().toLowerCase();
+  const moduleReadPermissions: Record<string, string> = {
+    tasks: 'wo.read',
+    inventory: 'inv.consume',
+    gearboxes: 'asset.read',
+    fleet: 'fleet.read',
+    hvac: 'hvac.read',
+    reports: 'report.read',
+    warehouse: 'warehouse.view',
+    shifts: 'shifts.view',
+    admin: 'admin.view',
+  };
+
+  const groupedPermissions = useMemo(() => {
+    const known = new Set(allKnownPermissions());
+    const groups = PERMISSION_GROUPS
+      .map(group => ({
+        ...group,
+        permissions: group.permissions
+          .map(permission => permission.key)
+          .filter(permission => {
+            if (!known.has(permission)) return false;
+            if (!normalizedFilter) return true;
+            return `${permission} ${getPermissionLabel(permission)} ${getPermissionGroupLabel(permission)}`
+              .toLowerCase()
+              .includes(normalizedFilter);
+          }),
+      }))
+      .filter(group => group.permissions.length > 0);
+
+    const groupedKeys = new Set(groups.flatMap(group => group.permissions));
+    const otherPermissions = allKnownPermissions().filter(permission => {
+      if (groupedKeys.has(permission)) return false;
+      if (!normalizedFilter) return true;
+      return `${permission} ${getPermissionLabel(permission)} ${getPermissionGroupLabel(permission)}`
+        .toLowerCase()
+        .includes(normalizedFilter);
+    });
+
+    if (otherPermissions.length > 0) {
+      groups.push({ module: 'other', label: 'Ostatní', permissions: otherPermissions });
+    }
+
+    return groups;
+  }, [normalizedFilter]);
+
+  const setPermissionMode = (permission: string, mode: 'role' | 'grant' | 'revoke') => {
+    const next: AdminCustomPermissions = {
+      granted: custom.granted.filter(item => item !== permission),
+      revoked: custom.revoked.filter(item => item !== permission),
+    };
+    if (mode === 'grant') next.granted = uniqueStrings([...next.granted, permission]);
+    if (mode === 'revoke') next.revoked = uniqueStrings([...next.revoked, permission]);
+    onChange(next);
+  };
+
+  const setModuleEnabled = (moduleId: string, enabled: boolean) => {
+    const readPermission = moduleReadPermissions[moduleId];
+    if (!readPermission) return;
+    setPermissionMode(readPermission, enabled ? 'grant' : 'revoke');
+  };
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-4 shadow-sm">
+      <div>
+        <div className="text-sm font-bold text-slate-950">Individuální práva</div>
+        <div className="text-xs text-slate-600">
+          Role je základ. Tady můžeš konkrétnímu člověku právo přidat nebo odebrat.
+        </div>
+      </div>
+
+      <input
+        value={filter}
+        onChange={e => setFilter(e.target.value)}
+        placeholder="Hledat právo nebo modul..."
+        className="w-full min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-950 outline-none focus:border-emerald-600"
+      />
+
+      <div className="max-h-96 overflow-y-auto space-y-3 pr-1">
+        {groupedPermissions.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+            Žádné právo neodpovídá hledání.
+          </div>
+        ) : groupedPermissions.map(group => (
+          <section key={group.module} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-black text-slate-950">{group.label}</div>
+                <div className="text-xs font-semibold text-slate-500">{group.permissions.length} práv</div>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                {moduleReadPermissions[group.module] && (
+                  <button
+                    type="button"
+                    onClick={() => setModuleEnabled(group.module, !effectivePermissions.includes(moduleReadPermissions[group.module]))}
+                    className={`min-h-9 rounded-full border px-3 text-[11px] font-black ${
+                      effectivePermissions.includes(moduleReadPermissions[group.module])
+                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                        : 'border-red-200 bg-red-50 text-red-700'
+                    }`}
+                  >
+                    Modul {effectivePermissions.includes(moduleReadPermissions[group.module]) ? 'zapnutý' : 'vypnutý'}
+                  </button>
+                )}
+                <span className="rounded-full border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-600">
+                  {group.module}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              {group.permissions.map(permission => {
+                const isBase = basePermissions.includes(permission);
+                const isGranted = custom.granted.includes(permission);
+                const isRevoked = custom.revoked.includes(permission);
+                const isEffective = effectivePermissions.includes(permission);
+                const mode: 'role' | 'grant' | 'revoke' = isRevoked ? 'revoke' : isGranted ? 'grant' : 'role';
+
+                return (
+                  <div key={permission} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-slate-950">{getPermissionLabel(permission)}</div>
+                        <div className="text-xs text-slate-500">
+                          {permission} · {isBase ? 'v roli' : 'mimo roli'} · {isEffective ? 'aktivní' : 'neaktivní'}
+                        </div>
+                      </div>
+                      <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-bold ${
+                        isEffective ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500 border border-slate-200'
+                      }`}>
+                        {isEffective ? 'aktivní' : 'vypnuto'}
+                      </span>
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-3 gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setPermissionMode(permission, 'role')}
+                        className={`min-h-9 rounded-lg border text-xs font-bold ${
+                          mode === 'role'
+                            ? 'border-slate-300 bg-slate-200 text-slate-950'
+                            : 'border-slate-200 bg-white text-slate-600'
+                        }`}
+                      >
+                        Role
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPermissionMode(permission, 'grant')}
+                        className={`min-h-9 rounded-lg border text-xs font-bold ${
+                          mode === 'grant'
+                            ? 'border-emerald-700 bg-emerald-700 text-white'
+                            : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                        }`}
+                      >
+                        Povolit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPermissionMode(permission, 'revoke')}
+                        className={`min-h-9 rounded-lg border text-xs font-bold ${
+                          mode === 'revoke'
+                            ? 'border-red-600 bg-red-600 text-white'
+                            : 'border-red-200 bg-red-50 text-red-700'
+                        }`}
+                      >
+                        Zakázat
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        ))}
+      </div>
+    </div>
+  );
+}
+function UserScopeEditor({
+  value,
+  onChange,
+}: {
+  value: AdminUserScope;
+  onChange: (value: AdminUserScope) => void;
+}) {
+  const scope = normalizeUserScope(value);
+  const allBuildings = scope.buildings.includes('*');
+
+  const setAllBuildings = () => {
+    onChange({ buildings: ['*'], areas: scope.areas?.length ? scope.areas : ['*'] });
+  };
+
+  const toggleBuilding = (buildingId: string) => {
+    const current = allBuildings ? [] : scope.buildings;
+    const nextBuildings = current.includes(buildingId)
+      ? current.filter(id => id !== buildingId)
+      : [...current, buildingId];
+
+    onChange({
+      buildings: nextBuildings.length ? nextBuildings : ['*'],
+      areas: scope.areas?.length ? scope.areas : ['*'],
+    });
+  };
+
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/5 p-3 space-y-3">
+      <div>
+        <div className="text-sm font-bold text-white">Rozsah přístupu</div>
+        <div className="text-xs text-slate-400">
+          Tady omezíš, které budovy má pracovník vidět. Místnosti zatím zůstávají bez omezení.
+        </div>
+      </div>
+
+      <button
+        type="button"
+        onClick={setAllBuildings}
+        className={`w-full min-h-10 rounded-xl border text-sm font-bold ${
+          allBuildings
+            ? 'bg-emerald-500 text-white border-emerald-400'
+            : 'bg-white/5 text-slate-300 border-white/10'
+        }`}
+      >
+        Všechny budovy
+      </button>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        {BUILDINGS.map(building => {
+          const active = !allBuildings && scope.buildings.includes(building.id);
+          return (
+            <button
+              key={building.id}
+              type="button"
+              onClick={() => toggleBuilding(building.id)}
+              className={`min-h-12 rounded-xl border p-2 text-left ${
+                active
+                  ? 'bg-sky-500/20 text-sky-100 border-sky-400/40'
+                  : 'bg-white/5 text-slate-300 border-white/10'
+              }`}
+            >
+              <div className="text-sm font-bold">Budova {building.id}</div>
+              <div className="text-[11px] opacity-75 truncate">{building.name}</div>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="rounded-lg bg-slate-950/40 border border-white/10 p-2 text-xs text-slate-400">
+        Uloženo jako <span className="font-mono text-slate-200">{allBuildings ? '*' : scope.buildings.join(', ')}</span>.
       </div>
     </div>
   );
@@ -705,6 +1158,7 @@ function NewUserModal({ existingPins, onClose, onCreated }: {
         positionId: formData.positionId || '',
         color: '#64748b',
         active: true,
+        isActive: true,
         uid: newUid,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -1064,6 +1518,158 @@ function DynamicConfigTab({ canEdit }: { canEdit: boolean }) {
 // ═══════════════════════════════════════════════════════════════════
 // AUDIT TRAIL TAB — Structural change logging
 // ═══════════════════════════════════════════════════════════════════
+
+function formatErrorTime(value?: Timestamp) {
+  if (!value) return 'bez času';
+  return value.toDate().toLocaleString('cs-CZ', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function ErrorMonitorTab() {
+  const [logs, setLogs] = useState<AppErrorLog[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    const q = query(collection(db, 'audit_logs'), orderBy('createdAt', 'desc'), limit(100));
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const loaded = snap.docs
+          .map((d) => {
+            const data = d.data();
+            return {
+              id: d.id,
+              action: data.action || 'APP_ERROR',
+              severity: data.severity || 'error',
+              message: data.message || 'Neznámá chyba',
+              stack: data.stack || '',
+              componentStack: data.componentStack || '',
+              path: data.path || '',
+              userName: data.userName || '',
+              userRole: data.userRole || '',
+              createdAt: data.createdAt instanceof Timestamp ? data.createdAt : undefined,
+              handled: data.handled === true,
+              isErrorLog: data.type === 'error' || data.category === 'app_error',
+            };
+          })
+          .filter((log) => log.isErrorLog)
+          .map(({ isErrorLog, ...log }) => log);
+
+        setLogs(loaded);
+        setLoading(false);
+      },
+      (err) => {
+        console.error('[AdminPage] Error monitor listener FAILED:', err);
+        setLoading(false);
+      }
+    );
+
+    return () => unsub();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 py-8 text-slate-500 justify-center">
+        <Loader2 className="w-5 h-5 animate-spin" /> Načítám chyby...
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
+        <div className="flex items-start gap-3">
+          <Bug className="w-5 h-5 text-red-300 mt-0.5" />
+          <div>
+            <h3 className="text-white font-semibold">Dohled nad chybami aplikace</h3>
+            <p className="text-sm text-red-100/80 mt-1">
+              Tady se objeví pády obrazovek a chyby z prohlížeče. Pro řešení je důležité hlavně datum, uživatel, stránka a text chyby.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {logs.length === 0 ? (
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-center">
+          <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto mb-3" />
+          <div className="text-white font-semibold">Zatím žádné chyby</div>
+          <div className="text-slate-400 text-sm mt-1">Až aplikace zachytí pád nebo technickou chybu, zobrazí se tady.</div>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {logs.map((log) => {
+            const isExpanded = expandedId === log.id;
+            return (
+              <div key={log.id} className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setExpandedId(isExpanded ? null : log.id)}
+                  className="w-full p-4 text-left hover:bg-white/5 transition"
+                >
+                  <div className="flex flex-col lg:flex-row lg:items-start gap-3">
+                    <div className={`px-2.5 py-1 rounded-lg text-xs font-semibold w-fit ${
+                      log.severity === 'fatal'
+                        ? 'bg-red-500/20 text-red-200 border border-red-500/30'
+                        : 'bg-amber-500/15 text-amber-200 border border-amber-500/25'
+                    }`}>
+                      {log.severity === 'fatal' ? 'Pád obrazovky' : 'Chyba'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-white font-semibold break-words">{log.message}</div>
+                      <div className="text-xs text-slate-400 mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                        <span>{formatErrorTime(log.createdAt)}</span>
+                        {log.userName && <span>{log.userName}</span>}
+                        {log.path && <span>{log.path}</span>}
+                        <span>{log.action}</span>
+                      </div>
+                    </div>
+                    <div className="text-xs text-slate-500">{isExpanded ? 'Skrýt detail' : 'Detail'}</div>
+                  </div>
+                </button>
+
+                {isExpanded && (
+                  <div className="border-t border-white/10 p-4 space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+                      <div className="rounded-xl bg-slate-950/40 p-3">
+                        <div className="text-slate-500 text-xs">Uživatel</div>
+                        <div className="text-white">{log.userName || 'Neznámý'}</div>
+                      </div>
+                      <div className="rounded-xl bg-slate-950/40 p-3">
+                        <div className="text-slate-500 text-xs">Role</div>
+                        <div className="text-white">{log.userRole || 'bez role'}</div>
+                      </div>
+                      <div className="rounded-xl bg-slate-950/40 p-3">
+                        <div className="text-slate-500 text-xs">Stránka</div>
+                        <div className="text-white break-words">{log.path || 'bez stránky'}</div>
+                      </div>
+                      <div className="rounded-xl bg-slate-950/40 p-3">
+                        <div className="text-slate-500 text-xs">Zachyceno</div>
+                        <div className="text-white">{log.handled ? 'Ano' : 'Ne'}</div>
+                      </div>
+                    </div>
+
+                    {(log.stack || log.componentStack) && (
+                      <pre className="max-h-72 overflow-auto rounded-xl bg-black/40 border border-white/10 p-3 text-xs text-slate-300 whitespace-pre-wrap">
+                        {log.stack || log.componentStack}
+                      </pre>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const AUDIT_LOG_ENTRIES = [
   { time: '17.2.2026 09:15', user: 'Vilém', action: 'Konfigurace', detail: 'Přidán typ odpadu: Kovový odpad', type: 'config' },

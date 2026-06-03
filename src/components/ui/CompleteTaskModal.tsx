@@ -1,19 +1,11 @@
-// src/components/ui/CompleteTaskModal.tsx
-// VIKRR — Asset Shield — Povinná pole při dokončení úkolu
-// Technik MUSÍ vyplnit popis řešení, volitelně čas
-
-import { useState } from 'react';
-import { Clock, FileText } from 'lucide-react';
+﻿import { useMemo, useState } from 'react';
+import { Clock, FileText, Users } from 'lucide-react';
 import BottomSheet, { FormField, FormFooter } from './BottomSheet';
 import MicButton from './MicButton';
 
-const ASSIGNEE_OPTIONS = [
-  { value: 'Filip Novák', label: 'Filip Novák (interní)' },
-  { value: 'Zdeněk Mička', label: 'Zdeněk Mička (interní)' },
-  { value: 'Petr Volf', label: 'Petr Volf (interní)' },
-  { value: 'Údržba (tým)', label: 'Údržba — tým (interní)' },
-  { value: 'Externí firma', label: 'Externí firma' },
-];
+function todayDateInput() {
+  return new Date().toISOString().slice(0, 10);
+}
 
 const WORK_TYPE_OPTIONS = [
   { value: 'udrzba', label: 'Údržba' },
@@ -22,29 +14,88 @@ const WORK_TYPE_OPTIONS = [
   { value: 'sanitace', label: 'Sanitace' },
 ];
 
+const RESULT_OPTIONS = [
+  { value: 'fixed', label: 'Opraveno' },
+  { value: 'monitor', label: 'Sledovat' },
+  { value: 'not_fixable', label: 'Nelze opravit' },
+  { value: 'handover', label: 'Předat dál' },
+];
+
 interface CompleteTaskModalProps {
   taskTitle: string;
-  onConfirm: (data: { resolution: string; durationMinutes: number | null; completedByName: string; workType: string }) => Promise<void>;
+  defaultWorkers?: string[];
+  workerOptions?: string[];
+  onConfirm: (data: {
+    resolution: string;
+    durationMinutes: number | null;
+    completedByName: string;
+    completedByNames: string[];
+    workType: string;
+    performedDate: string;
+    result: string;
+    auditNote: string;
+  }) => Promise<void>;
   onClose: () => void;
 }
 
-export default function CompleteTaskModal({ taskTitle, onConfirm, onClose }: CompleteTaskModalProps) {
+function normalizePersonKey(name: string): string {
+  return name
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .toLocaleLowerCase('cs-CZ');
+}
+
+function personNameScore(name: string): number {
+  const nonAscii = [...name].filter((char) => char.charCodeAt(0) > 127).length;
+  const hasReplacement = name.includes('?') || name.includes('\uFFFD');
+  return nonAscii * 10 + name.length - (hasReplacement ? 1000 : 0);
+}
+
+function uniqueNames(names: string[]): string[] {
+  const byKey = new Map<string, string>();
+  for (const rawName of names) {
+    const cleanName = rawName.trim().replace(/\s+/g, ' ');
+    if (!cleanName) continue;
+    const key = normalizePersonKey(cleanName);
+    const existing = byKey.get(key);
+    if (!existing || personNameScore(cleanName) > personNameScore(existing)) {
+      byKey.set(key, cleanName);
+    }
+  }
+  return [...byKey.values()];
+}
+
+export default function CompleteTaskModal({ taskTitle, defaultWorkers = [], workerOptions = [], onConfirm, onClose }: CompleteTaskModalProps) {
   const [resolution, setResolution] = useState('');
   const [duration, setDuration] = useState(0);
-  const [assignee, setAssignee] = useState('');
+  const [workers, setWorkers] = useState<string[]>(uniqueNames(defaultWorkers));
   const [workType, setWorkType] = useState('');
+  const [performedDate, setPerformedDate] = useState(todayDateInput());
+  const [result, setResult] = useState('fixed');
+  const [auditNote, setAuditNote] = useState('');
   const [pin, setPin] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const isValid = resolution.trim().length >= 5 && pin.length === 4 && assignee !== '' && workType !== '';
+  const workerChoices = useMemo(() => uniqueNames([...workerOptions, ...workers]), [workerOptions, workers]);
+  const isValid = resolution.trim().length >= 5 && pin.length === 4 && workers.length > 0 && workType !== '';
+
+  const toggleWorker = (name: string) => {
+    const key = normalizePersonKey(name);
+    setWorkers((current) => current.some((item) => normalizePersonKey(item) === key)
+      ? current.filter((item) => normalizePersonKey(item) !== key)
+      : uniqueNames([...current, name])
+    );
+  };
 
   const handleSubmit = async () => {
     if (resolution.trim().length < 5) {
       setError('Popis řešení musí mít alespoň 5 znaků');
       return;
     }
-    if (!assignee) {
+    if (workers.length === 0) {
       setError('Vyber kdo úkol provedl');
       return;
     }
@@ -63,8 +114,12 @@ export default function CompleteTaskModal({ taskTitle, onConfirm, onClose }: Com
       await onConfirm({
         resolution: resolution.trim(),
         durationMinutes: duration > 0 ? duration : null,
-        completedByName: assignee,
+        completedByName: workers.join(', '),
+        completedByNames: workers,
         workType,
+        performedDate,
+        result,
+        auditNote: auditNote.trim(),
       });
       onClose();
     } catch (err: unknown) {
@@ -75,19 +130,17 @@ export default function CompleteTaskModal({ taskTitle, onConfirm, onClose }: Com
 
   return (
     <BottomSheet title="Dokončit úkol" isOpen onClose={onClose}>
-      {/* Task title */}
-      <div className="bg-slate-700/50 rounded-xl p-3 mb-4">
-        <div className="text-sm text-slate-400">Úkol:</div>
-        <div className="text-white font-medium">{taskTitle}</div>
+      <div className="mb-4 rounded-xl border border-slate-200 bg-slate-100 p-3">
+        <div className="text-sm text-slate-500">Úkol:</div>
+        <div className="font-medium text-slate-950">{taskTitle}</div>
       </div>
 
-      {/* Resolution — POVINNÉ (custom kvůli character counter) */}
       <div className="mb-4">
-        <label className="block text-sm text-slate-400 font-medium mb-1.5">
-          <FileText className="w-4 h-4 inline mr-1" />
-          Popis řešení <span className="text-red-400">*</span>
+        <label className="mb-1.5 block text-sm font-medium text-slate-600">
+          <FileText className="mr-1 inline h-4 w-4" />
+          Popis řešení <span className="text-red-600">*</span>
         </label>
-        <div className="flex gap-2 items-start">
+        <div className="flex items-start gap-2">
           <textarea
             value={resolution}
             onChange={(e) => {
@@ -97,83 +150,108 @@ export default function CompleteTaskModal({ taskTitle, onConfirm, onClose }: Com
             placeholder="Co jste udělali? Jaký díl jste vyměnili? Co bylo příčinou?"
             rows={3}
             autoFocus
-            className={`flex-1 px-4 py-3 rounded-xl bg-white/5 border text-white text-[15px] placeholder-slate-600 focus:outline-none transition resize-none min-h-[48px] ${
-              error && !isValid
-                ? 'border-red-500 focus:border-red-400'
-                : 'border-white/10 focus:border-orange-500/50'
+            className={`min-h-[96px] flex-1 resize-none rounded-xl border bg-white px-4 py-3 text-[15px] text-slate-950 placeholder-slate-400 outline-none transition ${
+              error && !isValid ? 'border-red-500 focus:border-red-500' : 'border-slate-300 focus:border-emerald-600'
             }`}
           />
           <div className="pt-2">
             <MicButton onTranscript={(t) => setResolution((prev) => prev ? prev + ' ' + t : t)} />
           </div>
         </div>
-        <div className="flex justify-between mt-1">
+        <div className="mt-1 flex justify-between">
           {error && !isValid ? (
-            <span className="text-xs text-red-400">{error}</span>
+            <span className="text-xs text-red-600">{error}</span>
           ) : (
             <span className="text-xs text-slate-500">Min. 5 znaků</span>
           )}
-          <span className={`text-xs ${resolution.trim().length >= 5 ? 'text-emerald-400' : 'text-slate-500'}`}>
+          <span className={`text-xs ${resolution.trim().length >= 5 ? 'text-emerald-600' : 'text-slate-500'}`}>
             {resolution.trim().length}/5
           </span>
         </div>
       </div>
 
-      {/* Assignee */}
-      <FormField
-        label="Provedl"
-        value={assignee}
-        onChange={setAssignee}
-        type="select"
-        required
-        options={ASSIGNEE_OPTIONS}
-      />
-
-      {/* Work Type */}
-      <FormField
-        label="Typ práce"
-        value={workType}
-        onChange={setWorkType}
-        type="select"
-        required
-        options={WORK_TYPE_OPTIONS}
-      />
-
-      {/* Duration — slider */}
       <div className="mb-4">
-        <label className="block text-sm text-slate-400 font-medium mb-1.5">
-          <Clock className="w-4 h-4 inline mr-1" />
-          Čas práce <span className="text-slate-600">(volitelné)</span>
+        <label className="mb-2 block text-sm font-medium text-slate-600">
+          <Users className="mr-1 inline h-4 w-4" />
+          Provedli <span className="text-red-600">*</span>
         </label>
-        <div className="bg-white/5 border border-white/10 rounded-xl p-4">
-          <div className="text-center mb-3">
-            <span className="text-2xl font-bold text-white">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {workerChoices.map((name) => {
+            const active = workers.some((item) => normalizePersonKey(item) === normalizePersonKey(name));
+            return (
+              <button
+                key={name}
+                type="button"
+                onClick={() => toggleWorker(name)}
+                className={`min-h-[44px] rounded-xl border px-3 py-2 text-left text-sm font-semibold transition ${
+                  active
+                    ? 'border-emerald-500 bg-emerald-50 text-emerald-800'
+                    : 'border-slate-300 bg-white text-slate-700 active:bg-slate-50'
+                }`}
+              >
+                <span className="inline-flex items-center gap-2">
+                  <span className={`flex h-4 w-4 items-center justify-center rounded border text-[10px] ${
+                    active ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-400 text-transparent'
+                  }`}>
+                    ✓
+                  </span>
+                  {name}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        {workers.length > 0 && (
+          <div className="mt-2 text-xs text-slate-600">
+            Vybráno: <span className="font-semibold text-slate-950">{workers.join(', ')}</span>
+          </div>
+        )}
+      </div>
+
+      <FormField label="Datum provedení" value={performedDate} onChange={setPerformedDate} type="date" required />
+      <FormField label="Typ práce" value={workType} onChange={setWorkType} type="select" required options={WORK_TYPE_OPTIONS} />
+      <FormField label="Výsledek" value={result} onChange={setResult} type="select" required options={RESULT_OPTIONS} />
+      <FormField
+        label="Poznámka pro audit"
+        value={auditNote}
+        onChange={setAuditNote}
+        type="textarea"
+        placeholder="Např. kontrola po opravě OK, bude sledováno při další obchůzce."
+      />
+
+      <div className="mb-4">
+        <label className="mb-1.5 block text-sm font-medium text-slate-600">
+          <Clock className="mr-1 inline h-4 w-4" />
+          Čas práce <span className="text-slate-500">(volitelné)</span>
+        </label>
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div className="mb-3 text-center">
+            <span className="text-2xl font-bold text-slate-950">
               {duration > 0 ? `${Math.floor(duration / 60)}h ${duration % 60}min` : '—'}
             </span>
-            <span className="block text-xs text-slate-500 mt-0.5">
-              {duration > 0 ? `${duration} minut` : 'Přetáhni slider'}
+            <span className="mt-0.5 block text-xs text-slate-500">
+              {duration > 0 ? `${duration} minut` : 'Přetáhni posuvník'}
             </span>
           </div>
           <input
             type="range"
             min="0"
-            max="240"
+            max="480"
             step="15"
             value={duration}
             onChange={(e) => setDuration(Number(e.target.value))}
-            className="w-full h-2 rounded-full appearance-none cursor-pointer accent-orange-500"
-            style={{ background: `linear-gradient(to right, #f97316 ${(duration / 240) * 100}%, rgba(255,255,255,0.1) ${(duration / 240) * 100}%)` }}
+            className="h-2 w-full cursor-pointer appearance-none rounded-full accent-emerald-600"
+            style={{ background: `linear-gradient(to right, #059669 ${(duration / 480) * 100}%, #e2e8f0 ${(duration / 480) * 100}%)` }}
           />
-          <div className="flex justify-between text-[10px] text-slate-600 mt-1">
-            <span>0</span><span>1h</span><span>2h</span><span>3h</span><span>4h</span>
+          <div className="mt-1 flex justify-between text-[10px] text-slate-500">
+            <span>0</span><span>2h</span><span>4h</span><span>6h</span><span>8h</span>
           </div>
         </div>
       </div>
 
-      {/* PIN Verification */}
       <div className="mb-4">
-        <label className="block text-sm text-slate-400 font-medium mb-1.5">
-          PIN pro potvrzení <span className="text-red-400">*</span>
+        <label className="mb-1.5 block text-sm font-medium text-slate-600">
+          PIN pro potvrzení <span className="text-red-600">*</span>
         </label>
         <input
           type="password"
@@ -182,19 +260,17 @@ export default function CompleteTaskModal({ taskTitle, onConfirm, onClose }: Com
           value={pin}
           onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
           placeholder="4 číslice"
-          className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-[15px] placeholder-slate-600 focus:outline-none focus:border-orange-500/50 transition text-center text-2xl tracking-[0.5em] font-mono min-h-[48px]"
+          className="min-h-[48px] w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-center font-mono text-2xl tracking-[0.5em] text-slate-950 placeholder-slate-400 outline-none transition focus:border-emerald-600"
         />
-        <span className="text-[11px] text-slate-600 mt-1 block">Potvrzuji dokončení zadáním PINu</span>
+        <span className="mt-1 block text-[11px] text-slate-500">Potvrzuji dokončení zadáním PINu</span>
       </div>
 
-      {/* Error */}
       {error && isValid && (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-red-400 text-sm mb-4">
+        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
           {error}
         </div>
       )}
 
-      {/* Footer */}
       <FormFooter
         onCancel={onClose}
         onSubmit={handleSubmit}

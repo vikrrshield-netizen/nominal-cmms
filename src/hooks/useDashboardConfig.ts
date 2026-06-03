@@ -4,7 +4,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { doc, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db, isFirebaseConfigured } from '../lib/firebase';
 import type { UserRole } from '../types/user';
 import type { WidgetInstance } from '../types/dashboard';
 import { getDefaultConfig, WIDGET_DEFINITIONS } from '../config/widgetRegistry';
@@ -85,9 +85,11 @@ export function useDashboardConfig(userId: string | undefined, role: UserRole): 
 
   // Subscribe to Firestore doc
   useEffect(() => {
-    if (!userId) {
-      setWidgets(getDefaultConfig(role));
+    if (!userId || !isFirebaseConfigured) {
+      const local = loadFromLocalStorage();
+      setWidgets(local && local.length > 0 ? local : getDefaultConfig(role));
       setLoading(false);
+      setInitialized(true);
       return;
     }
 
@@ -147,7 +149,7 @@ export function useDashboardConfig(userId: string | undefined, role: UserRole): 
   const updateWidgets = useCallback((newWidgets: WidgetInstance[]) => {
     setWidgets(newWidgets);
     saveToLocalStorage(newWidgets);
-    if (userId) {
+    if (userId && isFirebaseConfigured) {
       const docRef = doc(db, COLLECTION, userId);
       setDoc(docRef, { userId, widgets: newWidgets, updatedAt: serverTimestamp() }).catch((err) => {
         console.error('[DashConfig] Firestore write failed:', err);

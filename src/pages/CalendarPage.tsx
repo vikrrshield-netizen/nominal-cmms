@@ -3,17 +3,19 @@
 // Flexibilní kalendář — upravuje se denně dle situace
 
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
-  collection, onSnapshot, doc, updateDoc, Timestamp
+  addDoc, collection, onSnapshot, doc, updateDoc, Timestamp
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
+import { useBackNavigation } from '../hooks/useBackNavigation';
+import { normalizeEmployeeName, useEmployeeNames } from '../hooks/useEmployeeDirectory';
 import {
   Calendar, ChevronLeft, ChevronRight, Plus,
   Clock, Wrench, AlertTriangle, CheckCircle2,
-  X, User, ArrowLeft, Loader2, Inbox
+  X, User, ArrowLeft, Loader2, Inbox, Users
 } from 'lucide-react';
+import type { VacationPlan, VacationPlanKind } from '../types/vacation';
 
 // ═══════════════════════════════════════════
 // TYPES
@@ -51,6 +53,18 @@ const PRIORITY_CONFIG: Record<string, { color: string; bg: string; border: strin
   P3: { color: '#60a5fa', bg: 'bg-blue-500/8', border: 'border-blue-500/20' },
   P4: { color: '#94a3b8', bg: 'bg-slate-500/8', border: 'border-slate-500/20' },
 };
+
+const ABSENCE_KIND_OPTIONS: Array<{ value: VacationPlanKind; label: string }> = [
+  { value: 'vacation', label: 'Dovolená' },
+  { value: 'doctor', label: 'Lékař' },
+  { value: 'sick', label: 'Nemoc' },
+  { value: 'training', label: 'Školení' },
+  { value: 'other', label: 'Ostatní' },
+];
+
+function absenceKindLabel(kind?: VacationPlanKind): string {
+  return ABSENCE_KIND_OPTIONS.find((option) => option.value === kind)?.label || 'Dovolená';
+}
 
 // ═══════════════════════════════════════════
 // WEEK HELPERS
@@ -91,6 +105,24 @@ function formatDate(d: Date): string {
   return `${d.getDate()}.${d.getMonth() + 1}.`;
 }
 
+function formatFullDate(d: Date): string {
+  return d.toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric', year: 'numeric' });
+}
+
+function dateToInputValue(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function inputValueToDate(value: string): Date {
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(year, (month || 1) - 1, day || 1);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
 function formatMinutes(mins: number): string {
   if (!mins) return '';
   if (mins < 60) return `${mins} min`;
@@ -104,6 +136,21 @@ function toDate(val: any): Date | null {
   if (val.toDate) return val.toDate();
   if (val instanceof Date) return val;
   return new Date(val);
+}
+
+function isDateInRange(date: Date, startValue: any, endValue: any): boolean {
+  const start = toDate(startValue);
+  const end = toDate(endValue);
+  if (!start || !end) return false;
+  const current = new Date(date);
+  current.setHours(12, 0, 0, 0);
+  start.setHours(0, 0, 0, 0);
+  end.setHours(23, 59, 59, 999);
+  return current >= start && current <= end;
+}
+
+function vacationSortValue(plan: VacationPlan): number {
+  return toDate(plan.startDate)?.getTime() || 0;
 }
 
 // ═══════════════════════════════════════════
@@ -133,6 +180,29 @@ function useTasks() {
   }, []);
 
   return { tasks, loading };
+}
+
+function useVacationPlans(tenantId: string) {
+  const [vacations, setVacations] = useState<VacationPlan[]>([]);
+
+  useEffect(() => {
+    const unsub = onSnapshot(
+      collection(db, 'vacation_plans'),
+      (snap) => {
+        setVacations(
+          snap.docs
+            .map((d) => ({ id: d.id, ...d.data() } as VacationPlan))
+            .filter((item) => !item.tenantId || item.tenantId === tenantId)
+            .filter((item) => item.status !== 'cancelled')
+            .sort((a, b) => vacationSortValue(a) - vacationSortValue(b))
+        );
+      },
+      (err) => console.error('[Calendar] vacation_plans error:', err)
+    );
+    return () => unsub();
+  }, [tenantId]);
+
+  return vacations;
 }
 
 // ═══════════════════════════════════════════
@@ -334,15 +404,221 @@ function BacklogPanel({
 // MAIN PAGE
 // ═══════════════════════════════════════════
 
+function VacationCard({ vacation, onCancel }: { vacation: VacationPlan; onCancel?: () => void }) {
+  const start = toDate(vacation.startDate);
+  const end = toDate(vacation.endDate);
+  return (
+    <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-2.5">
+      <div className="flex items-start gap-2">
+        <Users className="w-4 h-4 text-emerald-300 mt-0.5 flex-shrink-0" />
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-bold text-white truncate">{vacation.workerName}</div>
+          <div className="text-[11px] text-emerald-200/80">
+            {absenceKindLabel(vacation.kind)} · {start ? formatFullDate(start) : '?'} - {end ? formatFullDate(end) : '?'}
+          </div>
+          {vacation.note && <div className="text-xs text-slate-300 mt-1 line-clamp-2">{vacation.note}</div>}
+        </div>
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="p-1 rounded hover:bg-white/10 text-slate-500 hover:text-red-300 transition"
+            title="Zrušit dovolenou"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function VacationModal({
+  isOpen,
+  onClose,
+  onSave,
+  defaultDate,
+  employeeOptions,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (input: { workerName: string; kind: VacationPlanKind; startDate: Date; endDate: Date; note: string }) => Promise<void>;
+  defaultDate: Date;
+  employeeOptions: string[];
+}) {
+  const [workerName, setWorkerName] = useState('');
+  const [kind, setKind] = useState<VacationPlanKind>('vacation');
+  const [startDate, setStartDate] = useState(dateToInputValue(defaultDate));
+  const [endDate, setEndDate] = useState(dateToInputValue(defaultDate));
+  const [note, setNote] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [showEmployeeOptions, setShowEmployeeOptions] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setStartDate(dateToInputValue(defaultDate));
+    setEndDate(dateToInputValue(defaultDate));
+  }, [defaultDate, isOpen]);
+
+  if (!isOpen) return null;
+
+  const matchedEmployee = employeeOptions.find((name) => normalizeEmployeeName(name) === normalizeEmployeeName(workerName));
+  const canSave = Boolean(matchedEmployee && startDate && endDate && !saving);
+
+  const handleSave = async () => {
+    const name = workerName.trim();
+    if (!name || !matchedEmployee || !startDate || !endDate) return;
+    const start = inputValueToDate(startDate);
+    const end = inputValueToDate(endDate);
+    if (end < start) return;
+    setSaving(true);
+    await onSave({ workerName: matchedEmployee, kind, startDate: start, endDate: end, note: note.trim() });
+    setSaving(false);
+    setWorkerName('');
+    setNote('');
+  };
+
+  const filteredEmployees = employeeOptions
+    .filter((name) => name.toLowerCase().includes(workerName.trim().toLowerCase()))
+    .slice(0, 8);
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-end md:items-center justify-center" onClick={onClose}>
+      <div
+        className="bg-slate-800 rounded-t-3xl md:rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between p-4 border-b border-white/10">
+          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+            <Users className="w-5 h-5 text-emerald-300" />
+            Naplánovat dovolenou
+          </h2>
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-white/10 text-slate-400">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-4 space-y-3">
+          <label className="block relative">
+            <span className="text-xs font-bold text-slate-400">Kdo bude pryč</span>
+            <input
+              value={workerName}
+              onChange={(e) => {
+                setWorkerName(e.target.value);
+                setShowEmployeeOptions(true);
+              }}
+              onFocus={() => setShowEmployeeOptions(true)}
+              placeholder="např. Jan Novák"
+              className="mt-1 w-full rounded-xl bg-slate-950/70 border border-white/10 px-3 py-3 text-white outline-none focus:border-emerald-400"
+            />
+            {showEmployeeOptions && filteredEmployees.length > 0 && (
+              <div className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-xl border border-white/10 bg-slate-950 shadow-2xl">
+                {filteredEmployees.map((name) => (
+                  <button
+                    key={name}
+                    type="button"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => {
+                      setWorkerName(name);
+                      setShowEmployeeOptions(false);
+                    }}
+                    className="block w-full px-3 py-2 text-left text-sm font-semibold text-slate-100 hover:bg-emerald-500/15"
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+            )}
+            {workerName.trim() && !matchedEmployee && (
+              <div className="mt-1 text-xs text-amber-300">
+                Vyber zaměstnance z administrace. Nové jméno se zakládá jen v Administraci.
+              </div>
+            )}
+          </label>
+
+          <label className="block">
+            <span className="text-xs font-bold text-slate-400">Typ absence</span>
+            <select
+              value={kind}
+              onChange={(e) => setKind(e.target.value as VacationPlanKind)}
+              className="mt-1 w-full rounded-xl bg-slate-950/70 border border-white/10 px-3 py-3 text-white outline-none focus:border-emerald-400"
+            >
+              {ABSENCE_KIND_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="text-xs font-bold text-slate-400">Od</span>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => {
+                  setStartDate(e.target.value);
+                  if (endDate < e.target.value) setEndDate(e.target.value);
+                }}
+                className="mt-1 w-full rounded-xl bg-slate-950/70 border border-white/10 px-3 py-3 text-white outline-none focus:border-emerald-400"
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs font-bold text-slate-400">Do</span>
+              <input
+                type="date"
+                value={endDate}
+                min={startDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="mt-1 w-full rounded-xl bg-slate-950/70 border border-white/10 px-3 py-3 text-white outline-none focus:border-emerald-400"
+              />
+            </label>
+          </div>
+
+          <label className="block">
+            <span className="text-xs font-bold text-slate-400">Poznámka</span>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={3}
+              placeholder="např. náhrada, směna, poznámka pro výrobu..."
+              className="mt-1 w-full rounded-xl bg-slate-950/70 border border-white/10 px-3 py-3 text-white outline-none focus:border-emerald-400"
+            />
+          </label>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 p-4 border-t border-white/10">
+          <button type="button" onClick={onClose} className="min-h-12 rounded-xl bg-white/5 border border-white/10 text-slate-300 font-bold">
+            Zrušit
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={!canSave}
+            className="min-h-12 rounded-xl bg-emerald-500 text-white font-bold disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
+            Uložit
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function CalendarPage() {
-  const navigate = useNavigate();
+  const goBack = useBackNavigation('/');
   const { user } = useAuthContext();
+  const tenantId = user?.tenantId ?? 'main_firm';
   const { tasks, loading } = useTasks();
+  const vacations = useVacationPlans(tenantId);
+  const employeeOptions = useEmployeeNames({ tenantId });
 
   // Current week state
   const [currentMonday, setCurrentMonday] = useState(() => getMonday(new Date()));
   const [expandedDay, setExpandedDay] = useState<number | null>(null);
   const [showBacklog, setShowBacklog] = useState(false);
+  const [showVacationModal, setShowVacationModal] = useState(false);
+  const [vacationDefaultDate, setVacationDefaultDate] = useState(new Date());
 
   const weekDays = useMemo(() => getWeekDays(currentMonday), [currentMonday]);
   const weekNumber = getISOWeekNumber(currentMonday);
@@ -376,9 +652,14 @@ export default function CalendarPage() {
       });
   };
 
+  const getVacationsForDay = (date: Date): VacationPlan[] => {
+    return vacations.filter((vacation) => isDateInRange(date, vacation.startDate, vacation.endDate));
+  };
+
   // Week stats
   const weekTasks = weekDays.flatMap((d) => getTasksForDay(d));
   const weekMinutes = weekTasks.reduce((sum, t) => sum + (t.estimatedMinutes || 0), 0);
+  const weekVacations = vacations.filter((vacation) => weekDays.some((day) => isDateInRange(day, vacation.startDate, vacation.endDate)));
 
   // ─────────────────────────────────────────
   // ACTIONS
@@ -412,7 +693,7 @@ export default function CalendarPage() {
   const handleComplete = async (taskId: string) => {
     try {
       await updateDoc(doc(db, 'tasks', taskId), {
-        status: 'done',
+        status: 'completed',
         completedAt: Timestamp.now(),
         completedBy: user?.displayName || 'Unknown',
         updatedAt: Timestamp.now(),
@@ -420,6 +701,39 @@ export default function CalendarPage() {
       });
     } catch (err) {
       console.error('Complete failed:', err);
+    }
+  };
+
+  const handleSaveVacation = async (input: { workerName: string; kind: VacationPlanKind; startDate: Date; endDate: Date; note: string }) => {
+    try {
+      await addDoc(collection(db, 'vacation_plans'), {
+        tenantId,
+        workerName: input.workerName,
+        kind: input.kind,
+        startDate: Timestamp.fromDate(input.startDate),
+        endDate: Timestamp.fromDate(input.endDate),
+        note: input.note,
+        status: 'planned',
+        createdBy: user?.uid || user?.id || '',
+        createdByName: user?.displayName || 'Neznámý',
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      });
+      setShowVacationModal(false);
+    } catch (err) {
+      console.error('Save vacation failed:', err);
+    }
+  };
+
+  const handleCancelVacation = async (vacationId: string) => {
+    try {
+      await updateDoc(doc(db, 'vacation_plans', vacationId), {
+        status: 'cancelled',
+        updatedAt: Timestamp.now(),
+        updatedBy: user?.uid || user?.id || '',
+      });
+    } catch (err) {
+      console.error('Cancel vacation failed:', err);
     }
   };
 
@@ -454,7 +768,7 @@ export default function CalendarPage() {
         {/* Header */}
         <div className="flex items-center gap-3 mb-3">
           <button
-            onClick={() => navigate('/')}
+            onClick={() => goBack()}
             className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 hover:text-white transition"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -468,6 +782,17 @@ export default function CalendarPage() {
               {weekTasks.length} naplánováno · {backlogTasks.length} v backlogu
             </p>
           </div>
+          <button
+            type="button"
+            onClick={() => {
+              setVacationDefaultDate(new Date());
+              setShowVacationModal(true);
+            }}
+            className="h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 px-3 text-sm font-bold text-emerald-200 flex items-center gap-2"
+          >
+            <Users className="w-4 h-4" />
+            Dovolená
+          </button>
           {loading && <Loader2 className="w-5 h-5 text-slate-500 animate-spin" />}
         </div>
 
@@ -509,7 +834,7 @@ export default function CalendarPage() {
           </div>
 
           {/* Stats */}
-          <div className="mt-3 grid grid-cols-3 gap-2">
+          <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
             <div className="bg-white/5 p-2.5 rounded-xl text-center">
               <div className="text-lg font-bold text-white">{weekTasks.length}</div>
               <div className="text-[10px] text-slate-500">Naplánováno</div>
@@ -525,6 +850,16 @@ export default function CalendarPage() {
               <div className="text-lg font-bold text-blue-400">{backlogTasks.length}</div>
               <div className="text-[10px] text-blue-400/70">V backlogu →</div>
             </button>
+            <button
+              onClick={() => {
+                setVacationDefaultDate(today);
+                setShowVacationModal(true);
+              }}
+              className="bg-emerald-500/10 border border-emerald-500/20 p-2.5 rounded-xl text-center hover:bg-emerald-500/15 transition"
+            >
+              <div className="text-lg font-bold text-emerald-300">{weekVacations.length}</div>
+              <div className="text-[10px] text-emerald-300/70">Dovolené</div>
+            </button>
           </div>
         </div>
 
@@ -533,6 +868,7 @@ export default function CalendarPage() {
           {weekDays.slice(1, 6).map((date, _i) => {
             const dayIndex = date.getDay(); // 1-5 (Po-Pá)
             const dayTasks = getTasksForDay(date);
+            const dayVacations = getVacationsForDay(date);
             const dayMinutes = dayTasks.reduce((s, t) => s + (t.estimatedMinutes || 0), 0);
             const isToday = isSameDay(date, today);
             const isPast = date < today && !isToday;
@@ -578,6 +914,11 @@ export default function CalendarPage() {
                     {dayTasks.some((t) => t.priority === 'P2') && (
                       <span className="w-2 h-2 rounded-full bg-amber-500" />
                     )}
+                    {dayVacations.length > 0 && (
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/25 text-[10px] font-bold text-emerald-200">
+                        {dayVacations.length}
+                      </span>
+                    )}
                     <ChevronLeft
                       className={`w-4 h-4 text-slate-500 transition ${
                         isExpanded ? '-rotate-90' : 'rotate-180'
@@ -589,6 +930,18 @@ export default function CalendarPage() {
                 {/* Expanded tasks */}
                 {isExpanded && (
                   <div className="px-3 pb-3 border-t border-white/[0.06] pt-2 space-y-2">
+                    {dayVacations.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="text-[10px] uppercase tracking-wider font-bold text-emerald-300">Dovolená</div>
+                        {dayVacations.map((vacation) => (
+                          <VacationCard
+                            key={vacation.id}
+                            vacation={vacation}
+                            onCancel={() => handleCancelVacation(vacation.id)}
+                          />
+                        ))}
+                      </div>
+                    )}
                     {dayTasks.length === 0 ? (
                       <div className="text-center py-4 text-slate-500 text-sm">
                         Žádné úkoly na tento den
@@ -608,6 +961,15 @@ export default function CalendarPage() {
                       className="w-full py-2 border border-dashed border-white/10 rounded-xl text-slate-500 text-sm font-medium hover:border-blue-500/30 hover:text-blue-400 transition flex items-center justify-center gap-2"
                     >
                       <Plus className="w-4 h-4" /> Přidat z backlogu
+                    </button>
+                    <button
+                      onClick={() => {
+                        setVacationDefaultDate(date);
+                        setShowVacationModal(true);
+                      }}
+                      className="w-full py-2 border border-dashed border-emerald-500/20 rounded-xl text-emerald-300 text-sm font-medium hover:border-emerald-500/40 hover:bg-emerald-500/10 transition flex items-center justify-center gap-2"
+                    >
+                      <Users className="w-4 h-4" /> Naplánovat dovolenou
                     </button>
                   </div>
                 )}
@@ -641,6 +1003,13 @@ export default function CalendarPage() {
         onClose={() => setShowBacklog(false)}
         onSchedule={handleSchedule}
         weekDays={weekDays}
+      />
+      <VacationModal
+        isOpen={showVacationModal}
+        onClose={() => setShowVacationModal(false)}
+        onSave={handleSaveVacation}
+        defaultDate={vacationDefaultDate}
+        employeeOptions={employeeOptions}
       />
     </div>
   );

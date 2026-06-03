@@ -1,6 +1,6 @@
 // src/components/ui/BottomSheet.tsx
 // VIKRR — Asset Shield — Unified Modal/Sheet component
-// Standardizovaný layout pro všechny formuláře
+// Standardizovaný layout pro všechny formuláře (světlý vik-* vzhled).
 
 import { Loader2, X } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -25,28 +25,28 @@ export default function BottomSheet({ title, isOpen, onClose, children, titleAct
         }
       `}</style>
       <div
-        className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-md flex items-center justify-center p-4"
+        className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-md flex items-center justify-center p-4"
         onClick={onClose}
       >
         <div
           onClick={(e) => e.stopPropagation()}
-          className="w-full max-w-lg max-h-[85vh] bg-slate-800 rounded-3xl overflow-y-auto shadow-2xl border border-white/10"
+          className="w-full max-w-lg max-h-[85vh] bg-white rounded-3xl overflow-y-auto shadow-2xl border border-slate-200"
           style={{ animation: 'nominalScaleIn 0.2s ease-out' }}
         >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 pb-4 pt-5 border-b border-white/10">
-          <h2 className="text-xl font-bold text-white flex-1 min-w-0 truncate">{title}</h2>
+        <div className="flex items-center justify-between px-6 pb-4 pt-5 border-b border-slate-200">
+          <h2 className="text-xl font-bold text-slate-950 flex-1 min-w-0 truncate">{title}</h2>
           {titleActions && <div className="flex items-center gap-1.5 ml-2 flex-shrink-0">{titleActions}</div>}
           <button
             onClick={onClose}
-            className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-slate-400 hover:text-white transition min-w-[36px] min-h-[36px] ml-2 flex-shrink-0"
+            className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-slate-200 transition min-w-[36px] min-h-[36px] ml-2 flex-shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="px-6 py-6">
+        <div className="px-6 py-6 text-slate-950">
           {children}
         </div>
       </div>
@@ -61,9 +61,9 @@ export default function BottomSheet({ title, isOpen, onClose, children, titleAct
 
 const INPUT_BASE_CLASS = `
   w-full px-4 py-3 rounded-xl
-  bg-white/5 border border-white/10
-  text-white text-[15px] placeholder-slate-600
-  focus:outline-none focus:border-orange-500/50 focus:bg-white/8
+  bg-slate-50 border border-slate-300
+  text-slate-950 text-[15px] placeholder-slate-400
+  focus:outline-none focus:border-emerald-600 focus:bg-white focus:ring-2 focus:ring-emerald-600/15
   transition min-h-[48px]
 `;
 
@@ -90,8 +90,8 @@ export function FormField({
 }: FormFieldProps) {
   return (
     <div className="mb-4">
-      <label className="block text-sm text-slate-400 font-medium mb-1.5">
-        {label} {required && <span className="text-red-400">*</span>}
+      <label className="block text-sm text-slate-600 font-medium mb-1.5">
+        {label} {required && <span className="text-red-600">*</span>}
       </label>
       {type === 'select' ? (
         <select
@@ -100,9 +100,9 @@ export function FormField({
           className={INPUT_BASE_CLASS}
           style={{ appearance: 'auto' }}
         >
-          <option value="" className="bg-slate-800">— vybrat —</option>
+          <option value="" className="bg-white">— vybrat —</option>
           {options?.map((o) => (
-            <option key={o.value} value={o.value} className="bg-slate-800">
+            <option key={o.value} value={o.value} className="bg-white">
               {o.label}
             </option>
           ))}
@@ -125,8 +125,8 @@ export function FormField({
               onClick={() => onChange(o.value)}
               className={`py-2.5 rounded-xl text-sm font-semibold border transition min-h-[44px] ${
                 value === o.value
-                  ? 'bg-orange-500/20 border-orange-500/40 text-orange-400'
-                  : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'
+                  ? 'bg-emerald-50 border-emerald-500 text-emerald-700'
+                  : 'bg-slate-50 border-slate-300 text-slate-600 hover:bg-slate-100'
               }`}
             >
               {o.label}
@@ -168,20 +168,20 @@ export function FormFooter({
   cancelLabel = 'Zrušit',
   loading,
   disabled,
-  color = 'orange',
+  color = 'green',
 }: FormFooterProps) {
   const colorClass =
     color === 'red' ? 'from-red-500 to-red-600' :
-    color === 'green' ? 'from-emerald-500 to-emerald-600' :
     color === 'blue' ? 'from-blue-500 to-blue-600' :
-    'from-orange-500 to-amber-500';
+    color === 'orange' ? 'from-orange-500 to-amber-500' :
+    'from-emerald-500 to-emerald-600';
 
   return (
-    <div className="flex items-center gap-3 pt-4 mt-2 border-t border-white/10">
+    <div className="flex items-center gap-3 pt-4 mt-2 border-t border-slate-200">
       <button
         type="button"
         onClick={onCancel}
-        className="flex-1 py-3 rounded-2xl bg-white/5 border border-white/10 text-slate-400 font-semibold text-base hover:bg-white/10 transition active:scale-[0.98] min-h-[48px]"
+        className="flex-1 py-3 rounded-2xl bg-slate-100 border border-slate-300 text-slate-700 font-semibold text-base hover:bg-slate-200 transition active:scale-[0.98] min-h-[48px]"
       >
         {cancelLabel}
       </button>
@@ -209,11 +209,11 @@ interface SubmitButtonProps {
   color?: 'orange' | 'red' | 'green';
 }
 
-export function SubmitButton({ label, onClick, loading, color = 'orange' }: SubmitButtonProps) {
+export function SubmitButton({ label, onClick, loading, color = 'green' }: SubmitButtonProps) {
   const colorClass =
     color === 'red' ? 'from-red-500 to-red-600' :
-    color === 'green' ? 'from-emerald-500 to-emerald-600' :
-    'from-orange-500 to-amber-500';
+    color === 'orange' ? 'from-orange-500 to-amber-500' :
+    'from-emerald-500 to-emerald-600';
 
   return (
     <button

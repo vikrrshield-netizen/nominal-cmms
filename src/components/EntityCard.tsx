@@ -177,6 +177,12 @@ export function EntityCardCompact({ entity, blueprint, onClick }: EntityCardComp
     () => computeEntityStatus(entity, blueprint),
     [entity, blueprint]
   );
+  const compactSemaphoreText: Record<SemaphoreColor, string> = {
+    green: 'text-emerald-700',
+    yellow: 'text-amber-700',
+    red: 'text-red-700',
+    gray: 'text-slate-600',
+  };
 
   // Klíčová pole k zobrazení (date/number s alert)
   const keyFields = useMemo(() => {
@@ -196,7 +202,7 @@ export function EntityCardCompact({ entity, blueprint, onClick }: EntityCardComp
   return (
     <button
       onClick={onClick}
-      className="w-full bg-slate-800/60 backdrop-blur-sm rounded-2xl p-4 border border-slate-700/50 text-left hover:bg-slate-700/60 transition-all active:scale-[0.98] min-h-[120px]"
+      className="w-full bg-white rounded-2xl p-4 border border-slate-200 text-left shadow-sm hover:border-emerald-300 hover:bg-emerald-50/40 transition-all active:scale-[0.98] min-h-[120px]"
     >
       <div className="flex items-start gap-3">
         {/* Icon + status */}
@@ -215,7 +221,7 @@ export function EntityCardCompact({ entity, blueprint, onClick }: EntityCardComp
         {/* Content */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <h3 className="font-bold text-white truncate">{entity.name}</h3>
+            <h3 className="font-bold text-slate-950 truncate">{entity.name}</h3>
           </div>
           {entity.code && (
             <div className="text-xs text-slate-500 font-mono mb-2">{entity.code}</div>
@@ -226,8 +232,8 @@ export function EntityCardCompact({ entity, blueprint, onClick }: EntityCardComp
             {keyFields.map((f) => (
               <div key={f.key} className="flex items-center gap-2 text-xs">
                 <SemaphoreDot color={f.semaphore} />
-                <span className="text-slate-400">{f.label}:</span>
-                <span className={`font-medium ${SEMAPHORE_TEXT[f.semaphore]}`}>
+                <span className="text-slate-500">{f.label}:</span>
+                <span className={`font-medium ${compactSemaphoreText[f.semaphore]}`}>
                   {f.type === 'date'
                     ? (() => {
                         const days = daysUntilDate(f.value);
@@ -246,13 +252,13 @@ export function EntityCardCompact({ entity, blueprint, onClick }: EntityCardComp
 
           {/* Assigned / tags */}
           {entity.data?.assigned_to && entity.data.assigned_to !== 'Pool (sdílený)' && (
-            <div className="mt-2 text-xs text-blue-400">
+            <div className="mt-2 text-xs text-emerald-700">
               → {entity.data.assigned_to}
             </div>
           )}
         </div>
 
-        <ChevronRight className="w-5 h-5 text-slate-600 flex-shrink-0 self-center" />
+        <ChevronRight className="w-5 h-5 text-slate-400 flex-shrink-0 self-center" />
       </div>
     </button>
   );
