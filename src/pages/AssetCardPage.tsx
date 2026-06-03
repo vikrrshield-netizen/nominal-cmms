@@ -808,7 +808,7 @@ export default function AssetCardPage() {
         dateValue: log.performedAt || log.createdAt,
         time: historyTime(log.performedAt || log.createdAt),
         color: '#14b8a6',
-        linkWarning: log.assetId ? '' : 'Napojeno podle textu. Pro audit je lepsi otevrit denik praci a napojit zapis na kartu.',
+        linkWarning: log.assetId ? '' : 'Napojeno podle textu. Pro audit je lepší otevřít deník práce a napojit zápis na kartu.',
       };
     });
 
@@ -828,7 +828,7 @@ export default function AssetCardPage() {
       type: 'event' as const,
       typeLabel: 'Teplota',
       title: `${log.temperatureC} °C`,
-      detail: [log.extruderName ? `Extruder: ${log.extruderName}` : '', log.userName, log.note, log.photoUrl ? 'Fotka priložena' : ''].filter(Boolean).join(' | '),
+      detail: [log.extruderName ? `Extruder: ${log.extruderName}` : '', log.userName, log.note, log.photoUrl ? 'Fotka přiložena' : ''].filter(Boolean).join(' | '),
       dateValue: log.measuredAt,
       time: historyTime(log.measuredAt),
       color: '#0ea5e9',
@@ -1199,7 +1199,7 @@ export default function AssetCardPage() {
                 {[
                   { id: 'asset-section-basic', label: 'Zaklad' },
                   { id: 'asset-section-links', label: 'Vazby' },
-                  ...(isGearbox ? [{ id: 'asset-section-gearbox', label: 'Prevodovka' }] : []),
+                  ...(isGearbox ? [{ id: 'asset-section-gearbox', label: 'Převodovka' }] : []),
                   { id: 'asset-section-technical', label: 'Technika' },
                   { id: 'asset-section-service', label: 'Servis' },
                   { id: 'asset-section-documents', label: 'Dokumenty' },
@@ -1456,7 +1456,7 @@ export default function AssetCardPage() {
                           onClick={() => setProblemOpen(true)}
                           style={{ marginTop: assetV2.lastTemperatureC != null ? 10 : 0, minHeight: 44, width: '100%', borderRadius: 14, border: '1px solid #fecaca', background: '#fef2f2', color: '#b91c1c', fontWeight: 800 }}
                         >
-                          NahlĂˇsit problĂ©m
+                          Nahlásit problém
                         </button>
                       )}
                     </div>
