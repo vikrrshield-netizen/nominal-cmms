@@ -1776,13 +1776,13 @@ export default function WorkDiaryPage() {
                       <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{log.content}</p>
                       {expanded && (
                         <div
-                          className="mt-4 rounded-2xl border border-white/10 bg-slate-950/60 p-4 space-y-4"
+                          className="mt-4 rounded-2xl border border-[#e2d8c9] bg-[#fbf9f4] p-4 space-y-4"
                           onClick={(event) => event.stopPropagation()}
                         >
                           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                             <div>
                               <div className="text-xs font-bold uppercase tracking-wide text-slate-500">Detail zápisu</div>
-                              <div className="mt-1 text-base font-bold text-white">{log.assetName || log.location || typeLabel(log.type)}</div>
+                              <div className="mt-1 text-base font-bold text-slate-950">{log.assetName || log.location || typeLabel(log.type)}</div>
                             </div>
                             <button
                               type="button"
@@ -1794,9 +1794,9 @@ export default function WorkDiaryPage() {
                           </div>
 
                           {canRepairLink && matchedLogAsset && (
-                            <div className="rounded-xl border border-blue-500/25 bg-blue-500/10 p-3 text-sm text-blue-100">
+                            <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
                               <div className="font-bold">Zápis ještě není pevně napojený na kartotéku.</div>
-                              <div className="mt-1 text-blue-200/80">
+                              <div className="mt-1 text-blue-700">
                                 Systém našel pravděpodobnou kartu: {matchedLogAsset.code ? `${matchedLogAsset.code} - ` : ''}{matchedLogAsset.name}
                               </div>
                               <button
@@ -1812,41 +1812,41 @@ export default function WorkDiaryPage() {
                           )}
 
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                            <div className="rounded-xl border border-white/10 bg-slate-900/70 p-3">
+                            <div className="rounded-xl border border-slate-200 bg-white p-3">
                               <div className="text-xs text-slate-600">Typ</div>
-                              <div className="font-bold text-slate-100">{typeLabel(log.type)}</div>
+                              <div className="font-bold text-slate-950">{typeLabel(log.type)}</div>
                             </div>
-                            <div className="rounded-xl border border-white/10 bg-slate-900/70 p-3">
+                            <div className="rounded-xl border border-slate-200 bg-white p-3">
                               <div className="text-xs text-slate-600">Kdy provedeno</div>
-                              <div className="font-bold text-slate-100">{formatDate(log.performedAt || log.createdAt)}</div>
+                              <div className="font-bold text-slate-950">{formatDate(log.performedAt || log.createdAt)}</div>
                             </div>
-                            <div className="rounded-xl border border-white/10 bg-slate-900/70 p-3">
+                            <div className="rounded-xl border border-slate-200 bg-white p-3">
                               <div className="text-xs text-slate-600">Kdo</div>
-                              <div className="font-bold text-slate-100">{logWorkers.join(', ') || '-'}</div>
+                              <div className="font-bold text-slate-950">{logWorkers.join(', ') || '-'}</div>
                             </div>
-                            <div className="rounded-xl border border-white/10 bg-slate-900/70 p-3">
+                            <div className="rounded-xl border border-slate-200 bg-white p-3">
                               <div className="text-xs text-slate-600">Čas práce</div>
-                              <div className="font-bold text-slate-100">{formatDuration(Math.round((log.hoursWorked || 0) * 60))}</div>
+                              <div className="font-bold text-slate-950">{formatDuration(Math.round((log.hoursWorked || 0) * 60))}</div>
                             </div>
-                            <div className="rounded-xl border border-white/10 bg-slate-900/70 p-3">
+                            <div className="rounded-xl border border-slate-200 bg-white p-3">
                               <div className="text-xs text-slate-600">Kde</div>
-                              <div className="font-bold text-slate-100">{log.location || '-'}</div>
+                              <div className="font-bold text-slate-950">{log.location || '-'}</div>
                             </div>
-                            <div className="rounded-xl border border-white/10 bg-slate-900/70 p-3">
+                            <div className="rounded-xl border border-slate-200 bg-white p-3">
                               <div className="text-xs text-slate-600">Zařízení / věc</div>
-                              <div className="font-bold text-slate-100">{log.assetName || '-'}</div>
+                              <div className="font-bold text-slate-950">{log.assetName || '-'}</div>
                             </div>
                           </div>
 
-                          <div className="rounded-xl border border-white/10 bg-slate-900/70 p-3">
+                          <div className="rounded-xl border border-slate-200 bg-white p-3">
                             <div className="text-xs text-slate-600">Popis práce</div>
-                            <div className="mt-1 text-sm text-slate-100 whitespace-pre-wrap leading-relaxed">{log.content || '-'}</div>
+                            <div className="mt-1 text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">{log.content || '-'}</div>
                           </div>
 
                           <div className={`rounded-xl border px-3 py-2 text-sm font-bold ${
                             cleaningEvidenceConfirmed(log)
-                              ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-200'
-                              : 'border-red-500/25 bg-red-500/10 text-red-200'
+                              ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                              : 'border-red-200 bg-red-50 text-red-800'
                           }`}>
                             {cleaningEvidenceConfirmed(log)
                               ? cleaningEvidenceLabel(log)

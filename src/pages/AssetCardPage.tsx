@@ -182,9 +182,18 @@ function normalizeLookup(value: unknown): string {
     .replace(/\s+/g, ' ');
 }
 
-function isRoomLikeAsset(asset: Asset): boolean {
+function isRoomLikeAsset(asset: { entityType?: string; category?: string }): boolean {
   const type = normalizeLookup(`${asset.entityType || ''} ${asset.category || ''}`);
   return type.includes('mistnost') || type.includes('room');
+}
+
+function isBuildingLikeAsset(asset: { name?: string; entityType?: string; category?: string }): boolean {
+  const type = normalizeLookup(`${asset.name || ''} ${asset.entityType || ''} ${asset.category || ''}`);
+  return type.includes('budova') || type.includes('building');
+}
+
+function isContainerAsset(asset: { name?: string; entityType?: string; category?: string }): boolean {
+  return isRoomLikeAsset(asset) || isBuildingLikeAsset(asset);
 }
 
 function assetLocationAliases(asset: Asset): Set<string> {
@@ -319,6 +328,22 @@ export default function AssetCardPage() {
       .filter(Boolean) as AssetV2[],
     [allAssetsV2, linkedAssetIds]
   );
+  const descendantAssetIds = useMemo(() => {
+    if (!assetId || !assetV2 || !isContainerAsset(assetV2)) return [];
+    const ids = new Set<string>();
+    let changed = true;
+    while (changed) {
+      changed = false;
+      allAssetsV2.forEach((item) => {
+        if (item.isDeleted || ids.has(item.id)) return;
+        if (item.parentId === assetId || (item.parentId && ids.has(item.parentId))) {
+          ids.add(item.id);
+          changed = true;
+        }
+      });
+    }
+    return Array.from(ids);
+  }, [allAssetsV2, assetId, assetV2]);
   const relationOptions = useMemo(() => {
     const q = relationSearch.trim().toLowerCase();
     const selected = new Set(linkedToForm);
@@ -683,8 +708,8 @@ export default function AssetCardPage() {
   useEffect(() => {
     if (!assetId || !asset) return;
     const assetName = normalizeLookup(asset.name);
-    const roomCard = isRoomLikeAsset(asset);
-    const relatedIds = new Set(linkedAssetIds);
+    const containerCard = isContainerAsset(assetV2 || asset);
+    const relatedIds = new Set([...linkedAssetIds, ...descendantAssetIds]);
     const relatedNames = new Set(linkedAssets.map((item) => normalizeLookup(item.name)).filter(Boolean));
 
     return subscribeToRecentWorkLogs((logs) => {
@@ -695,16 +720,15 @@ export default function AssetCardPage() {
           if (log.assetId) return false;
 
           const logAssetName = normalizeLookup(log.assetName);
-          const logLocation = normalizeLookup(log.location);
           const locationFits = logLocationFitsAsset(log, asset);
+          if (containerCard) return false;
           if (assetName && logAssetName === assetName && locationFits) return true;
           if (logAssetName && relatedNames.has(logAssetName) && locationFits) return true;
-          if (roomCard && !logAssetName && logLocation && locationFits) return true;
           return false;
         })
       );
     }, 300);
-  }, [asset, assetId, linkedAssetIds, linkedAssets]);
+  }, [asset, assetId, assetV2, descendantAssetIds, linkedAssetIds, linkedAssets]);
 
   // Revision alerts
   const expiredRevisions = useMemo(

@@ -105,3 +105,29 @@ Nova funkce je hotova az tehdy, kdyz:
 6. jde dohledat v reportu
 
 Bez toho je to jen operativni funkce, ne IFS/Tesco dukaz.
+
+## 7. Auditni checkpoint 2026-06-03
+
+### Hotovo / pokryto v kodu
+
+- Zmeny prav v administraci se zapisuji do `audit_logs` jako `PERMISSION_CHANGE`.
+- Predani smeny ma potvrzeni precteni pres `acknowledgedBy` a `acknowledgedByName`.
+- Ukol umi nest food-safety riziko, typ nebezpeci a dopad.
+- Ukol umi priznak docasne opravy a termin trvaleho reseni.
+- Dokonceni ukolu umi nest uklid po oprave (`cleaningDone`, `cleaningChecked`, `cleaningNote`).
+- Reporty zobrazuji food-safety rizika, docasne opravy a hygienicky sign-off.
+- Rodny list uz nezobrazuje u mistnosti/budov volne textove dohledane denikove zapisy jako auditni vazbu.
+
+### Zbyva jako priorita
+
+1. Registr skla a krehkeho plastu.
+2. Food-grade flag u maziv a chemie ve skladu.
+3. Samostatna kalibrace meridel s certifikatem, intervalem a odpovednou osobou.
+4. Samostatny modul / evidence pro metal detekci.
+5. Audit pack export pro IFS/Tesco za obdobi.
+6. Retencni politika zaznamu.
+7. Evidence skoleni po osobach.
+
+### Technicke pravidlo pro historii
+
+Historie karty smi byt auditni dukaz jen tehdy, kdyz je zaznam napojen pres `assetId`, `taskId`, kontrolni log nebo jasnou systemovou vazbu. Volne textove dohledani je jen pomocna migracni funkce pro konkretni stroje a nema byt pouzite jako dukaz pro mistnosti nebo budovy.
