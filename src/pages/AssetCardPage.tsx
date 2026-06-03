@@ -695,10 +695,11 @@ export default function AssetCardPage() {
           if (log.assetId) return false;
 
           const logAssetName = normalizeLookup(log.assetName);
+          const logLocation = normalizeLookup(log.location);
           const locationFits = logLocationFitsAsset(log, asset);
           if (assetName && logAssetName === assetName && locationFits) return true;
           if (logAssetName && relatedNames.has(logAssetName) && locationFits) return true;
-          if (roomCard && locationFits) return true;
+          if (roomCard && !logAssetName && logLocation && locationFits) return true;
           return false;
         })
       );
