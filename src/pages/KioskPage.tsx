@@ -361,6 +361,7 @@ export default function KioskPage() {
   const [gearboxProblemNote, setGearboxProblemNote] = useState('');
   const [dataloggerTemperature, setDataloggerTemperature] = useState('');
   const [dataloggerHumidity, setDataloggerHumidity] = useState('');
+  const [dataloggerRawMaterial, setDataloggerRawMaterial] = useState('');
   const [dataloggerMeasuredAt, setDataloggerMeasuredAt] = useState(() => new Date().toISOString().slice(0, 16));
   const [dataloggerNote, setDataloggerNote] = useState('');
 
@@ -869,6 +870,7 @@ export default function KioskPage() {
     setGearboxProblemNote('');
     setDataloggerTemperature('');
     setDataloggerHumidity('');
+    setDataloggerRawMaterial('');
     setDataloggerMeasuredAt(new Date().toISOString().slice(0, 16));
     setDataloggerNote('');
     setSubmitError('');
@@ -1089,6 +1091,7 @@ export default function KioskPage() {
         user,
         temperatureC,
         humidityPct,
+        rawMaterial: dataloggerRawMaterial.trim(),
         measuredAt: new Date(dataloggerMeasuredAt),
         roomName: getAssetRoom(selectedAsset, assets),
         note: dataloggerNote.trim(),
@@ -2262,6 +2265,16 @@ export default function KioskPage() {
                 ))}
               </div>
             </div>
+
+            <label className="block">
+              <span className="mb-1 block text-xs font-black text-slate-200">Surovina / produkt</span>
+              <input
+                value={dataloggerRawMaterial}
+                onChange={(event) => setDataloggerRawMaterial(event.target.value)}
+                placeholder="Volitelně: mouka, směs, šarže..."
+                className="w-full rounded-xl border border-white/10 bg-slate-950 p-2.5 text-base text-white outline-none focus:border-teal-400"
+              />
+            </label>
 
             <label className="block">
               <span className="mb-1 block text-xs font-black text-slate-200">Datum a čas měření</span>

@@ -67,11 +67,13 @@ export async function addDataloggerTemperatureLog(input: {
   user?: AppUser | null;
   temperatureC: number;
   humidityPct?: number;
+  rawMaterial?: string;
   measuredAt: Date;
   roomName?: string;
   note?: string;
 }) {
   const roomName = input.roomName?.trim() || dataloggerRoom(input.datalogger);
+  const rawMaterial = input.rawMaterial?.trim() || '';
   await addDoc(collection(db, 'datalogger_temperature_logs'), {
     tenantId: input.tenantId,
     dataloggerId: input.datalogger.id,
@@ -81,6 +83,7 @@ export async function addDataloggerTemperatureLog(input: {
     location: input.datalogger.location || input.datalogger.areaName || '',
     temperatureC: input.temperatureC,
     ...(typeof input.humidityPct === 'number' ? { humidityPct: input.humidityPct } : {}),
+    ...(rawMaterial ? { rawMaterial } : {}),
     measuredAt: Timestamp.fromDate(input.measuredAt),
     userId: userId(input.user),
     userName: userName(input.user),

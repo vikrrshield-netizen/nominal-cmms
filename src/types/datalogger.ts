@@ -10,6 +10,7 @@ export interface DataloggerTemperatureLog {
   location?: string;
   temperatureC: number;
   humidityPct?: number;
+  rawMaterial?: string;
   measuredAt: Date | Timestamp;
   userId: string;
   userName: string;

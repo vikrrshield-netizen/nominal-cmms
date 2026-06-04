@@ -128,6 +128,10 @@ function latestLogFor(asset: Asset, logs: DataloggerTemperatureLog[]): Datalogge
   return logs.find((log) => log.dataloggerId === asset.id) || null;
 }
 
+function logsForAsset(asset: Asset, logs: DataloggerTemperatureLog[], count = 8): DataloggerTemperatureLog[] {
+  return logs.filter((log) => log.dataloggerId === asset.id).slice(0, count);
+}
+
 function temperatureLevel(asset: Asset, log: DataloggerTemperatureLog | null): DataloggerTemperatureLevel {
   if (isWeekend() && !(log && isToday(log.measuredAt))) return 'not_required';
   if (!log) return 'missing';
@@ -357,12 +361,14 @@ export default function DataloggersPage() {
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {filteredDataloggers.map((asset) => {
             const latest = latestLogFor(asset, tenantLogs);
+            const history = logsForAsset(asset, tenantLogs);
             const level = temperatureLevel(asset, latest);
             return (
               <DataloggerCard
                 key={asset.id}
                 asset={asset}
                 latest={latest}
+                history={history}
                 level={level}
                 canWrite={canWrite}
                 canAssignRoom={canAssignRoom}
@@ -426,6 +432,7 @@ function StatCard({
 function DataloggerCard({
   asset,
   latest,
+  history,
   level,
   canWrite,
   canAssignRoom,
@@ -434,6 +441,7 @@ function DataloggerCard({
 }: {
   asset: Asset;
   latest: DataloggerTemperatureLog | null;
+  history: DataloggerTemperatureLog[];
   level: DataloggerTemperatureLevel;
   canWrite: boolean;
   canAssignRoom: boolean;
@@ -477,8 +485,13 @@ function DataloggerCard({
             {latest ? `${latest.temperatureC} °C` : '—'}
           </div>
           <div className="mt-1 text-xs font-semibold text-slate-500">
-            {latest ? formatDateTime(latest.measuredAt) : level === 'not_required' ? 'víkend bez obsluhy' : 'bez zápisu'}
+            {latest ? `Naposledy ${formatDateTime(latest.measuredAt)}` : level === 'not_required' ? 'víkend bez obsluhy' : 'bez zápisu'}
           </div>
+          {latest?.rawMaterial && (
+            <div className="mt-2 truncate text-xs font-black text-emerald-700">
+              Surovina: {latest.rawMaterial}
+            </div>
+          )}
         </div>
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
           <div className="text-xs font-black uppercase tracking-wide text-slate-500">Vlhkost / limit</div>
@@ -494,6 +507,8 @@ function DataloggerCard({
           </div>
         </div>
       </div>
+
+      <MiniTemperatureTrend history={history} />
 
       {latest?.note && (
         <div className="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
@@ -528,6 +543,63 @@ function DataloggerCard({
         </div>
       )}
     </article>
+  );
+}
+
+function MiniTemperatureTrend({ history }: { history: DataloggerTemperatureLog[] }) {
+  const pointsSource = history
+    .filter((log) => Number.isFinite(log.temperatureC))
+    .slice(0, 8)
+    .reverse();
+
+  if (pointsSource.length < 2) {
+    return (
+      <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-500">
+        Trend teplot se ukáže po druhém zápisu.
+      </div>
+    );
+  }
+
+  const values = pointsSource.map((log) => log.temperatureC);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = Math.max(1, max - min);
+  const width = 220;
+  const height = 56;
+  const pad = 8;
+  const points = pointsSource.map((log, index) => {
+    const x = pad + (index * (width - pad * 2)) / Math.max(1, pointsSource.length - 1);
+    const y = height - pad - ((log.temperatureC - min) / span) * (height - pad * 2);
+    return { x, y, log };
+  });
+  const first = pointsSource[0];
+  const last = pointsSource[pointsSource.length - 1];
+
+  return (
+    <div className="mt-3 rounded-xl border border-cyan-100 bg-cyan-50/60 p-3">
+      <div className="mb-2 flex items-center justify-between gap-2 text-xs font-black text-cyan-900">
+        <span>Trend teplot</span>
+        <span>{first.temperatureC} °C → {last.temperatureC} °C</span>
+      </div>
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-14 w-full overflow-visible" role="img" aria-label="Trend teplot dataloggeru">
+        <line x1={pad} y1={height - pad} x2={width - pad} y2={height - pad} stroke="#bae6fd" strokeWidth="2" />
+        <polyline
+          points={points.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(' ')}
+          fill="none"
+          stroke="#0891b2"
+          strokeWidth="4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        {points.map((point, index) => (
+          <circle key={`${point.log.id}-${index}`} cx={point.x} cy={point.y} r="4" fill="#0e7490" />
+        ))}
+      </svg>
+      <div className="mt-1 flex justify-between text-[11px] font-bold text-slate-500">
+        <span>{formatDateTime(first.measuredAt)}</span>
+        <span>{formatDateTime(last.measuredAt)}</span>
+      </div>
+    </div>
   );
 }
 
@@ -654,6 +726,7 @@ function TemperatureModal({
 }) {
   const [temperature, setTemperature] = useState('');
   const [humidity, setHumidity] = useState('');
+  const [rawMaterial, setRawMaterial] = useState('');
   const [measuredAt, setMeasuredAt] = useState(toDateTimeLocal(new Date()));
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
@@ -678,6 +751,7 @@ function TemperatureModal({
         user,
         temperatureC: value,
         humidityPct: humidityValue,
+        rawMaterial: rawMaterial.trim(),
         measuredAt: fromDateTimeLocal(measuredAt),
         roomName: roomLabel(asset),
         note: note.trim(),
@@ -798,6 +872,16 @@ function TemperatureModal({
               </div>
             </div>
             <span className="mt-1 block text-xs font-semibold text-slate-500">Zadej procenta RH, pokud datalogger vlhkost ukazuje.</span>
+          </label>
+
+          <label className="block">
+            <span className="mb-1 block text-sm font-black text-slate-800">Surovina / produkt</span>
+            <input
+              value={rawMaterial}
+              onChange={(event) => setRawMaterial(event.target.value)}
+              placeholder="volitelně: mouka, směs, šarže..."
+              className="vik-input font-bold"
+            />
           </label>
 
           <label className="block">
