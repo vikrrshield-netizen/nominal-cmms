@@ -8,7 +8,7 @@ import { useBackNavigation } from '../hooks/useBackNavigation';
 import { showToast } from '../components/ui/Toast';
 import {
   collection, query, where, orderBy, onSnapshot,
-  doc, updateDoc, deleteDoc, addDoc, serverTimestamp, Timestamp,
+  doc, updateDoc, deleteDoc, addDoc, serverTimestamp, Timestamp, limit,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import {
@@ -60,6 +60,13 @@ const PRIORITY_CONFIG: Record<NotificationPriority, { color: string; pulse: bool
   critical: { color: 'bg-red-500', pulse: true },
 };
 
+const NOTIFICATION_LIMIT = 100;
+const OPEN_TASK_LIMIT = 500;
+const ASSET_LIMIT = 1000;
+const GEARBOX_TEMPERATURE_LIMIT = 500;
+const INSPECTION_LOG_LIMIT = 500;
+const OPEN_TASK_STATUSES = ['backlog', 'planned', 'in_progress', 'paused'];
+
 function startOfDay(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
@@ -106,6 +113,7 @@ export default function NotificationsPage() {
       collection(db, 'notifications'),
       where('userId', '==', uid),
       orderBy('createdAt', 'desc'),
+      limit(NOTIFICATION_LIMIT),
     );
     const unsub = onSnapshot(q, (snap) => {
       setNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification)));
@@ -115,11 +123,28 @@ export default function NotificationsPage() {
   }, [uid]);
 
   useEffect(() => {
+    const currentMonth = new Date().toISOString().slice(0, 7);
     const unsubs = [
-      onSnapshot(collection(db, 'tasks'), (snap) => setTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })))),
-      onSnapshot(collection(db, 'assets'), (snap) => setAssets(snap.docs.map(d => ({ id: d.id, ...d.data() })))),
-      onSnapshot(collection(db, 'gearbox_temperature_logs'), (snap) => setGearboxTemperatures(snap.docs.map(d => ({ id: d.id, ...d.data() })))),
-      onSnapshot(collection(db, 'inspection_logs'), (snap) => setInspectionLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })))),
+      onSnapshot(
+        query(collection(db, 'tasks'), where('status', 'in', OPEN_TASK_STATUSES), limit(OPEN_TASK_LIMIT)),
+        (snap) => setTasks(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+        (err) => console.error('[Notifications] tasks error:', err),
+      ),
+      onSnapshot(
+        query(collection(db, 'assets'), limit(ASSET_LIMIT)),
+        (snap) => setAssets(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+        (err) => console.error('[Notifications] assets error:', err),
+      ),
+      onSnapshot(
+        query(collection(db, 'gearbox_temperature_logs'), orderBy('measuredAt', 'desc'), limit(GEARBOX_TEMPERATURE_LIMIT)),
+        (snap) => setGearboxTemperatures(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+        (err) => console.error('[Notifications] gearbox temperatures error:', err),
+      ),
+      onSnapshot(
+        query(collection(db, 'inspection_logs'), where('month', '==', currentMonth), limit(INSPECTION_LOG_LIMIT)),
+        (snap) => setInspectionLogs(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+        (err) => console.error('[Notifications] inspection logs error:', err),
+      ),
     ];
     return () => unsubs.forEach((unsub) => unsub());
   }, []);
