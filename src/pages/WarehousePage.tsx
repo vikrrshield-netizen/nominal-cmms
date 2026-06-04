@@ -226,6 +226,7 @@ export default function WarehousePage() {
         quantity: Number(receiptForm.quantity),
         status: 'pending',
         createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
         createdById: user?.uid || '',
         createdByName: user?.displayName || '',
       });
@@ -238,7 +239,7 @@ export default function WarehousePage() {
 
   const acceptReceipt = async (id: string) => {
     if (!canManage) return;
-    await updateDoc(doc(db, 'warehouse_receipts', id), { status: 'accepted' });
+    await updateDoc(doc(db, 'warehouse_receipts', id), { status: 'accepted', updatedAt: serverTimestamp() });
     showToast('Příjem schválen', 'success');
   };
 
@@ -270,6 +271,7 @@ export default function WarehousePage() {
         palletCount: Number(shipmentForm.palletCount),
         status: 'planned',
         createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
         createdById: user?.uid || '',
         createdByName: user?.displayName || '',
       });
@@ -283,7 +285,7 @@ export default function WarehousePage() {
   const advanceShipment = async (id: string, current: ShipmentStatus) => {
     if (!canManage) return;
     const next: Record<ShipmentStatus, ShipmentStatus> = { planned: 'loading', loading: 'shipped', shipped: 'shipped' };
-    await updateDoc(doc(db, 'warehouse_shipments', id), { status: next[current] });
+    await updateDoc(doc(db, 'warehouse_shipments', id), { status: next[current], updatedAt: serverTimestamp() });
     showToast(next[current] === 'loading' ? 'Nakládka zahájena' : 'Odesláno', 'success');
   };
 
