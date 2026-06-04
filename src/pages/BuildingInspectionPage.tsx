@@ -8,6 +8,7 @@ import { db } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
 import { useBackNavigation } from '../hooks/useBackNavigation';
 import { useEmployeeNames } from '../hooks/useEmployeeDirectory';
+import { createTask } from '../services/taskService';
 import {
   ArrowLeft,
   Loader2,
@@ -418,7 +419,7 @@ export default function BuildingInspectionPage() {
     setSaving(true);
     try {
       if (createTaskFromIssue && !taskId) {
-        const taskRef = await addDoc(collection(db, 'tasks'), {
+        taskId = await createTask({
           title: `Závada: ${showIssueModal.roomCode} ${showIssueModal.roomName}`,
           description: [
             `Vzniklo z kontroly budovy ${buildingLabel(showIssueModal.buildingId)}.`,
@@ -426,7 +427,6 @@ export default function BuildingInspectionPage() {
             `Co se kontroluje: ${showIssueModal.description}`,
             `Závada: ${issueNote.trim()}`,
           ].join('\n'),
-          status: 'backlog',
           priority: 'P2',
           type: 'corrective',
           source: 'inspection',
@@ -434,13 +434,9 @@ export default function BuildingInspectionPage() {
           sourceRefId: showIssueModal.id,
           inspectionPointId: showIssueModal.id,
           buildingId: showIssueModal.buildingId,
-          createdAt: now,
-          updatedAt: now,
           createdById: user?.uid || user?.id || 'unknown',
           createdByName: inspector,
-          isDone: false,
         });
-        taskId = taskRef.id;
       }
 
       await updateDoc(doc(db, 'inspections', showIssueModal.id), {

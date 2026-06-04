@@ -35,6 +35,7 @@ export interface CreateTaskInput {
   sourceRefType?: 'inspection_log' | 'manual' | 'asset' | 'work_log' | 'datalogger_temperature';
   sourceRefId?: string;
   inspectionLogId?: string;
+  inspectionPointId?: string;
   assetId?: string;
   assetName?: string;
   relatedAssetId?: string;
@@ -130,6 +131,7 @@ export async function createTask(input: CreateTaskInput): Promise<string> {
   if (input.sourceRefType) taskData.sourceRefType = input.sourceRefType;
   if (input.sourceRefId) taskData.sourceRefId = input.sourceRefId;
   if (input.inspectionLogId) taskData.inspectionLogId = input.inspectionLogId;
+  if (input.inspectionPointId) taskData.inspectionPointId = input.inspectionPointId;
   if (input.assetId) taskData.assetId = input.assetId;
   if (input.assetName) taskData.assetName = input.assetName;
   if (input.relatedAssetId) taskData.relatedAssetId = input.relatedAssetId;
