@@ -578,6 +578,9 @@ function GearboxDashboardWidget({
 
   if (!data.total) return null;
 
+  const visibleRows = data.rows.slice(0, 4);
+  const hiddenRows = Math.max(0, data.rows.length - visibleRows.length);
+
   return (
     <section className={`mb-5 ${DASH_PANEL} p-4`}>
       <button
@@ -604,7 +607,7 @@ function GearboxDashboardWidget({
       </button>
 
       <div className="mt-4 grid gap-3 md:grid-cols-2">
-        {data.rows.slice(0, 6).map((item) => (
+        {visibleRows.map((item) => (
           <div
             key={item.id}
             className={`rounded-2xl border p-3 shadow-sm ${
@@ -717,6 +720,16 @@ function GearboxDashboardWidget({
         ))}
       </div>
 
+      {hiddenRows > 0 && (
+        <button
+          type="button"
+          onClick={() => onNavigate('/gearboxes')}
+          className="mt-3 min-h-11 w-full rounded-xl border border-[#ded6c8] bg-white px-4 text-sm font-black text-slate-800 transition hover:bg-[#fbf9f4] active:scale-[0.98]"
+        >
+          Zobrazit všechny převodovky ({data.rows.length})
+        </button>
+      )}
+
       {problemAsset && (
         <GearboxProblemModal
           asset={problemAsset}
@@ -733,6 +746,175 @@ function GearboxDashboardWidget({
           onSaved={() => setRepairAsset(null)}
         />
       )}
+    </section>
+  );
+}
+
+interface MasterDashboardItem {
+  id: string;
+  nkCode?: string;
+  name?: string;
+  usageCount?: number;
+  active?: boolean;
+  allergens?: string[];
+  approvalStatus?: string;
+}
+
+function useProductionMasterDashboard(canRead: boolean) {
+  const [materials, setMaterials] = useState<MasterDashboardItem[]>([]);
+  const [products, setProducts] = useState<MasterDashboardItem[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!canRead) {
+      setMaterials([]);
+      setProducts([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    let materialsReady = false;
+    let productsReady = false;
+    const done = () => {
+      if (materialsReady && productsReady) setLoading(false);
+    };
+
+    const unsubMaterials = onSnapshot(
+      collection(db, 'materials'),
+      (snap) => {
+        setMaterials(snap.docs.map((item) => ({ id: item.id, ...item.data() } as MasterDashboardItem)));
+        materialsReady = true;
+        done();
+      },
+      () => {
+        setMaterials([]);
+        materialsReady = true;
+        done();
+      },
+    );
+
+    const unsubProducts = onSnapshot(
+      collection(db, 'products'),
+      (snap) => {
+        setProducts(snap.docs.map((item) => ({ id: item.id, ...item.data() } as MasterDashboardItem)));
+        productsReady = true;
+        done();
+      },
+      () => {
+        setProducts([]);
+        productsReady = true;
+        done();
+      },
+    );
+
+    return () => {
+      unsubMaterials();
+      unsubProducts();
+    };
+  }, [canRead]);
+
+  return useMemo(() => {
+    const activeMaterials = materials.filter((item) => item.active !== false);
+    const activeProducts = products.filter((item) => item.active !== false);
+    const missingMaterialAllergens = activeMaterials.filter((item) => !item.allergens || item.allergens.length === 0).length;
+    const missingProductAllergens = activeProducts.filter((item) => !item.allergens || item.allergens.length === 0).length;
+    const pendingMaterials = activeMaterials.filter((item) => !item.approvalStatus || item.approvalStatus === 'pending' || item.approvalStatus === 'conditional').length;
+    const blockedMaterials = activeMaterials.filter((item) => item.approvalStatus === 'blocked').length;
+    const topMaterials = [...activeMaterials]
+      .sort((a, b) => (b.usageCount || 0) - (a.usageCount || 0) || String(a.name || '').localeCompare(String(b.name || ''), 'cs'))
+      .slice(0, 4);
+
+    return {
+      loading,
+      materials: activeMaterials.length,
+      products: activeProducts.length,
+      missingAllergens: missingMaterialAllergens + missingProductAllergens,
+      pendingMaterials,
+      blockedMaterials,
+      topMaterials,
+    };
+  }, [loading, materials, products]);
+}
+
+function ProductionMasterDashboardWidget({
+  data,
+  onNavigate,
+}: {
+  data: ReturnType<typeof useProductionMasterDashboard>;
+  onNavigate: (path: string) => void;
+}) {
+  if (data.loading && data.materials === 0 && data.products === 0) {
+    return null;
+  }
+
+  const issueCount = data.missingAllergens + data.pendingMaterials + data.blockedMaterials;
+
+  return (
+    <section className={`mb-5 ${DASH_PANEL} p-4`}>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className={DASH_ICON_BOX}>
+            <Package className="h-5 w-5 text-emerald-700" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-sm font-black text-slate-950">Suroviny a výrobky</div>
+            <div className="mt-1 text-sm font-semibold text-slate-500">
+              {data.materials} surovin · {data.products} výrobků · traceabilita šarží
+            </div>
+          </div>
+        </div>
+        {issueCount > 0 && (
+          <span className="w-fit rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-black text-amber-800">
+            {issueCount} bodů k doplnění
+          </span>
+        )}
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
+        <button type="button" onClick={() => onNavigate('/materials')} className="rounded-2xl border border-emerald-100 bg-emerald-50 p-3 text-left">
+          <div className="text-2xl font-black text-emerald-800">{data.materials}</div>
+          <div className="mt-1 text-xs font-black uppercase text-emerald-700">Suroviny</div>
+        </button>
+        <button type="button" onClick={() => onNavigate('/products')} className="rounded-2xl border border-sky-100 bg-sky-50 p-3 text-left">
+          <div className="text-2xl font-black text-sky-800">{data.products}</div>
+          <div className="mt-1 text-xs font-black uppercase text-sky-700">Výrobky</div>
+        </button>
+        <button type="button" onClick={() => onNavigate('/materials')} className="rounded-2xl border border-amber-100 bg-amber-50 p-3 text-left">
+          <div className="text-2xl font-black text-amber-800">{data.pendingMaterials}</div>
+          <div className="mt-1 text-xs font-black uppercase text-amber-700">Schválení</div>
+        </button>
+        <button type="button" onClick={() => onNavigate('/products')} className="rounded-2xl border border-red-100 bg-red-50 p-3 text-left">
+          <div className="text-2xl font-black text-red-700">{data.missingAllergens}</div>
+          <div className="mt-1 text-xs font-black uppercase text-red-700">Alergeny</div>
+        </button>
+      </div>
+
+      <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+          <div className="mb-2 text-xs font-black uppercase text-slate-500">Nejpoužívanější suroviny</div>
+          {data.topMaterials.length === 0 ? (
+            <div className="text-sm font-semibold text-slate-500">Použití se začne plnit ze zápisů výroby a teplot.</div>
+          ) : (
+            <div className="grid gap-2 sm:grid-cols-2">
+              {data.topMaterials.map((item) => (
+                <div key={item.id} className="rounded-xl bg-white px-3 py-2">
+                  <div className="truncate text-sm font-black text-slate-950">{item.nkCode || 'NK'} · {item.name || 'Surovina'}</div>
+                  <div className="mt-0.5 text-xs font-bold text-slate-500">{item.usageCount || 0} použití</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="grid grid-cols-2 gap-2 lg:w-64">
+          <button type="button" onClick={() => onNavigate('/materials')} className="min-h-12 rounded-xl bg-emerald-700 px-3 text-sm font-black text-white hover:bg-emerald-600">
+            Suroviny
+          </button>
+          <button type="button" onClick={() => onNavigate('/products')} className="min-h-12 rounded-xl border border-[#ded6c8] bg-white px-3 text-sm font-black text-slate-800 hover:bg-[#fbf9f4]">
+            Výrobky
+          </button>
+        </div>
+      </div>
     </section>
   );
 }
@@ -1643,6 +1825,8 @@ function FullDashboard() {
   const tenantId = (user as any)?.tenantId || 'main_firm';
   const vacationAlerts = useVacationAlerts(tenantId);
   const gearboxDashboard = useGearboxDashboard(tenantId);
+  const canReadProductionMaster = hasPermission('production.read') || hasPermission('production.manage') || hasPermission('report.read');
+  const productionMasterDashboard = useProductionMasterDashboard(canReadProductionMaster);
 
   // Sandbox: override stats with mock data + show welcome toast
   const stats = isSandbox ? { ...SANDBOX_STATS } : rawStats;
@@ -1880,6 +2064,13 @@ function FullDashboard() {
           canReportProblem={hasPermission('wo.create')}
           canLogRepair={hasPermission('asset.update')}
         />
+
+        {canReadProductionMaster && (
+          <ProductionMasterDashboardWidget
+            data={productionMasterDashboard}
+            onNavigate={navigate}
+          />
+        )}
 
         <VacationNotice
           todayVacations={vacationAlerts.todayVacations}
