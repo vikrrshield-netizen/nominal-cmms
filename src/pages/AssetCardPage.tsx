@@ -2828,6 +2828,13 @@ interface GearboxMasterItem {
   name: string;
   usageCount?: number;
   active?: boolean;
+  recipe?: Array<{ materialId?: string; materialName?: string; ratio?: number }>;
+}
+
+function matchesGearboxMasterItem(item: GearboxMasterItem, query: string) {
+  const needle = normalizeLookup(query);
+  if (!needle) return true;
+  return normalizeLookup(`${item.name} ${item.number} ${item.nkCode}`).includes(needle);
 }
 
 function sortGearboxMasterItems(items: GearboxMasterItem[], usage: Map<string, number>) {
@@ -2878,6 +2885,9 @@ function GearboxTemperatureModal({ gearbox, user, saving, onClose, onSave }: {
   const [productId, setProductId] = useState('');
   const [productBatchValue, setProductBatchValue] = useState('');
   const [productBatchDate, setProductBatchDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [materialSearch, setMaterialSearch] = useState('');
+  const [productSearch, setProductSearch] = useState('');
+  const [showAllProducts, setShowAllProducts] = useState(false);
   const [note, setNote] = useState('');
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState('');
@@ -2922,7 +2932,33 @@ function GearboxTemperatureModal({ gearbox, user, saving, onClose, onSave }: {
   const sortedMaterials = useMemo(() => sortGearboxMasterItems(materials, materialUsage), [materials, materialUsage]);
   const sortedProducts = useMemo(() => sortGearboxMasterItems(products, productUsage), [products, productUsage]);
   const selectedMaterial = useMemo(() => sortedMaterials.find((item) => item.id === materialId), [materialId, sortedMaterials]);
+  const relatedProducts = useMemo(
+    () => selectedMaterial
+      ? sortedProducts.filter((product) => (product.recipe || []).some((row) => row.materialId === selectedMaterial.id))
+      : sortedProducts,
+    [selectedMaterial, sortedProducts],
+  );
+  const productRelationActive = Boolean(selectedMaterial && !showAllProducts);
+  const productSource = productRelationActive ? relatedProducts : sortedProducts;
+  const filteredMaterials = useMemo(
+    () => sortedMaterials.filter((item) => matchesGearboxMasterItem(item, materialSearch)),
+    [materialSearch, sortedMaterials],
+  );
+  const filteredProducts = useMemo(
+    () => productSource.filter((item) => matchesGearboxMasterItem(item, productSearch)),
+    [productSearch, productSource],
+  );
   const selectedProduct = useMemo(() => sortedProducts.find((item) => item.id === productId), [productId, sortedProducts]);
+
+  useEffect(() => {
+    setShowAllProducts(false);
+  }, [materialId]);
+
+  useEffect(() => {
+    if (!productId) return;
+    if (productSource.some((product) => product.id === productId)) return;
+    setProductId('');
+  }, [productId, productSource]);
   useEffect(() => {
     if (!selectedProduct || !productBatchDate) {
       setProductBatchValue('');
@@ -3054,32 +3090,14 @@ function GearboxTemperatureModal({ gearbox, user, saving, onClose, onSave }: {
         </label>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <label className="block">
-            <div className="text-sm font-medium text-slate-400 mb-2">Vyrobek</div>
-            <select
-              value={productId}
-              onChange={(e) => setProductId(e.target.value)}
-              className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-cyan-400"
-            >
-              <option value="">Nezadano</option>
-              {sortedProducts.map((product) => (
-                <option key={product.id} value={product.id}>{product.nkCode} - {product.name}</option>
-              ))}
-            </select>
-          </label>
-          <label className="block">
-            <div className="text-sm font-medium text-slate-400 mb-2">Datum zahajeni vyroby</div>
+            <div className="text-sm font-medium text-slate-400 mb-2">Surovina z číselníku</div>
             <input
-              type="date"
-              value={productBatchDate}
-              onChange={(e) => setProductBatchDate(e.target.value)}
-              className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-cyan-400"
+              type="search"
+              value={materialSearch}
+              onChange={(e) => setMaterialSearch(e.target.value)}
+              placeholder="hledat název, č.sur nebo NK kód"
+              className="mb-2 w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-cyan-400"
             />
-            <div className="mt-2 rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-sm font-black text-cyan-100">
-              Sarze vyrobku: {productBatchValue || 'vyber vyrobek'}
-            </div>
-          </label>
-          <label className="block">
-            <div className="text-sm font-medium text-slate-400 mb-2">Surovina z ciselniku</div>
             <select
               value={materialId}
               onChange={(e) => {
@@ -3088,14 +3106,42 @@ function GearboxTemperatureModal({ gearbox, user, saving, onClose, onSave }: {
               }}
               className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-cyan-400"
             >
-              <option value="">Nezadano</option>
-              {sortedMaterials.map((material) => (
-                <option key={material.id} value={material.id}>{material.nkCode} - {material.name}</option>
+              <option value="">Nezadáno</option>
+              {filteredMaterials.map((material) => (
+                <option key={material.id} value={material.id}>{material.nkCode} - {material.number} - {material.name}</option>
               ))}
             </select>
           </label>
           <label className="block">
-            <div className="text-sm font-medium text-slate-400 mb-2">Sarze suroviny</div>
+            <div className="text-sm font-medium text-slate-400 mb-2">Výrobek</div>
+            <input
+              type="search"
+              value={productSearch}
+              onChange={(e) => setProductSearch(e.target.value)}
+              placeholder="hledat název, č.výr nebo NK kód"
+              className="mb-2 w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-cyan-400"
+            />
+            {selectedMaterial && (
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-xs font-bold text-cyan-100">
+                <span>{showAllProducts ? 'Zobrazeny všechny výrobky' : `Dle receptury: ${relatedProducts.length} výrobků`}</span>
+                <button type="button" onClick={() => setShowAllProducts((current) => !current)} className="rounded-lg bg-white/10 px-2 py-1 font-black text-white">
+                  {showAllProducts ? 'Dle receptury' : 'Zobrazit vše'}
+                </button>
+              </div>
+            )}
+            <select
+              value={productId}
+              onChange={(e) => setProductId(e.target.value)}
+              className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-cyan-400"
+            >
+              <option value="">Nezadáno</option>
+              {filteredProducts.map((product) => (
+                <option key={product.id} value={product.id}>{product.nkCode} - {product.number} - {product.name}</option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <div className="text-sm font-medium text-slate-400 mb-2">Šarže suroviny</div>
             <div className="grid grid-cols-[minmax(0,1fr)_80px] gap-2">
               <input
                 type="date"
@@ -3117,6 +3163,18 @@ function GearboxTemperatureModal({ gearbox, user, saving, onClose, onSave }: {
               placeholder="sarze se predvyplni po vyberu suroviny"
               className="mt-2 w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-cyan-400"
             />
+          </label>
+          <label className="block">
+            <div className="text-sm font-medium text-slate-400 mb-2">Datum zahajeni vyroby</div>
+            <input
+              type="date"
+              value={productBatchDate}
+              onChange={(e) => setProductBatchDate(e.target.value)}
+              className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-cyan-400"
+            />
+            <div className="mt-2 rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-sm font-black text-cyan-100">
+              Šarže výrobku: {productBatchValue || 'vyber výrobek'}
+            </div>
           </label>
         </div>
         <label className="block">

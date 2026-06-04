@@ -95,6 +95,22 @@ function collectionForTab(tab: Tab) {
   return tab === 'materials' ? 'materials' : 'products';
 }
 
+function normalizeSearch(value: unknown) {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function matchesMasterItem(item: MasterBase, query: string) {
+  const needle = normalizeSearch(query);
+  if (!needle) return true;
+  return normalizeSearch(`${item.name} ${item.number} ${item.nkCode}`).includes(needle);
+}
+
 function seedId(kind: 'material' | 'product', nkCode: string) {
   return `${kind}-${nkCode.toLowerCase()}`;
 }
@@ -310,6 +326,7 @@ function DetailPanel({
   const [batchDate, setBatchDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [batchSuffix, setBatchSuffix] = useState('');
   const [recipe, setRecipe] = useState<ProductRecipeItem[]>([]);
+  const [recipeMaterialSearch, setRecipeMaterialSearch] = useState('');
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -364,6 +381,10 @@ function DetailPanel({
   const relatedTemperatureLogs = temperatureLogs
     .filter((log) => tab === 'materials' ? log.materialId === item.id : log.productId === item.id)
     .slice(0, 12);
+  const filteredRecipeMaterials = useMemo(
+    () => sortByUseThenName(materials).filter((material) => matchesMasterItem(material, recipeMaterialSearch)),
+    [materials, recipeMaterialSearch],
+  );
 
   const addRecipeRow = () => {
     setRecipe((prev) => [...prev, { materialId: '', materialName: '', ratio: 0 }]);
@@ -637,6 +658,14 @@ function DetailPanel({
                   )}
                 </div>
                 <div className="mt-3 grid gap-2">
+                  <input
+                    type="search"
+                    value={recipeMaterialSearch}
+                    onChange={(e) => setRecipeMaterialSearch(e.target.value)}
+                    placeholder="Hledat surovinu podle názvu, čísla nebo NK kódu"
+                    className={INPUT}
+                    disabled={!canManage}
+                  />
                   {recipe.length === 0 && <div className="rounded-xl bg-white px-3 py-3 text-sm font-semibold text-slate-500">Receptura zatím není vyplněná.</div>}
                   {recipe.map((row, index) => (
                     <div key={`${row.materialId}-${index}`} className="grid grid-cols-[minmax(0,1fr)_90px_40px] gap-2">
@@ -647,7 +676,7 @@ function DetailPanel({
                         disabled={!canManage}
                       >
                         <option value="">Vyber surovinu</option>
-                        {sortByUseThenName(materials).map((material) => (
+                        {filteredRecipeMaterials.map((material) => (
                           <option key={material.id} value={material.id}>{material.nkCode} · {material.name}</option>
                         ))}
                       </select>
@@ -874,9 +903,8 @@ export default function MasterDataPage() {
   const activeItems = tab === 'materials' ? materials : products;
   const sortedItems = useMemo(() => sortByUseThenName(activeItems), [activeItems]);
   const filteredItems = useMemo(() => {
-    const needle = search.trim().toLowerCase();
-    if (!needle) return sortedItems;
-    return sortedItems.filter((item) => `${item.nkCode} ${item.number} ${item.name}`.toLowerCase().includes(needle));
+    if (!search.trim()) return sortedItems;
+    return sortedItems.filter((item) => matchesMasterItem(item, search));
   }, [search, sortedItems]);
   const selectedItem = activeItems.find((item) => item.id === selectedId) || filteredItems[0] || null;
 

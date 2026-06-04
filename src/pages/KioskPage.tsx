@@ -98,6 +98,7 @@ interface KioskMasterItem {
   name: string;
   usageCount?: number;
   active?: boolean;
+  recipe?: Array<{ materialId?: string; materialName?: string; ratio?: number }>;
 }
 
 const QUICK_BREAKDOWNS: QuickOption[] = [
@@ -172,6 +173,12 @@ const normalize = (value: unknown) =>
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .trim();
+
+const matchesMasterItem = (item: KioskMasterItem, query: string) => {
+  const needle = normalize(query);
+  if (!needle) return true;
+  return normalize(`${item.name} ${item.number} ${item.nkCode}`).includes(needle);
+};
 
 function sortMasterItemsByRecentUse(items: KioskMasterItem[], usage: Map<string, number>) {
   return [...items]
@@ -381,6 +388,9 @@ export default function KioskPage() {
   const [gearboxProductId, setGearboxProductId] = useState('');
   const [gearboxProductBatch, setGearboxProductBatch] = useState('');
   const [gearboxProductBatchDate, setGearboxProductBatchDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [gearboxMaterialSearch, setGearboxMaterialSearch] = useState('');
+  const [gearboxProductSearch, setGearboxProductSearch] = useState('');
+  const [gearboxShowAllProducts, setGearboxShowAllProducts] = useState(false);
   const [gearboxNote, setGearboxNote] = useState('');
   const [gearboxPhotoFile, setGearboxPhotoFile] = useState<File | null>(null);
   const gearboxPhotoInputRef = useRef<HTMLInputElement>(null);
@@ -476,7 +486,33 @@ export default function KioskPage() {
   const sortedMaterials = useMemo(() => sortMasterItemsByRecentUse(materials, recentMaterialUsage), [materials, recentMaterialUsage]);
   const sortedProducts = useMemo(() => sortMasterItemsByRecentUse(products, recentProductUsage), [products, recentProductUsage]);
   const selectedMaterial = useMemo(() => sortedMaterials.find((item) => item.id === gearboxMaterialId), [gearboxMaterialId, sortedMaterials]);
+  const relatedProducts = useMemo(
+    () => selectedMaterial
+      ? sortedProducts.filter((product) => (product.recipe || []).some((row) => row.materialId === selectedMaterial.id))
+      : sortedProducts,
+    [selectedMaterial, sortedProducts],
+  );
+  const productRelationActive = Boolean(selectedMaterial && !gearboxShowAllProducts);
+  const productSource = productRelationActive ? relatedProducts : sortedProducts;
+  const filteredMaterials = useMemo(
+    () => sortedMaterials.filter((item) => matchesMasterItem(item, gearboxMaterialSearch)),
+    [gearboxMaterialSearch, sortedMaterials],
+  );
+  const filteredProducts = useMemo(
+    () => productSource.filter((item) => matchesMasterItem(item, gearboxProductSearch)),
+    [gearboxProductSearch, productSource],
+  );
   const selectedProduct = useMemo(() => sortedProducts.find((item) => item.id === gearboxProductId), [gearboxProductId, sortedProducts]);
+
+  useEffect(() => {
+    setGearboxShowAllProducts(false);
+  }, [gearboxMaterialId]);
+
+  useEffect(() => {
+    if (!gearboxProductId) return;
+    if (productSource.some((product) => product.id === gearboxProductId)) return;
+    setGearboxProductId('');
+  }, [gearboxProductId, productSource]);
 
   useEffect(() => {
     const measuredDate = gearboxMeasuredAt ? gearboxMeasuredAt.slice(0, 10) : new Date().toISOString().slice(0, 10);
@@ -976,6 +1012,9 @@ export default function KioskPage() {
     setGearboxProductId('');
     setGearboxProductBatch('');
     setGearboxProductBatchDate(new Date().toISOString().slice(0, 10));
+    setGearboxMaterialSearch('');
+    setGearboxProductSearch('');
+    setGearboxShowAllProducts(false);
     setGearboxNote('');
     setGearboxPhotoFile(null);
     setGearboxProblemOpen(false);
@@ -2226,32 +2265,14 @@ export default function KioskPage() {
           </label>
           <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
             <label className="block">
-              <span className="mb-1 block text-xs font-black text-slate-200">Výrobek</span>
-              <select
-                value={gearboxProductId}
-                onChange={(event) => setGearboxProductId(event.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-slate-950 p-2.5 text-base text-white outline-none focus:border-violet-400"
-              >
-                <option value="">Nezadáno</option>
-                {sortedProducts.map((product) => (
-                  <option key={product.id} value={product.id}>{product.nkCode} · {product.name}</option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs font-black text-slate-200">Datum zahájení výroby</span>
-              <input
-                type="date"
-                value={gearboxProductBatchDate}
-                onChange={(event) => setGearboxProductBatchDate(event.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-slate-950 p-2.5 text-base text-white outline-none placeholder:text-slate-500 focus:border-violet-400"
-              />
-              <div className="mt-1 rounded-lg border border-violet-400/20 bg-violet-500/10 px-3 py-2 text-sm font-black text-violet-100">
-                Šarže výrobku: {gearboxProductBatch || 'vyber výrobek'}
-              </div>
-            </label>
-            <label className="block">
               <span className="mb-1 block text-xs font-black text-slate-200">Surovina</span>
+              <input
+                type="search"
+                value={gearboxMaterialSearch}
+                onChange={(event) => setGearboxMaterialSearch(event.target.value)}
+                placeholder="hledat název, č.sur nebo NK kód"
+                className="mb-2 w-full rounded-xl border border-white/10 bg-slate-950 p-2.5 text-base text-white outline-none placeholder:text-slate-500 focus:border-violet-400"
+              />
               <select
                 value={gearboxMaterialId}
                 onChange={(event) => {
@@ -2261,8 +2282,42 @@ export default function KioskPage() {
                 className="w-full rounded-xl border border-white/10 bg-slate-950 p-2.5 text-base text-white outline-none focus:border-violet-400"
               >
                 <option value="">Nezadáno</option>
-                {sortedMaterials.map((material) => (
-                  <option key={material.id} value={material.id}>{material.nkCode} · {material.name}</option>
+                {filteredMaterials.map((material) => (
+                  <option key={material.id} value={material.id}>{material.nkCode} · {material.number} · {material.name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-black text-slate-200">Výrobek</span>
+              <input
+                type="search"
+                value={gearboxProductSearch}
+                onChange={(event) => setGearboxProductSearch(event.target.value)}
+                placeholder="hledat název, č.výr nebo NK kód"
+                className="mb-2 w-full rounded-xl border border-white/10 bg-slate-950 p-2.5 text-base text-white outline-none placeholder:text-slate-500 focus:border-violet-400"
+              />
+              {selectedMaterial && (
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-violet-400/20 bg-violet-500/10 px-3 py-2 text-xs font-bold text-violet-100">
+                  <span>
+                    {gearboxShowAllProducts ? 'Zobrazeny všechny výrobky' : `Dle receptury: ${relatedProducts.length} výrobků`}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setGearboxShowAllProducts((current) => !current)}
+                    className="rounded-lg bg-white/10 px-2 py-1 font-black text-white"
+                  >
+                    {gearboxShowAllProducts ? 'Dle receptury' : 'Zobrazit všechny'}
+                  </button>
+                </div>
+              )}
+              <select
+                value={gearboxProductId}
+                onChange={(event) => setGearboxProductId(event.target.value)}
+                className="w-full rounded-xl border border-white/10 bg-slate-950 p-2.5 text-base text-white outline-none focus:border-violet-400"
+              >
+                <option value="">Nezadáno</option>
+                {filteredProducts.map((product) => (
+                  <option key={product.id} value={product.id}>{product.nkCode} · {product.number} · {product.name}</option>
                 ))}
               </select>
             </label>
@@ -2290,6 +2345,18 @@ export default function KioskPage() {
                 placeholder="šarže se předvyplní po výběru suroviny"
                 className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 p-2.5 text-base text-white outline-none placeholder:text-slate-500 focus:border-violet-400"
               />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-black text-slate-200">Datum zahájení výroby</span>
+              <input
+                type="date"
+                value={gearboxProductBatchDate}
+                onChange={(event) => setGearboxProductBatchDate(event.target.value)}
+                className="w-full rounded-xl border border-white/10 bg-slate-950 p-2.5 text-base text-white outline-none placeholder:text-slate-500 focus:border-violet-400"
+              />
+              <div className="mt-1 rounded-lg border border-violet-400/20 bg-violet-500/10 px-3 py-2 text-sm font-black text-violet-100">
+                Šarže výrobku: {gearboxProductBatch || 'vyber výrobek'}
+              </div>
             </label>
           </div>
           <label className="block">
