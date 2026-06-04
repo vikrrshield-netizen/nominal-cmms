@@ -30,6 +30,11 @@ type DataloggerLimitBreach = {
   max: number | null;
 };
 
+type DataloggerAlertRecipient = {
+  id: string;
+  name: string;
+};
+
 export function normalizeDataloggerText(value: unknown): string {
   return String(value || '')
     .toLowerCase()
@@ -122,6 +127,84 @@ async function hasOpenDataloggerLimitTask(assetId: string): Promise<boolean> {
   });
 }
 
+async function getDataloggerAlertRecipients(fallbackUser?: AppUser | null): Promise<DataloggerAlertRecipient[]> {
+  try {
+    const snap = await getDocs(collection(db, 'users'));
+    const recipients = snap.docs
+      .map((item) => {
+        const data = item.data() as { role?: string; displayName?: string; active?: boolean; isActive?: boolean };
+        return {
+          id: item.id,
+          name: data.displayName || item.id,
+          role: data.role || '',
+          active: data.active !== false && data.isActive !== false,
+        };
+      })
+      .filter((item) => item.active && ['UDRZBA', 'SUPERADMIN', 'VEDENI', 'SKLADNIK'].includes(item.role));
+
+    if (recipients.length > 0) {
+      const seen = new Set<string>();
+      return recipients.filter((item) => {
+        if (seen.has(item.id)) return false;
+        seen.add(item.id);
+        return true;
+      });
+    }
+  } catch (error) {
+    console.warn('[dataloggerService] Datalogger alert recipients were not loaded:', error);
+  }
+
+  const fallbackId = userId(fallbackUser);
+  if (!fallbackId || fallbackId === 'unknown') return [];
+  return [{ id: fallbackId, name: userName(fallbackUser) }];
+}
+
+async function createDataloggerLimitNotifications(input: {
+  datalogger: Asset;
+  user?: AppUser | null;
+  temperatureC: number;
+  humidityPct?: number;
+  rawMaterial?: string;
+  measuredAt: Date;
+  roomName: string;
+}, breach: DataloggerLimitBreach) {
+  const recipients = await getDataloggerAlertRecipients(input.user);
+  if (recipients.length === 0) return;
+
+  const directionText = breach.direction === 'low'
+    ? `pod minimem ${breach.limit} °C`
+    : `nad maximem ${breach.limit} °C`;
+  const roomName = input.roomName || 'umístění není vyplněné';
+  const rawMaterial = input.rawMaterial?.trim() || '';
+  const message = [
+    `${input.datalogger.name}: ${input.temperatureC} °C (${directionText}).`,
+    `Umístění: ${roomName}.`,
+    typeof input.humidityPct === 'number' ? `Vlhkost: ${input.humidityPct} %.` : '',
+    rawMaterial ? `Surovina: ${rawMaterial}.` : '',
+    `Měřeno: ${formatMeasuredAt(input.measuredAt)}.`,
+  ].filter(Boolean).join(' ');
+
+  await Promise.all(recipients.map((recipient) => addDoc(collection(db, 'notifications'), {
+    userId: recipient.id,
+    type: 'system',
+    priority: 'critical',
+    severity: 'critical',
+    title: `Datalogger mimo limit: ${input.datalogger.name}`,
+    message,
+    body: message,
+    actionUrl: '/dataloggers',
+    actionLabel: 'Otevřít dataloggery',
+    read: false,
+    isRead: false,
+    generated: true,
+    assetId: input.datalogger.id,
+    assetName: input.datalogger.name,
+    sourceRefType: 'datalogger_temperature',
+    sourceRefId: input.datalogger.id,
+    createdAt: serverTimestamp(),
+  })));
+}
+
 async function createDataloggerLimitTask(input: {
   datalogger: Asset;
   user?: AppUser | null;
@@ -210,10 +293,19 @@ export async function addDataloggerTemperatureLog(input: {
   try {
     const alreadyOpen = await hasOpenDataloggerLimitTask(input.datalogger.id);
     if (!alreadyOpen) {
-      await createDataloggerLimitTask({ ...input, roomName, rawMaterial }, breach);
+      try {
+        await createDataloggerLimitNotifications({ ...input, roomName, rawMaterial }, breach);
+      } catch (notificationError) {
+        console.warn('[dataloggerService] Temperature limit notification was not created:', notificationError);
+      }
+      try {
+        await createDataloggerLimitTask({ ...input, roomName, rawMaterial }, breach);
+      } catch (taskError) {
+        console.warn('[dataloggerService] Temperature limit task was not created:', taskError);
+      }
     }
   } catch (error) {
-    console.warn('[dataloggerService] Temperature limit task was not created:', error);
+    console.warn('[dataloggerService] Temperature limit alert dedup failed:', error);
   }
 }
 
