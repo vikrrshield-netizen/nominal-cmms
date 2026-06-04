@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { showToast } from '../components/ui/Toast';
 import MicButton from '../components/ui/MicButton';
+import { isExtruderAsset, normalizeGearboxText } from '../services/gearboxService';
 
 // ═══════════════════════════════════════════════════════════════════
 // TYPES
@@ -81,7 +82,13 @@ interface PackagingOrder {
 }
 
 // -- Asset (for machine/line picker) --
-interface SimpleAsset { id: string; name: string; code?: string; }
+interface SimpleAsset {
+  id: string;
+  name: string;
+  code?: string;
+  category?: string;
+  entityType?: string;
+}
 
 // ═══════════════════════════════════════════════════════════════════
 // CONFIG
@@ -297,6 +304,7 @@ function useAssetsPicker(category?: string) {
         name: d.data().name || '',
         code: d.data().code || '',
         category: d.data().category || '',
+        entityType: d.data().entityType || '',
       }));
       if (category) all = all.filter(a => a.category === category);
       setAssets(all.sort((a, b) => a.name.localeCompare(b.name, 'cs')));
@@ -326,6 +334,38 @@ function generateProductId(): string {
   const d = String(now.getDate()).padStart(2, '0');
   const seq = String(Math.floor(Math.random() * 900) + 100);
   return `PK-${y}${m}${d}-${seq}`;
+}
+
+function firstNumber(value: string): string {
+  return normalizeGearboxText(value).match(/\d+/)?.[0] || '';
+}
+
+function isProductionExtruderAsset(asset: SimpleAsset): boolean {
+  if (!isExtruderAsset(asset)) return false;
+  const text = normalizeGearboxText([asset.name, asset.code, asset.category, asset.entityType].filter(Boolean).join(' '));
+  return !/(predfiltr|pre-filter|filter|vzt|vzduchotech|prevodov|gearbox|datalog|logger)/.test(text);
+}
+
+function findRealExtruderAsset(line: ProductionExtruderOption | undefined, assets: SimpleAsset[]): SimpleAsset | undefined {
+  if (!line) return undefined;
+  const lineName = normalizeGearboxText(line.name);
+  const lineNumber = firstNumber(line.name);
+
+  return assets
+    .filter(isProductionExtruderAsset)
+    .map((asset) => {
+      const assetName = normalizeGearboxText(asset.name);
+      const assetCode = normalizeGearboxText(asset.code);
+      const assetNumber = firstNumber(`${asset.name} ${asset.code}`);
+      let score = 0;
+      if (assetName === lineName) score += 100;
+      if (assetName.includes(lineName) || lineName.includes(assetName)) score += 50;
+      if (lineNumber && assetNumber === lineNumber) score += 40;
+      if (assetCode && lineNumber && assetCode.includes(lineNumber.padStart(3, '0'))) score += 20;
+      return { asset, score };
+    })
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score)[0]?.asset;
 }
 
 function formatDuration(start: Date | null, end: Date | null): string {
@@ -500,6 +540,7 @@ export default function ProductionPage() {
   const createBatch = async () => {
     if (!batchForm.rawMaterial || !batchForm.targetWeight) return;
     const selectedLine = extrusionLineOptions.find((line) => line.id === batchForm.extruderId) || visibleExtrusionLines[0] || extrusionLineOptions[0];
+    const realMachine = findRealExtruderAsset(selectedLine, allAssets);
     setBatchSaving(true);
     try {
       await addDoc(collection(db, 'production_extrusion'), {
@@ -509,8 +550,9 @@ export default function ProductionPage() {
         productionAreaLabel: selectedLine?.areaName || areaOptions.find((area) => area.id === batchForm.productionArea)?.name || '',
         rawMaterial: batchForm.rawMaterial,
         targetWeight: Number(batchForm.targetWeight),
-        machineId: selectedLine?.id || '',
-        machineName: selectedLine?.name || '',
+        machineId: realMachine?.id || selectedLine?.id || '',
+        machineName: realMachine?.name || selectedLine?.name || '',
+        machineCatalogId: selectedLine?.id || '',
         note: batchForm.note.trim(),
         status: 'planned',
         shiftLog: '',
