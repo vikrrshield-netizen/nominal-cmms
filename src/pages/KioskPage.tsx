@@ -318,6 +318,8 @@ const getKioskDevicePriority = (
   return score;
 };
 
+const ENABLE_KIOSK_PRODUCTION_PLAN = false;
+
 export default function KioskPage() {
   const navigate = useNavigate();
   const { user, logout, canSeeBuilding, hasPermission } = useAuthContext();
@@ -325,7 +327,7 @@ export default function KioskPage() {
   const canUseGearboxKiosk = hasPermission('gearbox.temperature.write') || hasPermission('gearbox.manage') || hasPermission('asset.update');
   const canUsePrefilterKiosk = canUseGearboxKiosk;
   const canUseDataloggerKiosk = hasPermission('datalogger.temperature.write') || hasPermission('datalogger.read') || hasPermission('datalogger.manage');
-  const canViewProductionPlan = hasPermission('production.read') || hasPermission('production.manage');
+  const canViewProductionPlan = ENABLE_KIOSK_PRODUCTION_PLAN && (hasPermission('production.read') || hasPermission('production.manage'));
 
   const [activeView, setActiveView] = useState<ViewState>('MENU');
   const [currentTime, setCurrentTime] = useState(new Date());
