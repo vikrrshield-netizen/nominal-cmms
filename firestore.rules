@@ -780,6 +780,20 @@ service cloud.firestore {
       allow delete: if hasPermission('production.manage');
     }
 
+    match /materials/{docId} {
+      allow read: if hasPermission('production.read') || hasPermission('production.manage') || hasPermission('report.read');
+      allow create: if hasPermission('production.manage') && hasTimestamp();
+      allow update: if hasPermission('production.manage') && hasTimestamp();
+      allow delete: if hasPermission('production.manage');
+    }
+
+    match /products/{docId} {
+      allow read: if hasPermission('production.read') || hasPermission('production.manage') || hasPermission('report.read');
+      allow create: if hasPermission('production.manage') && hasTimestamp();
+      allow update: if hasPermission('production.manage') && hasTimestamp();
+      allow delete: if hasPermission('production.manage');
+    }
+
     match /warehouse_receipts/{docId} {
       allow read: if hasPermission('warehouse.view') || hasPermission('warehouse.manage');
       allow create: if hasPermission('warehouse.manage') && hasTimestamp();

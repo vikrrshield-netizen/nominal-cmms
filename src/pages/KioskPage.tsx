@@ -89,6 +89,15 @@ interface KioskProductionPlan {
   status: 'planned' | 'running' | 'done';
 }
 
+interface KioskMasterItem {
+  id: string;
+  number: string;
+  nkCode: string;
+  name: string;
+  usageCount?: number;
+  active?: boolean;
+}
+
 const QUICK_BREAKDOWNS: QuickOption[] = [
   { id: 'stuck', label: 'Zaseknutý materiál' },
   { id: 'noise', label: 'Hluk nebo vibrace' },
@@ -161,6 +170,12 @@ const normalize = (value: unknown) =>
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .trim();
+
+function sortMasterItems(items: KioskMasterItem[]) {
+  return [...items]
+    .filter((item) => item.active !== false)
+    .sort((a, b) => (b.usageCount || 0) - (a.usageCount || 0) || a.name.localeCompare(b.name, 'cs'));
+}
 
 const isEntity = (asset: Asset, words: string[]) => {
   const entity = normalize(asset.entityType);
@@ -353,6 +368,10 @@ export default function KioskPage() {
   const [gearboxMotorLoad, setGearboxMotorLoad] = useState('');
   const [gearboxMeasuredAt, setGearboxMeasuredAt] = useState(() => new Date().toISOString().slice(0, 16));
   const [gearboxRawMaterial, setGearboxRawMaterial] = useState('');
+  const [gearboxMaterialId, setGearboxMaterialId] = useState('');
+  const [gearboxMaterialBatch, setGearboxMaterialBatch] = useState('');
+  const [gearboxProductId, setGearboxProductId] = useState('');
+  const [gearboxProductBatch, setGearboxProductBatch] = useState('');
   const [gearboxNote, setGearboxNote] = useState('');
   const [gearboxPhotoFile, setGearboxPhotoFile] = useState<File | null>(null);
   const gearboxPhotoInputRef = useRef<HTMLInputElement>(null);
@@ -369,6 +388,8 @@ export default function KioskPage() {
   const [shiftNotes, setShiftNotes] = useState<ShiftNote[]>([]);
   const [prefilterLogs, setPrefilterLogs] = useState<PrefilterLog[]>([]);
   const [dataloggerLogs, setDataloggerLogs] = useState<DataloggerTemperatureLog[]>([]);
+  const [materials, setMaterials] = useState<KioskMasterItem[]>([]);
+  const [products, setProducts] = useState<KioskMasterItem[]>([]);
   const [productionPlans, setProductionPlans] = useState<KioskProductionPlan[]>([]);
   const [handoverText, setHandoverText] = useState('');
   const [handoverPriority, setHandoverPriority] = useState<'normal' | 'important'>('normal');
@@ -426,6 +447,11 @@ export default function KioskPage() {
     return allRecipients.filter((recipient) => normalize(recipient).includes(search)).slice(0, 18);
   }, [handoverRecipientSearch, normalizedHandoverRecipients]);
 
+  const sortedMaterials = useMemo(() => sortMasterItems(materials), [materials]);
+  const sortedProducts = useMemo(() => sortMasterItems(products), [products]);
+  const selectedMaterial = useMemo(() => sortedMaterials.find((item) => item.id === gearboxMaterialId), [gearboxMaterialId, sortedMaterials]);
+  const selectedProduct = useMemo(() => sortedProducts.find((item) => item.id === gearboxProductId), [gearboxProductId, sortedProducts]);
+
   useEffect(() => {
     const interval = window.setInterval(() => setCurrentTime(new Date()), 1000);
     return () => window.clearInterval(interval);
@@ -449,6 +475,23 @@ export default function KioskPage() {
       () => setAssets([])
     );
     return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const unsubMaterials = onSnapshot(
+      collection(db, 'materials'),
+      (snapshot) => setMaterials(snapshot.docs.map((document) => ({ id: document.id, ...document.data() } as KioskMasterItem))),
+      () => setMaterials([]),
+    );
+    const unsubProducts = onSnapshot(
+      collection(db, 'products'),
+      (snapshot) => setProducts(snapshot.docs.map((document) => ({ id: document.id, ...document.data() } as KioskMasterItem))),
+      () => setProducts([]),
+    );
+    return () => {
+      unsubMaterials();
+      unsubProducts();
+    };
   }, []);
 
   useEffect(() => {
@@ -864,6 +907,10 @@ export default function KioskPage() {
     setGearboxMotorLoad('');
     setGearboxMeasuredAt(new Date().toISOString().slice(0, 16));
     setGearboxRawMaterial('');
+    setGearboxMaterialId('');
+    setGearboxMaterialBatch('');
+    setGearboxProductId('');
+    setGearboxProductBatch('');
     setGearboxNote('');
     setGearboxPhotoFile(null);
     setGearboxProblemOpen(false);
@@ -1034,12 +1081,12 @@ export default function KioskPage() {
 
   const currentGearboxMotorLoad = () => {
     const parsed = Number(String(gearboxMotorLoad).replace(',', '.'));
-    if (Number.isFinite(parsed)) return Math.max(0, Math.min(100, Math.round(parsed)));
+    if (Number.isFinite(parsed)) return Math.max(0, Math.round(parsed * 10) / 10);
     return 0;
   };
 
   const setGearboxMotorLoadValue = (value: number) => {
-    setGearboxMotorLoad(String(Math.max(0, Math.min(100, Math.round(value)))));
+    setGearboxMotorLoad(String(Math.max(0, Math.round(value * 10) / 10)));
   };
 
   const currentDataloggerTemperature = () => {
@@ -1073,9 +1120,15 @@ export default function KioskPage() {
         gearbox: selectedAsset,
         user,
         temperatureC,
-        motorLoadPercent: gearboxMotorLoad.trim() ? currentGearboxMotorLoad() : null,
+        motorLoadAmps: gearboxMotorLoad.trim() ? currentGearboxMotorLoad() : null,
         measuredAt: new Date(gearboxMeasuredAt),
-        rawMaterial: gearboxRawMaterial.trim(),
+        rawMaterial: selectedMaterial?.name || gearboxRawMaterial.trim(),
+        materialId: selectedMaterial?.id,
+        materialName: selectedMaterial?.name,
+        materialBatch: gearboxMaterialBatch.trim(),
+        productId: selectedProduct?.id,
+        productName: selectedProduct?.name,
+        productBatch: gearboxProductBatch.trim(),
         note: gearboxNote.trim(),
         photoFile: gearboxPhotoFile,
       });
@@ -1627,7 +1680,6 @@ export default function KioskPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[45vh] overflow-y-auto pr-1">
         {activeGearboxAssets
           .filter((asset) => !assetSearch || normalize(assetLabel(asset, assets)).includes(normalize(assetSearch)))
-          .slice(0, 30)
           .map((asset) => {
             const dailyStatus = getGearboxDailyTemperatureStatus(asset);
             const missing = dailyStatus.state !== 'ok';
@@ -1994,6 +2046,7 @@ export default function KioskPage() {
       {selectedAsset && (() => {
         const temperature = currentGearboxTemperature();
         const motorLoad = currentGearboxMotorLoad();
+        const motorLoadSliderMax = Math.max(80, Math.ceil(motorLoad + 10));
         const status = temperatureStatus(selectedAsset, temperature);
         return (
         <div className="space-y-2">
@@ -2062,7 +2115,7 @@ export default function KioskPage() {
               <div>
                 <div className="text-xs font-bold text-slate-300">Zátěž motoru</div>
                 <div className="text-3xl font-black leading-none text-white">
-                  {gearboxMotorLoad.trim() ? motorLoad : '—'}<span className="text-lg"> %</span>
+                  {gearboxMotorLoad.trim() ? motorLoad : '—'}<span className="text-lg"> A</span>
                 </div>
               </div>
               <input
@@ -2070,21 +2123,21 @@ export default function KioskPage() {
                 inputMode="decimal"
                 value={gearboxMotorLoad}
                 onChange={(event) => setGearboxMotorLoad(event.target.value)}
-                placeholder="např. 65"
+                placeholder="např. 12,5"
                 className="w-28 rounded-xl border border-white/10 bg-slate-950 p-2.5 text-right text-base font-black text-white outline-none placeholder:text-slate-500 focus:border-cyan-300"
               />
             </div>
             <input
               type="range"
               min={0}
-              max={100}
-              step={1}
+              max={motorLoadSliderMax}
+              step={0.1}
               value={motorLoad}
               onChange={(event) => setGearboxMotorLoadValue(Number(event.target.value))}
               className="mt-2 w-full accent-cyan-400"
             />
             <div className="mt-2 grid grid-cols-4 gap-2">
-              {[-10, -1, 1, 10].map((delta) => (
+              {[-5, -0.1, 0.1, 5].map((delta) => (
                 <button
                   key={delta}
                   type="button"
@@ -2106,13 +2159,64 @@ export default function KioskPage() {
               className="w-full rounded-xl border border-white/10 bg-slate-950 p-2.5 text-base text-white"
             />
           </label>
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+            <label className="block">
+              <span className="mb-1 block text-xs font-black text-slate-200">Výrobek</span>
+              <select
+                value={gearboxProductId}
+                onChange={(event) => setGearboxProductId(event.target.value)}
+                className="w-full rounded-xl border border-white/10 bg-slate-950 p-2.5 text-base text-white outline-none focus:border-violet-400"
+              >
+                <option value="">Nezadáno</option>
+                {sortedProducts.map((product) => (
+                  <option key={product.id} value={product.id}>{product.nkCode} · {product.name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-black text-slate-200">Šarže výrobku</span>
+              <input
+                type="text"
+                value={gearboxProductBatch}
+                onChange={(event) => setGearboxProductBatch(event.target.value)}
+                placeholder="např. sk004290526"
+                className="w-full rounded-xl border border-white/10 bg-slate-950 p-2.5 text-base text-white outline-none placeholder:text-slate-500 focus:border-violet-400"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-black text-slate-200">Surovina</span>
+              <select
+                value={gearboxMaterialId}
+                onChange={(event) => {
+                  setGearboxMaterialId(event.target.value);
+                  setGearboxRawMaterial('');
+                }}
+                className="w-full rounded-xl border border-white/10 bg-slate-950 p-2.5 text-base text-white outline-none focus:border-violet-400"
+              >
+                <option value="">Nezadáno</option>
+                {sortedMaterials.map((material) => (
+                  <option key={material.id} value={material.id}>{material.nkCode} · {material.name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-black text-slate-200">Šarže suroviny</span>
+              <input
+                type="text"
+                value={gearboxMaterialBatch}
+                onChange={(event) => setGearboxMaterialBatch(event.target.value)}
+                placeholder="např. nk01290526-A"
+                className="w-full rounded-xl border border-white/10 bg-slate-950 p-2.5 text-base text-white outline-none placeholder:text-slate-500 focus:border-violet-400"
+              />
+            </label>
+          </div>
           <label className="block">
-            <span className="mb-1 block text-xs font-black text-slate-200">Surovina</span>
+            <span className="mb-1 block text-xs font-black text-slate-200">Surovina mimo seznam</span>
             <input
               type="text"
               value={gearboxRawMaterial}
               onChange={(event) => setGearboxRawMaterial(event.target.value)}
-              placeholder="napr. kukurice, ryze, smes..."
+              placeholder="jen když není v číselníku"
               className="w-full rounded-xl border border-white/10 bg-slate-950 p-2.5 text-base text-white outline-none placeholder:text-slate-500 focus:border-violet-400"
             />
           </label>
@@ -2630,7 +2734,7 @@ function QuickButton({ label, selected, onClick }: { label: string; selected: bo
 
 function FormWrapper({ title, onCancel, children }: { title: string; onCancel: () => void; children: React.ReactNode }) {
   return (
-    <div className="w-full max-w-5xl max-h-[calc(100vh-24px)] overflow-y-auto bg-slate-800 p-4 md:p-6 rounded-3xl shadow-2xl border border-white/10">
+    <div className="w-full max-w-6xl max-h-[calc(100dvh-12px)] overflow-y-auto bg-slate-800 p-3 md:p-6 rounded-3xl shadow-2xl border border-white/10">
       <div className="flex items-center gap-3 mb-5">
         <button onClick={onCancel} className="min-h-12 min-w-12 flex items-center justify-center p-3 rounded-xl bg-slate-900 text-slate-300 hover:bg-slate-700 hover:text-white transition">
           <ArrowLeft className="w-6 h-6" />

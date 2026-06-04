@@ -38,6 +38,7 @@ const SchedulesPage = lazy(() => import('./pages/SchedulesPage'));
 const PersonalDiaryPage = lazy(() => import('./pages/PersonalDiaryPage'));
 const WorkDiaryPage = lazy(() => import('./pages/WorkDiaryPage'));
 const ProductionPage = lazy(() => import('./pages/ProductionPage'));
+const MasterDataPage = lazy(() => import('./pages/MasterDataPage'));
 const WarehousePage = lazy(() => import('./pages/WarehousePage'));
 const ShiftPlannerPage = lazy(() => import('./pages/ShiftPlannerPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
@@ -207,6 +208,8 @@ function ProtectedRoutes() {
         <Route path="/notes" element={<PersonalDiaryPage />} />
         <Route path="/work-diary" element={<ProtectedPage permissions={['wo.read', 'wo.update', 'wo.create']}><WorkDiaryPage /></ProtectedPage>} />
         <Route path="/production" element={<ProtectedPage moduleId="production" roles={['SUPERADMIN']} permissions={['preview.superadmin']}><ProductionPage /></ProtectedPage>} />
+        <Route path="/materials" element={<ProtectedPage permissions={['production.read', 'production.manage', 'report.read']}><MasterDataPage /></ProtectedPage>} />
+        <Route path="/products" element={<ProtectedPage permissions={['production.read', 'production.manage', 'report.read']}><MasterDataPage /></ProtectedPage>} />
         <Route path="/warehouse" element={<ProtectedPage moduleId="warehouse" permissions={['warehouse.view', 'warehouse.manage']}><WarehousePage /></ProtectedPage>} />
         <Route path="/shifts" element={<ProtectedPage moduleId="shifts" permissions={['shifts.view', 'shifts.manage']}><ShiftPlannerPage /></ProtectedPage>} />
         <Route path="/settings" element={<ProtectedPage permissions={['admin.view', 'admin.manage']}><SettingsPage /></ProtectedPage>} />

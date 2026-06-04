@@ -11,11 +11,17 @@ export interface GearboxTemperatureLog {
   extruderId?: string | null;
   extruderName?: string | null;
   temperatureC: number;
-  motorLoadPercent?: number | null;
+  motorLoadAmps?: number | null;
   measuredAt: Timestamp;
   userId: string;
   userName: string;
   rawMaterial?: string;
+  materialId?: string | null;
+  materialName?: string | null;
+  materialBatch?: string;
+  productId?: string | null;
+  productName?: string | null;
+  productBatch?: string;
   note?: string;
   photoUrl?: string;
   createdAt: Timestamp;

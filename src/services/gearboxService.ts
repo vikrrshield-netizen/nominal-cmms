@@ -330,9 +330,15 @@ export async function addGearboxTemperatureLog(input: {
   gearbox: Asset;
   user?: AppUser | null;
   temperatureC: number;
-  motorLoadPercent?: number | null;
+  motorLoadAmps?: number | null;
   measuredAt: Date;
   rawMaterial?: string;
+  materialId?: string;
+  materialName?: string;
+  materialBatch?: string;
+  productId?: string;
+  productName?: string;
+  productBatch?: string;
   note?: string;
   photoFile?: File | null;
 }) {
@@ -345,8 +351,12 @@ export async function addGearboxTemperatureLog(input: {
 
   const measuredAt = Timestamp.fromDate(input.measuredAt);
   const rawMaterial = input.rawMaterial?.trim() || '';
-  const motorLoadPercent = typeof input.motorLoadPercent === 'number' && Number.isFinite(input.motorLoadPercent)
-    ? Math.max(0, Math.min(100, Math.round(input.motorLoadPercent)))
+  const materialName = input.materialName?.trim() || rawMaterial;
+  const productName = input.productName?.trim() || '';
+  const materialBatch = input.materialBatch?.trim() || '';
+  const productBatch = input.productBatch?.trim() || '';
+  const motorLoadAmps = typeof input.motorLoadAmps === 'number' && Number.isFinite(input.motorLoadAmps)
+    ? Math.max(0, Math.round(input.motorLoadAmps * 10) / 10)
     : null;
   await addDoc(collection(db, 'gearbox_temperature_logs'), {
     tenantId: input.tenantId,
@@ -355,11 +365,17 @@ export async function addGearboxTemperatureLog(input: {
     extruderId: input.gearbox.currentExtruderId || null,
     extruderName: input.gearbox.currentExtruderName || null,
     temperatureC: input.temperatureC,
-    motorLoadPercent,
+    motorLoadAmps,
     measuredAt,
     userId: userId(input.user),
     userName: userName(input.user),
     rawMaterial,
+    materialId: input.materialId || null,
+    materialName: materialName || null,
+    materialBatch,
+    productId: input.productId || null,
+    productName: productName || null,
+    productBatch,
     note: input.note || '',
     photoUrl,
     createdAt: serverTimestamp(),
@@ -369,7 +385,7 @@ export async function addGearboxTemperatureLog(input: {
     tenantId: input.tenantId,
     lastTemperatureC: input.temperatureC,
     lastTemperatureAt: input.measuredAt.toISOString(),
-    lastMotorLoadPercent: motorLoadPercent,
+    lastMotorLoadAmps: motorLoadAmps,
     lastGearboxPhotoUrl: photoUrl || input.gearbox.lastGearboxPhotoUrl || null,
     updatedAt: Timestamp.now(),
   });
@@ -385,12 +401,13 @@ export async function addGearboxTemperatureLog(input: {
     auditReady: true,
     performedAt: input.measuredAt,
     content: [
-      `Zaznam teploty prevodovky: ${input.temperatureC} °C`,
-      motorLoadPercent !== null ? `Zatez motoru: ${motorLoadPercent} %` : '',
+      `Záznam teploty převodovky: ${input.temperatureC} °C`,
+      motorLoadAmps !== null ? `Zátěž motoru: ${motorLoadAmps} A` : '',
       input.gearbox.currentExtruderName ? `Extruder: ${input.gearbox.currentExtruderName}` : '',
-      rawMaterial ? `Surovina: ${rawMaterial}` : '',
-      input.note ? `Poznamka: ${input.note}` : '',
-      photoUrl ? 'Prilozena fotka kontroly.' : '',
+      productName ? `Výrobek: ${productName}${productBatch ? ` / šarže ${productBatch}` : ''}` : '',
+      materialName ? `Surovina: ${materialName}${materialBatch ? ` / šarže ${materialBatch}` : ''}` : '',
+      input.note ? `Poznámka: ${input.note}` : '',
+      photoUrl ? 'Přiložena fotka kontroly.' : '',
     ].filter(Boolean).join('\n'),
   });
 }

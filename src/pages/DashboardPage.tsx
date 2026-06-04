@@ -311,6 +311,8 @@ function ModuleShortcuts({ onNavigate }: { onNavigate: (path: string) => void })
     { label: 'Sklad ND', detail: 'díly a převodovky', path: '/inventory', icon: Package, tone: 'text-orange-600', permissions: ['inv.consume', 'inv.restock', 'inv.manage', 'inv.order', 'report.read'] },
     { label: 'Převodovky', detail: 'umístění a teploty', path: '/gearboxes', icon: Cog, tone: 'text-violet-600', permissions: ['gearbox.temperature.write', 'gearbox.manage', 'asset.update', 'asset.read'] },
     { label: 'Datalogery', detail: 'denní teploty skladu', path: '/dataloggers', icon: Thermometer, tone: 'text-cyan-700', permissions: ['datalogger.read', 'datalogger.temperature.write', 'datalogger.manage'] },
+    { label: 'Suroviny', detail: 'šarže, alergeny, dodavatelé', path: '/materials', icon: Package, tone: 'text-emerald-700', permissions: ['production.read', 'production.manage', 'report.read'] },
+    { label: 'Výrobky', detail: 'receptury a šarže', path: '/products', icon: Factory, tone: 'text-emerald-700', permissions: ['production.read', 'production.manage', 'report.read'] },
     { label: 'Vzduchotechnika', detail: 'filtry a výměny', path: '/hvac', icon: Wind, tone: 'text-sky-600', permissions: ['hvac.read', 'hvac.manage'] },
     ...(user?.role === 'SUPERADMIN'
       ? [{ label: 'Výroba', detail: 'plán extrudoven', path: '/production', icon: Factory, tone: 'text-emerald-700', permissions: ['preview.superadmin'] }]

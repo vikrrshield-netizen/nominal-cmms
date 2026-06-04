@@ -1505,7 +1505,8 @@ export default function AssetCardPage() {
                         <div>
                           <div style={{ fontWeight: 700, color: '#0f172a' }}>{log.temperatureC} °C</div>
                           <div style={{ fontSize: 12, color: '#64748b' }}>{formatHistoryDate(log.measuredAt)} · {log.userName}</div>
-                          {typeof log.motorLoadPercent === 'number' && <div style={{ fontSize: 12, color: '#0369a1', marginTop: 3 }}>Zátěž motoru: {log.motorLoadPercent} %</div>}
+                          {typeof log.motorLoadAmps === 'number' && <div style={{ fontSize: 12, color: '#0369a1', marginTop: 3 }}>Zátěž motoru: {log.motorLoadAmps} A</div>}
+                          {typeof (log as unknown as { motorLoadPercent?: number }).motorLoadPercent === 'number' && typeof log.motorLoadAmps !== 'number' && <div style={{ fontSize: 12, color: '#0369a1', marginTop: 3 }}>Zátěž motoru: {(log as unknown as { motorLoadPercent: number }).motorLoadPercent} %</div>}
                           {log.rawMaterial && <div style={{ fontSize: 12, color: '#0f766e', marginTop: 3 }}>Surovina: {log.rawMaterial}</div>}
                           {log.note && <div style={{ fontSize: 12, color: '#475569', marginTop: 3 }}>{log.note}</div>}
                         </div>
@@ -2378,10 +2379,10 @@ export default function AssetCardPage() {
           user={user}
           saving={gearboxActionSaving}
           onClose={() => setShowGearboxTemperature(false)}
-          onSave={async ({ temperatureC, motorLoadPercent, measuredAt, rawMaterial, note, photoFile }) => {
+          onSave={async ({ temperatureC, motorLoadAmps, measuredAt, rawMaterial, note, photoFile }) => {
             setGearboxActionSaving(true);
             try {
-              await addGearboxTemperatureLog({ tenantId, gearbox: assetV2, user, temperatureC, motorLoadPercent, measuredAt, rawMaterial, note, photoFile });
+              await addGearboxTemperatureLog({ tenantId, gearbox: assetV2, user, temperatureC, motorLoadAmps, measuredAt, rawMaterial, note, photoFile });
               await refreshAssetV2();
               setShowGearboxTemperature(false);
               setActiveTab('history');
@@ -2824,7 +2825,7 @@ function GearboxTemperatureModal({ gearbox, user, saving, onClose, onSave }: {
   user: { displayName?: string } | null;
   saving: boolean;
   onClose: () => void;
-  onSave: (input: { temperatureC: number; motorLoadPercent: number | null; measuredAt: Date; rawMaterial: string; note: string; photoFile?: File | null }) => Promise<void>;
+  onSave: (input: { temperatureC: number; motorLoadAmps: number | null; measuredAt: Date; rawMaterial: string; note: string; photoFile?: File | null }) => Promise<void>;
 }) {
   const [temperature, setTemperature] = useState(String(clampTemperature(gearbox.lastTemperatureC ?? 60)));
   const [motorLoad, setMotorLoad] = useState('');
@@ -2843,9 +2844,10 @@ function GearboxTemperatureModal({ gearbox, user, saving, onClose, onSave }: {
   const setTemperatureValue = (value: number) => setTemperature(String(clampTemperature(value)));
   const motorLoadNumber = (() => {
     const parsed = Number(String(motorLoad).replace(',', '.'));
-    return Number.isFinite(parsed) ? Math.max(0, Math.min(100, Math.round(parsed))) : 0;
+    return Number.isFinite(parsed) ? Math.max(0, Math.round(parsed * 10) / 10) : 0;
   })();
-  const setMotorLoadValue = (value: number) => setMotorLoad(String(Math.max(0, Math.min(100, Math.round(value)))));
+  const motorLoadSliderMax = Math.max(80, Math.ceil(motorLoadNumber + 10));
+  const setMotorLoadValue = (value: number) => setMotorLoad(String(Math.max(0, Math.round(value * 10) / 10)));
 
   return (
     <ModalShell title="Záznam teploty" icon={<Thermometer className="w-5 h-5 text-cyan-300" />} onClose={onClose}>
@@ -2909,28 +2911,28 @@ function GearboxTemperatureModal({ gearbox, user, saving, onClose, onSave }: {
           <div className="flex items-center justify-between gap-3">
             <div>
               <div className="text-sm font-medium text-slate-400">Zátěž motoru</div>
-              <div className="mt-1 text-3xl font-black text-white">{motorLoad.trim() ? motorLoadNumber : '—'} %</div>
+              <div className="mt-1 text-3xl font-black text-white">{motorLoad.trim() ? motorLoadNumber : '—'} A</div>
             </div>
             <input
               type="text"
               inputMode="decimal"
               value={motorLoad}
               onChange={(e) => setMotorLoad(e.target.value)}
-              placeholder="např. 65"
+              placeholder="např. 12,5"
               className="w-28 rounded-xl border border-white/10 bg-slate-900 p-3 text-right font-black text-white placeholder-slate-600 focus:outline-none focus:border-cyan-400"
             />
           </div>
           <input
             type="range"
             min="0"
-            max="100"
-            step="1"
+            max={motorLoadSliderMax}
+            step="0.1"
             value={motorLoadNumber}
             onChange={(e) => setMotorLoadValue(Number(e.target.value))}
             className="mt-4 w-full accent-cyan-400"
           />
           <div className="mt-3 grid grid-cols-4 gap-2">
-            {[-10, -1, 1, 10].map((delta) => (
+            {[-5, -0.1, 0.1, 5].map((delta) => (
               <button
                 key={delta}
                 type="button"
@@ -2987,7 +2989,7 @@ function GearboxTemperatureModal({ gearbox, user, saving, onClose, onSave }: {
           {photoPreview && <img src={photoPreview} alt="Náhled" className="mt-3 h-28 rounded-xl object-cover border border-white/10" />}
         </label>
         <button
-          onClick={() => onSave({ temperatureC: temperatureNumber, motorLoadPercent: motorLoad.trim() ? motorLoadNumber : null, measuredAt: new Date(measuredAt), rawMaterial: rawMaterial.trim(), note: note.trim(), photoFile })}
+          onClick={() => onSave({ temperatureC: temperatureNumber, motorLoadAmps: motorLoad.trim() ? motorLoadNumber : null, measuredAt: new Date(measuredAt), rawMaterial: rawMaterial.trim(), note: note.trim(), photoFile })}
           disabled={!measuredAt || saving}
           className="w-full py-3.5 bg-cyan-600 text-white rounded-xl font-bold disabled:opacity-50 flex items-center justify-center gap-2"
         >

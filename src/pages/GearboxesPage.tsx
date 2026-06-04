@@ -62,6 +62,12 @@ function daysSince(value: unknown): number | null {
   return Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24));
 }
 
+function motorLoadAmps(log: GearboxTemperatureLog): number | null {
+  if (typeof log.motorLoadAmps === 'number') return log.motorLoadAmps;
+  const legacy = (log as { motorLoadPercent?: unknown }).motorLoadPercent;
+  return typeof legacy === 'number' ? legacy : null;
+}
+
 function temperatureInfo(asset: Asset): {
   level: TemperatureLevel;
   label: string;
@@ -705,7 +711,7 @@ function TemperatureTrend({ logs }: { logs: GearboxTemperatureLog[] }) {
 
 function MotorLoadTrend({ logs }: { logs: GearboxTemperatureLog[] }) {
   const points = logs
-    .filter((log) => typeof log.motorLoadPercent === 'number' && asDate(log.measuredAt))
+    .filter((log) => motorLoadAmps(log) !== null && asDate(log.measuredAt))
     .slice(0, 12)
     .reverse();
 
@@ -723,13 +729,13 @@ function MotorLoadTrend({ logs }: { logs: GearboxTemperatureLog[] }) {
     );
   }
 
-  const values = points.map((log) => log.motorLoadPercent ?? 0);
+  const values = points.map((log) => motorLoadAmps(log) ?? 0);
   const min = Math.min(...values);
   const max = Math.max(...values);
   const spread = Math.max(1, max - min);
   const polyline = points.map((log, index) => {
     const x = points.length === 1 ? 50 : (index / (points.length - 1)) * 100;
-    const y = 46 - (((log.motorLoadPercent ?? 0) - min) / spread) * 36;
+    const y = 46 - (((motorLoadAmps(log) ?? 0) - min) / spread) * 36;
     return `${x.toFixed(2)},${y.toFixed(2)}`;
   }).join(' ');
   const latest = points[points.length - 1];
@@ -743,7 +749,7 @@ function MotorLoadTrend({ logs }: { logs: GearboxTemperatureLog[] }) {
           Trend zátěže motoru
         </div>
         <div className="text-xs font-bold text-slate-300">
-          {first.motorLoadPercent} % {'->'} {latest.motorLoadPercent} %
+          {motorLoadAmps(first)} A {'->'} {motorLoadAmps(latest)} A
         </div>
       </div>
       <svg viewBox="0 0 100 52" preserveAspectRatio="none" className="h-16 w-full overflow-visible">
@@ -752,7 +758,7 @@ function MotorLoadTrend({ logs }: { logs: GearboxTemperatureLog[] }) {
         <polyline points={polyline} fill="none" className="stroke-amber-300" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
         {points.map((log, index) => {
           const x = points.length === 1 ? 50 : (index / (points.length - 1)) * 100;
-          const y = 46 - (((log.motorLoadPercent ?? 0) - min) / spread) * 36;
+          const y = 46 - (((motorLoadAmps(log) ?? 0) - min) / spread) * 36;
           return <circle key={`${log.id}-load-${index}`} cx={x} cy={y} r="2.2" className="fill-amber-200" />;
         })}
       </svg>
