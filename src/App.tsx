@@ -197,7 +197,7 @@ function ProtectedRoutes() {
           )}
         />
         <Route path="/ai" element={<ProtectedPage moduleId="ai" permissions={['ai.use']}><AIAssistantPage /></ProtectedPage>} />
-        <Route path="/notifications" element={<NotificationsPage />} />
+        <Route path="/notifications" element={<ProtectedPage><NotificationsPage /></ProtectedPage>} />
         <Route path="/louparna" element={<Navigate to="/" replace />} />
         <Route path="/kiosk" element={<KioskPage />} />
         <Route path="/inspections" element={<ProtectedPage moduleId="inspections" permissions={['asset.read', 'weekly.modify']}><InspectionsPage /></ProtectedPage>} />
@@ -207,8 +207,8 @@ function ProtectedRoutes() {
         <Route path="/notes" element={<PersonalDiaryPage />} />
         <Route path="/work-diary" element={<ProtectedPage permissions={['wo.read', 'wo.update', 'wo.create']}><WorkDiaryPage /></ProtectedPage>} />
         <Route path="/production" element={<ProtectedPage moduleId="production" permissions={['production.manage']}><ProductionPage /></ProtectedPage>} />
-        <Route path="/warehouse" element={<ProtectedPage moduleId="warehouse" permissions={['warehouse.view']}><WarehousePage /></ProtectedPage>} />
-        <Route path="/shifts" element={<ProtectedPage moduleId="shifts" permissions={['shifts.view']}><ShiftPlannerPage /></ProtectedPage>} />
+        <Route path="/warehouse" element={<ProtectedPage moduleId="warehouse" permissions={['warehouse.view', 'warehouse.manage']}><WarehousePage /></ProtectedPage>} />
+        <Route path="/shifts" element={<ProtectedPage moduleId="shifts" permissions={['shifts.view', 'shifts.manage']}><ShiftPlannerPage /></ProtectedPage>} />
         <Route path="/settings" element={<ProtectedPage permissions={['admin.view', 'admin.manage']}><SettingsPage /></ProtectedPage>} />
         <Route path="/kartoteka" element={<ProtectedPage permissions={['asset.read']}><KartotekaPage /></ProtectedPage>} />
         <Route path="/preview" element={<ProtectedPage roles={['SUPERADMIN']} permissions={['preview.superadmin']}><PreviewPage /></ProtectedPage>} />
