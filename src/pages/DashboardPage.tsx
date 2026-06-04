@@ -312,7 +312,9 @@ function ModuleShortcuts({ onNavigate }: { onNavigate: (path: string) => void })
     { label: 'Převodovky', detail: 'umístění a teploty', path: '/gearboxes', icon: Cog, tone: 'text-violet-600', permissions: ['gearbox.temperature.write', 'gearbox.manage', 'asset.update', 'asset.read'] },
     { label: 'Datalogery', detail: 'denní teploty skladu', path: '/dataloggers', icon: Thermometer, tone: 'text-cyan-700', permissions: ['datalogger.read', 'datalogger.temperature.write', 'datalogger.manage'] },
     { label: 'Vzduchotechnika', detail: 'filtry a výměny', path: '/hvac', icon: Wind, tone: 'text-sky-600', permissions: ['hvac.read', 'hvac.manage'] },
-    { label: 'Výroba', detail: 'plán extrudoven', path: '/production', icon: Factory, tone: 'text-emerald-700', permissions: ['production.manage'] },
+    ...(user?.role === 'SUPERADMIN'
+      ? [{ label: 'Výroba', detail: 'plán extrudoven', path: '/production', icon: Factory, tone: 'text-emerald-700', permissions: ['preview.superadmin'] }]
+      : []),
     { label: 'Administrace', detail: 'uživatelé a práva', path: '/admin', icon: Settings, tone: 'text-slate-600', permissions: ['admin.view', 'admin.manage', 'user.manage'] },
     ...(user?.role === 'SUPERADMIN'
       ? [{ label: 'Testovací stránky', detail: 'preview před produkcí', path: '/preview', icon: FlaskConical, tone: 'text-emerald-700', permissions: ['admin.manage'] }]

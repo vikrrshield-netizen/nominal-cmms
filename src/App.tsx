@@ -206,7 +206,7 @@ function ProtectedRoutes() {
         <Route path="/schedules" element={<ProtectedPage permissions={['schedule.manage']}><SchedulesPage /></ProtectedPage>} />
         <Route path="/notes" element={<PersonalDiaryPage />} />
         <Route path="/work-diary" element={<ProtectedPage permissions={['wo.read', 'wo.update', 'wo.create']}><WorkDiaryPage /></ProtectedPage>} />
-        <Route path="/production" element={<ProtectedPage moduleId="production" permissions={['production.manage']}><ProductionPage /></ProtectedPage>} />
+        <Route path="/production" element={<ProtectedPage moduleId="production" roles={['SUPERADMIN']} permissions={['preview.superadmin']}><ProductionPage /></ProtectedPage>} />
         <Route path="/warehouse" element={<ProtectedPage moduleId="warehouse" permissions={['warehouse.view', 'warehouse.manage']}><WarehousePage /></ProtectedPage>} />
         <Route path="/shifts" element={<ProtectedPage moduleId="shifts" permissions={['shifts.view', 'shifts.manage']}><ShiftPlannerPage /></ProtectedPage>} />
         <Route path="/settings" element={<ProtectedPage permissions={['admin.view', 'admin.manage']}><SettingsPage /></ProtectedPage>} />
