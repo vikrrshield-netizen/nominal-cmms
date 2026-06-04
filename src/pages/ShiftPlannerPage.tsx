@@ -185,7 +185,8 @@ function useShiftNotes() {
 export default function ShiftPlannerPage() {
   const goBack = useBackNavigation('/');
   const { user, hasPermission } = useAuthContext();
-  const canView = hasPermission('shifts.view');
+  const canView = hasPermission('shifts.view') || hasPermission('shifts.manage');
+  const canManage = hasPermission('shifts.manage');
 
   const [currentMonday, setCurrentMonday] = useState(() => getWeekMonday(new Date()));
   const weekId = useMemo(() => getWeekId(currentMonday), [currentMonday]);
@@ -218,6 +219,7 @@ export default function ShiftPlannerPage() {
   const goToday = () => setCurrentMonday(getWeekMonday(new Date()));
 
   const toggleShift = (userId: string, dayKey: string) => {
+    if (!canManage) return;
     const current = assignments[userId]?.[dayKey] || '-';
     const cycle: ShiftType[] = ['-', 'R', 'O', 'N', 'V'];
     const nextIdx = (cycle.indexOf(current) + 1) % cycle.length;
@@ -229,6 +231,7 @@ export default function ShiftPlannerPage() {
   };
 
   const savePlan = async () => {
+    if (!canManage) return;
     setSaving(true);
     try {
       await setDoc(doc(db, 'shift_plans', weekId), {
@@ -292,7 +295,7 @@ export default function ShiftPlannerPage() {
               <p className="text-xs text-slate-500">Přiřazení techniků na týden</p>
             </div>
           </div>
-          {dirty && (
+          {canManage && dirty && (
             <button onClick={savePlan} disabled={saving}
               className="px-3 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-500 transition flex items-center gap-1.5 disabled:opacity-50">
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
@@ -446,10 +449,11 @@ export default function ShiftPlannerPage() {
                         <td key={dayKey} className="py-2 px-1 text-center">
                           <button
                             onClick={() => toggleShift(tech.id, dayKey)}
+                            disabled={!canManage}
                             className={`w-full py-2.5 rounded-xl text-sm font-bold transition active:scale-90
                               ${cfg.bg} ${cfg.color}
                               ${isToday ? 'ring-1 ring-orange-500/40' : ''}
-                              hover:brightness-125
+                              ${canManage ? 'hover:brightness-125' : 'cursor-default opacity-80'}
                             `}
                           >
                             {cfg.short}

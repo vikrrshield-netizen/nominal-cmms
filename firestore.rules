@@ -115,7 +115,7 @@ service cloud.firestore {
           'report.read', 'report.export', 'audit.read',
           'finance.view', 'purchase.approve',
           'weekly.modify', 'ai.use', 'admin.view',
-          'warehouse.view', 'shifts.view'
+          'warehouse.view', 'warehouse.manage', 'shifts.view', 'shifts.manage'
         ]
       ) || (
         userRole() == 'SUPERADMIN'
@@ -130,7 +130,7 @@ service cloud.firestore {
           'report.read', 'report.export', 'audit.read',
           'weekly.modify', 'ai.use', 'schedule.manage', 'production.manage',
           'admin.view', 'admin.manage',
-          'warehouse.view', 'shifts.view'
+          'warehouse.view', 'warehouse.manage', 'shifts.view', 'shifts.manage'
         ]
       ) || (
         userRole() == 'UDRZBA'
@@ -142,7 +142,7 @@ service cloud.firestore {
           'fleet.read',
           'report.read',
           'ai.use', 'schedule.manage', 'production.manage',
-          'warehouse.view', 'shifts.view'
+          'warehouse.view', 'warehouse.manage', 'shifts.view', 'shifts.manage'
         ]
       ) || (
         userRole() == 'VYROBA'
@@ -151,7 +151,7 @@ service cloud.firestore {
           'asset.read',
           'zone.change',
           'weekly.modify', 'report.read',
-          'production.manage', 'warehouse.view', 'shifts.view'
+          'production.manage', 'warehouse.view', 'warehouse.manage', 'shifts.view', 'shifts.manage'
         ]
       ) || (
         userRole() == 'SKLADNIK'
@@ -781,30 +781,30 @@ service cloud.firestore {
     }
 
     match /warehouse_receipts/{docId} {
-      allow read: if hasPermission('warehouse.view');
-      allow create: if hasPermission('warehouse.view') && hasTimestamp();
-      allow update: if hasPermission('warehouse.view') && hasTimestamp();
+      allow read: if hasPermission('warehouse.view') || hasPermission('warehouse.manage');
+      allow create: if hasPermission('warehouse.manage') && hasTimestamp();
+      allow update: if hasPermission('warehouse.manage') && hasTimestamp();
       allow delete: if isSuperAdmin();
     }
 
     match /warehouse_stock/{docId} {
-      allow read: if hasPermission('warehouse.view');
-      allow create: if hasPermission('warehouse.view') && hasTimestamp();
-      allow update: if hasPermission('warehouse.view') && hasTimestamp();
+      allow read: if hasPermission('warehouse.view') || hasPermission('warehouse.manage');
+      allow create: if hasPermission('warehouse.manage') && hasTimestamp();
+      allow update: if hasPermission('warehouse.manage') && hasTimestamp();
       allow delete: if isSuperAdmin();
     }
 
     match /warehouse_shipments/{docId} {
-      allow read: if hasPermission('warehouse.view');
-      allow create: if hasPermission('warehouse.view') && hasTimestamp();
-      allow update: if hasPermission('warehouse.view') && hasTimestamp();
+      allow read: if hasPermission('warehouse.view') || hasPermission('warehouse.manage');
+      allow create: if hasPermission('warehouse.manage') && hasTimestamp();
+      allow update: if hasPermission('warehouse.manage') && hasTimestamp();
       allow delete: if isSuperAdmin();
     }
 
     match /shift_plans/{docId} {
-      allow read: if hasPermission('shifts.view');
-      allow create: if hasPermission('shifts.view') && hasTimestamp();
-      allow update: if hasPermission('shifts.view') && hasTimestamp();
+      allow read: if hasPermission('shifts.view') || hasPermission('shifts.manage');
+      allow create: if hasPermission('shifts.manage') && hasTimestamp();
+      allow update: if hasPermission('shifts.manage') && hasTimestamp();
       allow delete: if isSuperAdmin();
     }
 

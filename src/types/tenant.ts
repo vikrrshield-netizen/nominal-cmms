@@ -108,6 +108,7 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     label: 'Sklad výroby',
     permissions: [
       { key: 'warehouse.view', label: 'Zobrazit', description: 'Příjem, zásoby, expedice' },
+      { key: 'warehouse.manage', label: 'Spravovat', description: 'Zapisovat prijem, zasoby a expedici' },
     ],
   },
   {
@@ -115,6 +116,7 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     label: 'Směny',
     permissions: [
       { key: 'shifts.view', label: 'Zobrazit', description: 'Plánování směn' },
+      { key: 'shifts.manage', label: 'Spravovat', description: 'Upravovat a ukladat plan smen' },
     ],
   },
   {

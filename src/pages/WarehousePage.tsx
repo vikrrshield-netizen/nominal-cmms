@@ -173,7 +173,8 @@ function useShipments() {
 export default function WarehousePage() {
   const goBack = useBackNavigation('/');
   const { user, hasPermission } = useAuthContext();
-  const canView = hasPermission('warehouse.view');
+  const canView = hasPermission('warehouse.view') || hasPermission('warehouse.manage');
+  const canManage = hasPermission('warehouse.manage');
 
   const [activeTab, setActiveTab] = useState<WarehouseTab>('zasoby');
 
@@ -216,6 +217,7 @@ export default function WarehousePage() {
 
   // ── Actions ──
   const createReceipt = async () => {
+    if (!canManage) return;
     if (!receiptForm.materialName || !receiptForm.quantity) return;
     setSaving(true);
     try {
@@ -235,11 +237,13 @@ export default function WarehousePage() {
   };
 
   const acceptReceipt = async (id: string) => {
+    if (!canManage) return;
     await updateDoc(doc(db, 'warehouse_receipts', id), { status: 'accepted' });
     showToast('Příjem schválen', 'success');
   };
 
   const createStock = async () => {
+    if (!canManage) return;
     if (!stockForm.materialName || !stockForm.quantity) return;
     setSaving(true);
     try {
@@ -257,6 +261,7 @@ export default function WarehousePage() {
   };
 
   const createShipment = async () => {
+    if (!canManage) return;
     if (!shipmentForm.productName || !shipmentForm.palletCount) return;
     setSaving(true);
     try {
@@ -276,6 +281,7 @@ export default function WarehousePage() {
   };
 
   const advanceShipment = async (id: string, current: ShipmentStatus) => {
+    if (!canManage) return;
     const next: Record<ShipmentStatus, ShipmentStatus> = { planned: 'loading', loading: 'shipped', shipped: 'shipped' };
     await updateDoc(doc(db, 'warehouse_shipments', id), { status: next[current] });
     showToast(next[current] === 'loading' ? 'Nakládka zahájena' : 'Odesláno', 'success');
@@ -303,6 +309,7 @@ export default function WarehousePage() {
               <p className="text-xs text-slate-500">Příjem, zásoby, expedice</p>
             </div>
           </div>
+          {canManage && (
           <button
             onClick={() => {
               if (activeTab === 'prijem') setShowNewReceipt(true);
@@ -314,6 +321,7 @@ export default function WarehousePage() {
             <Plus className="w-4 h-4" />
             <span className="hidden sm:inline">Přidat</span>
           </button>
+          )}
         </div>
 
         {/* Tabs */}
@@ -394,7 +402,7 @@ export default function WarehousePage() {
                       </div>
                     </div>
                     {r.note && <p className="text-xs text-slate-400 mb-2">{r.note}</p>}
-                    {r.status === 'pending' && (
+                    {canManage && r.status === 'pending' && (
                       <button onClick={() => acceptReceipt(r.id)}
                         className="w-full py-2.5 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-emerald-500/25 transition">
                         <CheckCircle2 className="w-3.5 h-3.5" /> Potvrdit příjem
@@ -477,7 +485,7 @@ export default function WarehousePage() {
                       </div>
                     </div>
                     {s.note && <p className="text-xs text-slate-400 mb-2">{s.note}</p>}
-                    {s.status !== 'shipped' && (
+                    {canManage && s.status !== 'shipped' && (
                       <button onClick={() => advanceShipment(s.id, s.status)}
                         className="w-full py-2.5 bg-blue-500/15 border border-blue-500/30 text-blue-400 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-blue-500/25 transition">
                         {s.status === 'planned' ? <><TruckIcon className="w-3.5 h-3.5" /> Zahájit nakládku</> : <><ArrowUpFromLine className="w-3.5 h-3.5" /> Odeslat</>}
@@ -492,7 +500,7 @@ export default function WarehousePage() {
       </div>
 
       {/* ═══ NEW RECEIPT MODAL ═══ */}
-      {showNewReceipt && (
+      {canManage && showNewReceipt && (
         <ModalShell title="Nový příjem" icon={<ArrowDownToLine className="w-5 h-5 text-teal-400" />} onClose={() => setShowNewReceipt(false)}>
           <div className="space-y-4">
             <Field label="Materiál">
@@ -529,7 +537,7 @@ export default function WarehousePage() {
       )}
 
       {/* ═══ NEW STOCK MODAL ═══ */}
-      {showNewStock && (
+      {canManage && showNewStock && (
         <ModalShell title="Nová položka skladu" icon={<Boxes className="w-5 h-5 text-blue-400" />} onClose={() => setShowNewStock(false)}>
           <div className="space-y-4">
             <Field label="Název materiálu">
@@ -572,7 +580,7 @@ export default function WarehousePage() {
       )}
 
       {/* ═══ NEW SHIPMENT MODAL ═══ */}
-      {showNewShipment && (
+      {canManage && showNewShipment && (
         <ModalShell title="Nová expedice" icon={<TruckIcon className="w-5 h-5 text-blue-400" />} onClose={() => setShowNewShipment(false)}>
           <div className="space-y-4">
             <Field label="Produkt">

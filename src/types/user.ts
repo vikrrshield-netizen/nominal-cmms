@@ -56,8 +56,10 @@ export type Permission =
   | 'admin.view'        // Čtení administrace (read-only)
   | 'admin.manage'      // Plná správa administrace
   // Warehouse & Shifts
-  | 'warehouse.view'    // Sklad výroby — příjem, zásoby, expedice
-  | 'shifts.view';      // Plánování směn
+  | 'warehouse.view'    // Sklad vyroby - prijem, zasoby, expedice
+  | 'warehouse.manage'  // Sklad vyroby - zapis prijmu, zasob a expedice
+  | 'shifts.view'       // Planovani smen
+  | 'shifts.manage';    // Upravy planu smen
 
 // ═══════════════════════════════════════════════════════════════════
 // ROLE FLAGS (speciální módy)
@@ -166,8 +168,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'purchase.approve',    // ✅ Schvaluje nákupy
     'ai.use',
     'admin.view',          // ✅ Vidí administraci (read-only)
-    'warehouse.view',      // ✅ Sklad výroby
-    'shifts.view',         // ✅ Směny
+    'warehouse.view',
+    'shifts.view',
   ],
 
   // 🏢 VEDENÍ (Martina) — Výkonná ředitelka
@@ -184,8 +186,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'weekly.modify',
     'ai.use',
     'admin.view',          // ✅ Vidí administraci (read-only)
-    'warehouse.view',      // ✅ Sklad výroby
-    'shifts.view',         // ✅ Směny
+    'warehouse.view', 'warehouse.manage',
+    'shifts.view', 'shifts.manage',
   ],
 
   // 🛠️ SUPERADMIN (Vilém) — Technika, BEZ financí
@@ -208,8 +210,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'production.manage',
     'admin.view',          // ✅ Vidí administraci
     'admin.manage',        // ✅ Plná správa
-    'warehouse.view',      // ✅ Sklad výroby
-    'shifts.view',         // ✅ Směny
+    'warehouse.view', 'warehouse.manage',
+    'shifts.view', 'shifts.manage',
   ],
 
   // 🔧 ÚDRŽBA (Zdeněk) — Stroje, sklad
@@ -224,8 +226,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'ai.use',
     'schedule.manage',
     'production.manage',
-    'warehouse.view',      // ✅ Sklad výroby
-    'shifts.view',         // ✅ Směny
+    'warehouse.view', 'warehouse.manage',
+    'shifts.view', 'shifts.manage',
   ],
 
   // 🏭 VÝROBA (Pavla) — Zóny, priority
@@ -237,8 +239,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'weekly.modify',
     'report.read',
     'production.manage',
-    'warehouse.view',      // ✅ Sklad výroby
-    'shifts.view',         // ✅ Směny
+    'warehouse.view', 'warehouse.manage',
+    'shifts.view', 'shifts.manage',
   ],
 
   // 📦 SKLADNÍK — Sklad ND, inventura
