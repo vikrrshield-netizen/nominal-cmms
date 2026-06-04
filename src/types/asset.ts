@@ -82,6 +82,7 @@ export interface Asset {
   inventoryItemId?: string | null;
   lastTemperatureC?: number | null;
   lastTemperatureAt?: string | null;
+  lastMotorLoadPercent?: number | null;
   lastGearboxPhotoUrl?: string | null;
   gearboxWarningTemperatureC?: number | null;
   gearboxCriticalTemperatureC?: number | null;

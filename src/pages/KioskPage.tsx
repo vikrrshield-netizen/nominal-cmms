@@ -350,6 +350,7 @@ export default function KioskPage() {
   const [trustboxCategory, setTrustboxCategory] = useState<TrustboxCategoryId | ''>('');
   const [prefilterDate, setPrefilterDate] = useState(new Date().toISOString().slice(0, 10));
   const [gearboxTemperature, setGearboxTemperature] = useState('');
+  const [gearboxMotorLoad, setGearboxMotorLoad] = useState('');
   const [gearboxMeasuredAt, setGearboxMeasuredAt] = useState(() => new Date().toISOString().slice(0, 16));
   const [gearboxRawMaterial, setGearboxRawMaterial] = useState('');
   const [gearboxNote, setGearboxNote] = useState('');
@@ -860,6 +861,7 @@ export default function KioskPage() {
     setTrustboxCategory('');
     setPrefilterDate(new Date().toISOString().slice(0, 10));
     setGearboxTemperature('');
+    setGearboxMotorLoad('');
     setGearboxMeasuredAt(new Date().toISOString().slice(0, 16));
     setGearboxRawMaterial('');
     setGearboxNote('');
@@ -1030,6 +1032,16 @@ export default function KioskPage() {
     setGearboxTemperature(String(clampTemperature(value)));
   };
 
+  const currentGearboxMotorLoad = () => {
+    const parsed = Number(String(gearboxMotorLoad).replace(',', '.'));
+    if (Number.isFinite(parsed)) return Math.max(0, Math.min(100, Math.round(parsed)));
+    return 0;
+  };
+
+  const setGearboxMotorLoadValue = (value: number) => {
+    setGearboxMotorLoad(String(Math.max(0, Math.min(100, Math.round(value)))));
+  };
+
   const currentDataloggerTemperature = () => {
     const parsed = Number(String(dataloggerTemperature).replace(',', '.'));
     if (Number.isFinite(parsed)) return Math.max(-30, Math.min(40, parsed));
@@ -1061,6 +1073,7 @@ export default function KioskPage() {
         gearbox: selectedAsset,
         user,
         temperatureC,
+        motorLoadPercent: gearboxMotorLoad.trim() ? currentGearboxMotorLoad() : null,
         measuredAt: new Date(gearboxMeasuredAt),
         rawMaterial: gearboxRawMaterial.trim(),
         note: gearboxNote.trim(),
@@ -1980,6 +1993,7 @@ export default function KioskPage() {
       {!selectedAsset && renderGearboxPicker()}
       {selectedAsset && (() => {
         const temperature = currentGearboxTemperature();
+        const motorLoad = currentGearboxMotorLoad();
         const status = temperatureStatus(selectedAsset, temperature);
         return (
         <div className="space-y-2">
@@ -2038,6 +2052,46 @@ export default function KioskPage() {
                   className="min-h-10 rounded-lg border border-white/10 bg-white/5 text-sm font-bold text-slate-200 active:scale-[0.98]"
                 >
                   {preset} °C
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-cyan-400/20 bg-cyan-500/10 p-2.5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-bold text-slate-300">Zátěž motoru</div>
+                <div className="text-3xl font-black leading-none text-white">
+                  {gearboxMotorLoad.trim() ? motorLoad : '—'}<span className="text-lg"> %</span>
+                </div>
+              </div>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={gearboxMotorLoad}
+                onChange={(event) => setGearboxMotorLoad(event.target.value)}
+                placeholder="např. 65"
+                className="w-28 rounded-xl border border-white/10 bg-slate-950 p-2.5 text-right text-base font-black text-white outline-none placeholder:text-slate-500 focus:border-cyan-300"
+              />
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              value={motorLoad}
+              onChange={(event) => setGearboxMotorLoadValue(Number(event.target.value))}
+              className="mt-2 w-full accent-cyan-400"
+            />
+            <div className="mt-2 grid grid-cols-4 gap-2">
+              {[-10, -1, 1, 10].map((delta) => (
+                <button
+                  key={delta}
+                  type="button"
+                  onClick={() => setGearboxMotorLoadValue(motorLoad + delta)}
+                  className="min-h-10 rounded-lg border border-white/10 bg-slate-950/60 text-base font-black text-white active:scale-[0.98]"
+                >
+                  {delta > 0 ? `+${delta}` : delta}
                 </button>
               ))}
             </div>

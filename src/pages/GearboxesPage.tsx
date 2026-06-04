@@ -534,6 +534,7 @@ function GearboxCard({
         </div>
 
         <TemperatureTrend logs={temperatureLogs} />
+        <MotorLoadTrend logs={temperatureLogs} />
 
         {canSetStockStatus && (
           <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/45 p-3">
@@ -692,6 +693,67 @@ function TemperatureTrend({ logs }: { logs: GearboxTemperatureLog[] }) {
           const x = points.length === 1 ? 50 : (index / (points.length - 1)) * 100;
           const y = 46 - ((log.temperatureC - min) / spread) * 36;
           return <circle key={`${log.id}-${index}`} cx={x} cy={y} r="2.2" className="fill-cyan-200" />;
+        })}
+      </svg>
+      <div className="mt-1 flex justify-between text-xs font-semibold text-slate-400">
+        <span>{formatDateTime(first.measuredAt)}</span>
+        <span>{formatDateTime(latest.measuredAt)}</span>
+      </div>
+    </div>
+  );
+}
+
+function MotorLoadTrend({ logs }: { logs: GearboxTemperatureLog[] }) {
+  const points = logs
+    .filter((log) => typeof log.motorLoadPercent === 'number' && asDate(log.measuredAt))
+    .slice(0, 12)
+    .reverse();
+
+  if (points.length === 0) return null;
+
+  if (points.length < 2) {
+    return (
+      <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/45 p-3">
+        <div className="flex items-center gap-2 text-sm font-black text-white">
+          <Activity className="h-4 w-4 text-amber-300" />
+          Trend zátěže motoru
+        </div>
+        <div className="mt-2 text-sm font-semibold text-slate-400">Trend bude vidět po dalším zápisu se zátěží.</div>
+      </div>
+    );
+  }
+
+  const values = points.map((log) => log.motorLoadPercent ?? 0);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const spread = Math.max(1, max - min);
+  const polyline = points.map((log, index) => {
+    const x = points.length === 1 ? 50 : (index / (points.length - 1)) * 100;
+    const y = 46 - (((log.motorLoadPercent ?? 0) - min) / spread) * 36;
+    return `${x.toFixed(2)},${y.toFixed(2)}`;
+  }).join(' ');
+  const latest = points[points.length - 1];
+  const first = points[0];
+
+  return (
+    <div className="mt-3 rounded-xl border border-amber-400/20 bg-slate-950/45 p-3">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-sm font-black text-white">
+          <Activity className="h-4 w-4 text-amber-300" />
+          Trend zátěže motoru
+        </div>
+        <div className="text-xs font-bold text-slate-300">
+          {first.motorLoadPercent} % {'->'} {latest.motorLoadPercent} %
+        </div>
+      </div>
+      <svg viewBox="0 0 100 52" preserveAspectRatio="none" className="h-16 w-full overflow-visible">
+        <line x1="0" y1="46" x2="100" y2="46" className="stroke-slate-700" strokeWidth="1" />
+        <line x1="0" y1="10" x2="100" y2="10" className="stroke-slate-800" strokeWidth="1" />
+        <polyline points={polyline} fill="none" className="stroke-amber-300" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        {points.map((log, index) => {
+          const x = points.length === 1 ? 50 : (index / (points.length - 1)) * 100;
+          const y = 46 - (((log.motorLoadPercent ?? 0) - min) / spread) * 36;
+          return <circle key={`${log.id}-load-${index}`} cx={x} cy={y} r="2.2" className="fill-amber-200" />;
         })}
       </svg>
       <div className="mt-1 flex justify-between text-xs font-semibold text-slate-400">
