@@ -4,7 +4,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import {
-  addDoc, collection, onSnapshot, doc, updateDoc, Timestamp
+  addDoc, collection, onSnapshot, doc, updateDoc, Timestamp, query, where
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
@@ -54,6 +54,8 @@ const PRIORITY_CONFIG: Record<string, { color: string; bg: string; border: strin
   P4: { color: '#94a3b8', bg: 'bg-slate-500/8', border: 'border-slate-500/20' },
 };
 
+const OPEN_TASK_STATUSES = ['backlog', 'planned', 'in_progress', 'paused'];
+
 const ABSENCE_KIND_OPTIONS: Array<{ value: VacationPlanKind; label: string }> = [
   { value: 'vacation', label: 'Dovolená' },
   { value: 'doctor', label: 'Lékař' },
@@ -85,6 +87,18 @@ function getWeekDays(monday: Date): Date[] {
     d.setDate(monday.getDate() + i);
     return d;
   });
+}
+
+function endOfDay(date: Date): Date {
+  const d = new Date(date);
+  d.setHours(23, 59, 59, 999);
+  return d;
+}
+
+function addDays(date: Date, days: number): Date {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
 }
 
 function getISOWeekNumber(date: Date): number {
@@ -157,50 +171,107 @@ function vacationSortValue(plan: VacationPlan): number {
 // HOOK — všechny nesmazané tasky
 // ═══════════════════════════════════════════
 
-function useTasks() {
+function useTasks(windowStart: Date, windowEnd: Date) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsub = onSnapshot(
+    setLoading(true);
+
+    let scheduledReady = false;
+    let backlogReady = false;
+    let scheduledItems: Task[] = [];
+    let backlogItems: Task[] = [];
+
+    const publish = () => {
+      const byId = new Map<string, Task>();
+      [...scheduledItems, ...backlogItems].forEach((task) => byId.set(task.id, task));
+      setTasks([...byId.values()]);
+      if (scheduledReady && backlogReady) setLoading(false);
+    };
+
+    const scheduledQuery = query(
       collection(db, 'tasks'),
+      where('scheduledDate', '>=', Timestamp.fromDate(windowStart)),
+      where('scheduledDate', '<=', Timestamp.fromDate(windowEnd))
+    );
+
+    const backlogQuery = query(
+      collection(db, 'tasks'),
+      where('status', 'in', OPEN_TASK_STATUSES)
+    );
+
+    const unsubScheduled = onSnapshot(
+      scheduledQuery,
       (snap) => {
-        const all = snap.docs
+        scheduledItems = snap.docs
           .map((d) => ({ id: d.id, ...d.data() } as Task))
-          .filter((t) => !((t as any).isDeleted));
-        setTasks(all);
-        setLoading(false);
+          .filter((t) => !((t as any).isDeleted))
+          .filter((t) => t.status !== 'done' && t.status !== 'completed' && t.status !== 'cancelled');
+        scheduledReady = true;
+        publish();
       },
       (err) => {
-        console.error('[Calendar] Firestore error:', err);
-        setLoading(false);
+        console.error('[Calendar] scheduled tasks error:', err);
+        scheduledReady = true;
+        publish();
       }
     );
-    return () => unsub();
-  }, []);
+
+    const unsubBacklog = onSnapshot(
+      backlogQuery,
+      (snap) => {
+        backlogItems = snap.docs
+          .map((d) => ({ id: d.id, ...d.data() } as Task))
+          .filter((t) => !((t as any).isDeleted))
+          .filter((t) => !toDate(t.scheduledDate));
+        backlogReady = true;
+        publish();
+      },
+      (err) => {
+        console.error('[Calendar] backlog tasks error:', err);
+        backlogReady = true;
+        publish();
+      }
+    );
+
+    return () => {
+      unsubScheduled();
+      unsubBacklog();
+    };
+  }, [windowStart, windowEnd]);
 
   return { tasks, loading };
 }
 
-function useVacationPlans(tenantId: string) {
+function useVacationPlans(tenantId: string, windowStart: Date, windowEnd: Date) {
   const [vacations, setVacations] = useState<VacationPlan[]>([]);
 
   useEffect(() => {
-    const unsub = onSnapshot(
+    const vacationQuery = query(
       collection(db, 'vacation_plans'),
+      where('endDate', '>=', Timestamp.fromDate(windowStart))
+    );
+
+    const unsub = onSnapshot(
+      vacationQuery,
       (snap) => {
         setVacations(
           snap.docs
             .map((d) => ({ id: d.id, ...d.data() } as VacationPlan))
             .filter((item) => !item.tenantId || item.tenantId === tenantId)
             .filter((item) => item.status !== 'cancelled')
+            .filter((item) => {
+              const start = toDate(item.startDate);
+              return Boolean(start && start <= windowEnd);
+            })
             .sort((a, b) => vacationSortValue(a) - vacationSortValue(b))
         );
       },
       (err) => console.error('[Calendar] vacation_plans error:', err)
     );
     return () => unsub();
-  }, [tenantId]);
+  }, [tenantId, windowStart, windowEnd]);
 
   return vacations;
 }
@@ -609,18 +680,19 @@ export default function CalendarPage() {
   const goBack = useBackNavigation('/');
   const { user } = useAuthContext();
   const tenantId = user?.tenantId ?? 'main_firm';
-  const { tasks, loading } = useTasks();
-  const vacations = useVacationPlans(tenantId);
+  const [currentMonday, setCurrentMonday] = useState(() => getMonday(new Date()));
+  const weekDays = useMemo(() => getWeekDays(currentMonday), [currentMonday]);
+  const weekEnd = useMemo(() => endOfDay(addDays(currentMonday, 6)), [currentMonday]);
+  const { tasks, loading } = useTasks(currentMonday, weekEnd);
+  const vacations = useVacationPlans(tenantId, currentMonday, weekEnd);
   const employeeOptions = useEmployeeNames({ tenantId });
 
   // Current week state
-  const [currentMonday, setCurrentMonday] = useState(() => getMonday(new Date()));
   const [expandedDay, setExpandedDay] = useState<number | null>(null);
   const [showBacklog, setShowBacklog] = useState(false);
   const [showVacationModal, setShowVacationModal] = useState(false);
   const [vacationDefaultDate, setVacationDefaultDate] = useState(new Date());
 
-  const weekDays = useMemo(() => getWeekDays(currentMonday), [currentMonday]);
   const weekNumber = getISOWeekNumber(currentMonday);
   const today = new Date();
 
