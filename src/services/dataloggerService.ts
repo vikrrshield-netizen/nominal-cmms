@@ -1,22 +1,33 @@
 import {
   addDoc,
   collection,
+  getDocs,
   limit,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
   Timestamp,
+  where,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { createTask } from './taskService';
 import type { Asset } from '../types/asset';
 import type { DataloggerTemperatureLog } from '../types/datalogger';
+import type { TaskSource } from '../types/firestore';
 
 type AppUser = {
   uid?: string;
   id?: string;
   displayName?: string;
   tenantId?: string;
+};
+
+type DataloggerLimitBreach = {
+  direction: 'low' | 'high';
+  limit: number;
+  min: number | null;
+  max: number | null;
 };
 
 export function normalizeDataloggerText(value: unknown): string {
@@ -61,6 +72,107 @@ function dataloggerRoom(asset: Asset): string {
   return asset.areaName || asset.roomId || asset.location || '';
 }
 
+function customFieldText(asset: Asset, keys: string[]): string {
+  const normalizedKeys = keys.map(normalizeDataloggerText);
+  const field = (asset.customFields || []).find((item) => {
+    const label = normalizeDataloggerText(`${item.key} ${item.label}`);
+    return normalizedKeys.some((key) => label.includes(key));
+  });
+  return field?.value === undefined || field.value === null ? '' : String(field.value);
+}
+
+function customFieldNumber(asset: Asset, keys: string[]): number | null {
+  const raw = customFieldText(asset, keys);
+  if (!raw) return null;
+  const value = Number(raw.replace(',', '.').replace(/[^\d.-]+/g, ''));
+  return Number.isFinite(value) ? value : null;
+}
+
+function dataloggerLimitBreach(asset: Asset, temperatureC: number): DataloggerLimitBreach | null {
+  const min = customFieldNumber(asset, ['min', 'minimum', 'min teplota', 'dolni limit']);
+  const max = customFieldNumber(asset, ['max', 'maximum', 'max teplota', 'horni limit']);
+  if (min !== null && temperatureC < min) return { direction: 'low', limit: min, min, max };
+  if (max !== null && temperatureC > max) return { direction: 'high', limit: max, min, max };
+  return null;
+}
+
+function formatMeasuredAt(value: Date): string {
+  return new Intl.DateTimeFormat('cs-CZ', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(value);
+}
+
+async function hasOpenDataloggerLimitTask(assetId: string): Promise<boolean> {
+  const snap = await getDocs(query(
+    collection(db, 'tasks'),
+    where('assetId', '==', assetId),
+    limit(50),
+  ));
+
+  return snap.docs.some((item) => {
+    const task = item.data() as { status?: string; sourceRefType?: string; sourceRefId?: string };
+    return task.sourceRefType === 'datalogger_temperature'
+      && task.sourceRefId === assetId
+      && task.status !== 'completed'
+      && task.status !== 'cancelled';
+  });
+}
+
+async function createDataloggerLimitTask(input: {
+  datalogger: Asset;
+  user?: AppUser | null;
+  temperatureC: number;
+  humidityPct?: number;
+  rawMaterial?: string;
+  measuredAt: Date;
+  roomName: string;
+  note?: string;
+  source?: TaskSource;
+}, breach: DataloggerLimitBreach) {
+  const directionText = breach.direction === 'low'
+    ? `pod minimem ${breach.limit} °C`
+    : `nad maximem ${breach.limit} °C`;
+  const rangeText = breach.min !== null && breach.max !== null
+    ? `Limit: ${breach.min} až ${breach.max} °C.`
+    : breach.min !== null
+      ? `Limit: min. ${breach.min} °C.`
+      : `Limit: max. ${breach.max} °C.`;
+  const rawMaterial = input.rawMaterial?.trim() || '';
+  const code = input.datalogger.code ? ` (${input.datalogger.code})` : '';
+
+  await createTask({
+    title: `Mimo limit teploty: ${input.datalogger.name}`,
+    description: [
+      `Naměřená teplota: ${input.temperatureC} °C (${directionText}).`,
+      rangeText,
+      `Datalogger: ${input.datalogger.name}${code}.`,
+      `Umístění: ${input.roomName || 'nevyplněno'}.`,
+      typeof input.humidityPct === 'number' ? `Vlhkost: ${input.humidityPct} %.` : '',
+      rawMaterial ? `Surovina: ${rawMaterial}.` : '',
+      `Měřeno: ${formatMeasuredAt(input.measuredAt)}.`,
+      input.note?.trim() ? `Poznámka: ${input.note.trim()}` : '',
+      'Automaticky založeno po zápisu teploty dataloggeru mimo limit.',
+    ].filter(Boolean).join('\n'),
+    type: 'corrective',
+    priority: 'P2',
+    source: input.source || 'web',
+    sourceRefType: 'datalogger_temperature',
+    sourceRefId: input.datalogger.id,
+    assetId: input.datalogger.id,
+    assetName: input.datalogger.name,
+    buildingId: input.datalogger.buildingId,
+    foodSafetyRisk: true,
+    foodSafetyHazardType: 'biological',
+    foodSafetyImpact: 'Teplota skladování mimo limit. Ověřit surovinu, prostor a provést nápravné opatření.',
+    createdById: userId(input.user),
+    createdByName: userName(input.user),
+  });
+}
+
 export async function addDataloggerTemperatureLog(input: {
   tenantId: string;
   datalogger: Asset;
@@ -71,6 +183,7 @@ export async function addDataloggerTemperatureLog(input: {
   measuredAt: Date;
   roomName?: string;
   note?: string;
+  source?: TaskSource;
 }) {
   const roomName = input.roomName?.trim() || dataloggerRoom(input.datalogger);
   const rawMaterial = input.rawMaterial?.trim() || '';
@@ -90,6 +203,18 @@ export async function addDataloggerTemperatureLog(input: {
     note: input.note || '',
     createdAt: serverTimestamp(),
   });
+
+  const breach = dataloggerLimitBreach(input.datalogger, input.temperatureC);
+  if (!breach) return;
+
+  try {
+    const alreadyOpen = await hasOpenDataloggerLimitTask(input.datalogger.id);
+    if (!alreadyOpen) {
+      await createDataloggerLimitTask({ ...input, roomName, rawMaterial }, breach);
+    }
+  } catch (error) {
+    console.warn('[dataloggerService] Temperature limit task was not created:', error);
+  }
 }
 
 export function subscribeDataloggerTemperatureLogs(

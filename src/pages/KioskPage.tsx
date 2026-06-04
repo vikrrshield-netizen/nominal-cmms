@@ -1095,6 +1095,7 @@ export default function KioskPage() {
         measuredAt: new Date(dataloggerMeasuredAt),
         roomName: getAssetRoom(selectedAsset, assets),
         note: dataloggerNote.trim(),
+        source: 'kiosk',
       });
       showSuccessAndReset('Teplota dataloggeru zapsána');
     } catch (err) {

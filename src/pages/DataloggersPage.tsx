@@ -755,6 +755,7 @@ function TemperatureModal({
         measuredAt: fromDateTimeLocal(measuredAt),
         roomName: roomLabel(asset),
         note: note.trim(),
+        source: 'web',
       });
       showToast('Teplota dataloggeru uložena.', 'success');
       onSaved();

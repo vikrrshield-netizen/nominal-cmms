@@ -32,7 +32,7 @@ export interface CreateTaskInput {
   type: TaskType;
   priority: TaskPriority;
   source?: TaskSource;
-  sourceRefType?: 'inspection_log' | 'manual' | 'asset' | 'work_log';
+  sourceRefType?: 'inspection_log' | 'manual' | 'asset' | 'work_log' | 'datalogger_temperature';
   sourceRefId?: string;
   inspectionLogId?: string;
   assetId?: string;
