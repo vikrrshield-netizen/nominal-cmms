@@ -693,12 +693,12 @@ function TemperatureModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-3 sm:items-center">
-      <div className="w-full max-w-xl rounded-3xl border border-slate-200 bg-white p-4 shadow-2xl">
-        <div className="mb-4 flex items-start justify-between gap-3">
+    <div className="fixed inset-0 z-50 flex items-end justify-center overflow-hidden bg-black/45 p-2 sm:items-center sm:p-3">
+      <div className="flex max-h-[calc(100dvh-1rem)] w-full max-w-xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl sm:max-h-[min(760px,calc(100dvh-1.5rem))]">
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 p-3 sm:p-4">
           <div>
             <div className="text-xs font-black uppercase tracking-widest text-cyan-700">Denní měření</div>
-            <h2 className="mt-1 text-2xl font-black text-slate-950">Zapsat teplotu</h2>
+            <h2 className="mt-1 text-xl font-black text-slate-950 sm:text-2xl">Zapsat teplotu</h2>
             <p className="text-sm font-semibold text-slate-600">{asset.name} · {placeLabel(asset)}</p>
           </div>
           <button type="button" onClick={onClose} className="vik-button h-11 w-11 p-0" aria-label="Zavřít">
@@ -706,7 +706,7 @@ function TemperatureModal({
           </button>
         </div>
 
-        <div className="space-y-3 pb-3 sm:space-y-4">
+        <div className="flex-1 space-y-3 overflow-y-auto overscroll-contain p-3 sm:space-y-4 sm:p-4">
           <label className="block">
             <span className="mb-1 block text-sm font-black text-slate-800">Teplota</span>
             <input
@@ -714,7 +714,7 @@ function TemperatureModal({
               onChange={(event) => setTemperature(event.target.value)}
               inputMode="decimal"
               placeholder="např. 5,2"
-              className="vik-input text-2xl font-black"
+              className="vik-input text-xl font-black sm:text-2xl"
               autoFocus
             />
             <div className="mt-2 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-2.5 sm:p-3">
@@ -762,7 +762,7 @@ function TemperatureModal({
               onChange={(event) => setHumidity(event.target.value)}
               inputMode="decimal"
               placeholder="volitelně, např. 55"
-              className="vik-input text-xl font-black"
+              className="vik-input text-lg font-black sm:text-xl"
             />
             <div className="mt-2 rounded-2xl border border-cyan-100 bg-cyan-50/60 p-2.5 sm:p-3">
               <div className="mb-2 flex items-center justify-end">
@@ -825,7 +825,7 @@ function TemperatureModal({
             type="button"
             disabled={saving}
             onClick={handleSave}
-            className="vik-button vik-button-primary min-h-12 w-full"
+            className="vik-button vik-button-primary sticky bottom-0 z-10 min-h-12 w-full shadow-lg"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ClipboardList className="h-4 w-4" />}
             Uložit denní teplotu
