@@ -13,6 +13,24 @@ service firebase.storage {
     function isAdmin() {
       return request.auth.token.role in ['SUPERADMIN', 'VEDENI'];
     }
+
+    function hasTokenPermission(permission) {
+      return isSignedIn()
+        && request.auth.token.permissions != null
+        && request.auth.token.permissions.hasAny([permission]);
+    }
+
+    function canReadProductionDocs() {
+      return hasTokenPermission('production.read')
+        || hasTokenPermission('production.manage')
+        || hasTokenPermission('report.read')
+        || request.auth.token.role in ['MAJITEL', 'VEDENI', 'SUPERADMIN', 'UDRZBA', 'VYROBA', 'SKLADNIK', 'OPERATOR'];
+    }
+
+    function canWriteProductionDocs() {
+      return hasTokenPermission('production.manage')
+        || request.auth.token.role in ['SUPERADMIN', 'VEDENI', 'UDRZBA', 'VYROBA'];
+    }
     
     // Revision documents
     match /revisions/{revisionId}/{allPaths=**} {
@@ -42,6 +60,17 @@ service firebase.storage {
     match /gearbox_checks/{gearboxId}/{allPaths=**} {
       allow read: if isSignedIn();
       allow write: if isSignedIn();
+    }
+
+    // Production master data documents: materials/products card attachments
+    match /materials/{materialId}/docs/{allPaths=**} {
+      allow read: if canReadProductionDocs();
+      allow write: if canWriteProductionDocs();
+    }
+
+    match /products/{productId}/docs/{allPaths=**} {
+      allow read: if canReadProductionDocs();
+      allow write: if canWriteProductionDocs();
     }
 
     // Temporary uploads
