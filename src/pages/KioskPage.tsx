@@ -39,6 +39,8 @@ import { addGearboxTemperatureLog, isGearboxAsset } from '../services/gearboxSer
 import { addDataloggerTemperatureLog, isDataloggerAsset } from '../services/dataloggerService';
 import type { Asset } from '../types/asset';
 import type { DataloggerTemperatureLog } from '../types/datalogger';
+import type { GearboxTemperatureLog } from '../types/gearbox';
+import { materialBatch, productBatch } from '../data/productionMasterSeed';
 
 type ViewState = 'MENU' | 'BREAKDOWN' | 'ORDER' | 'IDEA' | 'MESSAGE' | 'PREFILTER' | 'GEARBOX_TEMP' | 'DATALOGGER_TEMP' | 'ASSISTANT' | 'HANDOVER';
 
@@ -171,10 +173,14 @@ const normalize = (value: unknown) =>
     .toLowerCase()
     .trim();
 
-function sortMasterItems(items: KioskMasterItem[]) {
+function sortMasterItemsByRecentUse(items: KioskMasterItem[], usage: Map<string, number>) {
   return [...items]
     .filter((item) => item.active !== false)
-    .sort((a, b) => (b.usageCount || 0) - (a.usageCount || 0) || a.name.localeCompare(b.name, 'cs'));
+    .sort((a, b) => {
+      const recent = (usage.get(b.id) || 0) - (usage.get(a.id) || 0);
+      if (recent !== 0) return recent;
+      return (b.usageCount || 0) - (a.usageCount || 0) || a.name.localeCompare(b.name, 'cs');
+    });
 }
 
 const isEntity = (asset: Asset, words: string[]) => {
@@ -370,8 +376,11 @@ export default function KioskPage() {
   const [gearboxRawMaterial, setGearboxRawMaterial] = useState('');
   const [gearboxMaterialId, setGearboxMaterialId] = useState('');
   const [gearboxMaterialBatch, setGearboxMaterialBatch] = useState('');
+  const [gearboxMaterialBatchDate, setGearboxMaterialBatchDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [gearboxMaterialBatchSuffix, setGearboxMaterialBatchSuffix] = useState('A');
   const [gearboxProductId, setGearboxProductId] = useState('');
   const [gearboxProductBatch, setGearboxProductBatch] = useState('');
+  const [gearboxProductBatchDate, setGearboxProductBatchDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [gearboxNote, setGearboxNote] = useState('');
   const [gearboxPhotoFile, setGearboxPhotoFile] = useState<File | null>(null);
   const gearboxPhotoInputRef = useRef<HTMLInputElement>(null);
@@ -388,6 +397,7 @@ export default function KioskPage() {
   const [shiftNotes, setShiftNotes] = useState<ShiftNote[]>([]);
   const [prefilterLogs, setPrefilterLogs] = useState<PrefilterLog[]>([]);
   const [dataloggerLogs, setDataloggerLogs] = useState<DataloggerTemperatureLog[]>([]);
+  const [gearboxTemperatureLogs, setGearboxTemperatureLogs] = useState<GearboxTemperatureLog[]>([]);
   const [materials, setMaterials] = useState<KioskMasterItem[]>([]);
   const [products, setProducts] = useState<KioskMasterItem[]>([]);
   const [productionPlans, setProductionPlans] = useState<KioskProductionPlan[]>([]);
@@ -447,10 +457,48 @@ export default function KioskPage() {
     return allRecipients.filter((recipient) => normalize(recipient).includes(search)).slice(0, 18);
   }, [handoverRecipientSearch, normalizedHandoverRecipients]);
 
-  const sortedMaterials = useMemo(() => sortMasterItems(materials), [materials]);
-  const sortedProducts = useMemo(() => sortMasterItems(products), [products]);
+  const recentMaterialUsage = useMemo(() => {
+    const map = new Map<string, number>();
+    gearboxTemperatureLogs.forEach((log) => {
+      if (!log.materialId) return;
+      map.set(log.materialId, (map.get(log.materialId) || 0) + 1);
+    });
+    return map;
+  }, [gearboxTemperatureLogs]);
+  const recentProductUsage = useMemo(() => {
+    const map = new Map<string, number>();
+    gearboxTemperatureLogs.forEach((log) => {
+      if (!log.productId) return;
+      map.set(log.productId, (map.get(log.productId) || 0) + 1);
+    });
+    return map;
+  }, [gearboxTemperatureLogs]);
+  const sortedMaterials = useMemo(() => sortMasterItemsByRecentUse(materials, recentMaterialUsage), [materials, recentMaterialUsage]);
+  const sortedProducts = useMemo(() => sortMasterItemsByRecentUse(products, recentProductUsage), [products, recentProductUsage]);
   const selectedMaterial = useMemo(() => sortedMaterials.find((item) => item.id === gearboxMaterialId), [gearboxMaterialId, sortedMaterials]);
   const selectedProduct = useMemo(() => sortedProducts.find((item) => item.id === gearboxProductId), [gearboxProductId, sortedProducts]);
+
+  useEffect(() => {
+    const measuredDate = gearboxMeasuredAt ? gearboxMeasuredAt.slice(0, 10) : new Date().toISOString().slice(0, 10);
+    setGearboxProductBatchDate((current) => current || measuredDate);
+    setGearboxMaterialBatchDate((current) => current || measuredDate);
+  }, [gearboxMeasuredAt]);
+
+  useEffect(() => {
+    if (!selectedProduct || !gearboxProductBatchDate) {
+      setGearboxProductBatch('');
+      return;
+    }
+    setGearboxProductBatch(productBatch(selectedProduct.number, new Date(`${gearboxProductBatchDate}T00:00:00`)));
+  }, [gearboxProductBatchDate, selectedProduct]);
+
+  useEffect(() => {
+    if (!selectedMaterial || !gearboxMaterialBatchDate) {
+      setGearboxMaterialBatch('');
+      return;
+    }
+    setGearboxMaterialBatch(materialBatch(selectedMaterial.number, new Date(`${gearboxMaterialBatchDate}T00:00:00`), gearboxMaterialBatchSuffix));
+  }, [gearboxMaterialBatchDate, gearboxMaterialBatchSuffix, selectedMaterial]);
 
   useEffect(() => {
     const interval = window.setInterval(() => setCurrentTime(new Date()), 1000);
@@ -558,6 +606,20 @@ export default function KioskPage() {
     );
     return () => unsubscribe();
   }, [canUseDataloggerKiosk]);
+
+  useEffect(() => {
+    if (!canUseGearboxKiosk) {
+      setGearboxTemperatureLogs([]);
+      return;
+    }
+    const gearboxTemperatureQuery = query(collection(db, 'gearbox_temperature_logs'), orderBy('measuredAt', 'desc'), limit(500));
+    const unsubscribe = onSnapshot(
+      gearboxTemperatureQuery,
+      (snapshot) => setGearboxTemperatureLogs(snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as GearboxTemperatureLog))),
+      () => setGearboxTemperatureLogs([]),
+    );
+    return () => unsubscribe();
+  }, [canUseGearboxKiosk]);
 
   useEffect(() => {
     if (!canViewProductionPlan) {
@@ -909,8 +971,11 @@ export default function KioskPage() {
     setGearboxRawMaterial('');
     setGearboxMaterialId('');
     setGearboxMaterialBatch('');
+    setGearboxMaterialBatchDate(new Date().toISOString().slice(0, 10));
+    setGearboxMaterialBatchSuffix('A');
     setGearboxProductId('');
     setGearboxProductBatch('');
+    setGearboxProductBatchDate(new Date().toISOString().slice(0, 10));
     setGearboxNote('');
     setGearboxPhotoFile(null);
     setGearboxProblemOpen(false);
@@ -1677,7 +1742,7 @@ export default function KioskPage() {
           className="w-full bg-slate-950 border border-white/10 text-white text-lg rounded-2xl py-4 pl-12 pr-4 outline-none focus:border-violet-400"
         />
       </label>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[45vh] overflow-y-auto pr-1">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {activeGearboxAssets
           .filter((asset) => !assetSearch || normalize(assetLabel(asset, assets)).includes(normalize(assetSearch)))
           .map((asset) => {
@@ -2174,14 +2239,16 @@ export default function KioskPage() {
               </select>
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-black text-slate-200">Šarže výrobku</span>
+              <span className="mb-1 block text-xs font-black text-slate-200">Datum zahájení výroby</span>
               <input
-                type="text"
-                value={gearboxProductBatch}
-                onChange={(event) => setGearboxProductBatch(event.target.value)}
-                placeholder="např. sk004290526"
+                type="date"
+                value={gearboxProductBatchDate}
+                onChange={(event) => setGearboxProductBatchDate(event.target.value)}
                 className="w-full rounded-xl border border-white/10 bg-slate-950 p-2.5 text-base text-white outline-none placeholder:text-slate-500 focus:border-violet-400"
               />
+              <div className="mt-1 rounded-lg border border-violet-400/20 bg-violet-500/10 px-3 py-2 text-sm font-black text-violet-100">
+                Šarže výrobku: {gearboxProductBatch || 'vyber výrobek'}
+              </div>
             </label>
             <label className="block">
               <span className="mb-1 block text-xs font-black text-slate-200">Surovina</span>
@@ -2200,13 +2267,28 @@ export default function KioskPage() {
               </select>
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-black text-slate-200">Šarže suroviny</span>
+              <span className="mb-1 block text-xs font-black text-slate-200">Datum naskladnění suroviny</span>
+              <div className="grid grid-cols-[minmax(0,1fr)_80px] gap-2">
+                <input
+                  type="date"
+                  value={gearboxMaterialBatchDate}
+                  onChange={(event) => setGearboxMaterialBatchDate(event.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-slate-950 p-2.5 text-base text-white outline-none placeholder:text-slate-500 focus:border-violet-400"
+                />
+                <input
+                  type="text"
+                  value={gearboxMaterialBatchSuffix}
+                  onChange={(event) => setGearboxMaterialBatchSuffix(event.target.value.toUpperCase().slice(0, 2))}
+                  placeholder="A"
+                  className="w-full rounded-xl border border-white/10 bg-slate-950 p-2.5 text-center text-base font-black text-white outline-none placeholder:text-slate-500 focus:border-violet-400"
+                />
+              </div>
               <input
                 type="text"
                 value={gearboxMaterialBatch}
                 onChange={(event) => setGearboxMaterialBatch(event.target.value)}
-                placeholder="např. nk01290526-A"
-                className="w-full rounded-xl border border-white/10 bg-slate-950 p-2.5 text-base text-white outline-none placeholder:text-slate-500 focus:border-violet-400"
+                placeholder="šarže se předvyplní po výběru suroviny"
+                className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 p-2.5 text-base text-white outline-none placeholder:text-slate-500 focus:border-violet-400"
               />
             </label>
           </div>
@@ -2734,7 +2816,7 @@ function QuickButton({ label, selected, onClick }: { label: string; selected: bo
 
 function FormWrapper({ title, onCancel, children }: { title: string; onCancel: () => void; children: React.ReactNode }) {
   return (
-    <div className="w-full max-w-6xl max-h-[calc(100dvh-12px)] overflow-y-auto bg-slate-800 p-3 md:p-6 rounded-3xl shadow-2xl border border-white/10">
+    <div className="h-[100dvh] w-full overflow-y-auto bg-slate-800 p-3 shadow-2xl border border-white/10 sm:h-auto sm:max-h-[calc(100dvh-12px)] sm:max-w-6xl sm:rounded-3xl md:p-6">
       <div className="flex items-center gap-3 mb-5">
         <button onClick={onCancel} className="min-h-12 min-w-12 flex items-center justify-center p-3 rounded-xl bg-slate-900 text-slate-300 hover:bg-slate-700 hover:text-white transition">
           <ArrowLeft className="w-6 h-6" />

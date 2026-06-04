@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { collection, doc, onSnapshot, serverTimestamp, updateDoc, writeBatch, type Timestamp } from 'firebase/firestore';
+import { collection, doc, limit, onSnapshot, orderBy, query, serverTimestamp, updateDoc, writeBatch, type Timestamp } from 'firebase/firestore';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, ClipboardList, Factory, Leaf, Package, Save, Search, ShieldCheck } from 'lucide-react';
 import { useAuthContext } from '../context/AuthContext';
 import { db } from '../lib/firebase';
 import { MATERIAL_SEED, PRODUCT_SEED, materialBatch, productBatch } from '../data/productionMasterSeed';
 import { showToast } from '../components/ui/Toast';
+import type { GearboxTemperatureLog } from '../types/gearbox';
 
 type Tab = 'materials' | 'products';
 type ApprovalStatus = 'pending' | 'approved' | 'conditional' | 'blocked';
@@ -58,6 +59,12 @@ function formatDate(value: unknown): string {
   const date = asDate(value);
   if (!date) return 'bez použití';
   return date.toLocaleDateString('cs-CZ', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function formatDateTime(value: unknown): string {
+  const date = asDate(value);
+  if (!date) return 'bez data';
+  return date.toLocaleString('cs-CZ', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 function splitList(value: string): string[] {
@@ -168,6 +175,21 @@ function useMasterData(canManage: boolean, user: ReturnType<typeof useAuthContex
   return { materials, products, loading };
 }
 
+function useGearboxTemperatureHistory() {
+  const [logs, setLogs] = useState<GearboxTemperatureLog[]>([]);
+
+  useEffect(() => {
+    const q = query(collection(db, 'gearbox_temperature_logs'), orderBy('measuredAt', 'desc'), limit(500));
+    return onSnapshot(
+      q,
+      (snap) => setLogs(snap.docs.map((item) => ({ id: item.id, ...item.data() } as GearboxTemperatureLog))),
+      () => setLogs([]),
+    );
+  }, []);
+
+  return logs;
+}
+
 function MasterCard({
   item,
   selected,
@@ -208,11 +230,13 @@ function DetailPanel({
   item,
   canManage,
   materials,
+  temperatureLogs,
 }: {
   tab: Tab;
   item: MaterialDoc | ProductDoc | null;
   canManage: boolean;
   materials: MaterialDoc[];
+  temperatureLogs: GearboxTemperatureLog[];
 }) {
   const [form, setForm] = useState<Record<string, string>>({});
   const [batchDate, setBatchDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -253,6 +277,9 @@ function DetailPanel({
   const batchValue = tab === 'materials'
     ? materialBatch(item.number, selectedDate, batchSuffix)
     : productBatch(item.number, selectedDate);
+  const relatedTemperatureLogs = temperatureLogs
+    .filter((log) => tab === 'materials' ? log.materialId === item.id : log.productId === item.id)
+    .slice(0, 12);
 
   const save = async () => {
     if (!canManage || !item) return;
@@ -392,6 +419,40 @@ function DetailPanel({
           </label>
         </section>
 
+        <section className="rounded-2xl border border-sky-100 bg-sky-50 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-black text-sky-900">Historie teplot</div>
+              <div className="mt-1 text-xs font-semibold text-sky-700">Posledni záznamy navázané na tuto kartu</div>
+            </div>
+            <span className="rounded-full bg-white px-2.5 py-1 text-xs font-black text-sky-800">{relatedTemperatureLogs.length}</span>
+          </div>
+          {relatedTemperatureLogs.length === 0 ? (
+            <div className="mt-3 rounded-xl bg-white px-3 py-3 text-sm font-semibold text-slate-500">
+              Zatím není žádný záznam teploty pro tuto kartu.
+            </div>
+          ) : (
+            <div className="mt-3 grid gap-2">
+              {relatedTemperatureLogs.map((log) => (
+                <div key={log.id} className="rounded-xl bg-white px-3 py-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-sm font-black text-slate-950">
+                      {log.temperatureC} °C
+                      {typeof log.motorLoadAmps === 'number' && <span className="ml-2 text-sky-700">{log.motorLoadAmps} A</span>}
+                    </div>
+                    <div className="text-xs font-bold text-slate-500">{formatDateTime(log.measuredAt)}</div>
+                  </div>
+                  <div className="mt-1 text-xs font-semibold text-slate-500">
+                    {log.gearboxName || 'Převodovka'} · {log.extruderName || 'bez extruderu'}
+                    {tab === 'materials' && log.materialBatch ? ` · ${log.materialBatch}` : ''}
+                    {tab === 'products' && log.productBatch ? ` · ${log.productBatch}` : ''}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
         {canManage && (
           <button type="button" onClick={save} disabled={saving} className={BUTTON_PRIMARY}>
             <Save className="h-4 w-4" />
@@ -413,6 +474,7 @@ export default function MasterDataPage() {
   const [tab, setTab] = useState<Tab>(initialTab);
   const [search, setSearch] = useState('');
   const { materials, products, loading } = useMasterData(canManage, user);
+  const temperatureLogs = useGearboxTemperatureHistory();
   const [selectedId, setSelectedId] = useState('');
 
   const activeItems = tab === 'materials' ? materials : products;
@@ -496,7 +558,13 @@ export default function MasterDataPage() {
             )}
           </section>
 
-          <DetailPanel tab={tab} item={selectedItem as MaterialDoc | ProductDoc | null} canManage={canManage} materials={materials} />
+          <DetailPanel
+            tab={tab}
+            item={selectedItem as MaterialDoc | ProductDoc | null}
+            canManage={canManage}
+            materials={materials}
+            temperatureLogs={temperatureLogs}
+          />
         </div>
       </main>
     </div>

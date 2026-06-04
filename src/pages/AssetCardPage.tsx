@@ -48,6 +48,7 @@ import { subscribeToRecentWorkLogs } from '../services/workLogService';
 import GearboxRepairModal from '../components/gearbox/GearboxRepairModal';
 import GearboxProblemModal from '../components/gearbox/GearboxProblemModal';
 import type { WorkLog } from '../types/workLog';
+import { materialBatch, productBatch } from '../data/productionMasterSeed';
 
 // ═══════════════════════════════════════════
 // TYPES
@@ -2379,10 +2380,10 @@ export default function AssetCardPage() {
           user={user}
           saving={gearboxActionSaving}
           onClose={() => setShowGearboxTemperature(false)}
-          onSave={async ({ temperatureC, motorLoadAmps, measuredAt, rawMaterial, note, photoFile }) => {
+          onSave={async ({ temperatureC, motorLoadAmps, measuredAt, rawMaterial, materialId, materialName, materialBatch, productId, productName, productBatch, note, photoFile }) => {
             setGearboxActionSaving(true);
             try {
-              await addGearboxTemperatureLog({ tenantId, gearbox: assetV2, user, temperatureC, motorLoadAmps, measuredAt, rawMaterial, note, photoFile });
+              await addGearboxTemperatureLog({ tenantId, gearbox: assetV2, user, temperatureC, motorLoadAmps, measuredAt, rawMaterial, materialId, materialName, materialBatch, productId, productName, productBatch, note, photoFile });
               await refreshAssetV2();
               setShowGearboxTemperature(false);
               setActiveTab('history');
@@ -2820,12 +2821,44 @@ function GearboxAssignModal({ gearbox, extruders, saving, onClose, onAssign }: {
   );
 }
 
+interface GearboxMasterItem {
+  id: string;
+  number: string;
+  nkCode: string;
+  name: string;
+  usageCount?: number;
+  active?: boolean;
+}
+
+function sortGearboxMasterItems(items: GearboxMasterItem[], usage: Map<string, number>) {
+  return [...items]
+    .filter((item) => item.active !== false)
+    .sort((a, b) => {
+      const recent = (usage.get(b.id) || 0) - (usage.get(a.id) || 0);
+      if (recent !== 0) return recent;
+      return (b.usageCount || 0) - (a.usageCount || 0) || a.name.localeCompare(b.name, 'cs');
+    });
+}
+
 function GearboxTemperatureModal({ gearbox, user, saving, onClose, onSave }: {
   gearbox: AssetV2;
   user: { displayName?: string } | null;
   saving: boolean;
   onClose: () => void;
-  onSave: (input: { temperatureC: number; motorLoadAmps: number | null; measuredAt: Date; rawMaterial: string; note: string; photoFile?: File | null }) => Promise<void>;
+  onSave: (input: {
+    temperatureC: number;
+    motorLoadAmps: number | null;
+    measuredAt: Date;
+    rawMaterial: string;
+    materialId?: string;
+    materialName?: string;
+    materialBatch?: string;
+    productId?: string;
+    productName?: string;
+    productBatch?: string;
+    note: string;
+    photoFile?: File | null;
+  }) => Promise<void>;
 }) {
   const [temperature, setTemperature] = useState(String(clampTemperature(gearbox.lastTemperatureC ?? 60)));
   const [motorLoad, setMotorLoad] = useState('');
@@ -2835,9 +2868,75 @@ function GearboxTemperatureModal({ gearbox, user, saving, onClose, onSave }: {
     return now.toISOString().slice(0, 16);
   });
   const [rawMaterial, setRawMaterial] = useState('');
+  const [materials, setMaterials] = useState<GearboxMasterItem[]>([]);
+  const [products, setProducts] = useState<GearboxMasterItem[]>([]);
+  const [temperatureLogs, setTemperatureLogs] = useState<GearboxTemperatureLog[]>([]);
+  const [materialId, setMaterialId] = useState('');
+  const [materialBatchValue, setMaterialBatchValue] = useState('');
+  const [materialBatchDate, setMaterialBatchDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [materialBatchSuffix, setMaterialBatchSuffix] = useState('A');
+  const [productId, setProductId] = useState('');
+  const [productBatchValue, setProductBatchValue] = useState('');
+  const [productBatchDate, setProductBatchDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [note, setNote] = useState('');
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState('');
+  useEffect(() => {
+    const unsubMaterials = onSnapshot(
+      collection(db, 'materials'),
+      (snap) => setMaterials(snap.docs.map((item) => ({ id: item.id, ...item.data() } as GearboxMasterItem))),
+      () => setMaterials([]),
+    );
+    const unsubProducts = onSnapshot(
+      collection(db, 'products'),
+      (snap) => setProducts(snap.docs.map((item) => ({ id: item.id, ...item.data() } as GearboxMasterItem))),
+      () => setProducts([]),
+    );
+    const unsubLogs = onSnapshot(
+      query(collection(db, 'gearbox_temperature_logs'), orderBy('measuredAt', 'desc'), limit(500)),
+      (snap) => setTemperatureLogs(snap.docs.map((item) => ({ id: item.id, ...item.data() } as GearboxTemperatureLog))),
+      () => setTemperatureLogs([]),
+    );
+    return () => {
+      unsubMaterials();
+      unsubProducts();
+      unsubLogs();
+    };
+  }, []);
+  const materialUsage = useMemo(() => {
+    const map = new Map<string, number>();
+    temperatureLogs.forEach((log) => {
+      if (!log.materialId) return;
+      map.set(log.materialId, (map.get(log.materialId) || 0) + 1);
+    });
+    return map;
+  }, [temperatureLogs]);
+  const productUsage = useMemo(() => {
+    const map = new Map<string, number>();
+    temperatureLogs.forEach((log) => {
+      if (!log.productId) return;
+      map.set(log.productId, (map.get(log.productId) || 0) + 1);
+    });
+    return map;
+  }, [temperatureLogs]);
+  const sortedMaterials = useMemo(() => sortGearboxMasterItems(materials, materialUsage), [materials, materialUsage]);
+  const sortedProducts = useMemo(() => sortGearboxMasterItems(products, productUsage), [products, productUsage]);
+  const selectedMaterial = useMemo(() => sortedMaterials.find((item) => item.id === materialId), [materialId, sortedMaterials]);
+  const selectedProduct = useMemo(() => sortedProducts.find((item) => item.id === productId), [productId, sortedProducts]);
+  useEffect(() => {
+    if (!selectedProduct || !productBatchDate) {
+      setProductBatchValue('');
+      return;
+    }
+    setProductBatchValue(productBatch(selectedProduct.number, new Date(`${productBatchDate}T00:00:00`)));
+  }, [productBatchDate, selectedProduct]);
+  useEffect(() => {
+    if (!selectedMaterial || !materialBatchDate) {
+      setMaterialBatchValue('');
+      return;
+    }
+    setMaterialBatchValue(materialBatch(selectedMaterial.number, new Date(`${materialBatchDate}T00:00:00`), materialBatchSuffix));
+  }, [materialBatchDate, materialBatchSuffix, selectedMaterial]);
   const rawTemperatureNumber = Number(String(temperature).replace(',', '.'));
   const temperatureNumber = clampTemperature(Number.isFinite(rawTemperatureNumber) ? rawTemperatureNumber : 60);
   const tempState = getGearboxTemperatureState(gearbox, temperatureNumber);
@@ -2953,8 +3052,75 @@ function GearboxTemperatureModal({ gearbox, user, saving, onClose, onSave }: {
             className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-cyan-400"
           />
         </label>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <label className="block">
+            <div className="text-sm font-medium text-slate-400 mb-2">Vyrobek</div>
+            <select
+              value={productId}
+              onChange={(e) => setProductId(e.target.value)}
+              className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-cyan-400"
+            >
+              <option value="">Nezadano</option>
+              {sortedProducts.map((product) => (
+                <option key={product.id} value={product.id}>{product.nkCode} - {product.name}</option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <div className="text-sm font-medium text-slate-400 mb-2">Datum zahajeni vyroby</div>
+            <input
+              type="date"
+              value={productBatchDate}
+              onChange={(e) => setProductBatchDate(e.target.value)}
+              className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-cyan-400"
+            />
+            <div className="mt-2 rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-sm font-black text-cyan-100">
+              Sarze vyrobku: {productBatchValue || 'vyber vyrobek'}
+            </div>
+          </label>
+          <label className="block">
+            <div className="text-sm font-medium text-slate-400 mb-2">Surovina z ciselniku</div>
+            <select
+              value={materialId}
+              onChange={(e) => {
+                setMaterialId(e.target.value);
+                setRawMaterial('');
+              }}
+              className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-cyan-400"
+            >
+              <option value="">Nezadano</option>
+              {sortedMaterials.map((material) => (
+                <option key={material.id} value={material.id}>{material.nkCode} - {material.name}</option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <div className="text-sm font-medium text-slate-400 mb-2">Sarze suroviny</div>
+            <div className="grid grid-cols-[minmax(0,1fr)_80px] gap-2">
+              <input
+                type="date"
+                value={materialBatchDate}
+                onChange={(e) => setMaterialBatchDate(e.target.value)}
+                className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-cyan-400"
+              />
+              <input
+                value={materialBatchSuffix}
+                onChange={(e) => setMaterialBatchSuffix(e.target.value.toUpperCase().slice(0, 2))}
+                placeholder="A"
+                className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-center font-black text-white focus:outline-none focus:border-cyan-400"
+              />
+            </div>
+            <input
+              type="text"
+              value={materialBatchValue}
+              onChange={(e) => setMaterialBatchValue(e.target.value)}
+              placeholder="sarze se predvyplni po vyberu suroviny"
+              className="mt-2 w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-cyan-400"
+            />
+          </label>
+        </div>
         <label className="block">
-          <div className="text-sm font-medium text-slate-400 mb-2">Surovina</div>
+          <div className="text-sm font-medium text-slate-400 mb-2">Surovina mimo seznam</div>
           <input
             type="text"
             value={rawMaterial}
@@ -2989,7 +3155,20 @@ function GearboxTemperatureModal({ gearbox, user, saving, onClose, onSave }: {
           {photoPreview && <img src={photoPreview} alt="Náhled" className="mt-3 h-28 rounded-xl object-cover border border-white/10" />}
         </label>
         <button
-          onClick={() => onSave({ temperatureC: temperatureNumber, motorLoadAmps: motorLoad.trim() ? motorLoadNumber : null, measuredAt: new Date(measuredAt), rawMaterial: rawMaterial.trim(), note: note.trim(), photoFile })}
+          onClick={() => onSave({
+            temperatureC: temperatureNumber,
+            motorLoadAmps: motorLoad.trim() ? motorLoadNumber : null,
+            measuredAt: new Date(measuredAt),
+            rawMaterial: selectedMaterial?.name || rawMaterial.trim(),
+            materialId: selectedMaterial?.id,
+            materialName: selectedMaterial?.name,
+            materialBatch: materialBatchValue.trim(),
+            productId: selectedProduct?.id,
+            productName: selectedProduct?.name,
+            productBatch: productBatchValue.trim(),
+            note: note.trim(),
+            photoFile,
+          })}
           disabled={!measuredAt || saving}
           className="w-full py-3.5 bg-cyan-600 text-white rounded-xl font-bold disabled:opacity-50 flex items-center justify-center gap-2"
         >
