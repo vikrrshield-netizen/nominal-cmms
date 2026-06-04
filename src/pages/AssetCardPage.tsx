@@ -35,6 +35,7 @@ import { exportAssetCardPDF, exportAssetCardXLSX } from '../utils/exportAssetCar
 import {
   addGearboxTemperatureLog,
   assignGearboxToExtruder,
+  getGearboxStatus,
   getGearboxStatusLabel,
   isExtruderAsset,
   isGearboxAsset,
@@ -1126,7 +1127,7 @@ export default function AssetCardPage() {
               Přiřadit
             </button>
           )}
-          {isGearbox && canAssignGearbox && assetV2?.currentExtruderId && (
+          {isGearbox && canAssignGearbox && getGearboxStatus(assetV2) !== 'in_stock' && (
             <button
               onClick={handleReturnGearboxToStock}
               disabled={gearboxActionSaving}
@@ -1139,7 +1140,7 @@ export default function AssetCardPage() {
           {isGearbox && canAssignGearbox && (
             <button
               onClick={handleMoveGearboxToService}
-              disabled={gearboxActionSaving || assetV2?.gearboxStatus === 'service'}
+              disabled={gearboxActionSaving || getGearboxStatus(assetV2) === 'service'}
               className="min-w-[132px] flex-1 bg-amber-50 border border-amber-200 text-amber-700 rounded-xl px-3 text-sm font-black flex items-center justify-center gap-2 hover:bg-amber-100 transition active:scale-[0.97] min-h-11 disabled:opacity-50"
             >
               <Wrench className="w-5 h-5" />

@@ -415,7 +415,7 @@ function dashboardGearboxStatus(status: ReturnType<typeof getGearboxStatus>) {
     };
   }
   return {
-    label: 'Připravená',
+    label: 'Ve skladu',
     tone: 'border-sky-200 bg-sky-50 text-sky-700',
   };
 }

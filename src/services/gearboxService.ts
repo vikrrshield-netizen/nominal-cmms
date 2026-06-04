@@ -56,8 +56,14 @@ export function isExtruderAsset(asset?: Partial<Asset> | null): boolean {
 }
 
 export function getGearboxStatus(asset?: Partial<Asset> | null): GearboxStatus {
-  if (asset?.gearboxStatus) return asset.gearboxStatus as GearboxStatus;
+  if (asset?.gearboxStatus === 'installed' || asset?.gearboxStatus === 'in_stock' || asset?.gearboxStatus === 'service') {
+    return asset.gearboxStatus;
+  }
   if (asset?.currentExtruderId) return 'installed';
+  const place = normalizeGearboxText([asset?.location, asset?.areaName, asset?.status].filter(Boolean).join(' '));
+  if (place.includes('servis') || place.includes('oprav') || place.includes('maintenance') || place.includes('broken')) {
+    return 'service';
+  }
   return 'in_stock';
 }
 
@@ -107,6 +113,7 @@ export async function assignGearboxToExtruder(input: {
   for (const replaced of replacedGearboxes) {
     batch.update(assetRef(replaced.id), {
       tenantId: input.tenantId,
+      status: 'maintenance',
       gearboxStatus: 'service',
       currentExtruderId: null,
       currentExtruderName: null,
@@ -117,6 +124,7 @@ export async function assignGearboxToExtruder(input: {
 
   batch.update(assetRef(input.gearbox.id), {
     tenantId: input.tenantId,
+    status: 'operational',
     gearboxStatus: 'installed',
     currentExtruderId: input.extruder.id,
     currentExtruderName: input.extruder.name,
@@ -208,6 +216,7 @@ export async function returnGearboxToStock(input: {
 
   batch.update(assetRef(input.gearbox.id), {
     tenantId: input.tenantId,
+    status: 'operational',
     gearboxStatus: 'in_stock',
     currentExtruderId: null,
     currentExtruderName: null,
@@ -267,6 +276,7 @@ export async function setGearboxStockStatus(input: {
 
   batch.update(assetRef(input.gearbox.id), {
     tenantId: input.tenantId,
+    status: isService ? 'maintenance' : 'operational',
     gearboxStatus: input.status,
     currentExtruderId: null,
     currentExtruderName: null,

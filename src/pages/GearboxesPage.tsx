@@ -538,12 +538,12 @@ function GearboxCard({
         {canSetStockStatus && (
           <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/45 p-3">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <div className="text-sm font-black text-white">Stav náhradní převodovky</div>
+              <div className="text-sm font-black text-white">Aktuální stav převodovky</div>
               <div className={`rounded-full border px-2.5 py-1 text-xs font-black ${statusClass(status)}`}>
                 {status === 'service'
-                  ? 'Aktuálně v opravě'
+                  ? 'Je v servisu'
                   : status === 'in_stock'
-                    ? 'Aktuálně ve skladu'
+                    ? 'Je ve skladu'
                     : 'Namontovaná'}
               </div>
             </div>
@@ -556,11 +556,11 @@ function GearboxCard({
                 className={`min-h-12 rounded-xl border px-3 text-sm font-black transition active:scale-[0.98] ${
                   status === 'in_stock'
                     ? 'border-emerald-300/60 bg-emerald-500/25 text-emerald-50'
-                    : 'border-emerald-400/25 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/15'
+                    : 'border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/[0.08]'
                 } ${savingStatus && status !== 'in_stock' ? 'opacity-60' : ''}`}
               >
                 {savingStatus && status !== 'in_stock' ? <Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> : null}
-                {status === 'in_stock' ? 'Aktuálně ve skladu' : 'Přesunout do skladu'}
+                {status === 'in_stock' ? 'Ve skladu' : 'Přesunout do skladu'}
               </button>
               <button
                 type="button"
@@ -570,11 +570,11 @@ function GearboxCard({
                 className={`min-h-12 rounded-xl border px-3 text-sm font-black transition active:scale-[0.98] ${
                   status === 'service'
                     ? 'border-amber-300/60 bg-amber-500/25 text-amber-50'
-                    : 'border-amber-400/25 bg-amber-500/10 text-amber-100 hover:bg-amber-500/15'
+                    : 'border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/[0.08]'
                 } ${savingStatus && status !== 'service' ? 'opacity-60' : ''}`}
               >
                 {savingStatus && status !== 'service' ? <Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> : null}
-                {status === 'service' ? 'Aktuálně v opravě' : 'Dát do opravy'}
+                {status === 'service' ? 'V servisu' : 'Dát do servisu'}
               </button>
             </div>
           </div>
