@@ -323,9 +323,9 @@ function FolderTile({ folder, onClick }: { folder: FolderGroup; onClick: () => v
 // ═══════════════════════════════════════════════
 // ROOM TILE — drill-down level 2 (iPhone tile)
 // ═══════════════════════════════════════════════
-function RoomTile({ room, color, onClick, code, canManage, onEdit, onDelete }: {
+function RoomTile({ room, color, onClick, code, canUpdate, canDelete, onEdit, onDelete }: {
   room: RoomGroup; color: string; onClick: () => void; code: string;
-  canManage?: boolean; onEdit?: () => void; onDelete?: () => void;
+  canUpdate?: boolean; canDelete?: boolean; onEdit?: () => void; onDelete?: () => void;
 }) {
   const roomWorst = getWorstStatus(room.assets);
   const roomSt = STATUS_CONFIG[roomWorst] || STATUS_CONFIG.idle;
@@ -350,10 +350,10 @@ function RoomTile({ room, color, onClick, code, canManage, onEdit, onDelete }: {
           <span className="text-[11px] text-red-400 mt-0.5">{room.issueCount} problémů</span>
         )}
       </button>
-      {/* Edit/Delete overlay — visible on hover for users with asset.delete permission */}
-      {canManage && (
+      {/* Edit/delete overlay follows the same split as Firestore asset rules. */}
+      {(canUpdate || canDelete) && (
         <div className="absolute top-1 left-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-          {onEdit && (
+          {canUpdate && onEdit && (
             <button
               onClick={(e) => { e.stopPropagation(); onEdit(); }}
               className="w-7 h-7 rounded-lg bg-amber-500/80 text-white flex items-center justify-center hover:bg-amber-500 transition"
@@ -362,7 +362,7 @@ function RoomTile({ room, color, onClick, code, canManage, onEdit, onDelete }: {
               <Edit2 className="w-3.5 h-3.5" />
             </button>
           )}
-          {onDelete && (
+          {canDelete && onDelete && (
             <button
               onClick={(e) => { e.stopPropagation(); onDelete(); }}
               className="w-7 h-7 rounded-lg bg-red-500/80 text-white flex items-center justify-center hover:bg-red-500 transition"
@@ -564,14 +564,16 @@ const DEMO_MACHINE_LOGS: EntityLogEntry[] = [
 // ═══════════════════════════════════════════════
 // ASSET DETAIL SHEET — Matryoshka EntityCard style
 // ═══════════════════════════════════════════════
-function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onDelete, onOpenPassport, canManage, allAssets, onSelectAsset }: {
+function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onDelete, onOpenPassport, canCreate, canUpdate, canDelete, allAssets, onSelectAsset }: {
   asset: Asset;
   onClose: () => void;
   onCreateTask: (asset: Asset) => Promise<void>;
   onReport: (asset: Asset) => Promise<void>;
   onDelete?: (asset: Asset) => void;
   onOpenPassport?: (asset: Asset) => void;
-  canManage?: boolean;
+  canCreate?: boolean;
+  canUpdate?: boolean;
+  canDelete?: boolean;
   allAssets?: Asset[];
   onSelectAsset?: (asset: Asset) => void;
 }) {
@@ -622,6 +624,7 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onDelete, on
   const [subSaving, setSubSaving] = useState(false);
 
   const handleAddSubAsset = async () => {
+    if (!canCreate) return;
     if (!subName.trim()) return;
     setSubSaving(true);
     try {
@@ -650,6 +653,7 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onDelete, on
   };
 
   const handleInlineSave = async () => {
+    if (!canUpdate) return;
     if (!editName.trim()) return;
     setEditSaving(true);
     try {
@@ -748,9 +752,9 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onDelete, on
       title={asset.name}
       isOpen={true}
       onClose={onClose}
-      titleActions={canManage ? (
+      titleActions={(canUpdate || canDelete) ? (
         <>
-          {isEditing ? (
+          {isEditing && canUpdate ? (
             <button
               onClick={handleInlineSave}
               disabled={editSaving || !editName.trim()}
@@ -759,7 +763,7 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onDelete, on
             >
               {editSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             </button>
-          ) : (
+          ) : canUpdate ? (
             <button
               onClick={() => setIsEditing(true)}
               className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center text-amber-400 hover:bg-amber-500/30 transition"
@@ -767,8 +771,8 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onDelete, on
             >
               <Edit2 className="w-4 h-4" />
             </button>
-          )}
-          {!isEditing && onDelete && (
+          ) : null}
+          {!isEditing && canDelete && onDelete && (
             <button
               onClick={() => onDelete(asset)}
               className="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center text-red-400 hover:bg-red-500/30 transition"
@@ -1004,13 +1008,13 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onDelete, on
       )}
 
       {/* ═══ CHILDREN (SUB-ASSETS) ═══ */}
-      {(children.length > 0 || canManage) && (
+      {(children.length > 0 || canCreate) && (
         <div className="mt-4">
           <div className="flex items-center justify-between mb-1.5">
             <div className="text-[11px] text-slate-500 uppercase tracking-wider font-bold">
               Podzařízení {children.length > 0 && <span className="text-slate-600">({children.length})</span>}
             </div>
-            {canManage && !showSubForm && (
+            {canCreate && !showSubForm && (
               <button
                 onClick={() => setShowSubForm(true)}
                 className="text-[11px] text-orange-400 font-semibold hover:text-orange-300 transition flex items-center gap-1"
@@ -1331,7 +1335,9 @@ export default function MapPage() {
   };
 
   const { user, hasPermission } = useAuthContext();
-  const canManageAssets = hasPermission('asset.delete');
+  const canCreateAssets = hasPermission('asset.create');
+  const canUpdateAssets = hasPermission('asset.update');
+  const canDeleteAssets = hasPermission('asset.delete');
 
   // Delete modal state
   const [deleteTarget, setDeleteTarget] = useState<{ type: 'room' | 'asset'; name: string; buildingId: string; roomName?: string; assetId?: string } | null>(null);
@@ -1459,6 +1465,7 @@ export default function MapPage() {
   const [allowArchive, setAllowArchive] = useState(false);
 
   const handleDeleteAsset = async (asset: Asset) => {
+    if (!canDeleteAssets) return;
     setSelectedAsset(null);
     setDeleteTarget({ type: 'asset', name: asset.name, buildingId: asset.buildingId, assetId: asset.id });
     setAllowArchive(false);
@@ -1492,6 +1499,7 @@ export default function MapPage() {
   };
 
   const confirmAssetDelete = async () => {
+    if (!canDeleteAssets) return;
     if (!deleteTarget || deleteTarget.type !== 'asset' || !deleteTarget.assetId) return;
     // Soft delete — mark as archived (lookup by ID, not name)
     await updateDoc(doc(db, 'assets', deleteTarget.assetId), {
@@ -1508,6 +1516,7 @@ export default function MapPage() {
 
   // FAB handler — opens add modal for current drill level
   const handleFabClick = () => {
+    if (!canCreateAssets) return;
     setSelectedAsset(null);
     if (activeLevel === 'machines' || activeLevel === 'folder') setShowAddModal('asset');
     else if (activeLevel === 'rooms') setShowAddModal('room');
@@ -1516,6 +1525,7 @@ export default function MapPage() {
 
   // ── Room management handlers ──
   const handleRoomDelete = async (buildingId: string, roomName: string) => {
+    if (!canDeleteAssets) return;
     // Check for active tasks linked to assets in this room
     const roomAssets = assets.filter(a => a.buildingId === buildingId && (a.areaName || 'Ostatní') === roomName);
     const assetIds = roomAssets.map(a => a.id);
@@ -1546,6 +1556,7 @@ export default function MapPage() {
   };
 
   const confirmRoomDelete = async () => {
+    if (!canDeleteAssets) return;
     if (!deleteTarget || deleteTarget.type !== 'room') return;
     const roomAssets = assets.filter(
       a => a.buildingId === deleteTarget.buildingId && (a.areaName || 'Ostatní') === deleteTarget.name
@@ -1560,11 +1571,13 @@ export default function MapPage() {
   };
 
   const handleRoomRename = (buildingId: string, oldName: string) => {
+    if (!canUpdateAssets) return;
     setRenamingRoom({ buildingId, oldName });
     setRenameValue(oldName);
   };
 
   const saveRoomRename = async () => {
+    if (!canUpdateAssets) return;
     if (!renamingRoom || !renameValue.trim()) return;
     setRenameSaving(true);
     const roomAssets = assets.filter(
@@ -1759,7 +1772,7 @@ export default function MapPage() {
                   })}
 
                   {/* [+] Add building tile (admin only) */}
-                  {canManageAssets && (
+                  {canCreateAssets && (
                     <button
                       onClick={() => setShowAddModal('building')}
                       className="flex flex-col items-center justify-center p-3 rounded-2xl border-2 border-dashed border-slate-700/50 text-slate-500 hover:text-orange-400 hover:border-orange-500/30 transition cursor-pointer text-center min-h-[120px]"
@@ -1819,14 +1832,15 @@ export default function MapPage() {
                     color={currentColor}
                     code={getRoomCode(selectedBuildingId || '', room, idx)}
                     onClick={() => handleRoomClick(room.name)}
-                    canManage={canManageAssets}
+                    canUpdate={canUpdateAssets}
+                    canDelete={canDeleteAssets}
                     onEdit={() => handleRoomRename(selectedBuildingId || '', room.name)}
                     onDelete={() => handleRoomDelete(selectedBuildingId || '', room.name)}
                   />
                 ))}
 
                 {/* [+] Add room tile (admin only) */}
-                {canManageAssets && (
+                {canCreateAssets && (
                   <button
                     onClick={() => setShowAddModal('room')}
                     className="flex flex-col items-center justify-center p-3 rounded-2xl border-2 border-dashed border-slate-700/50 text-slate-500 hover:text-orange-400 hover:border-orange-500/30 transition cursor-pointer text-center min-h-[110px]"
@@ -1884,7 +1898,7 @@ export default function MapPage() {
                   ))}
 
                   {/* [+] Add asset tile (admin only) */}
-                  {canManageAssets && (
+                  {canCreateAssets && (
                     <button
                       onClick={() => setShowAddModal('asset')}
                       className="flex flex-col items-center justify-center p-3 rounded-2xl border-2 border-dashed border-slate-700/50 text-slate-500 hover:text-orange-400 hover:border-orange-500/30 transition cursor-pointer text-center min-h-[100px]"
@@ -1940,7 +1954,7 @@ export default function MapPage() {
       </div>
 
       {/* FAB — Floating Add Button (admin only) */}
-      {canManageAssets && (
+      {canCreateAssets && (
         <button
           onClick={handleFabClick}
           className="fixed bottom-24 right-4 z-50 w-14 h-14 bg-gradient-to-br from-orange-500 to-amber-500 rounded-2xl shadow-lg shadow-orange-500/30 flex items-center justify-center text-white active:scale-90 transition-all hover:shadow-xl hover:shadow-orange-500/40"
@@ -1957,7 +1971,9 @@ export default function MapPage() {
           onCreateTask={handleNewTask}
           onReport={handleReport}
           onDelete={handleDeleteAsset}
-          canManage={canManageAssets}
+          canCreate={canCreateAssets}
+          canUpdate={canUpdateAssets}
+          canDelete={canDeleteAssets}
           allAssets={assets}
           onSelectAsset={setSelectedAsset}
           onOpenPassport={(asset: Asset) => {

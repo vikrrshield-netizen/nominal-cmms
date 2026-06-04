@@ -9,6 +9,8 @@ import {
   Droplets,
   Loader2,
   MapPin,
+  Minus,
+  Plus,
   Search,
   Thermometer,
   X,
@@ -38,6 +40,26 @@ type RoomOption = {
 };
 
 const QUICK_TEMPS = [-25, -18, 0, 2, 5, 8, 20];
+
+function clampNumber(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function parseDecimalInput(value: string): number | null {
+  if (!value.trim()) return null;
+  const parsed = Number(value.replace(',', '.'));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function formatDecimalInput(value: number, digits = 1): string {
+  const rounded = Number(value.toFixed(digits));
+  return (Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(digits)).replace('.', ',');
+}
+
+function stepDecimalInput(value: string, delta: number, fallback: number, min: number, max: number, digits = 1): string {
+  const base = parseDecimalInput(value) ?? fallback;
+  return formatDecimalInput(clampNumber(base + delta, min, max), digits);
+}
 
 function asDate(value: unknown): Date | null {
   if (!value) return null;
@@ -730,15 +752,17 @@ function TemperatureModal({
   const [measuredAt, setMeasuredAt] = useState(toDateTimeLocal(new Date()));
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
+  const temperatureSliderValue = clampNumber(parseDecimalInput(temperature) ?? 5, -30, 40);
+  const humiditySliderValue = clampNumber(parseDecimalInput(humidity) ?? 50, 0, 100);
 
   const handleSave = async () => {
-    const value = Number(temperature.replace(',', '.'));
-    if (!Number.isFinite(value)) {
+    const value = parseDecimalInput(temperature);
+    if (value === null) {
       showToast('Zadej platnou teplotu.', 'error');
       return;
     }
-    const humidityValue = humidity.trim() ? Number(humidity.replace(',', '.')) : undefined;
-    if (humidityValue !== undefined && (!Number.isFinite(humidityValue) || humidityValue < 0 || humidityValue > 100)) {
+    const humidityValue = parseDecimalInput(humidity);
+    if (humidity.trim() && (humidityValue === null || humidityValue < 0 || humidityValue > 100)) {
       showToast('Vlhkost musí být číslo 0-100 %.', 'error');
       return;
     }
@@ -750,7 +774,7 @@ function TemperatureModal({
         datalogger: asset,
         user,
         temperatureC: value,
-        humidityPct: humidityValue,
+        humidityPct: humidityValue ?? undefined,
         rawMaterial: rawMaterial.trim(),
         measuredAt: fromDateTimeLocal(measuredAt),
         roomName: roomLabel(asset),
@@ -786,7 +810,7 @@ function TemperatureModal({
             <span className="mb-1 block text-sm font-black text-slate-800">Teplota</span>
             <input
               value={temperature}
-              onChange={(event) => setTemperature(event.target.value)}
+              onChange={(event) => setTemperature(event.target.value.replace('.', ','))}
               inputMode="decimal"
               placeholder="např. 5,2"
               className="vik-input text-xl font-black sm:text-2xl"
@@ -798,24 +822,42 @@ function TemperatureModal({
                   {temperature.trim() ? `${temperature.replace('.', ',')} °C` : 'nezadáno'}
                 </span>
               </div>
-              <input
-                type="range"
-                min="-30"
-                max="40"
-                step="0.5"
-                value={temperature.trim() ? Math.max(-30, Math.min(40, Number(temperature.replace(',', '.')) || 0)) : 5}
-                onChange={(event) => setTemperature(event.target.value)}
-                className="w-full accent-emerald-700"
-                aria-label="Teplota ve stupních Celsia"
-              />
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setTemperature(stepDecimalInput(temperature, -0.1, 5, -30, 40))}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-emerald-200 bg-white text-emerald-800"
+                  aria-label="Snížit teplotu o 0,1 stupně"
+                >
+                  <Minus className="h-4 w-4" />
+                </button>
+                <input
+                  type="range"
+                  min="-30"
+                  max="40"
+                  step="0.1"
+                  value={temperatureSliderValue}
+                  onChange={(event) => setTemperature(formatDecimalInput(Number(event.target.value)))}
+                  className="w-full accent-emerald-700"
+                  aria-label="Teplota ve stupních Celsia"
+                />
+                <button
+                  type="button"
+                  onClick={() => setTemperature(stepDecimalInput(temperature, 0.1, 5, -30, 40))}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-emerald-200 bg-white text-emerald-800"
+                  aria-label="Zvýšit teplotu o 0,1 stupně"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
               <div className="mt-2 grid grid-cols-4 gap-1.5 sm:grid-cols-7 sm:gap-2">
                 {QUICK_TEMPS.map((temp) => (
                   <button
                     key={temp}
                     type="button"
-                    onClick={() => setTemperature(String(temp))}
+                    onClick={() => setTemperature(formatDecimalInput(temp))}
                     className={`min-h-9 rounded-xl border px-2 text-xs font-black sm:min-h-10 sm:text-sm ${
-                      temperature === String(temp)
+                      parseDecimalInput(temperature) === temp
                         ? 'border-emerald-600 bg-emerald-100 text-emerald-800'
                         : 'border-emerald-100 bg-white text-emerald-800'
                     }`}
@@ -834,7 +876,7 @@ function TemperatureModal({
             </span>
             <input
               value={humidity}
-              onChange={(event) => setHumidity(event.target.value)}
+              onChange={(event) => setHumidity(event.target.value.replace('.', ','))}
               inputMode="decimal"
               placeholder="volitelně, např. 55"
               className="vik-input text-lg font-black sm:text-xl"
@@ -845,24 +887,42 @@ function TemperatureModal({
                   {humidity.trim() ? `${humidity.replace('.', ',')} %` : 'nezadáno'}
                 </span>
               </div>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                step="1"
-                value={humidity.trim() ? Math.max(0, Math.min(100, Number(humidity.replace(',', '.')) || 0)) : 50}
-                onChange={(event) => setHumidity(event.target.value)}
-                className="w-full accent-cyan-700"
-                aria-label="Vlhkost v procentech"
-              />
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setHumidity(stepDecimalInput(humidity, -1, 50, 0, 100, 0))}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-cyan-200 bg-white text-cyan-800"
+                  aria-label="Snížit vlhkost o 1 procento"
+                >
+                  <Minus className="h-4 w-4" />
+                </button>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={humiditySliderValue}
+                  onChange={(event) => setHumidity(formatDecimalInput(Number(event.target.value), 0))}
+                  className="w-full accent-cyan-700"
+                  aria-label="Vlhkost v procentech"
+                />
+                <button
+                  type="button"
+                  onClick={() => setHumidity(stepDecimalInput(humidity, 1, 50, 0, 100, 0))}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-cyan-200 bg-white text-cyan-800"
+                  aria-label="Zvýšit vlhkost o 1 procento"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
               <div className="mt-2 grid grid-cols-5 gap-1.5">
                 {[40, 50, 60, 70, 80].map((value) => (
                   <button
                     key={value}
                     type="button"
-                    onClick={() => setHumidity(String(value))}
+                    onClick={() => setHumidity(formatDecimalInput(value, 0))}
                     className={`min-h-9 rounded-xl border px-2 text-xs font-black ${
-                      humidity === String(value)
+                      parseDecimalInput(humidity) === value
                         ? 'border-cyan-700 bg-cyan-100 text-cyan-800'
                         : 'border-cyan-100 bg-white text-cyan-800'
                     }`}
