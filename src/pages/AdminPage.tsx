@@ -178,6 +178,18 @@ const normalizeAdminSearch = (value: unknown): string => String(value || '')
   .normalize('NFD')
   .replace(/[\u0300-\u036f]/g, '');
 
+// Po\u0159ad\u00ed rol\u00ed pro \u0159azen\u00ed (dle priority, ne abecedn\u011b)
+const ROLE_ORDER = Object.keys(ROLE_CONFIG) as UserRole[];
+const roleRank = (role: UserRole): number => {
+  const idx = ROLE_ORDER.indexOf(role);
+  return idx === -1 ? ROLE_ORDER.length : idx;
+};
+const compareUsersByRoleThenName = (a: AdminUser, b: AdminUser): number => {
+  const rankDiff = roleRank(a.role) - roleRank(b.role);
+  if (rankDiff !== 0) return rankDiff;
+  return a.displayName.localeCompare(b.displayName, 'cs');
+};
+
 // ═══════════════════════════════════════════════════════════════════
 // COMPONENT
 // ═══════════════════════════════════════════════════════════════════
@@ -244,30 +256,12 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<'users' | 'roles' | 'modules' | 'positions' | 'config' | 'audit' | 'errors' | 'import'>('users');
   const [filterRole, setFilterRole] = useState<UserRole | 'ALL'>('ALL');
   const [userSearch, setUserSearch] = useState('');
+  const [showInactive, setShowInactive] = useState(false);
 
   // Access: admin.view = read-only, admin.manage = full edit
   const canView = hasPermission('admin.view') || hasPermission('admin.manage');
   const canEdit = hasPermission('admin.manage');
 
-  if (!canView) {
-    return (
-      <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-6">
-        <div className="bg-red-500/20 border border-red-500/30 rounded-2xl p-8 text-center max-w-md">
-          <AlertTriangle className="w-16 h-16 text-red-400 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-white mb-2">Přístup odepřen</h2>
-          <p className="text-slate-400 mb-4">Nemáte oprávnění k administraci</p>
-          <button
-            onClick={() => goBack()}
-            className="px-6 py-2 bg-slate-700 text-white rounded-xl hover:bg-slate-600"
-          >
-            Zpět na Dashboard
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   const filteredUsers = useMemo(() => {
     const needle = normalizeAdminSearch(userSearch);
     return users.filter((u) => {
@@ -286,7 +280,16 @@ export default function AdminPage() {
     });
   }, [users, filterRole, userSearch]);
 
-  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const activeUsers = useMemo(
+    () => filteredUsers.filter(u => u.active).sort(compareUsersByRoleThenName),
+    [filteredUsers],
+  );
+
+  const inactiveUsers = useMemo(
+    () => filteredUsers.filter(u => !u.active).sort(compareUsersByRoleThenName),
+    [filteredUsers],
+  );
+
   const handleDeleteUser = useCallback(async (userId: string) => {
     if (confirm('Opravdu deaktivovat tohoto uživatele?')) {
       const userName = users.find(u => u.id === userId)?.displayName || '';
@@ -305,7 +308,6 @@ export default function AdminPage() {
     }
   }, [users, authUser?.uid]);
 
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   const handleToggleActive = useCallback(async (userId: string) => {
     const targetUser = users.find(u => u.id === userId);
     if (!targetUser) return;
@@ -322,47 +324,59 @@ export default function AdminPage() {
     }
   }, [users, authUser?.uid]);
 
-  return (
-    <div className="min-h-screen bg-[#0f172a]">
-      {/* Background */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 right-0 w-[300px] h-[300px] md:w-[500px] md:h-[500px] bg-purple-500/10 rounded-full blur-[120px]" />
-        <div className="absolute bottom-0 left-0 w-[300px] h-[300px] md:w-[500px] md:h-[500px] bg-blue-500/10 rounded-full blur-[120px]" />
-      </div>
-
-      <div className="relative z-10 pb-24">
-        {/* Header */}
-        <header className="p-6">
-          <button 
+  if (!canView) {
+    return (
+      <div className="vik-page min-h-screen flex items-center justify-center p-6">
+        <div className="vik-card border-red-200 bg-red-50 p-8 text-center max-w-md">
+          <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-slate-900 mb-2">Přístup odepřen</h2>
+          <p className="text-slate-600 mb-4">Nemáte oprávnění k administraci</p>
+          <button
             onClick={() => goBack()}
-            className="flex items-center gap-2 text-slate-400 hover:text-white mb-4 transition"
+            className="vik-button px-6"
+          >
+            Zpět na Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="vik-page min-h-screen">
+      <div className="vik-page-shell pb-24">
+        {/* Header */}
+        <header className="px-6 py-6">
+          <button
+            onClick={() => goBack()}
+            className="flex items-center gap-2 text-slate-500 hover:text-slate-900 mb-4 transition"
           >
             <ArrowLeft className="w-5 h-5" />
             Dashboard
           </button>
-          
+
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-500/25">
+              <div className="w-14 h-14 bg-gradient-to-br from-emerald-600 to-teal-600 rounded-2xl flex items-center justify-center shadow-sm">
                 <Shield className="w-7 h-7 text-white" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h1 className="text-2xl font-bold text-white">Administrace</h1>
+                  <h1 className="text-2xl font-black text-slate-900">Administrace</h1>
                   {!canEdit && (
-                    <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-[11px] font-semibold rounded-lg border border-amber-500/30">
+                    <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[11px] font-semibold rounded-lg border border-amber-200">
                       Pouze pro čtení
                     </span>
                   )}
                 </div>
-                <p className="text-slate-400 text-sm">Správa uživatelů a oprávnění</p>
+                <p className="text-slate-500 text-sm">Správa uživatelů a oprávnění</p>
               </div>
             </div>
 
             {canEdit && (
               <button
                 onClick={() => setShowNewUserModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl hover:shadow-lg transition"
+                className="vik-button-primary flex items-center gap-2 px-4"
               >
                 <UserPlus className="w-5 h-5" />
                 <span className="hidden sm:inline">Nový uživatel</span>
@@ -371,7 +385,7 @@ export default function AdminPage() {
           </div>
 
           {/* Tabs */}
-          <div className="flex gap-1 bg-white/5 p-1 rounded-xl">
+          <div className="flex gap-1 bg-white border border-slate-200 p-1 rounded-xl overflow-x-auto">
             {[
               { id: 'users', label: 'Uživatelé', icon: Users },
               { id: 'roles', label: 'Role', icon: Shield },
@@ -385,10 +399,10 @@ export default function AdminPage() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition ${
-                  activeTab === tab.id 
-                    ? 'bg-white text-slate-900' 
-                    : 'text-slate-400 hover:text-white'
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-sm font-bold whitespace-nowrap transition ${
+                  activeTab === tab.id
+                    ? 'bg-[#1a6b4f] text-white'
+                    : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
                 }`}
               >
                 <tab.icon className="w-4 h-4" />
@@ -407,13 +421,11 @@ export default function AdminPage() {
 
           {activeTab === 'users' && !usersLoading && (
             <>
-              {/* Filter */}
+              {/* Filtr rolí */}
               <div className="flex gap-2 overflow-x-auto pb-2">
                 <button
                   onClick={() => setFilterRole('ALL')}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition ${
-                    filterRole === 'ALL' ? 'bg-white text-slate-900' : 'bg-white/5 text-slate-400'
-                  }`}
+                  className={filterRole === 'ALL' ? 'vik-chip vik-chip-active' : 'vik-chip'}
                 >
                   Vše ({users.length})
                 </button>
@@ -423,9 +435,7 @@ export default function AdminPage() {
                     <button
                       key={role}
                       onClick={() => setFilterRole(role as UserRole)}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition flex items-center gap-1.5 ${
-                        filterRole === role ? 'bg-white text-slate-900' : 'bg-white/5 text-slate-400'
-                      }`}
+                      className={filterRole === role ? 'vik-chip vik-chip-active' : 'vik-chip'}
                     >
                       <span>{cfg.icon}</span>
                       <span>{cfg.label}</span>
@@ -435,73 +445,90 @@ export default function AdminPage() {
                 })}
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+              <div className="vik-card p-3">
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <div>
-                    <div className="text-xs font-bold uppercase tracking-wider text-purple-300">Správa podle jména</div>
-                    <div className="text-sm text-slate-400">{filteredUsers.length} z {users.length} pracovníků</div>
+                    <div className="text-xs font-bold uppercase tracking-wider text-emerald-700">Správa podle jména</div>
+                    <div className="text-sm text-slate-500">{filteredUsers.length} z {users.length} pracovníků</div>
                   </div>
                   {userSearch && (
                     <button
                       type="button"
                       onClick={() => setUserSearch('')}
-                      className="rounded-lg px-3 py-1.5 text-xs font-bold text-slate-300 hover:bg-white/10 hover:text-white"
+                      className="rounded-lg px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-100 hover:text-slate-900"
                     >
                       Vymazat
                     </button>
                   )}
                 </div>
-                <div className="flex min-h-12 items-center gap-3 rounded-xl border border-white/10 bg-slate-950/60 px-3">
-                  <Search className="h-5 w-5 shrink-0 text-slate-500" />
+                <div className="flex min-h-12 items-center gap-3 rounded-xl border border-slate-200 bg-[#fbf9f4] px-3">
+                  <Search className="h-5 w-5 shrink-0 text-slate-400" />
                   <input
                     value={userSearch}
                     onChange={(event) => setUserSearch(event.target.value)}
                     placeholder="Hledat pracovníka podle jména, PINu, role, budovy..."
-                    className="h-12 w-full bg-transparent text-base font-semibold text-white outline-none placeholder:text-slate-500"
+                    className="h-12 w-full bg-transparent text-base font-semibold text-slate-900 outline-none placeholder:text-slate-400"
                   />
                 </div>
               </div>
 
-              {/* Users List */}
-              <div className="space-y-3">
-                {filteredUsers.map(adminUser => {
-                  const roleCfg = ROLE_CONFIG[adminUser.role];
-                  return (
-                    <button
-                      key={adminUser.id}
-                      onClick={() => setSelectedUser(adminUser)}
-                      className={`w-full flex items-center gap-4 p-4 bg-white/5 backdrop-blur-xl rounded-2xl border transition hover:bg-white/10 ${
-                        adminUser.active ? 'border-white/10' : 'border-red-500/30 opacity-60'
-                      }`}
-                    >
-                      <div className={`w-12 h-12 ${roleCfg.color} rounded-xl flex items-center justify-center text-white text-xl`}>
-                        {roleCfg.icon}
-                      </div>
-                      <div className="flex-1 text-left min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-white">{adminUser.displayName}</span>
-                          {!adminUser.active && (
-                            <span className="px-1.5 py-0.5 bg-red-500/20 text-red-400 text-[10px] rounded">
-                              NEAKTIVNÍ
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-sm text-slate-400">{roleCfg.label}</div>
-                        {adminUser.building && (
-                          <div className="text-xs text-slate-500 flex items-center gap-1 mt-1">
-                            <Building2 className="w-3 h-3" />
-                            Budova {adminUser.building}
-                          </div>
-                        )}
-                      </div>
-                      <div className="text-right">
-                        <div className="font-mono text-lg text-white">{adminUser.pin}</div>
-                        <div className="text-xs text-slate-500">PIN</div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
+              {/* Prázdný stav */}
+              {activeUsers.length === 0 && inactiveUsers.length === 0 && (
+                <div className="vik-card p-8 text-center text-slate-500">
+                  Žádní pracovníci neodpovídají filtru.
+                </div>
+              )}
+
+              {/* Aktivní — seskupení podle rolí */}
+              {ROLE_ORDER.map(role => {
+                const group = activeUsers.filter(u => u.role === role);
+                if (group.length === 0) return null;
+                const cfg = ROLE_CONFIG[role];
+                return (
+                  <div key={role} className="space-y-2">
+                    <div className="flex items-center gap-2 px-1 pt-2">
+                      <span className="text-base">{cfg.icon}</span>
+                      <span className="text-xs font-black uppercase tracking-wider text-slate-500">{cfg.label}</span>
+                      <span className="text-xs text-slate-400">({group.length})</span>
+                      <div className="ml-2 h-px flex-1 bg-slate-200" />
+                    </div>
+                    {group.map(adminUser => (
+                      <AdminUserCard
+                        key={adminUser.id}
+                        adminUser={adminUser}
+                        onSelect={() => setSelectedUser(adminUser)}
+                      />
+                    ))}
+                  </div>
+                );
+              })}
+
+              {/* Neaktivní — sbalená sekce dole */}
+              {inactiveUsers.length > 0 && (
+                <div className="space-y-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowInactive(v => !v)}
+                    className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-left hover:bg-slate-100 transition"
+                  >
+                    <span className="text-xs font-black uppercase tracking-wider text-slate-500">Neaktivní</span>
+                    <span className="text-xs text-slate-400">({inactiveUsers.length})</span>
+                    <div className="flex-1" />
+                    <span className="text-xs font-bold text-slate-500">{showInactive ? 'Skrýt' : 'Zobrazit'}</span>
+                  </button>
+                  {showInactive && (
+                    <div className="space-y-2">
+                      {inactiveUsers.map(adminUser => (
+                        <AdminUserCard
+                          key={adminUser.id}
+                          adminUser={adminUser}
+                          onSelect={() => setSelectedUser(adminUser)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           )}
 
@@ -556,6 +583,47 @@ export default function AdminPage() {
         />
       )}
     </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// USER CARD (sdílená pro aktivní i neaktivní seznam)
+// ═══════════════════════════════════════════════════════════════════
+
+function AdminUserCard({ adminUser, onSelect }: { adminUser: AdminUser; onSelect: () => void }) {
+  const roleCfg = ROLE_CONFIG[adminUser.role];
+  return (
+    <button
+      onClick={onSelect}
+      className={`w-full flex items-center gap-4 p-4 rounded-2xl border bg-white text-left transition hover:bg-slate-50 ${
+        adminUser.active ? 'border-slate-200' : 'border-red-200 bg-red-50/50'
+      }`}
+    >
+      <div className={`w-12 h-12 ${roleCfg.color} rounded-xl flex items-center justify-center text-white text-xl shrink-0`}>
+        {roleCfg.icon}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="font-bold text-slate-900 truncate">{adminUser.displayName}</span>
+          {!adminUser.active && (
+            <span className="px-1.5 py-0.5 bg-red-100 text-red-700 text-[10px] font-bold rounded shrink-0">
+              NEAKTIVNÍ
+            </span>
+          )}
+        </div>
+        <div className="text-sm text-slate-500">{roleCfg.label}</div>
+        {adminUser.building && (
+          <div className="text-xs text-slate-400 flex items-center gap-1 mt-1">
+            <Building2 className="w-3 h-3" />
+            Budova {adminUser.building}
+          </div>
+        )}
+      </div>
+      <div className="text-right shrink-0">
+        <div className="font-mono text-lg text-slate-900">{adminUser.pin}</div>
+        <div className="text-xs text-slate-400">PIN</div>
+      </div>
+    </button>
   );
 }
 
@@ -639,15 +707,15 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-[9999] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-[#1e293b] rounded-3xl w-full max-w-lg max-h-[85vh] overflow-hidden shadow-2xl border border-white/10" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-3xl w-full max-w-lg max-h-[85vh] overflow-hidden shadow-2xl border border-slate-200" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className={`${roleCfg.color} p-6`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <span className="text-4xl">{roleCfg.icon}</span>
               <div>
-                <h2 className="text-xl font-bold text-white">{user.displayName}</h2>
+                <h2 className="text-xl font-bold text-slate-900">{user.displayName}</h2>
                 <p className="text-white/80">{roleCfg.label}</p>
               </div>
             </div>
@@ -662,18 +730,18 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
           {!isEditing ? (
             <>
               {/* PIN */}
-              <div className="bg-white/5 rounded-xl p-4">
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-400">PIN kód</span>
+                  <span className="text-slate-500">PIN kód</span>
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-2xl text-white">
+                    <span className="font-mono text-2xl text-slate-900">
                       {showPin ? user.pin : '••••'}
                     </span>
-                    <button 
+                    <button
                       onClick={() => setShowPin(!showPin)}
-                      className="p-1 hover:bg-white/10 rounded"
+                      className="p-1 hover:bg-slate-200 rounded"
                     >
-                      {showPin ? <EyeOff className="w-4 h-4 text-slate-400" /> : <Eye className="w-4 h-4 text-slate-400" />}
+                      {showPin ? <EyeOff className="w-4 h-4 text-slate-500" /> : <Eye className="w-4 h-4 text-slate-500" />}
                     </button>
                   </div>
                 </div>
@@ -682,39 +750,39 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
               {/* Info */}
               <div className="space-y-2">
                 {user.email && (
-                  <div className="flex justify-between py-2 border-b border-white/5">
-                    <span className="text-slate-400">Email</span>
-                    <span className="text-white">{user.email}</span>
+                  <div className="flex justify-between py-2 border-b border-slate-100">
+                    <span className="text-slate-500">Email</span>
+                    <span className="text-slate-900">{user.email}</span>
                   </div>
                 )}
                 {user.phone && (
-                  <div className="flex justify-between py-2 border-b border-white/5">
-                    <span className="text-slate-400">Telefon</span>
-                    <span className="text-white">{user.phone}</span>
+                  <div className="flex justify-between py-2 border-b border-slate-100">
+                    <span className="text-slate-500">Telefon</span>
+                    <span className="text-slate-900">{user.phone}</span>
                   </div>
                 )}
                 {user.building && (
-                  <div className="flex justify-between py-2 border-b border-white/5">
-                    <span className="text-slate-400">Budova</span>
-                    <span className="text-white">{user.building}</span>
+                  <div className="flex justify-between py-2 border-b border-slate-100">
+                    <span className="text-slate-500">Budova</span>
+                    <span className="text-slate-900">{user.building}</span>
                   </div>
                 )}
                 {user.positionId && (
-                  <div className="flex justify-between py-2 border-b border-white/5">
-                    <span className="text-slate-400">Pozice</span>
-                    <span className="text-white">{user.positionId}</span>
+                  <div className="flex justify-between py-2 border-b border-slate-100">
+                    <span className="text-slate-500">Pozice</span>
+                    <span className="text-slate-900">{user.positionId}</span>
                   </div>
                 )}
                 {user.createdAt && (
-                  <div className="flex justify-between py-2 border-b border-white/5">
-                    <span className="text-slate-400">Vytvořen</span>
-                    <span className="text-white">{new Date(user.createdAt).toLocaleDateString('cs-CZ')}</span>
+                  <div className="flex justify-between py-2 border-b border-slate-100">
+                    <span className="text-slate-500">Vytvořen</span>
+                    <span className="text-slate-900">{new Date(user.createdAt).toLocaleDateString('cs-CZ')}</span>
                   </div>
                 )}
                 {user.lastLogin && (
                   <div className="flex justify-between py-2">
-                    <span className="text-slate-400">Poslední přihlášení</span>
-                    <span className="text-white">{new Date(user.lastLogin).toLocaleDateString('cs-CZ')}</span>
+                    <span className="text-slate-500">Poslední přihlášení</span>
+                    <span className="text-slate-900">{new Date(user.lastLogin).toLocaleDateString('cs-CZ')}</span>
                   </div>
                 )}
               </div>
@@ -759,32 +827,32 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
             <>
               {/* Edit Form */}
               <div>
-                <label className="text-sm text-slate-400">Jméno</label>
+                <label className="text-sm text-slate-600">Jméno</label>
                 <input
                   type="text"
                   value={formData.displayName}
                   onChange={e => setFormData(prev => ({ ...prev, displayName: e.target.value }))}
-                  className="w-full p-2 bg-white/5 border border-white/10 rounded-lg mt-1 text-white"
+                  className="w-full p-2 bg-[#fbf9f4] border border-slate-200 rounded-lg mt-1 text-slate-900"
                 />
               </div>
               
               <div>
-                <label className="text-sm text-slate-400">PIN (4 číslice)</label>
+                <label className="text-sm text-slate-600">PIN (4 číslice)</label>
                 <input
                   type="text"
                   value={formData.pin}
                   onChange={e => setFormData(prev => ({ ...prev, pin: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
-                  className="w-full p-2 bg-white/5 border border-white/10 rounded-lg mt-1 text-white font-mono text-xl"
+                  className="w-full p-2 bg-[#fbf9f4] border border-slate-200 rounded-lg mt-1 text-slate-900 font-mono text-xl"
                   maxLength={4}
                 />
               </div>
 
               <div>
-                <label className="text-sm text-slate-400">Role</label>
+                <label className="text-sm text-slate-600">Role</label>
                 <select
                   value={formData.role}
                   onChange={e => setFormData(prev => ({ ...prev, role: e.target.value as UserRole }))}
-                  className="w-full p-2 bg-white/5 border border-white/10 rounded-lg mt-1 text-white"
+                  className="w-full p-2 bg-[#fbf9f4] border border-slate-200 rounded-lg mt-1 text-slate-900"
                 >
                   {Object.entries(ROLE_CONFIG).map(([role, cfg]) => (
                     <option key={role} value={role}>{cfg.icon} {cfg.label}</option>
@@ -793,21 +861,21 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
               </div>
 
               <div>
-                <label className="text-sm text-slate-400">Email</label>
+                <label className="text-sm text-slate-600">Email</label>
                 <input
                   type="email"
                   value={formData.email}
                   onChange={e => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                  className="w-full p-2 bg-white/5 border border-white/10 rounded-lg mt-1 text-white"
+                  className="w-full p-2 bg-[#fbf9f4] border border-slate-200 rounded-lg mt-1 text-slate-900"
                 />
               </div>
 
               <div>
-                <label className="text-sm text-slate-400">Budova</label>
+                <label className="text-sm text-slate-600">Budova</label>
                 <select
                   value={formData.building}
                   onChange={e => setFormData(prev => ({ ...prev, building: e.target.value }))}
-                  className="w-full p-2 bg-white/5 border border-white/10 rounded-lg mt-1 text-white"
+                  className="w-full p-2 bg-[#fbf9f4] border border-slate-200 rounded-lg mt-1 text-slate-900"
                 >
                   <option value="">— Nespecifikováno —</option>
                   {BUILDINGS.map(b => (
@@ -831,7 +899,7 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
                 <button
                   onClick={() => setIsEditing(false)}
                   disabled={saving}
-                  className="flex-1 p-3 border border-white/20 text-white rounded-xl disabled:opacity-50"
+                  className="flex-1 p-3 border border-slate-300 text-slate-700 rounded-xl disabled:opacity-50"
                 >
                   Zrušit
                 </button>
@@ -863,29 +931,29 @@ function WorkerPermissionsPanel({ user }: { user: AdminUser }) {
     : (user.scope?.buildings || []).join(', ') || 'Neurčeno';
 
   return (
-    <div className="bg-white/5 rounded-xl p-4 border border-white/10 space-y-3">
+    <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-sm font-bold text-white">Práva pracovníka</div>
-          <div className="text-xs text-slate-400">
+          <div className="text-sm font-bold text-slate-900">Práva pracovníka</div>
+          <div className="text-xs text-slate-500">
             Role dává {basePermissions.length} práv, výsledně má {effectivePermissions.length}.
           </div>
         </div>
-        <div className="text-right text-xs text-slate-400">
+        <div className="text-right text-xs text-slate-500">
           <div>Rozsah</div>
-          <div className="font-semibold text-slate-200">{scopeBuildings}</div>
+          <div className="font-semibold text-slate-700">{scopeBuildings}</div>
         </div>
       </div>
 
       {(custom.granted.length > 0 || custom.revoked.length > 0) && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <div className="rounded-lg bg-emerald-500/10 border border-emerald-400/20 p-2">
-            <div className="text-[11px] uppercase font-bold text-emerald-300 mb-1">Individuálně přidáno</div>
-            <div className="text-sm text-emerald-100">{custom.granted.length || 'nic'}</div>
+          <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-2">
+            <div className="text-[11px] uppercase font-bold text-emerald-700 mb-1">Individuálně přidáno</div>
+            <div className="text-sm text-emerald-800">{custom.granted.length || 'nic'}</div>
           </div>
-          <div className="rounded-lg bg-red-500/10 border border-red-400/20 p-2">
-            <div className="text-[11px] uppercase font-bold text-red-300 mb-1">Individuálně odebráno</div>
-            <div className="text-sm text-red-100">{custom.revoked.length || 'nic'}</div>
+          <div className="rounded-lg bg-red-50 border border-red-200 p-2">
+            <div className="text-[11px] uppercase font-bold text-red-700 mb-1">Individuálně odebráno</div>
+            <div className="text-sm text-red-800">{custom.revoked.length || 'nic'}</div>
           </div>
         </div>
       )}
@@ -896,8 +964,8 @@ function WorkerPermissionsPanel({ user }: { user: AdminUser }) {
             key={permission}
             className={`rounded-full px-2 py-1 text-[11px] font-semibold ${
               custom.granted.includes(permission)
-                ? 'bg-emerald-500/20 text-emerald-200 border border-emerald-400/30'
-                : 'bg-white/10 text-slate-200 border border-white/10'
+                ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                : 'bg-slate-100 text-slate-700 border border-slate-200'
             }`}
             title={permission}
           >
@@ -905,18 +973,18 @@ function WorkerPermissionsPanel({ user }: { user: AdminUser }) {
           </span>
         ))}
         {hiddenCount > 0 && (
-          <span className="rounded-full px-2 py-1 text-[11px] font-semibold bg-white/10 text-slate-400 border border-white/10">
+          <span className="rounded-full px-2 py-1 text-[11px] font-semibold bg-slate-100 text-slate-500 border border-slate-200">
             +{hiddenCount} dalších
           </span>
         )}
       </div>
 
       {custom.revoked.length > 0 && (
-        <div className="pt-2 border-t border-white/10">
-          <div className="text-[11px] uppercase font-bold text-red-300 mb-1">Zakázaná práva</div>
+        <div className="pt-2 border-t border-slate-200">
+          <div className="text-[11px] uppercase font-bold text-red-700 mb-1">Zakázaná práva</div>
           <div className="flex flex-wrap gap-1.5">
             {custom.revoked.map(permission => (
-              <span key={permission} className="rounded-full px-2 py-1 text-[11px] font-semibold bg-red-500/15 text-red-200 border border-red-400/20">
+              <span key={permission} className="rounded-full px-2 py-1 text-[11px] font-semibold bg-red-50 text-red-700 border border-red-200">
                 {getPermissionLabel(permission)}
               </span>
             ))}
@@ -1148,10 +1216,10 @@ function UserScopeEditor({
   };
 
   return (
-    <div className="rounded-xl border border-white/10 bg-white/5 p-3 space-y-3">
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-3">
       <div>
-        <div className="text-sm font-bold text-white">Rozsah přístupu</div>
-        <div className="text-xs text-slate-400">
+        <div className="text-sm font-bold text-slate-900">Rozsah přístupu</div>
+        <div className="text-xs text-slate-500">
           Tady omezíš, které budovy má pracovník vidět. Místnosti zatím zůstávají bez omezení.
         </div>
       </div>
@@ -1161,8 +1229,8 @@ function UserScopeEditor({
         onClick={setAllBuildings}
         className={`w-full min-h-10 rounded-xl border text-sm font-bold ${
           allBuildings
-            ? 'bg-emerald-500 text-white border-emerald-400'
-            : 'bg-white/5 text-slate-300 border-white/10'
+            ? 'bg-emerald-600 text-white border-emerald-600'
+            : 'bg-white text-slate-600 border-slate-200'
         }`}
       >
         Všechny budovy
@@ -1178,8 +1246,8 @@ function UserScopeEditor({
               onClick={() => toggleBuilding(building.id)}
               className={`min-h-12 rounded-xl border p-2 text-left ${
                 active
-                  ? 'bg-sky-500/20 text-sky-100 border-sky-400/40'
-                  : 'bg-white/5 text-slate-300 border-white/10'
+                  ? 'bg-sky-50 text-sky-700 border-sky-300'
+                  : 'bg-white text-slate-600 border-slate-200'
               }`}
             >
               <div className="text-sm font-bold">Budova {building.id}</div>
@@ -1189,8 +1257,8 @@ function UserScopeEditor({
         })}
       </div>
 
-      <div className="rounded-lg bg-slate-950/40 border border-white/10 p-2 text-xs text-slate-400">
-        Uloženo jako <span className="font-mono text-slate-200">{allBuildings ? '*' : scope.buildings.join(', ')}</span>.
+      <div className="rounded-lg bg-white border border-slate-200 p-2 text-xs text-slate-500">
+        Uloženo jako <span className="font-mono text-slate-700">{allBuildings ? '*' : scope.buildings.join(', ')}</span>.
       </div>
     </div>
   );
@@ -1280,52 +1348,52 @@ function NewUserModal({ existingPins, onClose, onCreated }: {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-[9999] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-[#1e293b] rounded-3xl w-full max-w-lg max-h-[85vh] overflow-hidden shadow-2xl border border-white/10 flex flex-col" onClick={e => e.stopPropagation()}>
-        <div className="p-4 border-b border-white/10 flex items-center justify-between flex-shrink-0">
-          <h2 className="text-xl font-bold text-white">Nový uživatel</h2>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-white/10">
-            <X className="w-5 h-5 text-slate-400" />
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-3xl w-full max-w-lg max-h-[85vh] overflow-hidden shadow-2xl border border-slate-200 flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="p-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
+          <h2 className="text-xl font-bold text-slate-900">Nový uživatel</h2>
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100">
+            <X className="w-5 h-5 text-slate-500" />
           </button>
         </div>
 
         <div className="p-4 space-y-4 overflow-y-auto flex-1 min-h-0">
           <div>
-            <label className="text-sm text-slate-400">Jméno *</label>
+            <label className="text-sm text-slate-600">Jméno *</label>
             <input
               type="text"
               value={formData.displayName}
               onChange={e => setFormData(prev => ({ ...prev, displayName: e.target.value }))}
-              className="w-full p-2 bg-white/5 border border-white/10 rounded-lg mt-1 text-white"
+              className="w-full p-2 bg-[#fbf9f4] border border-slate-200 rounded-lg mt-1 text-slate-900"
               placeholder="Jan Novák"
             />
           </div>
 
           <div>
-            <label className="text-sm text-slate-400">PIN (4 číslice) *</label>
+            <label className="text-sm text-slate-600">PIN (4 číslice) *</label>
             <input
               type="text"
               value={formData.pin}
               onChange={e => setFormData(prev => ({ ...prev, pin: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
-              className={`w-full p-2 bg-white/5 border rounded-lg mt-1 text-white font-mono text-xl ${
-                formData.pin.length === 4 
+              className={`w-full p-2 bg-[#fbf9f4] border rounded-lg mt-1 text-slate-900 font-mono text-xl ${
+                formData.pin.length === 4
                   ? isPinValid ? 'border-emerald-500' : 'border-red-500'
-                  : 'border-white/10'
+                  : 'border-slate-200'
               }`}
               maxLength={4}
               placeholder="0000"
             />
             {formData.pin.length === 4 && !isPinValid && (
-              <p className="text-red-400 text-xs mt-1">Tento PIN už existuje</p>
+              <p className="text-red-600 text-xs mt-1">Tento PIN už existuje</p>
             )}
           </div>
 
           <div>
-            <label className="text-sm text-slate-400">Role *</label>
+            <label className="text-sm text-slate-600">Role *</label>
             <select
               value={formData.role}
               onChange={e => setFormData(prev => ({ ...prev, role: e.target.value as UserRole }))}
-              className="w-full p-2 bg-white/5 border border-white/10 rounded-lg mt-1 text-white"
+              className="w-full p-2 bg-[#fbf9f4] border border-slate-200 rounded-lg mt-1 text-slate-900"
             >
               {Object.entries(ROLE_CONFIG).map(([role, cfg]) => (
                 <option key={role} value={role}>{cfg.icon} {cfg.label}</option>
@@ -1334,22 +1402,22 @@ function NewUserModal({ existingPins, onClose, onCreated }: {
           </div>
 
           <div>
-            <label className="text-sm text-slate-400">Email</label>
+            <label className="text-sm text-slate-600">Email</label>
             <input
               type="email"
               value={formData.email}
               onChange={e => setFormData(prev => ({ ...prev, email: e.target.value }))}
-              className="w-full p-2 bg-white/5 border border-white/10 rounded-lg mt-1 text-white"
+              className="w-full p-2 bg-[#fbf9f4] border border-slate-200 rounded-lg mt-1 text-slate-900"
               placeholder="jan@vikrr.cz"
             />
           </div>
 
           <div>
-            <label className="text-sm text-slate-400">Budova</label>
+            <label className="text-sm text-slate-600">Budova</label>
             <select
               value={formData.building}
               onChange={e => setFormData(prev => ({ ...prev, building: e.target.value }))}
-              className="w-full p-2 bg-white/5 border border-white/10 rounded-lg mt-1 text-white"
+              className="w-full p-2 bg-[#fbf9f4] border border-slate-200 rounded-lg mt-1 text-slate-900"
             >
               <option value="">— Nespecifikováno —</option>
               {BUILDINGS.map(b => (
@@ -1360,11 +1428,11 @@ function NewUserModal({ existingPins, onClose, onCreated }: {
 
           {tenantPositions.length > 0 && (
             <div>
-              <label className="text-sm text-slate-400">Pozice</label>
+              <label className="text-sm text-slate-600">Pozice</label>
               <select
                 value={formData.positionId}
                 onChange={e => setFormData(prev => ({ ...prev, positionId: e.target.value }))}
-                className="w-full p-2 bg-white/5 border border-white/10 rounded-lg mt-1 text-white"
+                className="w-full p-2 bg-[#fbf9f4] border border-slate-200 rounded-lg mt-1 text-slate-900"
               >
                 <option value="">— Bez pozice —</option>
                 {tenantPositions.map(pos => (
@@ -1375,14 +1443,14 @@ function NewUserModal({ existingPins, onClose, onCreated }: {
           )}
         </div>
 
-        <div className="p-4 border-t border-white/10 space-y-2 flex-shrink-0">
+        <div className="p-4 border-t border-slate-200 space-y-2 flex-shrink-0">
           {error && (
-            <div className="p-2 bg-amber-500/20 border border-amber-500/30 rounded-lg text-amber-300 text-xs text-center">
+            <div className="p-2 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-xs text-center">
               {error}
             </div>
           )}
           <div className="flex gap-2">
-            <button onClick={onClose} className="flex-1 p-3 border border-white/20 text-white rounded-xl">
+            <button onClick={onClose} className="flex-1 p-3 border border-slate-300 text-slate-700 rounded-xl">
               Zrušit
             </button>
             <button
@@ -1445,13 +1513,13 @@ function RoleManagerTab({ users, canEdit }: { users: AdminUser[]; canEdit: boole
   return (
     <div className="space-y-4">
       {Object.entries(ROLE_CONFIG).map(([role, cfg]) => (
-        <div key={role} className="bg-white/5 backdrop-blur-xl rounded-2xl p-4 border border-white/10">
+        <div key={role} className="bg-white rounded-2xl p-4 border border-slate-200">
           <div className="flex items-center gap-3 mb-4">
             <div className={`w-10 h-10 ${cfg.color} rounded-xl flex items-center justify-center text-xl`}>
               {cfg.icon}
             </div>
             <div className="flex-1">
-              <h3 className="font-bold text-white">{cfg.label}</h3>
+              <h3 className="font-bold text-slate-900">{cfg.label}</h3>
               <p className="text-xs text-slate-400">{cfg.description} · {users.filter(u => u.role === role).length} uživatelů</p>
             </div>
           </div>
@@ -1464,14 +1532,14 @@ function RoleManagerTab({ users, canEdit }: { users: AdminUser[]; canEdit: boole
                   onClick={() => canEdit && handleToggle(role, feat.id)}
                   disabled={!canEdit}
                   className={`flex items-center gap-2 p-2.5 rounded-xl text-left transition text-sm ${
-                    isOn ? 'bg-emerald-500/15 border border-emerald-500/30' : 'bg-white/5 border border-white/10'
+                    isOn ? 'bg-emerald-50 border border-emerald-300' : 'bg-slate-50 border border-slate-200'
                   } ${!canEdit ? 'opacity-60 cursor-not-allowed' : ''}`}
                 >
-                  <div className={`w-5 h-5 rounded-md flex items-center justify-center ${isOn ? 'bg-emerald-500' : 'bg-slate-600'}`}>
+                  <div className={`w-5 h-5 rounded-md flex items-center justify-center ${isOn ? 'bg-emerald-500' : 'bg-slate-300'}`}>
                     {isOn && <Check className="w-3.5 h-3.5 text-white" />}
                   </div>
                   <div>
-                    <div className={`font-medium ${isOn ? 'text-emerald-300' : 'text-slate-400'}`}>{feat.label}</div>
+                    <div className={`font-medium ${isOn ? 'text-emerald-700' : 'text-slate-400'}`}>{feat.label}</div>
                   </div>
                 </button>
               );
@@ -1541,7 +1609,7 @@ function DynamicConfigTab({ canEdit }: { canEdit: boolean }) {
 
   return (
     <div className="space-y-4">
-      <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-sm text-amber-300">
+      <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-700">
         <Settings2 className="w-4 h-4 inline mr-2" />
         Zde můžete upravovat hodnoty dropdown seznamů v celém systému.
       </div>
@@ -1549,30 +1617,30 @@ function DynamicConfigTab({ canEdit }: { canEdit: boolean }) {
       {sections.map(section => {
         const isOpen = editingSection === section.id;
         return (
-          <div key={section.id} className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 overflow-hidden">
+          <div key={section.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
             <button
               onClick={() => setEditingSection(isOpen ? null : section.id)}
-              className="w-full flex items-center gap-3 p-4 hover:bg-white/5 transition text-left"
+              className="w-full flex items-center gap-3 p-4 hover:bg-slate-50 transition text-left"
             >
               <span className="text-2xl">{section.icon}</span>
               <div className="flex-1">
-                <h3 className="font-bold text-white">{section.label}</h3>
+                <h3 className="font-bold text-slate-900">{section.label}</h3>
                 <p className="text-xs text-slate-500">{section.items.length} položek</p>
               </div>
               <Edit2 className={`w-4 h-4 transition ${isOpen ? 'text-orange-400' : 'text-slate-500'}`} />
             </button>
 
             {isOpen && (
-              <div className="px-4 pb-4 border-t border-white/5 pt-3">
+              <div className="px-4 pb-4 border-t border-slate-100 pt-3">
                 {/* Contextual help */}
-                <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 mb-3 flex items-start gap-2">
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-3 flex items-start gap-2">
                   <span className="text-blue-400 text-xs mt-0.5">ℹ️</span>
-                  <p className="text-xs text-blue-300/80">{section.help}</p>
+                  <p className="text-xs text-blue-700">{section.help}</p>
                 </div>
                 <div className="space-y-1.5 mb-3">
                   {section.items.map((item, idx) => (
-                    <div key={idx} className="flex items-center gap-2 p-2 bg-slate-700/30 rounded-lg group">
-                      <span className="text-sm text-white flex-1">{item}</span>
+                    <div key={idx} className="flex items-center gap-2 p-2 bg-slate-100 rounded-lg group">
+                      <span className="text-sm text-slate-900 flex-1">{item}</span>
                       {canEdit && (
                         <button
                           onClick={() => removeItem(section.id, idx)}
@@ -1592,7 +1660,7 @@ function DynamicConfigTab({ canEdit }: { canEdit: boolean }) {
                       onChange={e => setNewItem(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && addItem(section.id)}
                       placeholder="Nová položka..."
-                      className="flex-1 p-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm placeholder-slate-600"
+                      className="flex-1 p-2 bg-[#fbf9f4] border border-slate-200 rounded-lg text-slate-900 text-sm placeholder-slate-400"
                     />
                     <button
                       onClick={() => addItem(section.id)}
@@ -1680,12 +1748,12 @@ function ErrorMonitorTab() {
 
   return (
     <div className="space-y-4">
-      <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
+      <div className="bg-red-50 border border-red-200 rounded-xl p-4">
         <div className="flex items-start gap-3">
-          <Bug className="w-5 h-5 text-red-300 mt-0.5" />
+          <Bug className="w-5 h-5 text-red-500 mt-0.5" />
           <div>
-            <h3 className="text-white font-semibold">Dohled nad chybami aplikace</h3>
-            <p className="text-sm text-red-100/80 mt-1">
+            <h3 className="text-slate-900 font-semibold">Dohled nad chybami aplikace</h3>
+            <p className="text-sm text-red-700 mt-1">
               Tady se objeví pády obrazovek a chyby z prohlížeče. Pro řešení je důležité hlavně datum, uživatel, stránka a text chyby.
             </p>
           </div>
@@ -1693,9 +1761,9 @@ function ErrorMonitorTab() {
       </div>
 
       {logs.length === 0 ? (
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-center">
+        <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
           <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto mb-3" />
-          <div className="text-white font-semibold">Zatím žádné chyby</div>
+          <div className="text-slate-900 font-semibold">Zatím žádné chyby</div>
           <div className="text-slate-400 text-sm mt-1">Až aplikace zachytí pád nebo technickou chybu, zobrazí se tady.</div>
         </div>
       ) : (
@@ -1703,22 +1771,22 @@ function ErrorMonitorTab() {
           {logs.map((log) => {
             const isExpanded = expandedId === log.id;
             return (
-              <div key={log.id} className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
+              <div key={log.id} className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
                 <button
                   type="button"
                   onClick={() => setExpandedId(isExpanded ? null : log.id)}
-                  className="w-full p-4 text-left hover:bg-white/5 transition"
+                  className="w-full p-4 text-left hover:bg-slate-50 transition"
                 >
                   <div className="flex flex-col lg:flex-row lg:items-start gap-3">
                     <div className={`px-2.5 py-1 rounded-lg text-xs font-semibold w-fit ${
                       log.severity === 'fatal'
-                        ? 'bg-red-500/20 text-red-200 border border-red-500/30'
-                        : 'bg-amber-500/15 text-amber-200 border border-amber-500/25'
+                        ? 'bg-red-100 text-red-700 border border-red-200'
+                        : 'bg-amber-100 text-amber-700 border border-amber-200'
                     }`}>
                       {log.severity === 'fatal' ? 'Pád obrazovky' : 'Chyba'}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-white font-semibold break-words">{log.message}</div>
+                      <div className="text-slate-900 font-semibold break-words">{log.message}</div>
                       <div className="text-xs text-slate-400 mt-1 flex flex-wrap gap-x-3 gap-y-1">
                         <span>{formatErrorTime(log.createdAt)}</span>
                         {log.userName && <span>{log.userName}</span>}
@@ -1731,28 +1799,28 @@ function ErrorMonitorTab() {
                 </button>
 
                 {isExpanded && (
-                  <div className="border-t border-white/10 p-4 space-y-3">
+                  <div className="border-t border-slate-200 p-4 space-y-3">
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
-                      <div className="rounded-xl bg-slate-950/40 p-3">
+                      <div className="rounded-xl bg-slate-50 p-3">
                         <div className="text-slate-500 text-xs">Uživatel</div>
-                        <div className="text-white">{log.userName || 'Neznámý'}</div>
+                        <div className="text-slate-900">{log.userName || 'Neznámý'}</div>
                       </div>
-                      <div className="rounded-xl bg-slate-950/40 p-3">
+                      <div className="rounded-xl bg-slate-50 p-3">
                         <div className="text-slate-500 text-xs">Role</div>
-                        <div className="text-white">{log.userRole || 'bez role'}</div>
+                        <div className="text-slate-900">{log.userRole || 'bez role'}</div>
                       </div>
-                      <div className="rounded-xl bg-slate-950/40 p-3">
+                      <div className="rounded-xl bg-slate-50 p-3">
                         <div className="text-slate-500 text-xs">Stránka</div>
-                        <div className="text-white break-words">{log.path || 'bez stránky'}</div>
+                        <div className="text-slate-900 break-words">{log.path || 'bez stránky'}</div>
                       </div>
-                      <div className="rounded-xl bg-slate-950/40 p-3">
+                      <div className="rounded-xl bg-slate-50 p-3">
                         <div className="text-slate-500 text-xs">Zachyceno</div>
-                        <div className="text-white">{log.handled ? 'Ano' : 'Ne'}</div>
+                        <div className="text-slate-900">{log.handled ? 'Ano' : 'Ne'}</div>
                       </div>
                     </div>
 
                     {(log.stack || log.componentStack) && (
-                      <pre className="max-h-72 overflow-auto rounded-xl bg-black/40 border border-white/10 p-3 text-xs text-slate-300 whitespace-pre-wrap">
+                      <pre className="max-h-72 overflow-auto rounded-xl bg-slate-900 border border-slate-700 p-3 text-xs text-slate-100 whitespace-pre-wrap">
                         {log.stack || log.componentStack}
                       </pre>
                     )}
@@ -1804,9 +1872,7 @@ function AuditTrailTab() {
           <button
             key={t}
             onClick={() => setFilter(t)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition ${
-              filter === t ? 'bg-white text-slate-900' : 'bg-white/5 text-slate-400'
-            }`}
+            className={filter === t ? 'vik-chip vik-chip-active' : 'vik-chip'}
           >
             {t === 'all' ? `Vše (${AUDIT_LOG_ENTRIES.length})` : t}
           </button>
@@ -1815,7 +1881,7 @@ function AuditTrailTab() {
 
       <div className="space-y-2">
         {filtered.map((log, i) => (
-          <div key={i} className="flex items-start gap-3 p-3 bg-white/5 rounded-xl">
+          <div key={i} className="flex items-start gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
             <div className={`w-2 h-2 mt-1.5 rounded-full flex-shrink-0 ${AUDIT_TYPE_COLORS[log.type] || 'bg-slate-400'}`} />
             <div className="flex-1 min-w-0">
               <div className="text-sm text-white">
@@ -1938,8 +2004,8 @@ function ImportExportTab({ canEdit }: { canEdit: boolean }) {
   return (
     <div className="space-y-6">
       {/* IMPORT SECTION */}
-      <div className="bg-slate-800/50 rounded-2xl border border-slate-700/50 p-5">
-        <h3 className="text-white font-bold text-lg mb-4 flex items-center gap-2">
+      <div className="bg-white rounded-2xl border border-slate-200 p-5">
+        <h3 className="text-slate-900 font-bold text-lg mb-4 flex items-center gap-2">
           <Upload className="w-5 h-5 text-blue-400" />
           Hromadný import (CSV / Excel)
         </h3>
@@ -1953,7 +2019,7 @@ function ImportExportTab({ canEdit }: { canEdit: boolean }) {
               className={`flex-1 p-3 rounded-xl text-sm font-medium transition ${
                 importTarget === t.id
                   ? 'bg-blue-600 text-white'
-                  : 'bg-white/5 text-slate-400 hover:text-white border border-white/10'
+                  : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200'
               }`}
             >
               <span className="mr-1">{t.icon}</span> {t.label}
@@ -1969,7 +2035,7 @@ function ImportExportTab({ canEdit }: { canEdit: boolean }) {
           className={`relative border-2 border-dashed rounded-xl p-8 text-center transition ${
             dragOver
               ? 'border-blue-400 bg-blue-500/10'
-              : 'border-slate-600 hover:border-slate-500'
+              : 'border-slate-300 hover:border-slate-400'
           }`}
         >
           <FileSpreadsheet className="w-10 h-10 text-slate-500 mx-auto mb-3" />
@@ -1987,9 +2053,9 @@ function ImportExportTab({ canEdit }: { canEdit: boolean }) {
         {parseResult && (
           <div className="mt-4 space-y-3">
             <div className="flex items-center justify-between">
-              <div className="text-sm text-slate-400">
-                <span className="text-white font-semibold">{parseResult.rowCount}</span> řádků,{' '}
-                <span className="text-white font-semibold">{parseResult.columns.length}</span> sloupců
+              <div className="text-sm text-slate-600">
+                <span className="text-slate-900 font-semibold">{parseResult.rowCount}</span> řádků,{' '}
+                <span className="text-slate-900 font-semibold">{parseResult.columns.length}</span> sloupců
                 {' '}(list: {parseResult.sheetName})
               </div>
               {importedCount > 0 && (
@@ -2000,7 +2066,7 @@ function ImportExportTab({ canEdit }: { canEdit: boolean }) {
             </div>
 
             {/* Column mappings */}
-            <div className="bg-slate-900/50 rounded-xl p-3 max-h-48 overflow-y-auto">
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 max-h-48 overflow-y-auto">
               <div className="text-xs text-slate-500 mb-2 font-semibold uppercase tracking-wide">Mapování sloupců</div>
               {parseResult.mappings.map((m, i) => (
                 <div key={i} className="flex items-center gap-2 py-1 text-sm">
@@ -2015,7 +2081,7 @@ function ImportExportTab({ canEdit }: { canEdit: boolean }) {
             </div>
 
             {/* Data preview */}
-            <div className="bg-slate-900/50 rounded-xl p-3 overflow-x-auto">
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 overflow-x-auto">
               <div className="text-xs text-slate-500 mb-2 font-semibold uppercase tracking-wide">Náhled dat (prvních 5)</div>
               <table className="text-xs w-full">
                 <thead>
@@ -2029,7 +2095,7 @@ function ImportExportTab({ canEdit }: { canEdit: boolean }) {
                   {parseResult.rows.slice(0, 5).map((row, ri) => (
                     <tr key={ri}>
                       {parseResult!.mappings.slice(0, 6).map((m, ci) => (
-                        <td key={ci} className="text-slate-300 py-0.5 pr-3 whitespace-nowrap truncate max-w-[120px]">
+                        <td key={ci} className="text-slate-700 py-0.5 pr-3 whitespace-nowrap truncate max-w-[120px]">
                           {String(row[m.mappedTo] ?? row[m.excelColumn] ?? '—')}
                         </td>
                       ))}
@@ -2043,7 +2109,7 @@ function ImportExportTab({ canEdit }: { canEdit: boolean }) {
             <button
               onClick={handleImport}
               disabled={importing || importedCount > 0 || !canEdit}
-              className="w-full py-3 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-500 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full py-3 bg-emerald-600 text-slate-900 font-semibold rounded-xl hover:bg-emerald-500 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {importing ? (
                 <><Loader2 className="w-4 h-4 animate-spin" /> Importuji...</>
@@ -2058,8 +2124,8 @@ function ImportExportTab({ canEdit }: { canEdit: boolean }) {
       </div>
 
       {/* EXPORT SECTION */}
-      <div className="bg-slate-800/50 rounded-2xl border border-slate-700/50 p-5">
-        <h3 className="text-white font-bold text-lg mb-4 flex items-center gap-2">
+      <div className="bg-white rounded-2xl border border-slate-200 p-5">
+        <h3 className="text-slate-900 font-bold text-lg mb-4 flex items-center gap-2">
           <Download className="w-5 h-5 text-emerald-400" />
           Export dat (migrace)
         </h3>
@@ -2069,7 +2135,7 @@ function ImportExportTab({ canEdit }: { canEdit: boolean }) {
         <button
           onClick={handleExportMigration}
           disabled={exporting}
-          className="w-full py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-500 transition disabled:opacity-50 flex items-center justify-center gap-2"
+          className="w-full py-3 bg-blue-600 text-slate-900 font-semibold rounded-xl hover:bg-blue-500 transition disabled:opacity-50 flex items-center justify-center gap-2"
         >
           {exporting ? (
             <><Loader2 className="w-4 h-4 animate-spin" /> Exportuji kolekce...</>
@@ -2119,7 +2185,7 @@ function ModuleManagerTab({ canEdit }: { canEdit: boolean }) {
 
   return (
     <div className="space-y-4">
-      <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 text-sm text-blue-300">
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm text-blue-700">
         <LayoutGrid className="w-4 h-4 inline mr-2" />
         Správa aktivních modulů per tenant. Vypnuté moduly nebudou dostupné pro žádného uživatele v dané organizaci.
       </div>
@@ -2127,13 +2193,13 @@ function ModuleManagerTab({ canEdit }: { canEdit: boolean }) {
       {tenants.map(tenant => {
         const activeModules = tenant.activeModules || [];
         return (
-          <div key={tenant.id} className="bg-white/5 backdrop-blur-xl rounded-2xl p-4 border border-white/10">
+          <div key={tenant.id} className="bg-white rounded-2xl p-4 border border-slate-200">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center text-xl">
                 🏢
               </div>
               <div className="flex-1">
-                <h3 className="font-bold text-white">{tenant.name}</h3>
+                <h3 className="font-bold text-slate-900">{tenant.name}</h3>
                 <p className="text-xs text-slate-400">
                   {activeModules.length} / {MODULE_DEFINITIONS.length} modulů · ID: {tenant.id}
                 </p>
@@ -2167,14 +2233,14 @@ function ModuleManagerTab({ canEdit }: { canEdit: boolean }) {
                         onClick={() => canEdit && handleToggle(tenant.id, mod.id, activeModules)}
                         disabled={!canEdit}
                         className={`flex items-center gap-2 p-2 rounded-xl text-left transition text-sm ${
-                          isOn ? 'bg-emerald-500/15 border border-emerald-500/30' : 'bg-white/5 border border-white/10'
+                          isOn ? 'bg-emerald-50 border border-emerald-300' : 'bg-slate-50 border border-slate-200'
                         } ${!canEdit ? 'opacity-60 cursor-not-allowed' : ''}`}
                       >
-                        <div className={`w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 ${isOn ? 'bg-emerald-500' : 'bg-slate-600'}`}>
+                        <div className={`w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 ${isOn ? 'bg-emerald-500' : 'bg-slate-300'}`}>
                           {isOn && <Check className="w-3.5 h-3.5 text-white" />}
                         </div>
                         <div className="min-w-0">
-                          <div className={`text-xs font-medium truncate ${isOn ? 'text-emerald-300' : 'text-slate-500'}`}>
+                          <div className={`text-xs font-medium truncate ${isOn ? 'text-emerald-700' : 'text-slate-500'}`}>
                             {mod.icon} {mod.label}
                           </div>
                         </div>
@@ -2256,7 +2322,7 @@ function PositionManagerTab({ canEdit }: { canEdit: boolean }) {
 
   return (
     <div className="space-y-4">
-      <div className="bg-violet-500/10 border border-violet-500/20 rounded-xl p-3 text-sm text-violet-300">
+      <div className="bg-violet-50 border border-violet-200 rounded-xl p-3 text-sm text-violet-700">
         <Briefcase className="w-4 h-4 inline mr-2" />
         Vlastní pozice (role) pro organizaci. Každá pozice má definovaná CRUD oprávnění omezená aktivními moduly.
       </div>
@@ -2267,17 +2333,17 @@ function PositionManagerTab({ canEdit }: { canEdit: boolean }) {
           {roles.map(role => {
             const permCount = Object.values(role.permissions).filter(Boolean).length;
             return (
-              <div key={role.id} className="bg-white/5 rounded-2xl p-4 border border-white/10 flex items-center gap-3">
+              <div key={role.id} className="bg-white rounded-2xl p-4 border border-slate-200 flex items-center gap-3">
                 <div className="w-10 h-10 bg-violet-500/20 rounded-xl flex items-center justify-center">
                   <Briefcase className="w-5 h-5 text-violet-400" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-white text-sm">{role.roleName}</div>
+                  <div className="font-semibold text-slate-900 text-sm">{role.roleName}</div>
                   <div className="text-xs text-slate-500">{role.description || 'Bez popisu'} · {permCount} oprávnění</div>
                 </div>
                 {canEdit && (
                   <div className="flex gap-1">
-                    <button onClick={() => handleEdit(role.id)} className="p-2 rounded-lg hover:bg-white/10 transition">
+                    <button onClick={() => handleEdit(role.id)} className="p-2 rounded-lg hover:bg-slate-100 transition">
                       <Edit2 className="w-4 h-4 text-slate-400" />
                     </button>
                     <button onClick={() => handleDelete(role.id)} className="p-2 rounded-lg hover:bg-red-500/20 transition">
@@ -2311,10 +2377,10 @@ function PositionManagerTab({ canEdit }: { canEdit: boolean }) {
 
       {/* Create/Edit form */}
       {showForm && (
-        <div className="bg-slate-800/80 rounded-2xl p-4 border border-violet-500/30 space-y-4">
+        <div className="bg-white rounded-2xl p-4 border border-violet-200 space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-white font-bold text-sm">{editingId ? 'Upravit pozici' : 'Nová pozice'}</h3>
-            <button onClick={resetForm} className="p-1 rounded-lg hover:bg-white/10"><X className="w-4 h-4 text-slate-400" /></button>
+            <h3 className="text-slate-900 font-bold text-sm">{editingId ? 'Upravit pozici' : 'Nová pozice'}</h3>
+            <button onClick={resetForm} className="p-1 rounded-lg hover:bg-slate-100"><X className="w-4 h-4 text-slate-400" /></button>
           </div>
 
           <div>
@@ -2322,7 +2388,7 @@ function PositionManagerTab({ canEdit }: { canEdit: boolean }) {
             <input
               type="text" value={formName} onChange={e => setFormName(e.target.value)}
               placeholder="např. Vedoucí skladu"
-              className="w-full p-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm"
+              className="w-full p-2 bg-[#fbf9f4] border border-slate-200 rounded-lg text-slate-900 text-sm"
             />
           </div>
 
@@ -2331,7 +2397,7 @@ function PositionManagerTab({ canEdit }: { canEdit: boolean }) {
             <input
               type="text" value={formDesc} onChange={e => setFormDesc(e.target.value)}
               placeholder="Krátký popis zodpovědností"
-              className="w-full p-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm"
+              className="w-full p-2 bg-[#fbf9f4] border border-slate-200 rounded-lg text-slate-900 text-sm"
             />
           </div>
 
@@ -2350,13 +2416,13 @@ function PositionManagerTab({ canEdit }: { canEdit: boolean }) {
                           key={perm.key}
                           onClick={() => setFormPerms(prev => ({ ...prev, [perm.key]: !isOn }))}
                           className={`flex items-center gap-2 p-1.5 rounded-lg text-left transition text-xs ${
-                            isOn ? 'bg-violet-500/15 border border-violet-500/30' : 'bg-white/5 border border-white/10'
+                            isOn ? 'bg-violet-50 border border-violet-300' : 'bg-slate-50 border border-slate-200'
                           }`}
                         >
-                          <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 ${isOn ? 'bg-violet-500' : 'bg-slate-600'}`}>
+                          <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 ${isOn ? 'bg-violet-500' : 'bg-slate-300'}`}>
                             {isOn && <Check className="w-3 h-3 text-white" />}
                           </div>
-                          <span className={`${isOn ? 'text-violet-300' : 'text-slate-500'}`}>{perm.label}</span>
+                          <span className={`${isOn ? 'text-violet-700' : 'text-slate-500'}`}>{perm.label}</span>
                         </button>
                       );
                     })}
@@ -2367,7 +2433,7 @@ function PositionManagerTab({ canEdit }: { canEdit: boolean }) {
           </div>
 
           <div className="flex gap-2 pt-2">
-            <button onClick={resetForm} className="flex-1 py-2 border border-white/20 text-white rounded-xl text-sm">Zrušit</button>
+            <button onClick={resetForm} className="flex-1 py-2 border border-slate-300 text-slate-700 rounded-xl text-sm">Zrušit</button>
             <button
               onClick={handleSave}
               disabled={!formName.trim()}
@@ -2381,4 +2447,3 @@ function PositionManagerTab({ canEdit }: { canEdit: boolean }) {
     </div>
   );
 }
-
