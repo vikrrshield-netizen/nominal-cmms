@@ -54,10 +54,27 @@ enableIndexedDbPersistence(db).catch((err) => {
 });
 
 const pinToEmail = (pin: string): string => `pin_${pin}@nominal.local`;
+const LOGIN_DEVICE_ID_KEY = 'nominal-login-device-id';
 const sandboxUser = {
   uid: 'sandbox-user',
   email: 'sandbox@nominal.local',
 } as FirebaseUser;
+
+const createDeviceId = (): string => {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID();
+  }
+  return `dev_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 14)}`;
+};
+
+const getLoginDeviceId = (): string => {
+  if (typeof window === 'undefined') return createDeviceId();
+  const existing = localStorage.getItem(LOGIN_DEVICE_ID_KEY);
+  if (existing) return existing;
+  const next = createDeviceId();
+  localStorage.setItem(LOGIN_DEVICE_ID_KEY, next);
+  return next;
+};
 
 const notifySandboxAuthChanged = () => {
   if (typeof window !== 'undefined') {
@@ -80,8 +97,8 @@ export const signInWithPin = async (pin: string): Promise<FirebaseUser> => {
 
   // F2+: přihlášení přes Cloud Function (PIN se nepřevádí na heslo)
   if (useTokenLogin) {
-    const callable = httpsCallable<{ pin: string }, { token: string }>(functions, 'loginWithPin');
-    const res = await callable({ pin });
+    const callable = httpsCallable<{ pin: string; deviceId: string }, { token: string }>(functions, 'loginWithPin');
+    const res = await callable({ pin, deviceId: getLoginDeviceId() });
     const token = res.data?.token;
     if (!token) throw new Error('Přihlášení selhalo.');
     const result = await signInWithCustomToken(auth, token);

@@ -17,9 +17,14 @@ import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import * as crypto from 'crypto';
 
-const MAX_FAILS = 5;            // počet špatných pokusů před zámkem
-const LOCK_MS = 5 * 60 * 1000;  // doba zámku (5 min)
+const DEVICE_MAX_FAILS = 6;
+const DEVICE_WINDOW_MS = 5 * 60 * 1000;
+const DEVICE_LOCK_MS = 5 * 60 * 1000;
+const IP_MAX_FAILS = 40;
+const IP_WINDOW_MS = 15 * 60 * 1000;
+const IP_LOCK_MS = 15 * 60 * 1000;
 const PIN_RE = /^\d{4,6}$/;
+const DEVICE_ID_RE = /^[A-Za-z0-9_-]{16,80}$/;
 
 const SECRET_OPTS: functions.RuntimeOptions = { secrets: ['LOGIN_PEPPER'] };
 
@@ -67,9 +72,55 @@ async function assertAdmin(context: functions.https.CallableContext): Promise<vo
   }
 }
 
-function attemptKey(context: functions.https.CallableContext): string {
+function ipAttemptKey(context: functions.https.CallableContext): string {
   const ip = context.rawRequest?.ip || context.instanceIdToken || 'unknown';
-  return crypto.createHash('sha256').update(String(ip)).digest('hex').slice(0, 40);
+  return `ip_${crypto.createHash('sha256').update(String(ip)).digest('hex').slice(0, 40)}`;
+}
+
+function deviceAttemptKey(deviceId: string): string {
+  return `dev_${deviceId}`;
+}
+
+type AttemptDoc = {
+  fails?: number;
+  lockedUntil?: admin.firestore.Timestamp;
+  windowStartedAt?: admin.firestore.Timestamp;
+};
+
+async function readAttempt(ref: admin.firestore.DocumentReference): Promise<AttemptDoc> {
+  const snap = await ref.get();
+  return snap.exists ? (snap.data() as AttemptDoc) : {};
+}
+
+function assertNotLocked(attempt: AttemptDoc, now: number): void {
+  if (attempt.lockedUntil?.toMillis?.() && attempt.lockedUntil.toMillis() > now) {
+    throw new functions.https.HttpsError('resource-exhausted', 'Příliš mnoho pokusů. Zkuste to za chvíli.');
+  }
+}
+
+async function recordFailedAttempt(
+  ref: admin.firestore.DocumentReference,
+  attempt: AttemptDoc,
+  now: number,
+  maxFails: number,
+  windowMs: number,
+  lockMs: number,
+): Promise<void> {
+  const windowStart = attempt.windowStartedAt?.toMillis?.() || now;
+  const resetWindow = now - windowStart > windowMs;
+  const fails = (resetWindow ? 0 : attempt.fails || 0) + 1;
+  const update: any = {
+    fails,
+    lastFailAt: admin.firestore.Timestamp.fromMillis(now),
+    windowStartedAt: admin.firestore.Timestamp.fromMillis(resetWindow ? now : windowStart),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+  if (fails >= maxFails) {
+    update.lockedUntil = admin.firestore.Timestamp.fromMillis(now + lockMs);
+    update.fails = 0;
+    update.windowStartedAt = admin.firestore.Timestamp.fromMillis(now);
+  }
+  await ref.set(update, { merge: true });
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -82,15 +133,17 @@ export const loginWithPin = functions
     if (!PIN_RE.test(pin)) {
       throw new functions.https.HttpsError('invalid-argument', 'Neplatný PIN.');
     }
+    const rawDeviceId = String(data?.deviceId || '').trim();
+    const deviceId = DEVICE_ID_RE.test(rawDeviceId) ? rawDeviceId : '';
 
     const now = Date.now();
-    const attemptRef = db().doc(`login_attempts/${attemptKey(context)}`);
-    const attemptSnap = await attemptRef.get();
-    const attempt = attemptSnap.exists ? (attemptSnap.data() as any) : null;
+    const ipAttemptRef = db().doc(`login_attempts/${ipAttemptKey(context)}`);
+    const deviceAttemptRef = deviceId ? db().doc(`login_attempts/${deviceAttemptKey(deviceId)}`) : null;
+    const ipAttempt = await readAttempt(ipAttemptRef);
+    const deviceAttempt = deviceAttemptRef ? await readAttempt(deviceAttemptRef) : {};
 
-    if (attempt?.lockedUntil && attempt.lockedUntil.toMillis?.() > now) {
-      throw new functions.https.HttpsError('resource-exhausted', 'Příliš mnoho pokusů. Zkuste to za chvíli.');
-    }
+    assertNotLocked(ipAttempt, now);
+    assertNotLocked(deviceAttempt, now);
 
     const pinHash = hashPin(pin);
     const secretSnap = await db().collection('user_secrets').where('pinHash', '==', pinHash).limit(1).get();
@@ -106,23 +159,20 @@ export const loginWithPin = functions
     }
 
     if (!userId) {
-      const fails = (attempt?.fails || 0) + 1;
-      const update: any = {
-        fails,
-        lastFailAt: admin.firestore.Timestamp.fromMillis(now),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      };
-      if (fails >= MAX_FAILS) {
-        update.lockedUntil = admin.firestore.Timestamp.fromMillis(now + LOCK_MS);
-        update.fails = 0;
+      if (deviceAttemptRef) {
+        await Promise.all([
+          recordFailedAttempt(deviceAttemptRef, deviceAttempt, now, DEVICE_MAX_FAILS, DEVICE_WINDOW_MS, DEVICE_LOCK_MS),
+          recordFailedAttempt(ipAttemptRef, ipAttempt, now, IP_MAX_FAILS, IP_WINDOW_MS, IP_LOCK_MS),
+        ]);
+      } else {
+        await recordFailedAttempt(ipAttemptRef, ipAttempt, now, IP_MAX_FAILS, IP_WINDOW_MS, IP_LOCK_MS);
       }
-      await attemptRef.set(update, { merge: true });
       throw new functions.https.HttpsError('unauthenticated', 'Nesprávný PIN.');
     }
 
-    // úspěch -> vynulovat pokusy + zapsat lastLogin
-    if (attemptSnap.exists) {
-      await attemptRef.delete().catch(() => undefined);
+    // úspěch -> vynulovat pokusy tohoto zařízení + zapsat lastLogin
+    if (deviceAttemptRef) {
+      await deviceAttemptRef.delete().catch(() => undefined);
     }
     await db().doc(`users/${userId}`).set(
       { lastLoginAt: admin.firestore.FieldValue.serverTimestamp() },
