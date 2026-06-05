@@ -16,6 +16,7 @@ import {
 import { showToast } from '../components/ui/Toast';
 import MicButton from '../components/ui/MicButton';
 import { isExtruderAsset, normalizeGearboxText } from '../services/gearboxService';
+import { materialBatch, productBatch } from '../data/productionMasterSeed';
 
 // ═══════════════════════════════════════════════════════════════════
 // TYPES
@@ -41,12 +42,54 @@ interface ProductionExtruderOption {
   areaName: string;
 }
 
+interface MasterMaterial {
+  id: string;
+  number: string;
+  nkCode: string;
+  name: string;
+  active?: boolean;
+  usageCount?: number;
+}
+
+interface ProductRecipeItem {
+  materialId: string;
+  materialName: string;
+  ratio: number;
+}
+
+interface MasterProduct {
+  id: string;
+  number: string;
+  nkCode: string;
+  name: string;
+  active?: boolean;
+  recipe?: ProductRecipeItem[];
+  targetMotorLoadAmps?: number | null;
+}
+
+interface MixingRecipeSnapshotItem {
+  materialId: string;
+  materialName: string;
+  ratio: number;
+  plannedAmountKg: number;
+  materialBatch: string;
+}
+
 // -- Extrusion --
 type ExtrusionStatus = 'planned' | 'running' | 'done';
 interface ExtrusionBatch {
   id: string;
   batchId: string;
   rawMaterial: string;
+  productId?: string;
+  productName?: string;
+  productBatch?: string;
+  materialId?: string;
+  materialName?: string;
+  materialBatch?: string;
+  mixingRecipeSnapshot?: MixingRecipeSnapshotItem[];
+  mixingNote?: string;
+  targetMotorLoadAmps?: number | null;
   targetWeight: number;
   planDate: string;
   productionArea: ExtrusionArea;
@@ -145,6 +188,15 @@ function useExtrusionBatches() {
           id: d.id,
           batchId: data.batchId || '',
           rawMaterial: data.rawMaterial || '',
+          productId: data.productId || '',
+          productName: data.productName || '',
+          productBatch: data.productBatch || '',
+          materialId: data.materialId || '',
+          materialName: data.materialName || '',
+          materialBatch: data.materialBatch || '',
+          mixingRecipeSnapshot: Array.isArray(data.mixingRecipeSnapshot) ? data.mixingRecipeSnapshot : [],
+          mixingNote: data.mixingNote || '',
+          targetMotorLoadAmps: typeof data.targetMotorLoadAmps === 'number' ? data.targetMotorLoadAmps : null,
           targetWeight: data.targetWeight || 0,
           planDate: data.planDate || '',
           productionArea: data.productionArea || 'extrudovna_i',
@@ -295,6 +347,52 @@ function useProductionCatalogs(canManage: boolean, user: any) {
   };
 }
 
+function useProductionMasterData() {
+  const [materials, setMaterials] = useState<MasterMaterial[]>([]);
+  const [products, setProducts] = useState<MasterProduct[]>([]);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'materials'), (snap) => {
+      setMaterials(snap.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: d.id,
+          number: data.number || '',
+          nkCode: data.nkCode || '',
+          name: data.name || '',
+          active: data.active !== false,
+          usageCount: data.usageCount || 0,
+        };
+      })
+        .filter((item) => item.active !== false && item.name)
+        .sort((a, b) => (b.usageCount || 0) - (a.usageCount || 0) || a.name.localeCompare(b.name, 'cs')));
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'products'), (snap) => {
+      setProducts(snap.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: d.id,
+          number: data.number || '',
+          nkCode: data.nkCode || '',
+          name: data.name || '',
+          active: data.active !== false,
+          recipe: Array.isArray(data.recipe) ? data.recipe : [],
+          targetMotorLoadAmps: typeof data.targetMotorLoadAmps === 'number' ? data.targetMotorLoadAmps : null,
+        };
+      })
+        .filter((item) => item.active !== false && item.name)
+        .sort((a, b) => a.name.localeCompare(b.name, 'cs')));
+    });
+    return () => unsub();
+  }, []);
+
+  return { materials, products };
+}
+
 function useAssetsPicker(category?: string) {
   const [assets, setAssets] = useState<SimpleAsset[]>([]);
   useEffect(() => {
@@ -398,6 +496,7 @@ export default function ProductionPage() {
   const { user, hasPermission } = useAuthContext();
   const canManage = hasPermission('production.manage');
   const { materials, areas, extruders: catalogExtruders } = useProductionCatalogs(canManage, user);
+  const { materials: masterMaterials, products: masterProducts } = useProductionMasterData();
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('extrusion');
 
@@ -408,8 +507,15 @@ export default function ProductionPage() {
     planDate: localDateKey(),
     productionArea: 'extrudovna_i' as ExtrusionArea,
     extruderId: 'extruder-1',
+    productId: '',
+    materialId: '',
+    productBatchDate: localDateKey(),
+    materialBatchDate: localDateKey(),
+    materialBatchSuffix: 'A',
+    materialBatchOverride: '',
     rawMaterial: '',
     targetWeight: '',
+    mixingNote: '',
     note: '',
   });
   const [batchSaving, setBatchSaving] = useState(false);
@@ -457,6 +563,55 @@ export default function ProductionPage() {
     [batchForm.productionArea, extrusionLineOptions],
   );
 
+  const selectedProduct = useMemo(
+    () => masterProducts.find((product) => product.id === batchForm.productId),
+    [batchForm.productId, masterProducts],
+  );
+
+  const selectedMaterial = useMemo(
+    () => masterMaterials.find((material) => material.id === batchForm.materialId),
+    [batchForm.materialId, masterMaterials],
+  );
+
+  const selectedProductBatch = useMemo(() => {
+    if (!selectedProduct?.number || !batchForm.productBatchDate) return '';
+    return productBatch(selectedProduct.number, new Date(`${batchForm.productBatchDate}T00:00:00`));
+  }, [batchForm.productBatchDate, selectedProduct]);
+
+  const selectedMaterialBatch = useMemo(() => {
+    if (batchForm.materialBatchOverride.trim()) return batchForm.materialBatchOverride.trim();
+    if (!selectedMaterial?.number || !batchForm.materialBatchDate) return '';
+    return materialBatch(selectedMaterial.number, new Date(`${batchForm.materialBatchDate}T00:00:00`), batchForm.materialBatchSuffix || 'A');
+  }, [batchForm.materialBatchDate, batchForm.materialBatchOverride, batchForm.materialBatchSuffix, selectedMaterial]);
+
+  const mixingRecipeSnapshot = useMemo<MixingRecipeSnapshotItem[]>(() => {
+    const targetWeight = Number(batchForm.targetWeight) || 0;
+    const recipe = selectedProduct?.recipe || [];
+    const totalRatio = recipe.reduce((sum, row) => sum + (Number(row.ratio) || 0), 0);
+    if (!targetWeight || !totalRatio) {
+      return recipe.map((row) => ({
+        materialId: row.materialId,
+        materialName: row.materialName,
+        ratio: Number(row.ratio) || 0,
+        plannedAmountKg: 0,
+        materialBatch: row.materialId === selectedMaterial?.id ? selectedMaterialBatch : '',
+      }));
+    }
+    return recipe.map((row) => ({
+      materialId: row.materialId,
+      materialName: row.materialName,
+      ratio: Number(row.ratio) || 0,
+      plannedAmountKg: Math.round((targetWeight * ((Number(row.ratio) || 0) / totalRatio)) * 10) / 10,
+      materialBatch: row.materialId === selectedMaterial?.id ? selectedMaterialBatch : '',
+    }));
+  }, [batchForm.targetWeight, selectedMaterial?.id, selectedMaterialBatch, selectedProduct]);
+
+  useEffect(() => {
+    if (selectedMaterial?.name && batchForm.rawMaterial !== selectedMaterial.name) {
+      setBatchForm((prev) => ({ ...prev, rawMaterial: selectedMaterial.name }));
+    }
+  }, [batchForm.rawMaterial, selectedMaterial]);
+
   useEffect(() => {
     if (!areaOptions.some((area) => area.id === batchForm.productionArea)) {
       setBatchForm((prev) => ({ ...prev, productionArea: areaOptions[0]?.id || 'extrudovna_i' }));
@@ -494,7 +649,7 @@ export default function ProductionPage() {
   const createCatalogItem = async (kind: 'material' | 'area' | 'extruder') => {
     if (!canManage) return;
     const userId = user?.uid || user?.id || '';
-    const userName = user?.displayName || 'NeznĂˇmĂ˝';
+    const userName = user?.displayName || 'Neznámý';
     const base = {
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -508,7 +663,7 @@ export default function ProductionPage() {
         if (!name) return;
         await addDoc(collection(db, 'production_materials'), { ...base, name });
         setCatalogForms((prev) => ({ ...prev, material: '' }));
-        showToast('Surovina pĹ™idĂˇna', 'success');
+        showToast('Surovina přidána', 'success');
         return;
       }
 
@@ -517,7 +672,7 @@ export default function ProductionPage() {
         if (!name) return;
         await addDoc(collection(db, 'production_areas'), { ...base, name });
         setCatalogForms((prev) => ({ ...prev, area: '' }));
-        showToast('Extrudovna pĹ™idĂˇna', 'success');
+        showToast('Extrudovna přidána', 'success');
         return;
       }
 
@@ -531,16 +686,17 @@ export default function ProductionPage() {
         areaName: area.name,
       });
       setCatalogForms((prev) => ({ ...prev, extruder: '' }));
-      showToast('Extruder pĹ™idĂˇn', 'success');
+      showToast('Extruder přidán', 'success');
     } catch {
-      showToast('ÄŚĂ­selnĂ­k se nepodaĹ™ilo uloĹľit', 'error');
+      showToast('Číselník se nepodařilo uložit', 'error');
     }
   };
 
   const createBatch = async () => {
-    if (!batchForm.rawMaterial || !batchForm.targetWeight) return;
+    if ((!batchForm.rawMaterial && !selectedMaterial) || !batchForm.targetWeight) return;
     const selectedLine = extrusionLineOptions.find((line) => line.id === batchForm.extruderId) || visibleExtrusionLines[0] || extrusionLineOptions[0];
     const realMachine = findRealExtruderAsset(selectedLine, allAssets);
+    const rawMaterial = selectedMaterial?.name || batchForm.rawMaterial;
     setBatchSaving(true);
     try {
       await addDoc(collection(db, 'production_extrusion'), {
@@ -548,7 +704,16 @@ export default function ProductionPage() {
         planDate: batchForm.planDate || localDateKey(),
         productionArea: selectedLine?.areaId || batchForm.productionArea,
         productionAreaLabel: selectedLine?.areaName || areaOptions.find((area) => area.id === batchForm.productionArea)?.name || '',
-        rawMaterial: batchForm.rawMaterial,
+        rawMaterial,
+        productId: selectedProduct?.id || '',
+        productName: selectedProduct?.name || '',
+        productBatch: selectedProductBatch,
+        materialId: selectedMaterial?.id || '',
+        materialName: selectedMaterial?.name || '',
+        materialBatch: selectedMaterialBatch,
+        mixingRecipeSnapshot,
+        mixingNote: batchForm.mixingNote.trim(),
+        targetMotorLoadAmps: selectedProduct?.targetMotorLoadAmps ?? null,
         targetWeight: Number(batchForm.targetWeight),
         machineId: realMachine?.id || selectedLine?.id || '',
         machineName: realMachine?.name || selectedLine?.name || '',
@@ -564,7 +729,21 @@ export default function ProductionPage() {
         createdByName: user?.displayName || 'Neznámý',
       });
       setShowNewBatch(false);
-      setBatchForm({ planDate: localDateKey(), productionArea: areaOptions[0]?.id || 'extrudovna_i', extruderId: extrusionLineOptions[0]?.id || '', rawMaterial: '', targetWeight: '', note: '' });
+      setBatchForm({
+        planDate: localDateKey(),
+        productionArea: areaOptions[0]?.id || 'extrudovna_i',
+        extruderId: extrusionLineOptions[0]?.id || '',
+        productId: '',
+        materialId: '',
+        productBatchDate: localDateKey(),
+        materialBatchDate: localDateKey(),
+        materialBatchSuffix: 'A',
+        materialBatchOverride: '',
+        rawMaterial: '',
+        targetWeight: '',
+        mixingNote: '',
+        note: '',
+      });
       showToast('Dávka vytvořena', 'success');
     } catch { showToast('Chyba při vytváření', 'error'); }
     setBatchSaving(false);
@@ -778,10 +957,16 @@ export default function ProductionPage() {
                       <span className="rounded-full bg-white/5 px-2.5 py-1">{batch.productionAreaLabel}</span>
                       <span className="rounded-full bg-white/5 px-2.5 py-1">{batch.planDate || 'Bez data'}</span>
                     </div>
-                    <div className="grid grid-cols-3 gap-3 mb-3">
+                    <div className="grid grid-cols-2 gap-3 mb-3 lg:grid-cols-4">
+                      <div>
+                        <div className="text-[10px] text-slate-500 uppercase">Výrobek</div>
+                        <div className="text-sm font-medium text-white">{batch.productName || 'nezadáno'}</div>
+                        {batch.productBatch && <div className="mt-1 font-mono text-[11px] text-emerald-300">{batch.productBatch}</div>}
+                      </div>
                       <div>
                         <div className="text-[10px] text-slate-500 uppercase">Surovina</div>
-                        <div className="text-sm font-medium text-white">{batch.rawMaterial}</div>
+                        <div className="text-sm font-medium text-white">{batch.materialName || batch.rawMaterial}</div>
+                        {batch.materialBatch && <div className="mt-1 font-mono text-[11px] text-emerald-300">{batch.materialBatch}</div>}
                       </div>
                       <div>
                         <div className="text-[10px] text-slate-500 uppercase">Hmotnost</div>
@@ -792,6 +977,29 @@ export default function ProductionPage() {
                         <div className="text-sm font-medium text-white">{batch.machineName || '—'}</div>
                       </div>
                     </div>
+
+                    {(batch.mixingRecipeSnapshot?.length || batch.mixingNote || typeof batch.targetMotorLoadAmps === 'number') && (
+                      <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-2.5 mb-3">
+                        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                          <div className="text-[10px] font-black uppercase tracking-wide text-emerald-300">Míchání podle receptury</div>
+                          {typeof batch.targetMotorLoadAmps === 'number' && (
+                            <div className="rounded-full bg-emerald-400/10 px-2 py-1 text-[11px] font-black text-emerald-200">cíl {batch.targetMotorLoadAmps} A</div>
+                          )}
+                        </div>
+                        {!!batch.mixingRecipeSnapshot?.length && (
+                          <div className="space-y-1">
+                            {batch.mixingRecipeSnapshot.map((row, index) => (
+                              <div key={`${row.materialId}-${index}`} className="grid grid-cols-[1fr_auto_auto] gap-2 rounded-lg bg-slate-950/40 px-2 py-1.5 text-xs">
+                                <span className="font-semibold text-white">{row.materialName}</span>
+                                <span className="text-slate-300">{row.ratio} dílů</span>
+                                <span className="font-bold text-emerald-200">{row.plannedAmountKg || '—'} kg</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {batch.mixingNote && <p className="mt-2 text-xs text-emerald-100 whitespace-pre-wrap">{batch.mixingNote}</p>}
+                      </div>
+                    )}
 
                     {batch.note && (
                       <div className="bg-slate-700/30 rounded-xl p-2.5 mb-3">
@@ -990,22 +1198,94 @@ export default function ProductionPage() {
                 ))}
               </div>
             </Field>
-            <Field label="Surovina">
-              <select value={batchForm.rawMaterial} onChange={e => setBatchForm(p => ({ ...p, rawMaterial: e.target.value }))}
-                className={SEL_CLS} style={{ appearance: 'auto' }}>
-                <option value="" className="bg-slate-800">— vybrat —</option>
-                {materialOptions.map(m => <option key={m.id} value={m.name} className="bg-slate-800">{m.name}</option>)}
+            <Field label="Výrobek">
+              <select
+                value={batchForm.productId}
+                onChange={e => setBatchForm(p => ({ ...p, productId: e.target.value }))}
+                className={SEL_CLS}
+                style={{ appearance: 'auto' }}
+              >
+                <option value="" className="bg-slate-800">— vybrat výrobek —</option>
+                {masterProducts.map(product => (
+                  <option key={product.id} value={product.id} className="bg-slate-800">
+                    {product.nkCode} — {product.name}
+                  </option>
+                ))}
               </select>
+            </Field>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Datum šarže výrobku">
+                <input
+                  type="date"
+                  value={batchForm.productBatchDate}
+                  onChange={e => setBatchForm(p => ({ ...p, productBatchDate: e.target.value }))}
+                  className={INP_CLS}
+                />
+              </Field>
+              <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3">
+                <div className="text-[10px] font-black uppercase text-emerald-300">Auto šarže výrobku</div>
+                <div className="mt-1 font-mono text-sm font-black text-white">{selectedProductBatch || 'vyber výrobek'}</div>
+              </div>
+            </div>
+            <Field label="Surovina">
+              <select
+                value={batchForm.materialId}
+                onChange={e => setBatchForm(p => ({ ...p, materialId: e.target.value, rawMaterial: '' }))}
+                className={SEL_CLS}
+                style={{ appearance: 'auto' }}
+              >
+                <option value="" className="bg-slate-800">— vybrat surovinu —</option>
+                {masterMaterials.map(material => (
+                  <option key={material.id} value={material.id} className="bg-slate-800">
+                    {material.nkCode} — {material.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            {masterMaterials.length === 0 && (
+              <Field label="Surovina (dočasný číselník)">
+                <select value={batchForm.rawMaterial} onChange={e => setBatchForm(p => ({ ...p, rawMaterial: e.target.value }))}
+                  className={SEL_CLS} style={{ appearance: 'auto' }}>
+                  <option value="" className="bg-slate-800">— vybrat —</option>
+                  {materialOptions.map(m => <option key={m.id} value={m.name} className="bg-slate-800">{m.name}</option>)}
+                </select>
+              </Field>
+            )}
+            <div className="grid gap-3 sm:grid-cols-[1fr_90px]">
+              <Field label="Datum naskladnění suroviny">
+                <input
+                  type="date"
+                  value={batchForm.materialBatchDate}
+                  onChange={e => setBatchForm(p => ({ ...p, materialBatchDate: e.target.value }))}
+                  className={INP_CLS}
+                />
+              </Field>
+              <Field label="A/B/C">
+                <input
+                  value={batchForm.materialBatchSuffix}
+                  onChange={e => setBatchForm(p => ({ ...p, materialBatchSuffix: e.target.value.toUpperCase().slice(0, 2) }))}
+                  className={INP_CLS}
+                  placeholder="A"
+                />
+              </Field>
+            </div>
+            <Field label="Šarže suroviny">
+              <input
+                value={batchForm.materialBatchOverride}
+                onChange={e => setBatchForm(p => ({ ...p, materialBatchOverride: e.target.value }))}
+                placeholder={selectedMaterialBatch || 'auto podle suroviny a data'}
+                className={INP_CLS}
+              />
             </Field>
             {canManage && (
               <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                <div className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-400">Sprava ciselniku</div>
+                <div className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-400">Správa číselníku</div>
                 <div className="grid gap-3">
                   <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
                     <input
                       value={catalogForms.material}
                       onChange={(e) => setCatalogForms((prev) => ({ ...prev, material: e.target.value }))}
-                      placeholder="Nova surovina"
+                      placeholder="Nová surovina"
                       className={INP_CLS}
                     />
                     <button
@@ -1021,7 +1301,7 @@ export default function ProductionPage() {
                     <input
                       value={catalogForms.area}
                       onChange={(e) => setCatalogForms((prev) => ({ ...prev, area: e.target.value }))}
-                      placeholder="Nova extrudovna"
+                      placeholder="Nová extrudovna"
                       className={INP_CLS}
                     />
                     <button
@@ -1037,7 +1317,7 @@ export default function ProductionPage() {
                     <input
                       value={catalogForms.extruder}
                       onChange={(e) => setCatalogForms((prev) => ({ ...prev, extruder: e.target.value }))}
-                      placeholder="Novy extruder"
+                      placeholder="Nový extruder"
                       className={INP_CLS}
                     />
                     <select
@@ -1067,6 +1347,37 @@ export default function ProductionPage() {
                 onChange={e => setBatchForm(p => ({ ...p, targetWeight: e.target.value }))}
                 placeholder="500" className={INP_CLS} />
             </Field>
+            <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-3">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <div className="text-xs font-black uppercase tracking-wide text-emerald-300">Míchání / receptura</div>
+                {typeof selectedProduct?.targetMotorLoadAmps === 'number' && (
+                  <div className="rounded-full bg-emerald-400/10 px-2 py-1 text-[11px] font-black text-emerald-100">
+                    zátěž {selectedProduct.targetMotorLoadAmps} A
+                  </div>
+                )}
+              </div>
+              {selectedProduct?.recipe?.length ? (
+                <div className="space-y-1">
+                  {mixingRecipeSnapshot.map((row, index) => (
+                    <div key={`${row.materialId}-${index}`} className="grid grid-cols-[1fr_auto_auto] gap-2 rounded-lg bg-slate-950/40 px-2 py-1.5 text-xs">
+                      <span className="font-semibold text-white">{row.materialName}</span>
+                      <span className="text-slate-300">{row.ratio} dílů</span>
+                      <span className="font-bold text-emerald-200">{row.plannedAmountKg || '—'} kg</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs font-semibold text-amber-200">Receptura není vyplněná v rodném listu výrobku.</p>
+              )}
+            </div>
+            <Field label="Poznámka k míchání">
+              <input
+                value={batchForm.mixingNote}
+                onChange={e => setBatchForm(p => ({ ...p, mixingNote: e.target.value }))}
+                placeholder="např. míchat 20 min, kontrola vody, zvláštní postup..."
+                className={INP_CLS}
+              />
+            </Field>
             <Field label="Poznámka pro operátory">
               <textarea
                 value={batchForm.note}
@@ -1076,7 +1387,7 @@ export default function ProductionPage() {
                 className={INP_CLS + ' resize-none'}
               />
             </Field>
-            <button onClick={createBatch} disabled={!batchForm.rawMaterial || !batchForm.targetWeight || batchSaving}
+            <button onClick={createBatch} disabled={(!batchForm.rawMaterial && !selectedMaterial) || !batchForm.targetWeight || batchSaving}
               className="w-full py-3.5 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-2xl font-bold disabled:opacity-50 flex items-center justify-center gap-2 transition active:scale-[0.98]">
               {batchSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
               {batchSaving ? 'Ukládám...' : 'Vytvořit dávku'}
