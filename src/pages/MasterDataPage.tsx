@@ -59,6 +59,9 @@ interface ProductDoc extends MasterBase {
   bomMaterialIds?: string[];
   recipe?: ProductRecipeItem[];
   targetMotorLoadAmps?: number | null;
+  productBatchDate?: string;
+  productBatchManual?: boolean;
+  productBatchOverride?: string;
 }
 
 const PANEL = 'rounded-2xl border border-[#ded6c8] bg-white shadow-sm';
@@ -384,6 +387,7 @@ function DetailPanel({
   useEffect(() => {
     if (!item) return;
     setForm({
+      name: item.name || '',
       allergens: (item.allergens || []).join(', '),
       note: item.note || '',
       active: item.active === false ? 'false' : 'true',
@@ -397,7 +401,10 @@ function DetailPanel({
       packaging: (item as ProductDoc).packaging || '',
       bomMaterialIds: ((item as ProductDoc).bomMaterialIds || []).join(','),
       targetMotorLoadAmps: typeof (item as ProductDoc).targetMotorLoadAmps === 'number' ? String((item as ProductDoc).targetMotorLoadAmps) : '',
+      productBatchManual: (item as ProductDoc).productBatchManual ? 'true' : 'false',
+      productBatchOverride: (item as ProductDoc).productBatchOverride || '',
     });
+    setBatchDate((item as ProductDoc).productBatchDate || new Date().toISOString().slice(0, 10));
     const product = item as ProductDoc;
     if (product.recipe?.length) {
       setRecipe(product.recipe);
@@ -431,15 +438,22 @@ function DetailPanel({
   }
 
   const selectedDate = new Date(`${batchDate}T00:00:00`);
-  const batchValue = tab === 'materials'
+  const autoBatchValue = tab === 'materials'
     ? materialBatch(item.number, selectedDate, batchSuffix)
     : productBatch(item.number, selectedDate);
+  const productBatchManual = tab === 'products' && form.productBatchManual === 'true';
+  const batchValue = productBatchManual ? (form.productBatchOverride || autoBatchValue) : autoBatchValue;
   const relatedTemperatureLogs = temperatureLogs
     .filter((log) => tab === 'materials' ? log.materialId === item.id : log.productId === item.id)
     .slice(0, 12);
+  const showWaterOption = !recipeMaterialSearch.trim() || normalizeSearch('Voda water').includes(normalizeSearch(recipeMaterialSearch));
 
   const addRecipeRow = () => {
     setRecipe((prev) => [...prev, { materialId: '', materialName: '', ratio: 0 }]);
+  };
+
+  const addWaterRow = () => {
+    setRecipe((prev) => [...prev, { materialId: 'water', materialName: 'Voda', ratio: 0 }]);
   };
 
   const updateRecipeRow = (index: number, patch: Partial<ProductRecipeItem>) => {
@@ -447,8 +461,12 @@ function DetailPanel({
       if (rowIndex !== index) return row;
       const next = { ...row, ...patch };
       if (patch.materialId) {
-        const material = materials.find((entry) => entry.id === patch.materialId);
-        next.materialName = material?.name || patch.materialId;
+        if (patch.materialId === 'water') {
+          next.materialName = 'Voda';
+        } else {
+          const material = materials.find((entry) => entry.id === patch.materialId);
+          next.materialName = material?.name || patch.materialId;
+        }
       }
       return next;
     }));
@@ -626,6 +644,7 @@ function DetailPanel({
     try {
       const collectionName = tab === 'materials' ? 'materials' : 'products';
       const payload: Record<string, unknown> = {
+        name: form.name?.trim() || item.name,
         allergens: splitList(form.allergens || ''),
         note: form.note || '',
         active: form.active !== 'false',
@@ -641,6 +660,13 @@ function DetailPanel({
         const cleanRecipe = recipe
           .filter((row) => row.materialId)
           .map((row) => {
+            if (row.materialId === 'water') {
+              return {
+                materialId: 'water',
+                materialName: 'Voda',
+                ratio: Number(row.ratio) || 0,
+              };
+            }
             const material = materials.find((entry) => entry.id === row.materialId);
             return {
               materialId: row.materialId,
@@ -654,6 +680,9 @@ function DetailPanel({
         payload.packaging = form.packaging || '';
         payload.recipe = cleanRecipe;
         payload.bomMaterialIds = cleanRecipe.map((row) => row.materialId);
+        payload.productBatchDate = batchDate;
+        payload.productBatchManual = form.productBatchManual === 'true';
+        payload.productBatchOverride = form.productBatchManual === 'true' ? (form.productBatchOverride || '').trim() : '';
         const targetMotorLoadAmps = form.targetMotorLoadAmps.trim() === '' ? null : Number(String(form.targetMotorLoadAmps).replace(',', '.'));
         if (targetMotorLoadAmps !== null && Number.isNaN(targetMotorLoadAmps)) {
           showToast('Cílová zátěž musí být číslo v ampérech', 'error');
@@ -721,10 +750,45 @@ function DetailPanel({
               </label>
             )}
           </div>
+          {tab === 'products' && canManage && (
+            <div className="mt-3 rounded-xl border border-emerald-100 bg-white p-3">
+              <label className="flex items-center gap-2 text-sm font-black text-slate-800">
+                <input
+                  type="checkbox"
+                  checked={productBatchManual}
+                  onChange={(e) => setForm((prev) => ({ ...prev, productBatchManual: e.target.checked ? 'true' : 'false' }))}
+                  className="h-4 w-4 rounded border-slate-300"
+                />
+                Upravit šarži ručně
+              </label>
+              {productBatchManual && (
+                <input
+                  value={form.productBatchOverride || ''}
+                  onChange={(e) => setForm((prev) => ({ ...prev, productBatchOverride: e.target.value }))}
+                  placeholder={autoBatchValue}
+                  className={`${INPUT} mt-2 bg-white`}
+                />
+              )}
+            </div>
+          )}
           <div className="mt-3 rounded-xl bg-white px-3 py-2 text-lg font-black text-emerald-900">{batchValue}</div>
         </section>
 
         <section className="grid grid-cols-1 gap-3">
+          <div className="grid grid-cols-2 gap-2">
+            <label>
+              <span className="mb-1 block text-xs font-black uppercase text-slate-500">NK kód</span>
+              <input value={item.nkCode} className={INPUT} disabled />
+            </label>
+            <label>
+              <span className="mb-1 block text-xs font-black uppercase text-slate-500">Číslo</span>
+              <input value={item.number} className={INPUT} disabled />
+            </label>
+          </div>
+          <label>
+            <span className="mb-1 block text-xs font-black uppercase text-slate-500">Název</span>
+            <input value={form.name || ''} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} className={INPUT} disabled={!canManage} />
+          </label>
           <label>
             <span className="mb-1 block text-xs font-black uppercase text-slate-500">Alergeny</span>
             <input value={form.allergens || ''} onChange={(e) => setForm((p) => ({ ...p, allergens: e.target.value }))} placeholder="např. sója, mléko, vejce" className={INPUT} disabled={!canManage} />
@@ -778,6 +842,11 @@ function DetailPanel({
                     className={INPUT}
                     disabled={!canManage}
                   />
+                  {canManage && (
+                    <button type="button" onClick={addWaterRow} className="inline-flex min-h-10 w-fit items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3 text-xs font-black text-sky-800">
+                      P?idat vodu
+                    </button>
+                  )}
                   {recipe.length === 0 && <div className="rounded-xl bg-white px-3 py-3 text-sm font-semibold text-slate-500">Receptura zatím není vyplněná.</div>}
                   {recipe.map((row, index) => (
                     <div key={`${row.materialId}-${index}`} className="grid grid-cols-[minmax(0,1fr)_90px_40px] gap-2">
@@ -788,6 +857,7 @@ function DetailPanel({
                         disabled={!canManage}
                       >
                         <option value="">Vyber surovinu</option>
+                        {showWaterOption && <option value="water">Voda</option>}
                         {filteredRecipeMaterials.map((material) => (
                           <option key={material.id} value={material.id}>{material.nkCode} · {material.name}</option>
                         ))}
@@ -1011,6 +1081,7 @@ export default function MasterDataPage() {
   const temperatureLogs = useGearboxTemperatureHistory();
   const [selectedId, setSelectedId] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showMobileDetail, setShowMobileDetail] = useState(false);
 
   const activeItems = tab === 'materials' ? materials : products;
   const sortedItems = useMemo(() => sortByUseThenName(activeItems), [activeItems]);
@@ -1022,6 +1093,7 @@ export default function MasterDataPage() {
 
   useEffect(() => {
     setSelectedId('');
+    setShowMobileDetail(false);
   }, [tab]);
 
   const switchTab = (next: Tab) => {
@@ -1079,6 +1151,7 @@ export default function MasterDataPage() {
     if (!ok) return;
     await deleteDoc(doc(db, collectionForTab(tab), item.id));
     setSelectedId('');
+    setShowMobileDetail(false);
     showToast('Karta smazána', 'success');
   };
 
@@ -1252,24 +1325,52 @@ export default function MasterDataPage() {
                     key={item.id}
                     item={item}
                     selected={selectedItem?.id === item.id}
-                    onSelect={() => setSelectedId(item.id)}
+                    onSelect={() => {
+                      setSelectedId(item.id);
+                      setShowMobileDetail(true);
+                    }}
                   />
                 ))}
               </div>
             )}
           </section>
 
-          <DetailPanel
-            tab={tab}
-            item={selectedItem as MaterialDoc | ProductDoc | null}
-            canManage={canManage}
-            user={user}
-            materials={materials}
-            temperatureLogs={temperatureLogs}
-            onDelete={deleteItem}
-          />
+          <div className="hidden lg:block">
+            <DetailPanel
+              tab={tab}
+              item={selectedItem as MaterialDoc | ProductDoc | null}
+              canManage={canManage}
+              user={user}
+              materials={materials}
+              temperatureLogs={temperatureLogs}
+              onDelete={deleteItem}
+            />
+          </div>
         </div>
       </main>
+
+      {showMobileDetail && selectedItem && (
+        <div className="fixed inset-0 z-50 bg-black/45 p-3 lg:hidden" onClick={() => setShowMobileDetail(false)}>
+          <div className="mx-auto flex h-full max-w-xl flex-col" onClick={(event) => event.stopPropagation()}>
+            <div className="mb-2 flex justify-end">
+              <button type="button" onClick={() => setShowMobileDetail(false)} className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-slate-700 shadow">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto rounded-2xl">
+              <DetailPanel
+                tab={tab}
+                item={selectedItem as MaterialDoc | ProductDoc}
+                canManage={canManage}
+                user={user}
+                materials={materials}
+                temperatureLogs={temperatureLogs}
+                onDelete={deleteItem}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {showCreateModal && (
         <NewItemModal
