@@ -1248,11 +1248,43 @@ select.k-input {
 }
 
 @media (max-width: 640px) {
+  .kartoteka-page .k-root-card {
+    padding: 12px;
+  }
+
   .kartoteka-page .k-root-top {
     display: grid;
-    grid-template-columns: 56px minmax(0, 1fr) auto auto auto;
+    grid-template-columns: 48px minmax(0, 1fr) auto;
+    grid-template-areas:
+      "icon title title"
+      "stats stats stats"
+      "detail actions actions";
+    align-items: center;
     gap: 8px;
     width: 100%;
+  }
+
+  .kartoteka-page .k-root-icon {
+    grid-area: icon;
+    width: 48px;
+    height: 48px;
+  }
+
+  .kartoteka-page .k-root-top > button:not(.k-root-action-btn) {
+    grid-area: title;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .kartoteka-page .k-root-info {
+    min-width: 0;
+  }
+
+  .kartoteka-page .k-root-name {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .kartoteka-page .k-root-type,
@@ -1261,21 +1293,23 @@ select.k-input {
   }
 
   .kartoteka-page .k-root-actions {
+    grid-area: actions;
+    justify-content: flex-end;
     gap: 4px;
     margin-left: 0 !important;
   }
 
   .kartoteka-page .k-root-stats-inline {
-    display: none;
+    grid-area: stats;
+    display: flex;
+    margin-left: 0;
+    width: 100%;
+    overflow: hidden;
+    gap: 6px;
   }
 
   .kartoteka-page .k-root-card > .k-root-stats:not(.k-root-stats-inline) {
-    display: flex;
-    margin-top: 8px;
-    padding-left: 64px;
-    gap: 5px;
-    flex-wrap: wrap;
-    width: 100%;
+    display: none;
   }
 
   .kartoteka-page .k-root-stat {
@@ -1287,6 +1321,13 @@ select.k-input {
     height: 38px;
     min-width: 38px;
     padding: 0;
+  }
+
+  .kartoteka-page .k-root-top > .k-root-action-btn {
+    grid-area: detail;
+    justify-self: start;
+    width: 38px;
+    margin-left: 0;
   }
 
   .kartoteka-page .k-root-action-btn .k-action-label {

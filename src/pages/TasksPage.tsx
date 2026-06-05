@@ -699,14 +699,12 @@ function TaskCard({ task, onClick, onEdit, onDelete, onAddLog, onTake, onComplet
       <div className="border-t border-slate-200 px-2 py-1.5 flex items-center gap-1 bg-white">
         {!isDone && (
           <>
-            {!isActive && (
-              <button
-                onClick={(e) => { e.stopPropagation(); onTake(); }}
-                className="flex-1 min-h-11 rounded-lg flex items-center justify-center gap-1.5 border border-amber-200 bg-amber-50 text-amber-800 text-xs font-bold hover:bg-amber-100 transition"
-              >
-                <Play className="w-4 h-4" /> Přebírám
-              </button>
-            )}
+            <button
+              onClick={(e) => { e.stopPropagation(); onTake(); }}
+              className="flex-1 min-h-11 rounded-lg flex items-center justify-center gap-1.5 border border-amber-200 bg-amber-50 text-amber-800 text-xs font-bold hover:bg-amber-100 transition"
+            >
+              <Play className="w-4 h-4" /> Přebírám
+            </button>
             <button
               onClick={(e) => { e.stopPropagation(); onAddLog(); }}
               className="flex-1 min-h-11 rounded-lg flex items-center justify-center gap-1.5 border border-sky-200 bg-sky-50 text-sky-700 text-xs font-bold hover:bg-sky-100 transition"
@@ -1974,24 +1972,23 @@ function TaskActionsSheet({ task, userName, onClose, onEdit, onComplete, onStatu
       {!isDone && (
         <div className="flex flex-col gap-2.5">
           {/* Přebírám */}
-          {!isInProgress && (
-            <button
-              disabled={saving}
-              onClick={() => {
-                const names = uniqueNames([...taskWorkerNames(task), userName]);
-                doAction({
-                  status: 'in_progress',
-                  startedAt: serverTimestamp(),
-                  assignedWorkerNames: names,
-                  assignedToName: names[0] || userName,
-                  updatedBy: userName,
-                });
-              }}
-              className="w-full py-4 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 font-bold text-base flex items-center justify-center gap-2.5 active:scale-[0.97] transition disabled:opacity-40"
-            >
-              <Play className="w-5 h-5" /> Přebírám
-            </button>
-          )}
+          <button
+            disabled={saving}
+            onClick={() => {
+              const names = uniqueNames([...taskWorkerNames(task), userName]);
+              const update: Record<string, unknown> = {
+                status: 'in_progress',
+                assignedWorkerNames: names,
+                assignedToName: names[0] || userName,
+                updatedBy: userName,
+              };
+              if (!isInProgress) update.startedAt = serverTimestamp();
+              doAction(update);
+            }}
+            className="w-full py-4 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 font-bold text-base flex items-center justify-center gap-2.5 active:scale-[0.97] transition disabled:opacity-40"
+          >
+            <Play className="w-5 h-5" /> Přebírám
+          </button>
 
           {/* Naplánovat */}
           {!showPlanner && (
