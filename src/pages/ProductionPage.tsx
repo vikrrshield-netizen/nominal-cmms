@@ -566,6 +566,7 @@ export default function ProductionPage() {
     extruder: '',
     extruderAreaId: 'extrudovna_i',
   });
+  const [showCatalogSettings, setShowCatalogSettings] = useState(false);
 
   // Machine filter for extrusion
   const [machineFilter, setMachineFilter] = useState<string>('ALL');
@@ -1567,8 +1568,23 @@ export default function ProductionPage() {
             </Field>
             {canManage && (
               <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                <div className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-400">Správa číselníku</div>
-                <div className="grid gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowCatalogSettings((value) => !value)}
+                  className="flex w-full items-center justify-between gap-3 text-left"
+                >
+                  <span>
+                    <span className="block text-xs font-bold uppercase tracking-wide text-slate-300">Nastavení seznamů</span>
+                    <span className="mt-1 block text-xs font-semibold text-slate-400">
+                      Volitelné: suroviny, úseky a stroje pro plánování. Sem později přidáme i mlýny.
+                    </span>
+                  </span>
+                  <span className="rounded-full border border-white/10 px-3 py-1 text-xs font-bold text-white">
+                    {showCatalogSettings ? 'Sbalit' : 'Rozbalit'}
+                  </span>
+                </button>
+                {showCatalogSettings && (
+                <div className="mt-3 grid gap-3">
                   <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
                     <input
                       value={catalogForms.material}
@@ -1589,7 +1605,7 @@ export default function ProductionPage() {
                     <input
                       value={catalogForms.area}
                       onChange={(e) => setCatalogForms((prev) => ({ ...prev, area: e.target.value }))}
-                      placeholder="Nová extrudovna"
+                      placeholder="Nový úsek / extrudovna"
                       className={INP_CLS}
                     />
                     <button
@@ -1598,14 +1614,14 @@ export default function ProductionPage() {
                       disabled={!catalogForms.area.trim()}
                       className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white disabled:opacity-50"
                     >
-                      + Extrudovna
+                      + Úsek
                     </button>
                   </div>
                   <div className="grid gap-2 lg:grid-cols-[1fr_180px_auto]">
                     <input
                       value={catalogForms.extruder}
                       onChange={(e) => setCatalogForms((prev) => ({ ...prev, extruder: e.target.value }))}
-                      placeholder="Nový extruder"
+                      placeholder="Nový stroj / linka"
                       className={INP_CLS}
                     />
                     <select
@@ -1624,10 +1640,11 @@ export default function ProductionPage() {
                       disabled={!catalogForms.extruder.trim()}
                       className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white disabled:opacity-50"
                     >
-                      + Extruder
+                      + Stroj
                     </button>
                   </div>
                 </div>
+                )}
               </div>
             )}
             <Field label="Cílová hmotnost (kg)">
