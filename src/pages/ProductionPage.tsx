@@ -568,6 +568,7 @@ export default function ProductionPage() {
 
   // Machine filter for extrusion
   const [machineFilter, setMachineFilter] = useState<string>('ALL');
+  const [planDateFilter, setPlanDateFilter] = useState<string>('ALL');
 
   // Asset pickers
   const packagingAssets = useAssetsPicker('packaging');
@@ -997,7 +998,8 @@ export default function ProductionPage() {
 
         {/* ═══ EXTRUSION TAB ═══ */}
         {activeTab === 'extrusion' && !loadingBatches && (() => {
-          const filtered = machineFilter === 'ALL' ? batches : batches.filter(b => getBatchMachineFilterIds(b).includes(machineFilter));
+          const byMachine = machineFilter === 'ALL' ? batches : batches.filter(b => getBatchMachineFilterIds(b).includes(machineFilter));
+          const filtered = planDateFilter === 'ALL' ? byMachine : byMachine.filter((batch) => batch.planDate === planDateFilter);
           return (
           <>
             <div className="rounded-2xl border border-slate-700/60 bg-slate-800/60 p-3">
@@ -1006,32 +1008,46 @@ export default function ProductionPage() {
                   <div className="text-xs font-black uppercase tracking-wide text-slate-400">Týdenní plán</div>
                   <div className="text-sm font-bold text-white">Extruze po dnech</div>
                 </div>
-                <div className="text-[11px] font-semibold text-slate-400">1 dávka může jet přes více extruderů</div>
+                <button
+                  type="button"
+                  onClick={() => setPlanDateFilter('ALL')}
+                  className={`rounded-full px-3 py-1.5 text-xs font-black transition ${
+                    planDateFilter === 'ALL'
+                      ? 'bg-white text-slate-950'
+                      : 'bg-slate-950/45 text-slate-300 hover:bg-slate-900'
+                  }`}
+                >
+                  Všechny dny
+                </button>
               </div>
               <div className="grid grid-cols-7 gap-1.5">
                 {weekTimeline.map((day) => {
                   const isToday = day.key === localDateKey();
+                  const isSelected = planDateFilter === day.key;
                   return (
-                    <div
+                    <button
+                      type="button"
+                      onClick={() => setPlanDateFilter(day.key)}
                       key={day.key}
-                      className={`min-h-[74px] rounded-xl border p-2 ${
-                        isToday ? 'border-emerald-400/50 bg-emerald-500/15' : 'border-white/10 bg-slate-950/35'
+                      className={`min-h-[74px] rounded-xl border p-2 text-left transition active:scale-[0.98] ${
+                        isSelected ? 'border-white bg-white text-slate-950' :
+                        isToday ? 'border-emerald-400/50 bg-emerald-500/15' : 'border-white/10 bg-slate-950/35 hover:bg-slate-950/55'
                       }`}
                     >
-                      <div className="text-[10px] font-bold uppercase text-slate-400">
+                      <div className={`text-[10px] font-bold uppercase ${isSelected ? 'text-slate-500' : 'text-slate-400'}`}>
                         {day.date.toLocaleDateString('cs-CZ', { weekday: 'short' })}
                       </div>
-                      <div className={`text-sm font-black ${isToday ? 'text-emerald-200' : 'text-white'}`}>
+                      <div className={`text-sm font-black ${isSelected ? 'text-slate-950' : isToday ? 'text-emerald-200' : 'text-white'}`}>
                         {day.date.getDate()}. {day.date.getMonth() + 1}.
                       </div>
-                      <div className="mt-2 text-lg font-black text-white">{day.total}</div>
+                      <div className={`mt-2 text-lg font-black ${isSelected ? 'text-slate-950' : 'text-white'}`}>{day.total}</div>
                       <div className="mt-1 flex gap-1">
                         {day.running > 0 && <span className="h-1.5 flex-1 rounded-full bg-amber-400" />}
                         {day.planned > 0 && <span className="h-1.5 flex-1 rounded-full bg-blue-400" />}
                         {day.done > 0 && <span className="h-1.5 flex-1 rounded-full bg-emerald-400" />}
-                        {day.total === 0 && <span className="h-1.5 flex-1 rounded-full bg-slate-700" />}
+                        {day.total === 0 && <span className={`h-1.5 flex-1 rounded-full ${isSelected ? 'bg-slate-300' : 'bg-slate-700'}`} />}
                       </div>
-                    </div>
+                    </button>
                   );
                 })}
               </div>
@@ -1070,27 +1086,36 @@ export default function ProductionPage() {
 
                   {/* Card body */}
                   <div className="px-4 py-3">
-                    <div className="mb-3 flex flex-wrap items-center gap-2 text-xs font-bold text-slate-300">
-                      <span className="rounded-full bg-white/5 px-2.5 py-1">{batch.productionAreaLabel}</span>
-                      <span className="rounded-full bg-white/5 px-2.5 py-1">{batch.planDate || 'Bez data'}</span>
+                    <div className="mb-3 flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="truncate text-base font-black text-white">{batch.productName || batch.materialName || batch.rawMaterial || 'Bez výrobku'}</div>
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-bold text-slate-300">
+                          <span className="rounded-full bg-white/5 px-2.5 py-1">{batch.productionAreaLabel}</span>
+                          <span className="rounded-full bg-white/5 px-2.5 py-1">{machineLabel}</span>
+                        </div>
+                      </div>
+                      <div className="shrink-0 rounded-xl border border-white/10 bg-slate-950/35 px-3 py-2 text-right">
+                        <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">Plán</div>
+                        <div className="text-sm font-black text-white">{batch.planDate || 'Bez data'}</div>
+                      </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-3 mb-3 lg:grid-cols-4">
-                      <div>
-                        <div className="text-[10px] text-slate-500 uppercase">Výrobek</div>
+                    <div className="grid grid-cols-2 gap-2 mb-3 lg:grid-cols-4">
+                      <div className="rounded-xl border border-white/10 bg-slate-950/35 p-2.5">
+                        <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">Výrobek</div>
                         <div className="text-sm font-medium text-white">{batch.productName || 'nezadáno'}</div>
                         {batch.productBatch && <div className="mt-1 font-mono text-[11px] text-emerald-300">{batch.productBatch}</div>}
                       </div>
-                      <div>
-                        <div className="text-[10px] text-slate-500 uppercase">Surovina</div>
+                      <div className="rounded-xl border border-white/10 bg-slate-950/35 p-2.5">
+                        <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">Surovina</div>
                         <div className="text-sm font-medium text-white">{batch.materialName || batch.rawMaterial}</div>
                         {batch.materialBatch && <div className="mt-1 font-mono text-[11px] text-emerald-300">{batch.materialBatch}</div>}
                       </div>
-                      <div>
-                        <div className="text-[10px] text-slate-500 uppercase">Hmotnost</div>
+                      <div className="rounded-xl border border-white/10 bg-slate-950/35 p-2.5">
+                        <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">Hmotnost</div>
                         <div className="text-sm font-medium text-white">{batch.targetWeight} kg</div>
                       </div>
-                      <div>
-                        <div className="text-[10px] text-slate-500 uppercase">Stroj</div>
+                      <div className="rounded-xl border border-white/10 bg-slate-950/35 p-2.5">
+                        <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">Stroj</div>
                         <div className="text-sm font-medium text-white">{machineLabel}</div>
                       </div>
                     </div>
