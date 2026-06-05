@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import ExcelJS from 'exceljs';
 import { collection, deleteDoc, doc, limit, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, writeBatch, type Timestamp } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -134,13 +135,7 @@ function escapeHtml(value: unknown) {
     .replace(/'/g, '&#039;');
 }
 
-function csvCell(value: unknown) {
-  const text = String(value ?? '').replace(/\r?\n/g, ' ');
-  return `"${text.replace(/"/g, '""')}"`;
-}
-
-function downloadTextFile(filename: string, content: string, mime = 'text/csv;charset=utf-8') {
-  const blob = new Blob([content], { type: mime });
+function downloadBlob(filename: string, blob: Blob) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -149,6 +144,62 @@ function downloadTextFile(filename: string, content: string, mime = 'text/csv;ch
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+const PRINT_STYLE = `
+  @page { size: A4; margin: 12mm; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: Arial, sans-serif; color: #111827; background: #f7f3ea; }
+  .page { max-width: 1020px; margin: 0 auto; padding: 24px; background: #fff; }
+  .toolbar { position: sticky; top: 0; z-index: 5; display: flex; justify-content: flex-end; gap: 8px; padding: 10px 0; background: #fff; }
+  button { border: 0; border-radius: 10px; background: #047857; color: #fff; padding: 10px 14px; font-weight: 800; cursor: pointer; }
+  h1 { margin: 0; font-size: 28px; line-height: 1.15; }
+  h2 { margin: 22px 0 8px; font-size: 16px; color: #064e3b; }
+  .muted { color: #64748b; font-weight: 700; }
+  .header { display: flex; justify-content: space-between; gap: 18px; border-bottom: 3px solid #047857; padding-bottom: 14px; }
+  .badge { display: inline-block; border: 1px solid #a7f3d0; border-radius: 999px; background: #ecfdf5; color: #065f46; padding: 5px 10px; font-size: 12px; font-weight: 800; }
+  .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; background: #fff; }
+  th { background: #e8f3ed; color: #0f172a; font-weight: 900; }
+  td, th { border: 1px solid #cfc7b8; padding: 8px 9px; text-align: left; vertical-align: top; font-size: 12px; }
+  tr:nth-child(even) td { background: #fbf9f4; }
+  .field th { width: 210px; }
+  @media print {
+    body { background: #fff; }
+    .page { padding: 0; max-width: none; }
+    .toolbar { display: none; }
+    a { color: #111827; text-decoration: none; }
+  }
+`;
+
+function openPrintDocument(title: string, bodyHtml: string) {
+  const win = window.open('', '_blank', 'width=1100,height=1000');
+  if (!win) return false;
+  win.document.write(`
+    <!doctype html>
+    <html lang="cs">
+      <head>
+        <meta charset="utf-8" />
+        <title>${escapeHtml(title)}</title>
+        <style>${PRINT_STYLE}</style>
+      </head>
+      <body>
+        <div class="page">
+          <div class="toolbar"><button onclick="window.print()">Tisk / uložit PDF</button></div>
+          ${bodyHtml}
+        </div>
+      </body>
+    </html>
+  `);
+  win.document.close();
+  win.focus();
+  return true;
+}
+
+function fieldRows(rows: Array<[string, unknown]>) {
+  return rows
+    .map(([label, value]) => `<tr><th>${escapeHtml(label)}</th><td>${escapeHtml(value || '')}</td></tr>`)
+    .join('');
 }
 
 function sortByUseThenName<T extends MasterBase>(items: T[]): T[] {
@@ -362,6 +413,11 @@ function DetailPanel({
     }
   }, [item, materials]);
 
+  const filteredRecipeMaterials = useMemo(
+    () => sortByUseThenName(materials).filter((material) => matchesMasterItem(material, recipeMaterialSearch)),
+    [materials, recipeMaterialSearch],
+  );
+
   if (!item) {
     return (
       <aside className={`${PANEL} p-5 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto`}>
@@ -381,10 +437,6 @@ function DetailPanel({
   const relatedTemperatureLogs = temperatureLogs
     .filter((log) => tab === 'materials' ? log.materialId === item.id : log.productId === item.id)
     .slice(0, 12);
-  const filteredRecipeMaterials = useMemo(
-    () => sortByUseThenName(materials).filter((material) => matchesMasterItem(material, recipeMaterialSearch)),
-    [materials, recipeMaterialSearch],
-  );
 
   const addRecipeRow = () => {
     setRecipe((prev) => [...prev, { materialId: '', materialName: '', ratio: 0 }]);
@@ -452,6 +504,65 @@ function DetailPanel({
   };
 
   const printCard = () => {
+    const product = item as ProductDoc;
+    const material = item as MaterialDoc;
+    const nextAttachmentsHtml = (item.attachments || [])
+      .map((attachment) => `<tr><td>${escapeHtml(attachment.name)}</td><td>${escapeHtml(formatDateTime(attachment.uploadedAt))}</td><td>${attachment.url ? `<a href="${escapeHtml(attachment.url)}">otevřít</a>` : ''}</td></tr>`)
+      .join('');
+    const recipeRowsHtml = tab === 'products'
+      ? recipe.map((row) => `<tr><td>${escapeHtml(row.materialName || row.materialId)}</td><td>${escapeHtml(row.ratio)}</td></tr>`).join('')
+      : '';
+    const nextTempHtml = relatedTemperatureLogs
+      .map((log) => `<tr><td>${escapeHtml(formatDateTime(log.measuredAt))}</td><td>${escapeHtml(log.gearboxName || '')}</td><td>${escapeHtml(log.extruderName || '')}</td><td>${escapeHtml(log.temperatureC)} °C</td><td>${escapeHtml(typeof log.motorLoadAmps === 'number' ? `${log.motorLoadAmps} A` : '')}</td></tr>`)
+      .join('');
+    const baseRows: Array<[string, unknown]> = [
+      ['NK kód', item.nkCode],
+      ['Číslo', item.number],
+      ['Typ', tab === 'materials' ? 'Surovina' : 'Výrobek'],
+      ['Stav', item.active === false ? 'Neaktivní' : 'Aktivní'],
+      ['Alergeny', (item.allergens || []).join(', ') || 'neuvedeno'],
+      ['Použití', item.usageCount || 0],
+      ['Naposledy použito', formatDateTime(item.lastUsedAt)],
+      ['Poznámka', form.note || item.note || ''],
+    ];
+    const specificRows: Array<[string, unknown]> = tab === 'materials'
+      ? [
+          ['Dodavatel', material.supplier || ''],
+          ['Schválení', material.approvalStatus || ''],
+          ['Skladování', material.storageConditions || ''],
+          ['Jednotka', material.unit || ''],
+        ]
+      : [
+          ['Zákazník', product.customer || ''],
+          ['Specifikace', product.specificationVersion || ''],
+          ['Shelf-life', product.shelfLife || ''],
+          ['Balení', product.packaging || ''],
+          ['Cílová zátěž motoru', form.targetMotorLoadAmps ? `${form.targetMotorLoadAmps} A` : ''],
+        ];
+
+    const printed = openPrintDocument(`Rodný list ${item.nkCode}`, `
+      <div class="header">
+        <div>
+          <h1>${escapeHtml(item.name)}</h1>
+          <div class="muted">${escapeHtml(item.nkCode)} · č. ${escapeHtml(item.number)}</div>
+        </div>
+        <div><span class="badge">${tab === 'materials' ? 'Surovina' : 'Výrobek'}</span></div>
+      </div>
+      <h2>Identifikace</h2>
+      <table class="field"><tbody>${fieldRows([...baseRows, ...specificRows])}</tbody></table>
+      ${tab === 'products' ? `<h2>Receptura</h2><table><thead><tr><th>Surovina</th><th>Poměr/díly</th></tr></thead><tbody>${recipeRowsHtml || '<tr><td colspan="2">Receptura není vyplněná.</td></tr>'}</tbody></table>` : ''}
+      <h2>Dokumenty</h2>
+      <table><thead><tr><th>Název</th><th>Nahráno</th><th>Odkaz</th></tr></thead><tbody>${nextAttachmentsHtml || '<tr><td colspan="3">Bez dokumentů.</td></tr>'}</tbody></table>
+      <h2>Historie teplot</h2>
+      <table>
+        <thead><tr><th>Datum</th><th>Převodovka</th><th>Extruder</th><th>Teplota</th><th>Zátěž</th></tr></thead>
+        <tbody>${nextTempHtml || '<tr><td colspan="5">Bez záznamů.</td></tr>'}</tbody>
+      </table>
+    `);
+    if (!printed) showToast('Prohlížeč zablokoval tiskové okno', 'error');
+    return;
+
+    /*
     const win = window.open('', '_blank', 'width=900,height=1000');
     if (!win) {
       showToast('Prohlížeč zablokoval tiskové okno', 'error');
@@ -506,6 +617,7 @@ function DetailPanel({
     `);
     win.document.close();
     win.focus();
+    */
   };
 
   const save = async () => {
@@ -970,7 +1082,10 @@ export default function MasterDataPage() {
     showToast('Karta smazána', 'success');
   };
 
-  const exportCsv = () => {
+  const getExportData = () => {
+    const headers = tab === 'materials'
+      ? ['NK kód', 'Číslo', 'Název', 'Stav', 'Alergeny', 'Použití', 'Naposledy', 'Poznámka', 'Dodavatel', 'Schválení', 'Skladování', 'Jednotka', 'Dokumenty']
+      : ['NK kód', 'Číslo', 'Název', 'Stav', 'Alergeny', 'Použití', 'Naposledy', 'Poznámka', 'Zákazník', 'Specifikace', 'Shelf-life', 'Balení', 'Cílová zátěž A', 'Receptura', 'Dokumenty'];
     const rows = filteredItems.map((item) => {
       const base = [
         item.nkCode,
@@ -989,11 +1104,74 @@ export default function MasterDataPage() {
       const product = item as ProductDoc;
       return [...base, product.customer || '', product.specificationVersion || '', product.shelfLife || '', product.packaging || '', product.targetMotorLoadAmps ?? '', (product.recipe || []).map((row) => `${row.materialName}:${row.ratio}`).join('; '), (product.attachments || []).map((a) => a.name).join('; ')];
     });
-    const headers = tab === 'materials'
-      ? ['NK kód', 'Číslo', 'Název', 'Stav', 'Alergeny', 'Použití', 'Naposledy', 'Poznámka', 'Dodavatel', 'Schválení', 'Skladování', 'Jednotka', 'Dokumenty']
-      : ['NK kód', 'Číslo', 'Název', 'Stav', 'Alergeny', 'Použití', 'Naposledy', 'Poznámka', 'Zákazník', 'Specifikace', 'Shelf-life', 'Balení', 'Cílová zátěž A', 'Receptura', 'Dokumenty'];
-    const csv = `\ufeff${[headers, ...rows].map((row) => row.map(csvCell).join(';')).join('\r\n')}`;
-    downloadTextFile(`${tab === 'materials' ? 'suroviny' : 'vyrobky'}-${new Date().toISOString().slice(0, 10)}.csv`, csv);
+    return { headers, rows };
+  };
+
+  const exportXlsx = async () => {
+    const { headers, rows } = getExportData();
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'VIKRR Asset Shield';
+    workbook.created = new Date();
+    const sheet = workbook.addWorksheet(tab === 'materials' ? 'Suroviny' : 'Výrobky');
+    sheet.views = [{ state: 'frozen', ySplit: 1 }];
+    sheet.addRow(headers);
+    rows.forEach((row) => sheet.addRow(row));
+
+    const headerRow = sheet.getRow(1);
+    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF047857' } };
+
+    sheet.eachRow((row) => {
+      row.eachCell((cell) => {
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFCFC7B8' } },
+          left: { style: 'thin', color: { argb: 'FFCFC7B8' } },
+          bottom: { style: 'thin', color: { argb: 'FFCFC7B8' } },
+          right: { style: 'thin', color: { argb: 'FFCFC7B8' } },
+        };
+        cell.alignment = { vertical: 'top', wrapText: true };
+      });
+    });
+
+    sheet.columns.forEach((column, index) => {
+      const header = headers[index] || '';
+      let maxLength = String(header).length;
+      column.eachCell?.({ includeEmpty: true }, (cell) => {
+        const value = cell.value;
+        const text = value && typeof value === 'object' && 'text' in value ? String(value.text) : String(value ?? '');
+        maxLength = Math.max(maxLength, text.length);
+      });
+      column.width = Math.min(Math.max(maxLength + 2, 12), 48);
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    downloadBlob(
+      `${tab === 'materials' ? 'suroviny' : 'vyrobky'}-${new Date().toISOString().slice(0, 10)}.xlsx`,
+      new Blob([buffer as BlobPart], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+    );
+  };
+
+  const printList = () => {
+    const { headers, rows } = getExportData();
+    const headerHtml = headers.map((header) => `<th>${escapeHtml(header)}</th>`).join('');
+    const rowsHtml = rows
+      .map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`)
+      .join('');
+    const printed = openPrintDocument(tab === 'materials' ? 'Seznam surovin' : 'Seznam výrobků', `
+      <div class="header">
+        <div>
+          <h1>${tab === 'materials' ? 'Seznam surovin' : 'Seznam výrobků'}</h1>
+          <div class="muted">${filteredItems.length} z ${activeItems.length} karet · ${new Date().toLocaleDateString('cs-CZ')}</div>
+        </div>
+        <div><span class="badge">${tab === 'materials' ? 'Suroviny' : 'Výrobky'}</span></div>
+      </div>
+      <h2>Přehled</h2>
+      <table>
+        <thead><tr>${headerHtml}</tr></thead>
+        <tbody>${rowsHtml || `<tr><td colspan="${headers.length}">Bez záznamů.</td></tr>`}</tbody>
+      </table>
+    `);
+    if (!printed) showToast('Prohlížeč zablokoval tiskové okno', 'error');
   };
 
   if (!canRead) {
@@ -1041,9 +1219,13 @@ export default function MasterDataPage() {
             {filteredItems.length} z {activeItems.length} karet
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={exportCsv} className={BUTTON_SECONDARY}>
+            <button type="button" onClick={() => void exportXlsx()} className={BUTTON_SECONDARY}>
               <Download className="h-4 w-4" />
-              CSV
+              Excel
+            </button>
+            <button type="button" onClick={printList} className={BUTTON_SECONDARY}>
+              <Printer className="h-4 w-4" />
+              PDF
             </button>
             {canManage && (
               <button type="button" onClick={() => setShowCreateModal(true)} className={BUTTON_PRIMARY}>
