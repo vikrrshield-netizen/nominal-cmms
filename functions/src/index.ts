@@ -7,6 +7,9 @@ import * as admin from 'firebase-admin';
 admin.initializeApp();
 const db = admin.firestore();
 
+// Bezpečné přihlášení PINem (custom token + lockout) + správa PINů
+export { loginWithPin, adminSetUserPin, backfillPinHashes, disableLegacyLogin } from './auth';
+
 const OPEN_TASK_STATUSES = new Set(['backlog', 'planned', 'in_progress', 'paused']);
 const PUSH_TARGET_ROLES = new Set(['SUPERADMIN', 'VEDENI', 'UDRZBA']);
 const GEARBOX_NOTIFICATION_ROLES = new Set(['SUPERADMIN', 'VEDENI', 'UDRZBA', 'VYROBA']);

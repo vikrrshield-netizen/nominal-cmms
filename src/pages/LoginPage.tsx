@@ -14,13 +14,13 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleDigit = (digit: string) => {
-    if (pin.length < 4) {
+    if (pin.length < 6) {
       const newPin = pin + digit;
       setPin(newPin);
       setError(false);
-      
-      // Auto-submit on 4 digits
-      if (newPin.length === 4) {
+
+      // Auto-submit at full length (6); 4–5 confirm via button
+      if (newPin.length === 6) {
         handleLogin(newPin);
       }
     }
@@ -60,15 +60,15 @@ export default function LoginPage() {
 
       {/* PIN Display */}
       <div className="mb-8">
-        <div className="flex gap-3 mb-3">
-          {[0, 1, 2, 3].map((i) => (
+        <div className="flex gap-2 mb-3">
+          {[0, 1, 2, 3, 4, 5].map((i) => (
             <div
               key={i}
-              className={`w-14 h-14 rounded-xl border-2 flex items-center justify-center text-2xl font-bold transition-all ${
-                error 
-                  ? 'border-red-500 bg-red-500/20 animate-shake' 
-                  : pin.length > i 
-                    ? 'border-blue-500 bg-blue-500/20 text-white' 
+              className={`w-11 h-14 rounded-xl border-2 flex items-center justify-center text-2xl font-bold transition-all ${
+                error
+                  ? 'border-red-500 bg-red-500/20 animate-shake'
+                  : pin.length > i
+                    ? 'border-blue-500 bg-blue-500/20 text-white'
                     : 'border-slate-600 bg-slate-800'
               }`}
             >
@@ -79,8 +79,11 @@ export default function LoginPage() {
         {error && (
           <p className="text-red-500 text-center text-sm animate-pulse">Nesprávný PIN</p>
         )}
+        {!error && (
+          <p className="text-slate-400 text-center text-xs">PIN má 4 až 6 číslic</p>
+        )}
         {isSandboxLoginEnabled && !error && (
-          <p className="text-blue-300 text-center text-xs">Demo režim: PIN 0000</p>
+          <p className="text-blue-300 text-center text-xs mt-1">Demo režim: PIN 0000</p>
         )}
       </div>
 
@@ -112,6 +115,16 @@ export default function LoginPage() {
           );
         })}
       </div>
+
+      {/* Submit (pro 4–5místné PINy; 6místný se odešle sám) */}
+      <button
+        onClick={() => handleLogin(pin)}
+        disabled={pin.length < 4 || isLoading}
+        className="mt-5 w-full max-w-xs h-14 rounded-xl bg-blue-600 text-white text-lg font-bold flex items-center justify-center gap-2 hover:bg-blue-500 active:scale-95 transition disabled:opacity-30 disabled:cursor-not-allowed"
+      >
+        <LogIn className="w-5 h-5" />
+        Přihlásit
+      </button>
 
       {/* Loading */}
       {isLoading && (

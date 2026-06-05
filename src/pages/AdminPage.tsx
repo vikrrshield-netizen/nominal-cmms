@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { collection, doc, setDoc, addDoc, updateDoc, onSnapshot, serverTimestamp, Timestamp, query, orderBy, limit, writeBatch } from 'firebase/firestore';
 import { initializeApp, deleteApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword, signOut as firebaseSignOut } from 'firebase/auth';
-import { db, firebaseConfig } from '../lib/firebase';
+import { db, firebaseConfig, adminSetUserPin, adminBackfillPinHashes, adminDisableLegacyLogin } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
 import { useBackNavigation } from '../hooks/useBackNavigation';
 import {
@@ -545,7 +545,10 @@ export default function AdminPage() {
           )}
 
           {activeTab === 'config' && (
-            <DynamicConfigTab canEdit={canEdit} />
+            <>
+              <LoginSecurityPanel canEdit={canEdit} />
+              <DynamicConfigTab canEdit={canEdit} />
+            </>
           )}
 
           {activeTab === 'import' && (
@@ -657,6 +660,10 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
   const roleCfg = ROLE_CONFIG[user.role];
 
   const handleSave = async () => {
+    if (!/^\d{4,6}$/.test(formData.pin)) {
+      showToast('PIN musí mít 4 až 6 číslic.', 'error');
+      return;
+    }
     setSaving(true);
     try {
       const beforePermissions = normalizeCustomPermissions(user.customPermissions);
@@ -694,6 +701,17 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
       }
 
       await batch.commit();
+
+      // PIN se hashuje na serveru (kvůli pepperu). Když se změnil, pošli na funkci.
+      if (formData.pin !== user.pin) {
+        try {
+          await adminSetUserPin(user.id, formData.pin);
+        } catch (pinErr) {
+          console.warn('[AdminPage] adminSetUserPin selhalo (funkce nasazena?):', pinErr);
+          showToast('Pozn.: bezpečné uložení PINu zatím neběží (Cloud Function nenasazena).', 'error');
+        }
+      }
+
       showToast('Změny uloženy do Firestore', 'success');
       onSaved();
     } catch (err) {
@@ -837,13 +855,14 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
               </div>
               
               <div>
-                <label className="text-sm text-slate-600">PIN (4 číslice)</label>
+                <label className="text-sm text-slate-600">PIN (4–6 číslic)</label>
                 <input
                   type="text"
+                  inputMode="numeric"
                   value={formData.pin}
-                  onChange={e => setFormData(prev => ({ ...prev, pin: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
+                  onChange={e => setFormData(prev => ({ ...prev, pin: e.target.value.replace(/\D/g, '').slice(0, 6) }))}
                   className="w-full p-2 bg-[#fbf9f4] border border-slate-200 rounded-lg mt-1 text-slate-900 font-mono text-xl"
-                  maxLength={4}
+                  maxLength={6}
                 />
               </div>
 
@@ -1288,7 +1307,7 @@ function NewUserModal({ existingPins, onClose, onCreated }: {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const isPinValid = formData.pin.length === 4 && !existingPins.includes(formData.pin);
+  const isPinValid = /^\d{4,6}$/.test(formData.pin) && !existingPins.includes(formData.pin);
   const isFormValid = formData.displayName.trim() && isPinValid;
 
   const handleSubmit = async () => {
@@ -1327,6 +1346,13 @@ function NewUserModal({ existingPins, onClose, onCreated }: {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
+
+      // pinHash (pro bezpečné přihlášení) počítá server kvůli pepperu
+      try {
+        await adminSetUserPin(newUid, formData.pin);
+      } catch (pinErr) {
+        console.warn('[AdminPage] adminSetUserPin selhalo (funkce nasazena?):', pinErr);
+      }
 
       showToast(`Uživatel "${formData.displayName.trim()}" vytvořen`, 'success');
       onCreated();
@@ -1370,20 +1396,21 @@ function NewUserModal({ existingPins, onClose, onCreated }: {
           </div>
 
           <div>
-            <label className="text-sm text-slate-600">PIN (4 číslice) *</label>
+            <label className="text-sm text-slate-600">PIN (4–6 číslic) *</label>
             <input
               type="text"
+              inputMode="numeric"
               value={formData.pin}
-              onChange={e => setFormData(prev => ({ ...prev, pin: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
+              onChange={e => setFormData(prev => ({ ...prev, pin: e.target.value.replace(/\D/g, '').slice(0, 6) }))}
               className={`w-full p-2 bg-[#fbf9f4] border rounded-lg mt-1 text-slate-900 font-mono text-xl ${
-                formData.pin.length === 4
+                formData.pin.length >= 4
                   ? isPinValid ? 'border-emerald-500' : 'border-red-500'
                   : 'border-slate-200'
               }`}
-              maxLength={4}
+              maxLength={6}
               placeholder="0000"
             />
-            {formData.pin.length === 4 && !isPinValid && (
+            {formData.pin.length >= 4 && !isPinValid && (
               <p className="text-red-600 text-xs mt-1">Tento PIN už existuje</p>
             )}
           </div>
@@ -1570,6 +1597,99 @@ const DEFAULT_CONFIG_SECTIONS: ConfigSection[] = [
   { id: 'priorities', label: 'Priority', icon: '🔴', help: 'Ovlivňuje barvu a pořadí na Dashboardu. P1 = červená (havárie), P4 = šedá (nápad). Mění chování semaforu.', items: ['P1 — Havárie', 'P2 — Urgentní', 'P3 — Běžná', 'P4 — Nápad'] },
   { id: 'buildings', label: 'Budovy', icon: '🏢', help: 'Seznam budov areálu. Zobrazuje se na Mapě, v kartách strojů a při vytváření úkolů. Přidáním budovy se rozšíří celý filtrační systém.', items: ['A — Administrativa', 'B — Spojovací krček', 'C — Zázemí & Vedení', 'D — Výrobní hala', 'E — Dílna & Sklad ND', 'L — Loupárna'] },
 ];
+
+function LoginSecurityPanel({ canEdit }: { canEdit: boolean }) {
+  const [busy, setBusy] = useState<'' | 'backfill' | 'disable'>('');
+  const [result, setResult] = useState('');
+  const [confirmText, setConfirmText] = useState('');
+
+  const runBackfill = async () => {
+    setBusy('backfill');
+    setResult('');
+    try {
+      const r = await adminBackfillPinHashes();
+      setResult(`Doplněno pinHash: ${r.updated}, přeskočeno: ${r.skipped}.`);
+      showToast('pinHash doplněn (F1).', 'success');
+    } catch (err) {
+      showToast(`Chyba: ${(err as Error).message}`, 'error');
+    }
+    setBusy('');
+  };
+
+  const runDisable = async () => {
+    if (confirmText !== 'ANO') return;
+    setBusy('disable');
+    setResult('');
+    try {
+      const r = await adminDisableLegacyLogin();
+      setResult(`Starý login vypnut. Zpracováno: ${r.processed}, bez pinHash (přeskočeno): ${r.missingSecret}.`);
+      showToast('Starý login vypnut (F3).', 'success');
+      setConfirmText('');
+    } catch (err) {
+      showToast(`Chyba: ${(err as Error).message}`, 'error');
+    }
+    setBusy('');
+  };
+
+  return (
+    <div className="vik-card p-4 space-y-4 mb-4">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center">
+          <Lock className="w-5 h-5 text-white" />
+        </div>
+        <div>
+          <h3 className="font-bold text-slate-900">Zabezpečení přihlášení</h3>
+          <p className="text-xs text-slate-500">Migrace na přihlášení přes custom token (PIN se nepřevádí na heslo).</p>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
+        <div className="text-sm font-bold text-slate-900">F1 — Doplnit pinHash</div>
+        <p className="text-xs text-slate-500">Bezpečné. Spočítá hash PINů na serveru. Stará cesta dál funguje.</p>
+        <button
+          type="button"
+          disabled={!canEdit || busy !== ''}
+          onClick={runBackfill}
+          className="vik-button-primary px-4 disabled:opacity-50"
+        >
+          {busy === 'backfill' ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+          Doplnit pinHash (F1)
+        </button>
+      </div>
+
+      <div className="rounded-xl border border-red-200 bg-red-50 p-3 space-y-2">
+        <div className="flex items-center gap-2 text-sm font-bold text-red-700">
+          <AlertTriangle className="w-4 h-4" /> F3 — Vypnout starý login (NEVRATNÉ)
+        </div>
+        <p className="text-xs text-red-700/90">
+          Spustit AŽ po ověření, že přihlášení přes token funguje. Nastaví náhodná hesla a smaže plaintext PIN.
+          Pak nastav <span className="font-mono">LEGACY_LOGIN_ENABLED=0</span> a přenasaď funkce.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <input
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            placeholder='Napiš ANO pro potvrzení'
+            className="flex-1 p-2 bg-white border border-red-200 rounded-lg text-slate-900 text-sm"
+          />
+          <button
+            type="button"
+            disabled={!canEdit || busy !== '' || confirmText !== 'ANO'}
+            onClick={runDisable}
+            className="vik-button-danger px-4 disabled:opacity-50"
+          >
+            {busy === 'disable' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
+            Vypnout starý login (F3)
+          </button>
+        </div>
+      </div>
+
+      {result && (
+        <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700">{result}</div>
+      )}
+    </div>
+  );
+}
 
 function DynamicConfigTab({ canEdit }: { canEdit: boolean }) {
   const [sections, setSections] = useState<ConfigSection[]>(() => {

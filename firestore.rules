@@ -245,6 +245,21 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
     }
 
+    // ===============================================================
+    // USER_SECRETS - pinHash pro prihlaseni. Pristup JEN pres Cloud
+    // Functions (admin SDK obchazi pravidla). Klient nesmi cist ani psat.
+    // ===============================================================
+    match /user_secrets/{userId} {
+      allow read, write: if false;
+    }
+
+    // ===============================================================
+    // LOGIN_ATTEMPTS - pocitadlo pokusu / lockout. Jen Cloud Functions.
+    // ===============================================================
+    match /login_attempts/{attemptId} {
+      allow read, write: if false;
+    }
+
     // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     // ASSETS â€” zaĹ™Ă­zenĂ­ / stroje
     // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
