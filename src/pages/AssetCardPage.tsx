@@ -184,9 +184,9 @@ function normalizeLookup(value: unknown): string {
     .replace(/\s+/g, ' ');
 }
 
-function isRoomLikeAsset(asset: { entityType?: string; category?: string }): boolean {
-  const type = normalizeLookup(`${asset.entityType || ''} ${asset.category || ''}`);
-  return type.includes('mistnost') || type.includes('room');
+function isRoomLikeAsset(asset: { name?: string; entityType?: string; category?: string }): boolean {
+  const type = normalizeLookup(`${asset.name || ''} ${asset.entityType || ''} ${asset.category || ''}`);
+  return /\b(mistnost|room|area|hala|prostor|sekce|stredisko|oddeleni|pracoviste|stanoviste|balirna|expedice|extrudovna|vyroba|louparna|satny)\b/.test(type);
 }
 
 function isBuildingLikeAsset(asset: { name?: string; entityType?: string; category?: string }): boolean {
@@ -710,7 +710,7 @@ export default function AssetCardPage() {
   useEffect(() => {
     if (!assetId || !asset) return;
     const assetName = normalizeLookup(asset.name);
-    const containerCard = isContainerAsset(assetV2 || asset);
+    const containerCard = isContainerAsset(assetV2 || asset) || descendantAssetIds.length > 0;
     const relatedIds = new Set([...linkedAssetIds, ...descendantAssetIds]);
     const relatedNames = new Set(linkedAssets.map((item) => normalizeLookup(item.name)).filter(Boolean));
 
