@@ -32,8 +32,25 @@ import GearboxProblemModal from '../components/gearbox/GearboxProblemModal';
 type GearboxFilter = 'all' | GearboxStatus | 'alerts';
 type TemperatureLevel = 'ok' | 'warning' | 'critical' | 'missing' | 'stale';
 
-const PANEL = 'rounded-2xl border border-white/10 bg-white/[0.04] shadow-sm shadow-black/20';
-const BUTTON = 'min-h-12 rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm font-bold text-white transition active:scale-[0.98] hover:bg-white/[0.1]';
+const PANEL = 'rounded-2xl border border-slate-200 bg-white shadow-sm';
+const BUTTON = 'min-h-12 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition active:scale-[0.98] hover:bg-slate-50';
+
+// Akcenty pro trendové grafy
+const TEMP_ACCENT: TrendAccent = { hex: '#0891b2', box: 'border-cyan-200 bg-cyan-50', text: 'text-cyan-700', icon: 'text-cyan-600' };
+const LOAD_ACCENT: TrendAccent = { hex: '#d97706', box: 'border-amber-200 bg-amber-50', text: 'text-amber-700', icon: 'text-amber-600' };
+
+interface TrendAccent {
+  hex: string;
+  box: string;
+  text: string;
+  icon: string;
+}
+
+interface TrendPoint {
+  value: number;
+  date: Date | null;
+  id: string;
+}
 
 function asDate(value: unknown): Date | null {
   if (!value) return null;
@@ -84,7 +101,7 @@ function temperatureInfo(asset: Asset): {
       level: 'missing',
       label: 'Chybí měření',
       value: 'bez teploty',
-      tone: 'border-red-400/30 bg-red-500/20 text-red-200',
+      tone: 'border-red-200 bg-red-50 text-red-700',
     };
   }
 
@@ -93,7 +110,7 @@ function temperatureInfo(asset: Asset): {
       level: 'critical',
       label: 'Kritická teplota',
       value: `${value} °C`,
-      tone: 'border-red-400/35 bg-red-500/20 text-red-200',
+      tone: 'border-red-200 bg-red-50 text-red-700',
     };
   }
 
@@ -102,7 +119,7 @@ function temperatureInfo(asset: Asset): {
       level: 'warning',
       label: 'Varování',
       value: `${value} °C`,
-      tone: 'border-amber-400/35 bg-amber-500/20 text-amber-200',
+      tone: 'border-amber-200 bg-amber-50 text-amber-700',
     };
   }
 
@@ -111,7 +128,7 @@ function temperatureInfo(asset: Asset): {
       level: 'stale',
       label: 'Staré měření',
       value: `${value} °C`,
-      tone: 'border-amber-400/35 bg-amber-500/20 text-amber-200',
+      tone: 'border-amber-200 bg-amber-50 text-amber-700',
     };
   }
 
@@ -120,8 +137,8 @@ function temperatureInfo(asset: Asset): {
     label: age !== null && age >= 5 ? 'Brzy zapsat' : 'Aktuální',
     value: `${value} °C`,
     tone: age !== null && age >= 5
-      ? 'border-amber-400/35 bg-amber-500/20 text-amber-200'
-      : 'border-emerald-400/30 bg-emerald-500/20 text-emerald-200',
+      ? 'border-amber-200 bg-amber-50 text-amber-700'
+      : 'border-emerald-200 bg-emerald-50 text-emerald-700',
   };
 }
 
@@ -135,7 +152,7 @@ function normalize(value: unknown): string {
   return String(value || '')
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
+    .replace(/[̀-ͯ]/g, '');
 }
 
 function relatedLogsForGearbox(asset: Asset, logs: WorkLog[]) {
@@ -160,9 +177,9 @@ function isFaultLikeLog(log: WorkLog): boolean {
 }
 
 function statusClass(status: GearboxStatus) {
-  if (status === 'installed') return 'border-emerald-400/30 bg-emerald-500/20 text-emerald-200';
-  if (status === 'service') return 'border-amber-400/35 bg-amber-500/20 text-amber-200';
-  return 'border-sky-400/30 bg-sky-500/20 text-sky-200';
+  if (status === 'installed') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+  if (status === 'service') return 'border-amber-200 bg-amber-50 text-amber-700';
+  return 'border-sky-200 bg-sky-50 text-sky-700';
 }
 
 function statusHint(asset: Asset): string {
@@ -313,22 +330,22 @@ export default function GearboxesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
+    <div className="vik-page min-h-screen">
       <div className="mx-auto max-w-6xl px-4 py-5 pb-24">
         <header className="mb-5 flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <button
               type="button"
               onClick={() => navigate(-1)}
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-slate-200 transition hover:bg-white/[0.1]"
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
               aria-label="Zpět"
             >
               <ArrowLeft className="h-5 w-5" />
             </button>
             <div className="min-w-0">
-              <div className="text-xs font-bold uppercase tracking-widest text-violet-300">Modul údržby</div>
-              <h1 className="truncate text-2xl font-black">Převodovky</h1>
-              <p className="mt-1 text-sm text-slate-300">
+              <div className="text-xs font-bold uppercase tracking-widest text-violet-600">Modul údržby</div>
+              <h1 className="truncate text-2xl font-black text-slate-900">Převodovky</h1>
+              <p className="mt-1 text-sm text-slate-500">
                 Kde jsou namontované, poslední teploty, poruchy a stav náhradních kusů.
               </p>
             </div>
@@ -338,27 +355,27 @@ export default function GearboxesPage() {
             onClick={() => navigate('/kartoteka')}
             className={`${BUTTON} hidden sm:inline-flex items-center gap-2`}
           >
-            <Cog className="h-4 w-4 text-violet-300" />
+            <Cog className="h-4 w-4 text-violet-600" />
             Kartotéka
           </button>
         </header>
 
         <section className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-5">
-          <StatCard label="Celkem" value={stats.total} icon={Cog} tone="text-violet-300" />
-          <StatCard label="V provozu" value={stats.installed} icon={CheckCircle2} tone="text-emerald-300" />
-          <StatCard label="Ve skladu" value={stats.inStock} icon={Package} tone="text-sky-300" />
-          <StatCard label="V servisu" value={stats.service} icon={Wrench} tone="text-amber-300" />
-          <StatCard label="Upozornění" value={stats.alerts} icon={AlertTriangle} tone="text-red-300" />
+          <StatCard label="Celkem" value={stats.total} icon={Cog} tone="text-violet-600" />
+          <StatCard label="V provozu" value={stats.installed} icon={CheckCircle2} tone="text-emerald-600" />
+          <StatCard label="Ve skladu" value={stats.inStock} icon={Package} tone="text-sky-600" />
+          <StatCard label="V servisu" value={stats.service} icon={Wrench} tone="text-amber-600" />
+          <StatCard label="Upozornění" value={stats.alerts} icon={AlertTriangle} tone="text-red-600" />
         </section>
 
         <section className={`${PANEL} mb-4 p-3`}>
-          <div className="mb-3 flex min-h-12 items-center gap-3 rounded-xl border border-white/10 bg-slate-950/60 px-3">
-            <Search className="h-5 w-5 shrink-0 text-slate-500" />
+          <div className="mb-3 flex min-h-12 items-center gap-3 rounded-xl border border-slate-200 bg-[#fbf9f4] px-3">
+            <Search className="h-5 w-5 shrink-0 text-slate-400" />
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Hledat převodovku, extruder, kód..."
-              className="h-12 w-full bg-transparent text-base font-semibold text-white outline-none placeholder:text-slate-500"
+              className="h-12 w-full bg-transparent text-base font-semibold text-slate-900 outline-none placeholder:text-slate-400"
             />
           </div>
           <div className="flex gap-2 overflow-x-auto pb-1">
@@ -369,18 +386,18 @@ export default function GearboxesPage() {
                 onClick={() => setFilter(item.id)}
                 className={`min-h-12 shrink-0 rounded-xl border px-4 text-sm font-bold transition ${
                   filter === item.id
-                    ? 'border-violet-400/60 bg-violet-500/20 text-white'
-                    : 'border-white/10 bg-white/[0.04] text-slate-300'
+                    ? 'border-violet-300 bg-violet-50 text-violet-700'
+                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
                 }`}
               >
-                {item.label} <span className="text-slate-300">({item.count})</span>
+                {item.label} <span className="opacity-60">({item.count})</span>
               </button>
             ))}
           </div>
         </section>
 
         {loading && (
-          <div className="flex items-center gap-2 text-sm font-bold text-slate-400">
+          <div className="flex items-center gap-2 text-sm font-bold text-slate-500">
             <Loader2 className="h-4 w-4 animate-spin" />
             Načítám převodovky...
           </div>
@@ -388,9 +405,9 @@ export default function GearboxesPage() {
 
         {!loading && filteredGearboxes.length === 0 && (
           <div className={`${PANEL} p-6 text-center`}>
-            <Cog className="mx-auto h-9 w-9 text-slate-500" />
-            <h2 className="mt-3 text-lg font-black">Nic nenalezeno</h2>
-            <p className="mt-1 text-sm text-slate-400">
+            <Cog className="mx-auto h-9 w-9 text-slate-400" />
+            <h2 className="mt-3 text-lg font-black text-slate-900">Nic nenalezeno</h2>
+            <p className="mt-1 text-sm text-slate-500">
               Zkontroluj filtr nebo vytvoř převodovku v kartotéce.
             </p>
           </div>
@@ -451,12 +468,12 @@ function StatCard({
   return (
     <div className={`${PANEL} p-4`}>
       <div className="flex items-center justify-between gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-slate-900">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-slate-50">
           <Icon className={`h-5 w-5 ${tone}`} />
         </div>
         <div className={`text-2xl font-black ${tone}`}>{value}</div>
       </div>
-      <div className="mt-3 text-sm font-bold text-slate-200">{label}</div>
+      <div className="mt-3 text-sm font-bold text-slate-600">{label}</div>
     </div>
   );
 }
@@ -495,22 +512,22 @@ function GearboxCard({
     <article className={`${PANEL} overflow-hidden`}>
       <div className="p-4">
         <div className="flex items-start gap-3">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-violet-400/35 bg-violet-500/20">
-            <Cog className="h-6 w-6 text-violet-200" />
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-violet-200 bg-violet-50">
+            <Cog className="h-6 w-6 text-violet-600" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="min-w-0 truncate text-lg font-black text-white">{asset.name}</h2>
+              <h2 className="min-w-0 truncate text-lg font-black text-slate-900">{asset.name}</h2>
               <span className={`rounded-full border px-2.5 py-1 text-xs font-black ${statusClass(status)}`}>
                 {getGearboxStatusLabel(asset)}
               </span>
             </div>
-            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-300">
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-500">
               <span className="inline-flex items-center gap-1">
-                <MapPin className="h-4 w-4 text-slate-500" />
+                <MapPin className="h-4 w-4 text-slate-400" />
                 {gearboxLocation(asset)}
               </span>
-              <span className="font-mono text-slate-300">{asset.code || 'bez kódu'}</span>
+              <span className="font-mono text-slate-500">{asset.code || 'bez kódu'}</span>
             </div>
           </div>
         </div>
@@ -521,13 +538,13 @@ function GearboxCard({
             label={temp.label}
             value={temp.value}
             tone={temp.tone}
-            detail={asset.lastTemperatureAt ? `Naposledy ${formatDateTime(asset.lastTemperatureAt)}` : 'Zatim bez zapisu'}
+            detail={asset.lastTemperatureAt ? `Naposledy ${formatDateTime(asset.lastTemperatureAt)}` : 'Zatím bez zápisu'}
           />
           <InfoBlock
             icon={Activity}
             label="Historie poruch"
             value={`${faultCount}`}
-            tone={faultCount > 0 ? 'border-amber-400/30 bg-amber-500/20 text-amber-200' : 'border-emerald-400/30 bg-emerald-500/20 text-emerald-200'}
+            tone={faultCount > 0 ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}
             detail={faultCount > 0 ? 'záznamy k prověření' : 'bez poruch v přehledu'}
           />
           <InfoBlock
@@ -543,9 +560,9 @@ function GearboxCard({
         <MotorLoadTrend logs={temperatureLogs} />
 
         {canSetStockStatus && (
-          <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/45 p-3">
+          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <div className="text-sm font-black text-white">Aktuální stav převodovky</div>
+              <div className="text-sm font-black text-slate-900">Aktuální stav převodovky</div>
               <div className={`rounded-full border px-2.5 py-1 text-xs font-black ${statusClass(status)}`}>
                 {status === 'service'
                   ? 'Je v servisu'
@@ -562,8 +579,8 @@ function GearboxCard({
                 aria-pressed={status === 'in_stock'}
                 className={`min-h-12 rounded-xl border px-3 text-sm font-black transition active:scale-[0.98] ${
                   status === 'in_stock'
-                    ? 'border-emerald-300/60 bg-emerald-500/25 text-emerald-50'
-                    : 'border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/[0.08]'
+                    ? 'border-emerald-300 bg-emerald-100 text-emerald-700'
+                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                 } ${savingStatus && status !== 'in_stock' ? 'opacity-60' : ''}`}
               >
                 {savingStatus && status !== 'in_stock' ? <Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> : null}
@@ -576,8 +593,8 @@ function GearboxCard({
                 aria-pressed={status === 'service'}
                 className={`min-h-12 rounded-xl border px-3 text-sm font-black transition active:scale-[0.98] ${
                   status === 'service'
-                    ? 'border-amber-300/60 bg-amber-500/25 text-amber-50'
-                    : 'border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/[0.08]'
+                    ? 'border-amber-300 bg-amber-100 text-amber-700'
+                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                 } ${savingStatus && status !== 'service' ? 'opacity-60' : ''}`}
               >
                 {savingStatus && status !== 'service' ? <Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> : null}
@@ -588,23 +605,23 @@ function GearboxCard({
         )}
 
         {logs.length > 0 && (
-          <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/45 p-3">
-            <div className="mb-2 flex items-center gap-2 text-sm font-black text-white">
+          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <div className="mb-2 flex items-center gap-2 text-sm font-black text-slate-900">
               <Clock className="h-4 w-4 text-slate-400" />
               Poslední zápisy
             </div>
             <div className="space-y-2">
               {logs.slice(0, 3).map((log) => (
-                <div key={log.id} className="rounded-lg bg-white/[0.04] px-3 py-2">
+                <div key={log.id} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
                   <div className="flex items-center justify-between gap-2">
-                    <div className="truncate text-sm font-bold text-white">
+                    <div className="truncate text-sm font-bold text-slate-900">
                       {log.assetName || asset.name}
                     </div>
-                    <div className="shrink-0 text-xs font-semibold text-slate-300">
+                    <div className="shrink-0 text-xs font-semibold text-slate-500">
                       {formatDateTime(log.performedAt || log.createdAt)}
                     </div>
                   </div>
-                  <div className="mt-1 line-clamp-2 text-sm text-slate-300">
+                  <div className="mt-1 line-clamp-2 text-sm text-slate-600">
                     {log.content || log.workType || 'Zápis bez popisu'}
                   </div>
                 </div>
@@ -615,11 +632,11 @@ function GearboxCard({
 
         <div className="mt-4 grid grid-cols-2 gap-2">
           <button type="button" onClick={onOpen} className={`${BUTTON} inline-flex items-center justify-center gap-2`}>
-            <ExternalLink className="h-4 w-4 text-violet-300" />
+            <ExternalLink className="h-4 w-4 text-violet-600" />
             Karta
           </button>
           <button type="button" onClick={onWorkLog} className={`${BUTTON} inline-flex items-center justify-center gap-2`}>
-            <FileText className="h-4 w-4 text-emerald-300" />
+            <FileText className="h-4 w-4 text-emerald-600" />
             Zapsat práci
           </button>
         </div>
@@ -630,7 +647,7 @@ function GearboxCard({
             onClick={onReport}
             className={`${BUTTON} mt-2 inline-flex w-full items-center justify-center gap-2`}
           >
-            <AlertTriangle className="h-4 w-4 text-red-300" />
+            <AlertTriangle className="h-4 w-4 text-red-600" />
             Nahlásit problém
           </button>
         )}
@@ -641,7 +658,7 @@ function GearboxCard({
             onClick={onRepair}
             className={`${BUTTON} mt-2 inline-flex w-full items-center justify-center gap-2`}
           >
-            <Wrench className="h-4 w-4 text-amber-300" />
+            <Wrench className="h-4 w-4 text-amber-600" />
             Oprava / úprava
           </button>
         )}
@@ -651,120 +668,155 @@ function GearboxCard({
 }
 
 function TemperatureTrend({ logs }: { logs: GearboxTemperatureLog[] }) {
-  const points = logs
+  const points: TrendPoint[] = logs
     .filter((log) => typeof log.temperatureC === 'number' && asDate(log.measuredAt))
     .slice(0, 12)
-    .reverse();
-
-  if (points.length < 2) {
-    return (
-      <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/45 p-3">
-        <div className="flex items-center gap-2 text-sm font-black text-white">
-          <Thermometer className="h-4 w-4 text-cyan-300" />
-          Trend teplot
-        </div>
-        <div className="mt-2 text-sm font-semibold text-slate-400">Trend bude videt po dalsim zapisu.</div>
-      </div>
-    );
-  }
-
-  const values = points.map((log) => log.temperatureC);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const spread = Math.max(1, max - min);
-  const polyline = points.map((log, index) => {
-    const x = points.length === 1 ? 50 : (index / (points.length - 1)) * 100;
-    const y = 46 - ((log.temperatureC - min) / spread) * 36;
-    return `${x.toFixed(2)},${y.toFixed(2)}`;
-  }).join(' ');
-  const latest = points[points.length - 1];
-  const first = points[0];
+    .reverse()
+    .map((log) => ({ value: log.temperatureC as number, date: asDate(log.measuredAt), id: log.id || `${log.gearboxId}-${String(log.measuredAt)}` }));
 
   return (
-    <div className="mt-4 rounded-xl border border-cyan-400/20 bg-slate-950/45 p-3">
-      <div className="mb-2 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-sm font-black text-white">
-          <Thermometer className="h-4 w-4 text-cyan-300" />
-          Trend teplot
-        </div>
-        <div className="text-xs font-bold text-slate-300">
-          {first.temperatureC} °C {'->'} {latest.temperatureC} °C
-        </div>
-      </div>
-      <svg viewBox="0 0 100 52" preserveAspectRatio="none" className="h-16 w-full overflow-visible">
-        <line x1="0" y1="46" x2="100" y2="46" className="stroke-slate-700" strokeWidth="1" />
-        <line x1="0" y1="10" x2="100" y2="10" className="stroke-slate-800" strokeWidth="1" />
-        <polyline points={polyline} fill="none" className="stroke-cyan-300" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-        {points.map((log, index) => {
-          const x = points.length === 1 ? 50 : (index / (points.length - 1)) * 100;
-          const y = 46 - ((log.temperatureC - min) / spread) * 36;
-          return <circle key={`${log.id}-${index}`} cx={x} cy={y} r="2.2" className="fill-cyan-200" />;
-        })}
-      </svg>
-      <div className="mt-1 flex justify-between text-xs font-semibold text-slate-400">
-        <span>{formatDateTime(first.measuredAt)}</span>
-        <span>{formatDateTime(latest.measuredAt)}</span>
-      </div>
-    </div>
+    <TrendChart
+      title="Trend teplot"
+      icon={Thermometer}
+      unit="°C"
+      accent={TEMP_ACCENT}
+      points={points}
+      emptyText="Trend bude vidět po dalším zápisu."
+    />
   );
 }
 
 function MotorLoadTrend({ logs }: { logs: GearboxTemperatureLog[] }) {
-  const points = logs
+  const points: TrendPoint[] = logs
     .filter((log) => motorLoadAmps(log) !== null && asDate(log.measuredAt))
     .slice(0, 12)
-    .reverse();
+    .reverse()
+    .map((log) => ({ value: motorLoadAmps(log) as number, date: asDate(log.measuredAt), id: log.id || `${log.gearboxId}-load-${String(log.measuredAt)}` }));
 
   if (points.length === 0) return null;
 
+  return (
+    <div className="mt-3">
+      <TrendChart
+        title="Trend zátěže motoru"
+        icon={Activity}
+        unit="A"
+        accent={LOAD_ACCENT}
+        points={points}
+        emptyText="Trend bude vidět po dalším zápisu se zátěží."
+      />
+    </div>
+  );
+}
+
+function TrendChart({
+  title,
+  icon: Icon,
+  unit,
+  accent,
+  points,
+  emptyText,
+}: {
+  title: string;
+  icon: typeof Thermometer;
+  unit: string;
+  accent: TrendAccent;
+  points: TrendPoint[];
+  emptyText: string;
+}) {
+  const gradientId = useMemo(() => `trend-grad-${Math.random().toString(36).slice(2, 9)}`, []);
+
   if (points.length < 2) {
     return (
-      <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/45 p-3">
-        <div className="flex items-center gap-2 text-sm font-black text-white">
-          <Activity className="h-4 w-4 text-amber-300" />
-          Trend zátěže motoru
+      <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3">
+        <div className="flex items-center gap-2 text-sm font-black text-slate-900">
+          <Icon className={`h-4 w-4 ${accent.icon}`} />
+          {title}
         </div>
-        <div className="mt-2 text-sm font-semibold text-slate-400">Trend bude vidět po dalším zápisu se zátěží.</div>
+        <div className="mt-2 text-sm font-semibold text-slate-500">{emptyText}</div>
       </div>
     );
   }
 
-  const values = points.map((log) => motorLoadAmps(log) ?? 0);
+  const values = points.map((point) => point.value);
   const min = Math.min(...values);
   const max = Math.max(...values);
   const spread = Math.max(1, max - min);
-  const polyline = points.map((log, index) => {
+
+  const coords = points.map((point, index) => {
     const x = points.length === 1 ? 50 : (index / (points.length - 1)) * 100;
-    const y = 46 - (((motorLoadAmps(log) ?? 0) - min) / spread) * 36;
-    return `${x.toFixed(2)},${y.toFixed(2)}`;
-  }).join(' ');
+    const y = 46 - ((point.value - min) / spread) * 36;
+    return { x, y };
+  });
+
+  const polyline = coords.map((c) => `${c.x.toFixed(2)},${c.y.toFixed(2)}`).join(' ');
+  const areaPath = `M ${coords[0].x.toFixed(2)},52 L ${coords.map((c) => `${c.x.toFixed(2)},${c.y.toFixed(2)}`).join(' L ')} L ${coords[coords.length - 1].x.toFixed(2)},52 Z`;
+
   const latest = points[points.length - 1];
   const first = points[0];
+  const lastCoord = coords[coords.length - 1];
 
   return (
-    <div className="mt-3 rounded-xl border border-amber-400/20 bg-slate-950/45 p-3">
+    <div className={`mt-4 rounded-xl border ${accent.box} p-3`}>
       <div className="mb-2 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-sm font-black text-white">
-          <Activity className="h-4 w-4 text-amber-300" />
-          Trend zátěže motoru
+        <div className="flex items-center gap-2 text-sm font-black text-slate-900">
+          <Icon className={`h-4 w-4 ${accent.icon}`} />
+          {title}
         </div>
-        <div className="text-xs font-bold text-slate-300">
-          {motorLoadAmps(first)} A {'->'} {motorLoadAmps(latest)} A
+        <div className="text-xs font-bold text-slate-500">
+          min {min} · max {max} {unit}
         </div>
       </div>
-      <svg viewBox="0 0 100 52" preserveAspectRatio="none" className="h-16 w-full overflow-visible">
-        <line x1="0" y1="46" x2="100" y2="46" className="stroke-slate-700" strokeWidth="1" />
-        <line x1="0" y1="10" x2="100" y2="10" className="stroke-slate-800" strokeWidth="1" />
-        <polyline points={polyline} fill="none" className="stroke-amber-300" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-        {points.map((log, index) => {
-          const x = points.length === 1 ? 50 : (index / (points.length - 1)) * 100;
-          const y = 46 - (((motorLoadAmps(log) ?? 0) - min) / spread) * 36;
-          return <circle key={`${log.id}-load-${index}`} cx={x} cy={y} r="2.2" className="fill-amber-200" />;
-        })}
+
+      <svg viewBox="0 0 100 56" preserveAspectRatio="none" className="h-28 w-full overflow-visible sm:h-36">
+        <defs>
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={accent.hex} stopOpacity="0.28" />
+            <stop offset="100%" stopColor={accent.hex} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {[10, 28, 46].map((y) => (
+          <line key={y} x1="0" y1={y} x2="100" y2={y} className="stroke-slate-200" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+        ))}
+        <path d={areaPath} fill={`url(#${gradientId})`} stroke="none" />
+        <polyline
+          points={polyline}
+          fill="none"
+          stroke={accent.hex}
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          vectorEffect="non-scaling-stroke"
+        />
+        {/* zvýraznění posledního zápisu */}
+        <line
+          x1={lastCoord.x.toFixed(2)}
+          y1="52"
+          x2={lastCoord.x.toFixed(2)}
+          y2={lastCoord.y.toFixed(2)}
+          stroke={accent.hex}
+          strokeWidth="1.5"
+          strokeDasharray="3 3"
+          strokeOpacity="0.6"
+          vectorEffect="non-scaling-stroke"
+        />
+        <circle cx={lastCoord.x.toFixed(2)} cy={lastCoord.y.toFixed(2)} r="3.6" fill="#ffffff" stroke={accent.hex} strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
       </svg>
+
       <div className="mt-1 flex justify-between text-xs font-semibold text-slate-400">
-        <span>{formatDateTime(first.measuredAt)}</span>
-        <span>{formatDateTime(latest.measuredAt)}</span>
+        <span>{formatDateTime(first.date)}</span>
+        <span>{formatDateTime(latest.date)}</span>
+      </div>
+
+      {/* Poslední zápis – výrazně */}
+      <div className={`mt-2 flex items-center justify-between gap-3 rounded-lg border bg-white px-3 py-2 ${accent.box}`}>
+        <div>
+          <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">Poslední zápis</div>
+          <div className="text-sm font-semibold text-slate-600">{formatDateTime(latest.date)}</div>
+        </div>
+        <div className={`text-2xl font-black ${accent.text}`}>
+          {latest.value} {unit}
+        </div>
       </div>
     </div>
   );
