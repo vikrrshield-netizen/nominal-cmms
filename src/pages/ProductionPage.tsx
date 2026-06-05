@@ -96,6 +96,10 @@ interface ExtrusionBatch {
   productionAreaLabel: string;
   machineId: string;
   machineName: string;
+  machineIds?: string[];
+  machineNames?: string[];
+  machineCatalogId?: string;
+  machineCatalogIds?: string[];
   note: string;
   status: ExtrusionStatus;
   shiftLog: string;
@@ -203,6 +207,10 @@ function useExtrusionBatches() {
           productionAreaLabel: data.productionAreaLabel || (data.productionArea === 'extrudovna_ii' ? 'Extrudovna II' : 'Extrudovna I'),
           machineId: data.machineId || '',
           machineName: data.machineName || '',
+          machineIds: Array.isArray(data.machineIds) ? data.machineIds : (data.machineId ? [data.machineId] : []),
+          machineNames: Array.isArray(data.machineNames) ? data.machineNames : (data.machineName ? [data.machineName] : []),
+          machineCatalogId: data.machineCatalogId || '',
+          machineCatalogIds: Array.isArray(data.machineCatalogIds) ? data.machineCatalogIds : (data.machineCatalogId ? [data.machineCatalogId] : []),
           note: data.note || '',
           status: data.status || 'planned',
           shiftLog: data.shiftLog || '',
@@ -466,6 +474,29 @@ function findRealExtruderAsset(line: ProductionExtruderOption | undefined, asset
     .sort((a, b) => b.score - a.score)[0]?.asset;
 }
 
+function getBatchMachineIds(batch: ExtrusionBatch): string[] {
+  if (batch.machineIds?.length) return batch.machineIds.filter(Boolean);
+  return batch.machineId ? [batch.machineId] : [];
+}
+
+function getBatchMachineNames(batch: ExtrusionBatch): string[] {
+  if (batch.machineNames?.length) return batch.machineNames.filter(Boolean);
+  return batch.machineName ? [batch.machineName] : [];
+}
+
+function getBatchMachineLabel(batch: ExtrusionBatch): string {
+  const names = getBatchMachineNames(batch);
+  return names.length ? names.join(' + ') : '—';
+}
+
+function getBatchMachineFilterIds(batch: ExtrusionBatch): string[] {
+  return Array.from(new Set([
+    ...getBatchMachineIds(batch),
+    ...(batch.machineCatalogIds || []),
+    ...(batch.machineCatalogId ? [batch.machineCatalogId] : []),
+  ].filter(Boolean)));
+}
+
 function formatDuration(start: Date | null, end: Date | null): string {
   if (!start) return '—';
   const to = end || new Date();
@@ -507,6 +538,7 @@ export default function ProductionPage() {
     planDate: localDateKey(),
     productionArea: 'extrudovna_i' as ExtrusionArea,
     extruderId: 'extruder-1',
+    extruderIds: ['extruder-1'] as string[],
     productId: '',
     materialId: '',
     productBatchDate: localDateKey(),
@@ -619,10 +651,22 @@ export default function ProductionPage() {
   }, [areaOptions, batchForm.productionArea]);
 
   useEffect(() => {
-    if (!visibleExtrusionLines.some((line) => line.id === batchForm.extruderId)) {
-      setBatchForm((prev) => ({ ...prev, extruderId: visibleExtrusionLines[0]?.id || '' }));
+    const visibleIds = new Set(visibleExtrusionLines.map((line) => line.id));
+    const nextSelected = batchForm.extruderIds.filter((id) => visibleIds.has(id));
+    const fallback = visibleExtrusionLines[0]?.id ? [visibleExtrusionLines[0].id] : [];
+    const safeSelected = nextSelected.length ? nextSelected : fallback;
+    if (
+      safeSelected.length !== batchForm.extruderIds.length ||
+      safeSelected.some((id, index) => id !== batchForm.extruderIds[index]) ||
+      batchForm.extruderId !== (safeSelected[0] || '')
+    ) {
+      setBatchForm((prev) => ({
+        ...prev,
+        extruderIds: safeSelected,
+        extruderId: safeSelected[0] || '',
+      }));
     }
-  }, [batchForm.extruderId, visibleExtrusionLines]);
+  }, [batchForm.extruderId, batchForm.extruderIds, visibleExtrusionLines]);
 
   useEffect(() => {
     if (!areaOptions.some((area) => area.id === catalogForms.extruderAreaId)) {
@@ -644,6 +688,29 @@ export default function ProductionPage() {
     running: orders.filter(o => o.status === 'running').length,
     done: orders.filter(o => o.status === 'done').length,
   }), [orders]);
+
+  const weekTimeline = useMemo(() => {
+    const today = new Date();
+    const start = new Date(today);
+    start.setHours(0, 0, 0, 0);
+    const day = start.getDay() || 7;
+    start.setDate(start.getDate() - day + 1);
+
+    return Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(start);
+      date.setDate(start.getDate() + index);
+      const key = localDateKey(date);
+      const dayBatches = batches.filter((batch) => batch.planDate === key);
+      return {
+        key,
+        date,
+        total: dayBatches.length,
+        running: dayBatches.filter((batch) => batch.status === 'running').length,
+        planned: dayBatches.filter((batch) => batch.status === 'planned').length,
+        done: dayBatches.filter((batch) => batch.status === 'done').length,
+      };
+    });
+  }, [batches]);
 
   // ── Extrusion actions ──
   const createCatalogItem = async (kind: 'material' | 'area' | 'extruder') => {
@@ -694,8 +761,17 @@ export default function ProductionPage() {
 
   const createBatch = async () => {
     if ((!batchForm.rawMaterial && !selectedMaterial) || !batchForm.targetWeight) return;
-    const selectedLine = extrusionLineOptions.find((line) => line.id === batchForm.extruderId) || visibleExtrusionLines[0] || extrusionLineOptions[0];
-    const realMachine = findRealExtruderAsset(selectedLine, allAssets);
+    const selectedLines = batchForm.extruderIds
+      .map((id) => extrusionLineOptions.find((line) => line.id === id))
+      .filter((line): line is ProductionExtruderOption => Boolean(line));
+    const safeLines = selectedLines.length ? selectedLines : [visibleExtrusionLines[0] || extrusionLineOptions[0]].filter(Boolean) as ProductionExtruderOption[];
+    const selectedLine = safeLines[0];
+    const resolvedMachines = safeLines.map((line) => ({
+      line,
+      asset: findRealExtruderAsset(line, allAssets),
+    }));
+    const machineIds = resolvedMachines.map((item) => item.asset?.id || item.line.id).filter(Boolean);
+    const machineNames = resolvedMachines.map((item) => item.asset?.name || item.line.name).filter(Boolean);
     const rawMaterial = selectedMaterial?.name || batchForm.rawMaterial;
     setBatchSaving(true);
     try {
@@ -715,9 +791,12 @@ export default function ProductionPage() {
         mixingNote: batchForm.mixingNote.trim(),
         targetMotorLoadAmps: selectedProduct?.targetMotorLoadAmps ?? null,
         targetWeight: Number(batchForm.targetWeight),
-        machineId: realMachine?.id || selectedLine?.id || '',
-        machineName: realMachine?.name || selectedLine?.name || '',
+        machineId: machineIds[0] || '',
+        machineName: machineNames[0] || '',
+        machineIds,
+        machineNames,
         machineCatalogId: selectedLine?.id || '',
+        machineCatalogIds: safeLines.map((line) => line.id),
         note: batchForm.note.trim(),
         status: 'planned',
         shiftLog: '',
@@ -733,6 +812,7 @@ export default function ProductionPage() {
         planDate: localDateKey(),
         productionArea: areaOptions[0]?.id || 'extrudovna_i',
         extruderId: extrusionLineOptions[0]?.id || '',
+        extruderIds: extrusionLineOptions[0]?.id ? [extrusionLineOptions[0].id] : [],
         productId: '',
         materialId: '',
         productBatchDate: localDateKey(),
@@ -917,14 +997,51 @@ export default function ProductionPage() {
 
         {/* ═══ EXTRUSION TAB ═══ */}
         {activeTab === 'extrusion' && !loadingBatches && (() => {
-          const filtered = machineFilter === 'ALL' ? batches : batches.filter(b => b.machineId === machineFilter);
+          const filtered = machineFilter === 'ALL' ? batches : batches.filter(b => getBatchMachineFilterIds(b).includes(machineFilter));
           return (
           <>
+            <div className="rounded-2xl border border-slate-700/60 bg-slate-800/60 p-3">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div>
+                  <div className="text-xs font-black uppercase tracking-wide text-slate-400">Týdenní plán</div>
+                  <div className="text-sm font-bold text-white">Extruze po dnech</div>
+                </div>
+                <div className="text-[11px] font-semibold text-slate-400">1 dávka může jet přes více extruderů</div>
+              </div>
+              <div className="grid grid-cols-7 gap-1.5">
+                {weekTimeline.map((day) => {
+                  const isToday = day.key === localDateKey();
+                  return (
+                    <div
+                      key={day.key}
+                      className={`min-h-[74px] rounded-xl border p-2 ${
+                        isToday ? 'border-emerald-400/50 bg-emerald-500/15' : 'border-white/10 bg-slate-950/35'
+                      }`}
+                    >
+                      <div className="text-[10px] font-bold uppercase text-slate-400">
+                        {day.date.toLocaleDateString('cs-CZ', { weekday: 'short' })}
+                      </div>
+                      <div className={`text-sm font-black ${isToday ? 'text-emerald-200' : 'text-white'}`}>
+                        {day.date.getDate()}. {day.date.getMonth() + 1}.
+                      </div>
+                      <div className="mt-2 text-lg font-black text-white">{day.total}</div>
+                      <div className="mt-1 flex gap-1">
+                        {day.running > 0 && <span className="h-1.5 flex-1 rounded-full bg-amber-400" />}
+                        {day.planned > 0 && <span className="h-1.5 flex-1 rounded-full bg-blue-400" />}
+                        {day.done > 0 && <span className="h-1.5 flex-1 rounded-full bg-emerald-400" />}
+                        {day.total === 0 && <span className="h-1.5 flex-1 rounded-full bg-slate-700" />}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
             {filtered.length === 0 && (
               <EmptyBlock icon={<Cog className="w-14 h-14 text-slate-600" />} text={machineFilter === 'ALL' ? 'Žádné dávky' : 'Žádné dávky pro tento stroj'} sub="Vytvořte první extruzní dávku" />
             )}
             {filtered.map(batch => {
               const st = STATUS_CFG[batch.status];
+              const machineLabel = getBatchMachineLabel(batch);
               return (
                 <div key={batch.id} className={`bg-slate-800/60 rounded-2xl border ${
                   batch.status === 'running' ? 'border-amber-500/30 ring-1 ring-amber-500/20' :
@@ -974,7 +1091,7 @@ export default function ProductionPage() {
                       </div>
                       <div>
                         <div className="text-[10px] text-slate-500 uppercase">Stroj</div>
-                        <div className="text-sm font-medium text-white">{batch.machineName || '—'}</div>
+                        <div className="text-sm font-medium text-white">{machineLabel}</div>
                       </div>
                     </div>
 
@@ -1180,19 +1297,48 @@ export default function ProductionPage() {
               </div>
             </Field>
             <Field label="Extruder">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold text-slate-400">
+                  Vyber jeden nebo oba extrudery, pokud jedou do stejné násypky.
+                </p>
+                {visibleExtrusionLines.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const ids = visibleExtrusionLines.map((line) => line.id);
+                      setBatchForm((prev) => ({ ...prev, extruderIds: ids, extruderId: ids[0] || '' }));
+                    }}
+                    className="shrink-0 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1.5 text-xs font-bold text-emerald-200"
+                  >
+                    Vybrat vše
+                  </button>
+                )}
+              </div>
               <div className="grid grid-cols-2 gap-2">
                 {visibleExtrusionLines.map(line => (
                   <button
                     key={line.id}
                     type="button"
-                    onClick={() => setBatchForm(p => ({ ...p, extruderId: line.id }))}
+                    onClick={() => setBatchForm((prev) => {
+                      const exists = prev.extruderIds.includes(line.id);
+                      const next = exists
+                        ? prev.extruderIds.filter((id) => id !== line.id)
+                        : [...prev.extruderIds, line.id];
+                      const safeNext = next.length ? next : [line.id];
+                      return { ...prev, extruderIds: safeNext, extruderId: safeNext[0] || '' };
+                    })}
                     className={`rounded-xl border p-3 text-left transition active:scale-[0.98] ${
-                      batchForm.extruderId === line.id
+                      batchForm.extruderIds.includes(line.id)
                         ? 'border-emerald-400 bg-emerald-500/20 text-white'
                         : 'border-white/10 bg-white/5 text-slate-300'
                     }`}
                   >
-                    <span className="block text-sm font-bold">{line.name}</span>
+                    <span className="flex items-center justify-between gap-2 text-sm font-bold">
+                      {line.name}
+                      {batchForm.extruderIds.includes(line.id) && (
+                        <CheckCircle2 className="h-4 w-4 text-emerald-300" />
+                      )}
+                    </span>
                     <span className="mt-1 block text-xs opacity-75">{line.areaName}</span>
                   </button>
                 ))}
