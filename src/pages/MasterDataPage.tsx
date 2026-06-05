@@ -3,7 +3,7 @@ import ExcelJS from 'exceljs';
 import { collection, deleteDoc, doc, limit, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, writeBatch, type Timestamp } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, ClipboardList, Download, Factory, FileText, Leaf, Package, Plus, Printer, Save, Search, ShieldCheck, Trash2, Upload, X } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, ClipboardList, Download, Factory, FileText, Leaf, Package, Pencil, Plus, Printer, Save, Search, ShieldCheck, Trash2, Upload, X } from 'lucide-react';
 import { useAuthContext } from '../context/AuthContext';
 import { db, storage } from '../lib/firebase';
 import { MATERIAL_SEED, PRODUCT_SEED, materialBatch, productBatch } from '../data/productionMasterSeed';
@@ -383,29 +383,30 @@ function DetailPanel({
   const [recipeMaterialSearch, setRecipeMaterialSearch] = useState('');
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
-  useEffect(() => {
-    if (!item) return;
+  const resetEditableState = (source: MaterialDoc | ProductDoc) => {
     setForm({
-      name: item.name || '',
-      allergens: (item.allergens || []).join(', '),
-      note: item.note || '',
-      active: item.active === false ? 'false' : 'true',
-      supplier: (item as MaterialDoc).supplier || '',
-      approvalStatus: (item as MaterialDoc).approvalStatus || 'pending',
-      storageConditions: (item as MaterialDoc).storageConditions || '',
-      unit: (item as MaterialDoc).unit || '',
-      customer: (item as ProductDoc).customer || '',
-      specificationVersion: (item as ProductDoc).specificationVersion || '',
-      shelfLife: (item as ProductDoc).shelfLife || '',
-      packaging: (item as ProductDoc).packaging || '',
-      bomMaterialIds: ((item as ProductDoc).bomMaterialIds || []).join(','),
-      targetMotorLoadAmps: typeof (item as ProductDoc).targetMotorLoadAmps === 'number' ? String((item as ProductDoc).targetMotorLoadAmps) : '',
-      productBatchManual: (item as ProductDoc).productBatchManual ? 'true' : 'false',
-      productBatchOverride: (item as ProductDoc).productBatchOverride || '',
+      number: source.number || '',
+      name: source.name || '',
+      allergens: (source.allergens || []).join(', '),
+      note: source.note || '',
+      active: source.active === false ? 'false' : 'true',
+      supplier: (source as MaterialDoc).supplier || '',
+      approvalStatus: (source as MaterialDoc).approvalStatus || 'pending',
+      storageConditions: (source as MaterialDoc).storageConditions || '',
+      unit: (source as MaterialDoc).unit || '',
+      customer: (source as ProductDoc).customer || '',
+      specificationVersion: (source as ProductDoc).specificationVersion || '',
+      shelfLife: (source as ProductDoc).shelfLife || '',
+      packaging: (source as ProductDoc).packaging || '',
+      bomMaterialIds: ((source as ProductDoc).bomMaterialIds || []).join(','),
+      targetMotorLoadAmps: typeof (source as ProductDoc).targetMotorLoadAmps === 'number' ? String((source as ProductDoc).targetMotorLoadAmps) : '',
+      productBatchManual: (source as ProductDoc).productBatchManual ? 'true' : 'false',
+      productBatchOverride: (source as ProductDoc).productBatchOverride || '',
     });
-    setBatchDate((item as ProductDoc).productBatchDate || new Date().toISOString().slice(0, 10));
-    const product = item as ProductDoc;
+    setBatchDate((source as ProductDoc).productBatchDate || new Date().toISOString().slice(0, 10));
+    const product = source as ProductDoc;
     if (product.recipe?.length) {
       setRecipe(product.recipe);
     } else {
@@ -418,6 +419,12 @@ function DetailPanel({
         };
       }));
     }
+  };
+
+  useEffect(() => {
+    if (!item) return;
+    resetEditableState(item);
+    setIsEditing(false);
   }, [item, materials]);
 
   const filteredRecipeMaterials = useMemo(
@@ -438,11 +445,13 @@ function DetailPanel({
   }
 
   const selectedDate = new Date(`${batchDate}T00:00:00`);
+  const currentNumber = form.number?.trim() || item.number;
   const autoBatchValue = tab === 'materials'
-    ? materialBatch(item.number, selectedDate, batchSuffix)
-    : productBatch(item.number, selectedDate);
+    ? materialBatch(currentNumber, selectedDate, batchSuffix)
+    : productBatch(currentNumber, selectedDate);
   const productBatchManual = tab === 'products' && form.productBatchManual === 'true';
   const batchValue = productBatchManual ? (form.productBatchOverride || autoBatchValue) : autoBatchValue;
+  const fieldsDisabled = !canManage || !isEditing;
   const relatedTemperatureLogs = temperatureLogs
     .filter((log) => tab === 'materials' ? log.materialId === item.id : log.productId === item.id)
     .slice(0, 12);
@@ -640,11 +649,18 @@ function DetailPanel({
 
   const save = async () => {
     if (!canManage || !item) return;
+    const nextName = form.name?.trim();
+    const nextNumber = form.number?.trim();
+    if (!nextName || !nextNumber) {
+      showToast('Název a číslo musí být vyplněné', 'error');
+      return;
+    }
     setSaving(true);
     try {
       const collectionName = tab === 'materials' ? 'materials' : 'products';
       const payload: Record<string, unknown> = {
-        name: form.name?.trim() || item.name,
+        name: nextName,
+        number: nextNumber,
         allergens: splitList(form.allergens || ''),
         note: form.note || '',
         active: form.active !== 'false',
@@ -693,6 +709,7 @@ function DetailPanel({
       }
 
       await updateDoc(doc(db, collectionName, item.id), payload);
+      setIsEditing(false);
       showToast('Rodný list uložen', 'success');
     } catch (err) {
       console.error('[MasterData] save:', err);
@@ -720,16 +737,41 @@ function DetailPanel({
             </button>
           </div>
           {canManage && (
-            <div className="grid grid-cols-2 gap-2">
-              <button type="button" onClick={save} disabled={saving} className={BUTTON_PRIMARY}>
-                <Save className="h-4 w-4" />
-                {saving ? 'Ukládám...' : 'Upravit / uložit'}
-              </button>
-              <button type="button" onClick={() => void onDelete(item)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-black text-red-700 hover:bg-red-100">
-                <Trash2 className="h-4 w-4" />
-                Smazat
-              </button>
-            </div>
+            <>
+              <div className="grid grid-cols-2 gap-2">
+                {isEditing ? (
+                  <>
+                    <button type="button" onClick={save} disabled={saving} className={BUTTON_PRIMARY}>
+                      <Save className="h-4 w-4" />
+                      {saving ? 'Ukládám...' : 'Uložit změny'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        resetEditableState(item);
+                        setIsEditing(false);
+                      }}
+                      disabled={saving}
+                      className={BUTTON_SECONDARY}
+                    >
+                      <X className="h-4 w-4" />
+                      Zrušit
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button type="button" onClick={() => setIsEditing(true)} className={BUTTON_PRIMARY}>
+                      <Pencil className="h-4 w-4" />
+                      Upravit
+                    </button>
+                    <button type="button" onClick={() => void onDelete(item)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-black text-red-700 hover:bg-red-100">
+                      <Trash2 className="h-4 w-4" />
+                      Smazat
+                    </button>
+                  </>
+                )}
+              </div>
+            </>
           )}
         </div>
 
@@ -741,12 +783,15 @@ function DetailPanel({
           <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
             <label>
               <span className="mb-1 block text-xs font-black uppercase text-slate-500">{tab === 'materials' ? 'Datum naskladnění' : 'Datum zahájení výroby'}</span>
-              <input type="date" value={batchDate} onChange={(e) => setBatchDate(e.target.value)} className={INPUT} />
+              <input type="date" value={batchDate} onChange={(e) => setBatchDate(e.target.value)} className={INPUT} disabled={fieldsDisabled} />
             </label>
             {tab === 'materials' && (
               <label>
                 <span className="mb-1 block text-xs font-black uppercase text-slate-500">Přípona expirace</span>
-                <input value={batchSuffix} onChange={(e) => setBatchSuffix(e.target.value.toUpperCase().slice(0, 2))} placeholder="A / B / C" className={INPUT} />
+                <input value={batchSuffix} onChange={(e) => setBatchSuffix(e.target.value.toUpperCase().slice(0, 2))} placeholder="A / B / C" className={INPUT} disabled={fieldsDisabled} />
+                <span className="mt-1 block text-xs font-semibold text-emerald-800">
+                  A/B/C se používá, když je stejná surovina naskladněná ve stejný den s různou expirací nebo šarží. První je A, další B, další C.
+                </span>
               </label>
             )}
           </div>
@@ -758,6 +803,7 @@ function DetailPanel({
                   checked={productBatchManual}
                   onChange={(e) => setForm((prev) => ({ ...prev, productBatchManual: e.target.checked ? 'true' : 'false' }))}
                   className="h-4 w-4 rounded border-slate-300"
+                  disabled={fieldsDisabled}
                 />
                 Upravit šarži ručně
               </label>
@@ -767,6 +813,7 @@ function DetailPanel({
                   onChange={(e) => setForm((prev) => ({ ...prev, productBatchOverride: e.target.value }))}
                   placeholder={autoBatchValue}
                   className={`${INPUT} mt-2 bg-white`}
+                  disabled={fieldsDisabled}
                 />
               )}
             </div>
@@ -782,27 +829,27 @@ function DetailPanel({
             </label>
             <label>
               <span className="mb-1 block text-xs font-black uppercase text-slate-500">Číslo</span>
-              <input value={item.number} className={INPUT} disabled />
+              <input value={form.number || ''} onChange={(e) => setForm((p) => ({ ...p, number: e.target.value }))} className={INPUT} disabled={fieldsDisabled} />
             </label>
           </div>
           <label>
             <span className="mb-1 block text-xs font-black uppercase text-slate-500">Název</span>
-            <input value={form.name || ''} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} className={INPUT} disabled={!canManage} />
+            <input value={form.name || ''} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} className={INPUT} disabled={fieldsDisabled} />
           </label>
           <label>
             <span className="mb-1 block text-xs font-black uppercase text-slate-500">Alergeny</span>
-            <input value={form.allergens || ''} onChange={(e) => setForm((p) => ({ ...p, allergens: e.target.value }))} placeholder="např. sója, mléko, vejce" className={INPUT} disabled={!canManage} />
+            <input value={form.allergens || ''} onChange={(e) => setForm((p) => ({ ...p, allergens: e.target.value }))} placeholder="např. sója, mléko, vejce" className={INPUT} disabled={fieldsDisabled} />
           </label>
 
           {tab === 'materials' ? (
             <>
               <label>
                 <span className="mb-1 block text-xs font-black uppercase text-slate-500">Dodavatel</span>
-                <input value={form.supplier || ''} onChange={(e) => setForm((p) => ({ ...p, supplier: e.target.value }))} className={INPUT} disabled={!canManage} />
+                <input value={form.supplier || ''} onChange={(e) => setForm((p) => ({ ...p, supplier: e.target.value }))} className={INPUT} disabled={fieldsDisabled} />
               </label>
               <label>
                 <span className="mb-1 block text-xs font-black uppercase text-slate-500">Schválení dodavatele</span>
-                <select value={form.approvalStatus || 'pending'} onChange={(e) => setForm((p) => ({ ...p, approvalStatus: e.target.value }))} className={INPUT} disabled={!canManage}>
+                <select value={form.approvalStatus || 'pending'} onChange={(e) => setForm((p) => ({ ...p, approvalStatus: e.target.value }))} className={INPUT} disabled={fieldsDisabled}>
                   <option value="pending">Doplnit / čeká na schválení</option>
                   <option value="approved">Schváleno</option>
                   <option value="conditional">Podmíněně</option>
@@ -811,11 +858,11 @@ function DetailPanel({
               </label>
               <label>
                 <span className="mb-1 block text-xs font-black uppercase text-slate-500">Skladovací podmínky</span>
-                <input value={form.storageConditions || ''} onChange={(e) => setForm((p) => ({ ...p, storageConditions: e.target.value }))} className={INPUT} disabled={!canManage} />
+                <input value={form.storageConditions || ''} onChange={(e) => setForm((p) => ({ ...p, storageConditions: e.target.value }))} className={INPUT} disabled={fieldsDisabled} />
               </label>
               <label>
                 <span className="mb-1 block text-xs font-black uppercase text-slate-500">Jednotka</span>
-                <input value={form.unit || ''} onChange={(e) => setForm((p) => ({ ...p, unit: e.target.value }))} placeholder="kg, ks, balení..." className={INPUT} disabled={!canManage} />
+                <input value={form.unit || ''} onChange={(e) => setForm((p) => ({ ...p, unit: e.target.value }))} placeholder="kg, ks, balení..." className={INPUT} disabled={fieldsDisabled} />
               </label>
             </>
           ) : (
@@ -840,7 +887,7 @@ function DetailPanel({
                     onChange={(e) => setRecipeMaterialSearch(e.target.value)}
                     placeholder="Hledat surovinu podle názvu, čísla nebo NK kódu"
                     className={INPUT}
-                    disabled={!canManage}
+                    disabled={fieldsDisabled}
                   />
                   {canManage && (
                     <button type="button" onClick={addWaterRow} className="inline-flex min-h-10 w-fit items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3 text-xs font-black text-sky-800">
@@ -854,7 +901,7 @@ function DetailPanel({
                         value={row.materialId}
                         onChange={(e) => updateRecipeRow(index, { materialId: e.target.value })}
                         className={INPUT}
-                        disabled={!canManage}
+                        disabled={fieldsDisabled}
                       >
                         <option value="">Vyber surovinu</option>
                         {showWaterOption && <option value="water">Voda</option>}
@@ -870,7 +917,7 @@ function DetailPanel({
                         onChange={(e) => updateRecipeRow(index, { ratio: Number(e.target.value) })}
                         placeholder="poměr"
                         className={INPUT}
-                        disabled={!canManage}
+                        disabled={fieldsDisabled}
                       />
                       {canManage ? (
                         <button type="button" onClick={() => removeRecipeRow(index)} className="flex h-11 items-center justify-center rounded-xl bg-red-50 text-red-700">
@@ -889,31 +936,31 @@ function DetailPanel({
                   inputMode="decimal"
                   placeholder="např. 42,5 A"
                   className={INPUT}
-                  disabled={!canManage}
+                  disabled={fieldsDisabled}
                 />
               </label>
               <label>
                 <span className="mb-1 block text-xs font-black uppercase text-slate-500">Specifikace / verze</span>
-                <input value={form.specificationVersion || ''} onChange={(e) => setForm((p) => ({ ...p, specificationVersion: e.target.value }))} className={INPUT} disabled={!canManage} />
+                <input value={form.specificationVersion || ''} onChange={(e) => setForm((p) => ({ ...p, specificationVersion: e.target.value }))} className={INPUT} disabled={fieldsDisabled} />
               </label>
               <label>
                 <span className="mb-1 block text-xs font-black uppercase text-slate-500">Shelf-life</span>
-                <input value={form.shelfLife || ''} onChange={(e) => setForm((p) => ({ ...p, shelfLife: e.target.value }))} className={INPUT} disabled={!canManage} />
+                <input value={form.shelfLife || ''} onChange={(e) => setForm((p) => ({ ...p, shelfLife: e.target.value }))} className={INPUT} disabled={fieldsDisabled} />
               </label>
               <label>
                 <span className="mb-1 block text-xs font-black uppercase text-slate-500">Balení</span>
-                <input value={form.packaging || ''} onChange={(e) => setForm((p) => ({ ...p, packaging: e.target.value }))} className={INPUT} disabled={!canManage} />
+                <input value={form.packaging || ''} onChange={(e) => setForm((p) => ({ ...p, packaging: e.target.value }))} className={INPUT} disabled={fieldsDisabled} />
               </label>
               <label>
                 <span className="mb-1 block text-xs font-black uppercase text-slate-500">Zákazník</span>
-                <input value={form.customer || ''} onChange={(e) => setForm((p) => ({ ...p, customer: e.target.value }))} className={INPUT} disabled={!canManage} />
+                <input value={form.customer || ''} onChange={(e) => setForm((p) => ({ ...p, customer: e.target.value }))} className={INPUT} disabled={fieldsDisabled} />
               </label>
             </>
           )}
 
           <label>
             <span className="mb-1 block text-xs font-black uppercase text-slate-500">Poznámka</span>
-            <textarea value={form.note || ''} onChange={(e) => setForm((p) => ({ ...p, note: e.target.value }))} className={`${INPUT} min-h-24 resize-y`} disabled={!canManage} />
+            <textarea value={form.note || ''} onChange={(e) => setForm((p) => ({ ...p, note: e.target.value }))} className={`${INPUT} min-h-24 resize-y`} disabled={fieldsDisabled} />
           </label>
         </section>
 
@@ -1005,21 +1052,43 @@ function DetailPanel({
 
 function NewItemModal({
   tab,
+  existingItems,
   onClose,
   onCreate,
 }: {
   tab: Tab;
+  existingItems: Array<MaterialDoc | ProductDoc>;
   onClose: () => void;
   onCreate: (input: { nkCode: string; number: string; name: string }) => Promise<void>;
 }) {
+  const codeWidth = tab === 'materials' ? 2 : 3;
+  const freeCodes = useMemo(() => {
+    const used = new Set(existingItems.map((item) => item.nkCode.toUpperCase()));
+    const max = tab === 'materials' ? 99 : 999;
+    return Array.from({ length: max }, (_, index) => {
+      const numberPart = String(index + 1).padStart(codeWidth, '0');
+      return { nkCode: `NK${numberPart}`, number: numberPart };
+    }).filter((option) => !used.has(option.nkCode));
+  }, [codeWidth, existingItems, tab]);
   const [nkCode, setNkCode] = useState('');
-  const [number, setNumber] = useState('');
   const [name, setName] = useState('');
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const firstFree = freeCodes[0];
+    setNkCode(firstFree?.nkCode || '');
+  }, [freeCodes]);
+
+  const selectedFreeCode = freeCodes.find((option) => option.nkCode === nkCode);
+  const number = selectedFreeCode?.number || nkCode.replace(/\D/g, '').padStart(codeWidth, '0');
 
   const submit = async () => {
     if (!nkCode.trim() || !number.trim() || !name.trim()) {
       showToast('Vyplň NK kód, číslo a název', 'error');
+      return;
+    }
+    if (!selectedFreeCode) {
+      showToast('Vyber volný NK kód', 'error');
       return;
     }
     setSaving(true);
@@ -1044,12 +1113,23 @@ function NewItemModal({
         </div>
         <div className="mt-5 grid gap-3">
           <label>
-            <span className="mb-1 block text-xs font-black uppercase text-slate-500">NK kód</span>
-            <input value={nkCode} onChange={(e) => setNkCode(e.target.value.toUpperCase())} placeholder={tab === 'materials' ? 'NK01' : 'NK001'} className={INPUT} />
+            <span className="mb-1 block text-xs font-black uppercase text-slate-500">Volný NK kód</span>
+            <select value={nkCode} onChange={(e) => setNkCode(e.target.value)} className={INPUT} disabled={freeCodes.length === 0}>
+              {freeCodes.length === 0 ? (
+                <option value="">Žádný volný kód</option>
+              ) : (
+                freeCodes.slice(0, 250).map((option) => (
+                  <option key={option.nkCode} value={option.nkCode}>{option.nkCode}</option>
+                ))
+              )}
+            </select>
+            {freeCodes.length > 250 && (
+              <span className="mt-1 block text-xs font-semibold text-slate-500">Zobrazeno prvních 250 volných kódů.</span>
+            )}
           </label>
           <label>
             <span className="mb-1 block text-xs font-black uppercase text-slate-500">Číslo</span>
-            <input value={number} onChange={(e) => setNumber(e.target.value)} placeholder={tab === 'materials' ? '01' : '001'} className={INPUT} />
+            <input value={number} className={INPUT} disabled />
           </label>
           <label>
             <span className="mb-1 block text-xs font-black uppercase text-slate-500">Název</span>
@@ -1103,6 +1183,11 @@ export default function MasterDataPage() {
 
   const createItem = async (input: { nkCode: string; number: string; name: string }) => {
     if (!canManage) return;
+    const duplicate = activeItems.some((item) => item.nkCode.toUpperCase() === input.nkCode.toUpperCase());
+    if (duplicate) {
+      showToast('Tenhle NK kód už existuje', 'error');
+      return;
+    }
     const collectionName = collectionForTab(tab);
     const newRef = doc(collection(db, collectionName));
     const basePayload = {
@@ -1375,6 +1460,7 @@ export default function MasterDataPage() {
       {showCreateModal && (
         <NewItemModal
           tab={tab}
+          existingItems={activeItems}
           onClose={() => setShowCreateModal(false)}
           onCreate={createItem}
         />
