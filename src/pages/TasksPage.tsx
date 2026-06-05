@@ -41,6 +41,7 @@ import FAB from '../components/ui/FAB';
 import EmptyState from '../components/ui/EmptyState';
 import BottomSheet, { FormField, FormFooter } from '../components/ui/BottomSheet';
 import MicButton from '../components/ui/MicButton';
+import { showToast } from '../components/ui/Toast';
 import { assetService } from '../services/assetService';
 import type { Asset } from '../types/asset';
 import { isGearboxAsset } from '../services/gearboxService';
@@ -582,7 +583,7 @@ const TAB_OPTIONS: { key: FilterTab; label: string; color: string }[] = [
 // ═══════════════════════════════════════════════════
 // TASK CARD (standardized)
 // ═══════════════════════════════════════════════════
-function TaskCard({ task, onClick, onEdit, onDelete, onAddLog, onComplete }: { task: Task; onClick: () => void; onEdit: () => void; onDelete: () => void; onAddLog: () => void; onComplete: () => void }) {
+function TaskCard({ task, onClick, onEdit, onDelete, onAddLog, onTake, onComplete }: { task: Task; onClick: () => void; onEdit: () => void; onDelete: () => void; onAddLog: () => void; onTake: () => void; onComplete: () => void }) {
   const pc = PRIORITY_CONFIG[task.priority] || PRIORITY_CONFIG.P3;
   const sb = STATUS_BADGES[task.status] || STATUS_BADGES.backlog;
   const assignee = taskWorkerLabel(task);
@@ -698,6 +699,14 @@ function TaskCard({ task, onClick, onEdit, onDelete, onAddLog, onComplete }: { t
       <div className="border-t border-slate-200 px-2 py-1.5 flex items-center gap-1 bg-white">
         {!isDone && (
           <>
+            {!isActive && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onTake(); }}
+                className="flex-1 min-h-11 rounded-lg flex items-center justify-center gap-1.5 border border-amber-200 bg-amber-50 text-amber-800 text-xs font-bold hover:bg-amber-100 transition"
+              >
+                <Play className="w-4 h-4" /> Přebírám
+              </button>
+            )}
             <button
               onClick={(e) => { e.stopPropagation(); onAddLog(); }}
               className="flex-1 min-h-11 rounded-lg flex items-center justify-center gap-1.5 border border-sky-200 bg-sky-50 text-sky-700 text-xs font-bold hover:bg-sky-100 transition"
@@ -1144,7 +1153,19 @@ export default function TasksPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
             {filteredTasks.map((task) => (
-              <TaskCard key={task.id} task={task} onClick={() => setActionsTask(task)} onEdit={() => setEditingTask(task)} onAddLog={() => { setLogText(''); setLoggingTask(task); }} onComplete={() => setCompletingTask(task)} onDelete={async () => {
+              <TaskCard key={task.id} task={task} onClick={() => setActionsTask(task)} onEdit={() => setEditingTask(task)} onAddLog={() => { setLogText(''); setLoggingTask(task); }} onTake={async () => {
+                const userName = user?.displayName || 'Uživatel';
+                const names = uniqueNames([...taskWorkerNames(task), userName]);
+                await updateDoc(doc(db, 'tasks', task.id), {
+                  status: 'in_progress',
+                  startedAt: serverTimestamp(),
+                  assignedWorkerNames: names,
+                  assignedToName: names[0] || userName,
+                  updatedBy: userName,
+                  updatedAt: serverTimestamp(),
+                });
+                showToast('Úkol převzat', 'success');
+              }} onComplete={() => setCompletingTask(task)} onDelete={async () => {
                 if (window.confirm(`Smazat úkol "${task.title}"?`)) {
                   await deleteDoc(doc(db, 'tasks', task.id));
                 }

@@ -1249,7 +1249,10 @@ select.k-input {
 
 @media (max-width: 640px) {
   .kartoteka-page .k-root-top {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr) auto auto auto;
     gap: 8px;
+    width: 100%;
   }
 
   .kartoteka-page .k-root-type,
@@ -1259,15 +1262,35 @@ select.k-input {
 
   .kartoteka-page .k-root-actions {
     gap: 4px;
+    margin-left: 0 !important;
   }
 
   .kartoteka-page .k-root-stats-inline {
-    margin-left: 0;
-    gap: 5px;
+    display: none;
   }
 
-  .kartoteka-page .k-root-stats-inline .k-root-stat {
+  .kartoteka-page .k-root-card > .k-root-stats:not(.k-root-stats-inline) {
+    display: flex;
+    margin-top: 8px;
+    padding-left: 64px;
+    gap: 5px;
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .kartoteka-page .k-root-stat {
     font-size: 0.72rem;
+  }
+
+  .kartoteka-page .k-root-action-btn {
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    padding: 0;
+  }
+
+  .kartoteka-page .k-root-action-btn .k-action-label {
+    display: none;
   }
 
   .kartoteka-page .k-tree-row {
