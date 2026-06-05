@@ -713,6 +713,26 @@ export default function ProductionPage() {
     });
   }, [batches]);
 
+  const todayKey = localDateKey();
+  const runningExtrusionBatches = useMemo(
+    () => batches.filter((batch) => batch.status === 'running'),
+    [batches]
+  );
+  const todayPlannedBatches = useMemo(
+    () => batches.filter((batch) => batch.planDate === todayKey && batch.status !== 'done'),
+    [batches, todayKey]
+  );
+  const extrusionAreaSummary = useMemo(() => areaOptions.map((area) => {
+    const areaBatches = batches.filter((batch) => batch.productionArea === area.id);
+    return {
+      area,
+      total: areaBatches.length,
+      today: areaBatches.filter((batch) => batch.planDate === todayKey && batch.status !== 'done').length,
+      running: areaBatches.filter((batch) => batch.status === 'running').length,
+      planned: areaBatches.filter((batch) => batch.status === 'planned').length,
+    };
+  }), [areaOptions, batches, todayKey]);
+
   // ── Extrusion actions ──
   const createCatalogItem = async (kind: 'material' | 'area' | 'extruder') => {
     if (!canManage) return;
@@ -960,6 +980,98 @@ export default function ProductionPage() {
           ))}
         </div>
       </div>
+
+      {activeTab === 'extrusion' && (
+        <div className="max-w-2xl mx-auto px-4 pb-3">
+          <div className="rounded-2xl border border-slate-700/60 bg-slate-800/60 p-3">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <div>
+                <div className="text-xs font-black uppercase tracking-wide text-slate-400">Dnešní provoz</div>
+                <div className="text-sm font-bold text-white">Co běží a co čeká</div>
+              </div>
+              <div className="rounded-full bg-slate-950/45 px-3 py-1 text-xs font-black text-slate-300">
+                {new Date().toLocaleDateString('cs-CZ', { day: '2-digit', month: '2-digit' })}
+              </div>
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3">
+                <div className="mb-2 text-[10px] font-black uppercase tracking-wide text-amber-300">Právě běží</div>
+                {runningExtrusionBatches.length === 0 ? (
+                  <div className="text-sm font-semibold text-slate-400">Nic neběží</div>
+                ) : (
+                  <div className="space-y-2">
+                    {runningExtrusionBatches.slice(0, 3).map((batch) => (
+                      <button
+                        key={batch.id}
+                        type="button"
+                        onClick={() => {
+                          setPlanDateFilter(batch.planDate || 'ALL');
+                          const filterId = getBatchMachineFilterIds(batch)[0];
+                          if (filterId) setMachineFilter(filterId);
+                        }}
+                        className="block w-full rounded-lg bg-slate-950/35 px-2.5 py-2 text-left transition hover:bg-slate-950/55"
+                      >
+                        <div className="truncate text-sm font-black text-white">{batch.productName || batch.materialName || batch.rawMaterial || 'Dávka'}</div>
+                        <div className="mt-0.5 truncate text-xs font-semibold text-amber-200">{getBatchMachineLabel(batch)}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-xl border border-blue-500/20 bg-blue-500/10 p-3">
+                <div className="mb-2 text-[10px] font-black uppercase tracking-wide text-blue-300">Dnes čeká</div>
+                {todayPlannedBatches.length === 0 ? (
+                  <div className="text-sm font-semibold text-slate-400">Dnes není otevřená dávka</div>
+                ) : (
+                  <div className="space-y-2">
+                    {todayPlannedBatches.slice(0, 3).map((batch) => (
+                      <button
+                        key={batch.id}
+                        type="button"
+                        onClick={() => {
+                          setPlanDateFilter(batch.planDate || 'ALL');
+                          const filterId = getBatchMachineFilterIds(batch)[0];
+                          if (filterId) setMachineFilter(filterId);
+                        }}
+                        className="block w-full rounded-lg bg-slate-950/35 px-2.5 py-2 text-left transition hover:bg-slate-950/55"
+                      >
+                        <div className="truncate text-sm font-black text-white">{batch.productName || batch.materialName || batch.rawMaterial || 'Dávka'}</div>
+                        <div className="mt-0.5 truncate text-xs font-semibold text-blue-200">{getBatchMachineLabel(batch)}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {extrusionAreaSummary.map(({ area, today, running, planned }) => (
+                <button
+                  key={area.id}
+                  type="button"
+                  onClick={() => {
+                    const firstLine = extrusionLineOptions.find((line) => line.areaId === area.id);
+                    setMachineFilter(firstLine?.id || 'ALL');
+                    setPlanDateFilter('ALL');
+                  }}
+                  className="rounded-xl border border-white/10 bg-slate-950/30 px-3 py-2 text-left transition hover:bg-slate-950/50"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="truncate text-sm font-black text-white">{area.name}</div>
+                    <div className="text-xs font-black text-slate-300">{today} dnes</div>
+                  </div>
+                  <div className="mt-1 flex gap-2 text-[11px] font-bold text-slate-400">
+                    <span className="text-amber-300">{running} běží</span>
+                    <span className="text-blue-300">{planned} plán</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Machine filter (extrusion only) */}
       {activeTab === 'extrusion' && (
