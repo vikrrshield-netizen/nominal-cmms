@@ -1947,7 +1947,6 @@ function FullDashboard() {
     'academy',
     'production',
     'warehouse',
-    'shifts',
   ], []);
   const enabledModules = useMemo(() => {
     if (isSandbox) {
