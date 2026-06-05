@@ -551,6 +551,7 @@ export default function ProductionPage() {
     note: '',
   });
   const [batchSaving, setBatchSaving] = useState(false);
+  const [selectedBatch, setSelectedBatch] = useState<ExtrusionBatch | null>(null);
   const [shiftLogId, setShiftLogId] = useState<string | null>(null);
   const [shiftLogText, setShiftLogText] = useState('');
 
@@ -1197,7 +1198,11 @@ export default function ProductionPage() {
                   </div>
 
                   {/* Card body */}
-                  <div className="px-4 py-3">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedBatch(batch)}
+                    className="block w-full px-4 py-3 text-left transition hover:bg-slate-950/20"
+                  >
                     <div className="mb-3 flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="truncate text-base font-black text-white">{batch.productName || batch.materialName || batch.rawMaterial || 'Bez výrobku'}</div>
@@ -1269,31 +1274,31 @@ export default function ProductionPage() {
                         <p className="text-xs text-slate-300 whitespace-pre-wrap">{batch.shiftLog}</p>
                       </div>
                     )}
+                  </button>
 
                     {/* Actions */}
                     {canManage && (
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 px-4 pb-3">
                         {batch.status === 'planned' && (
-                          <button onClick={() => startBatch(batch.id)}
+                          <button onClick={(event) => { event.stopPropagation(); startBatch(batch.id); }}
                             className="flex-1 py-2.5 bg-amber-500/15 border border-amber-500/30 text-amber-400 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-amber-500/25 transition active:scale-[0.97]">
                             <Play className="w-3.5 h-3.5" /> Start
                           </button>
                         )}
                         {batch.status === 'running' && (
-                          <button onClick={() => stopBatch(batch.id)}
+                          <button onClick={(event) => { event.stopPropagation(); stopBatch(batch.id); }}
                             className="flex-1 py-2.5 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-emerald-500/25 transition active:scale-[0.97]">
                             <Square className="w-3.5 h-3.5" /> Dokončit
                           </button>
                         )}
                         {batch.status !== 'done' && (
-                          <button onClick={() => { setShiftLogId(batch.id); setShiftLogText(batch.shiftLog || ''); }}
+                          <button onClick={(event) => { event.stopPropagation(); setShiftLogId(batch.id); setShiftLogText(batch.shiftLog || ''); }}
                             className="py-2.5 px-3 bg-white/5 border border-white/10 text-slate-400 rounded-xl text-xs font-semibold hover:text-white transition">
                             Záznam
                           </button>
                         )}
                       </div>
                     )}
-                  </div>
 
                   {/* Footer */}
                   <div className="px-4 pb-3 flex items-center gap-2 text-[11px] text-slate-500">
@@ -1714,6 +1719,129 @@ export default function ProductionPage() {
               {orderSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
               {orderSaving ? 'Ukládám...' : 'Vytvořit zakázku'}
             </button>
+          </div>
+        </ModalShell>
+      )}
+
+      {selectedBatch && (
+        <ModalShell
+          title="Detail dávky"
+          icon={<Cog className="w-5 h-5 text-amber-400" />}
+          onClose={() => setSelectedBatch(null)}
+        >
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-xs font-black uppercase tracking-wide text-slate-500">{selectedBatch.batchId}</div>
+                  <h3 className="mt-1 text-xl font-black text-white">{selectedBatch.productName || selectedBatch.materialName || selectedBatch.rawMaterial || 'Bez výrobku'}</h3>
+                  <p className="mt-1 text-sm font-semibold text-slate-300">{getBatchMachineLabel(selectedBatch)}</p>
+                </div>
+                <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-black ${STATUS_CFG[selectedBatch.status]?.bg || 'bg-white/10'} ${STATUS_CFG[selectedBatch.status]?.text || 'text-white'}`}>
+                  {STATUS_CFG[selectedBatch.status]?.label || selectedBatch.status}
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-xl border border-white/10 bg-slate-950/35 p-3">
+                <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">Extrudovna</div>
+                <div className="mt-1 text-sm font-black text-white">{selectedBatch.productionAreaLabel}</div>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-slate-950/35 p-3">
+                <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">Plán</div>
+                <div className="mt-1 text-sm font-black text-white">{selectedBatch.planDate || 'Bez data'}</div>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-slate-950/35 p-3">
+                <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">Hmotnost</div>
+                <div className="mt-1 text-sm font-black text-white">{selectedBatch.targetWeight} kg</div>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-slate-950/35 p-3">
+                <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">Cílová zátěž</div>
+                <div className="mt-1 text-sm font-black text-white">
+                  {typeof selectedBatch.targetMotorLoadAmps === 'number' ? `${selectedBatch.targetMotorLoadAmps} A` : 'Nezadáno'}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3">
+                <div className="text-[10px] font-black uppercase tracking-wide text-emerald-300">Výrobek / šarže</div>
+                <div className="mt-1 text-sm font-black text-white">{selectedBatch.productName || 'Nezadáno'}</div>
+                <div className="mt-1 font-mono text-xs font-bold text-emerald-200">{selectedBatch.productBatch || 'bez šarže'}</div>
+              </div>
+              <div className="rounded-xl border border-blue-500/20 bg-blue-500/10 p-3">
+                <div className="text-[10px] font-black uppercase tracking-wide text-blue-300">Surovina / šarže</div>
+                <div className="mt-1 text-sm font-black text-white">{selectedBatch.materialName || selectedBatch.rawMaterial || 'Nezadáno'}</div>
+                <div className="mt-1 font-mono text-xs font-bold text-blue-200">{selectedBatch.materialBatch || 'bez šarže'}</div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-3">
+              <div className="mb-2 text-[10px] font-black uppercase tracking-wide text-emerald-300">Receptura / míchání</div>
+              {selectedBatch.mixingRecipeSnapshot?.length ? (
+                <div className="space-y-1.5">
+                  {selectedBatch.mixingRecipeSnapshot.map((row, index) => (
+                    <div key={`${row.materialId}-${index}`} className="grid grid-cols-[1fr_auto_auto] gap-2 rounded-lg bg-slate-950/40 px-2.5 py-2 text-xs">
+                      <span className="font-black text-white">{row.materialName}</span>
+                      <span className="font-semibold text-slate-300">{row.ratio} dílů</span>
+                      <span className="font-black text-emerald-200">{row.plannedAmountKg || '—'} kg</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm font-semibold text-slate-400">Receptura není uložená u dávky.</div>
+              )}
+              {selectedBatch.mixingNote && <p className="mt-2 text-sm text-emerald-100 whitespace-pre-wrap">{selectedBatch.mixingNote}</p>}
+            </div>
+
+            {(selectedBatch.note || selectedBatch.shiftLog) && (
+              <div className="space-y-2">
+                {selectedBatch.note && (
+                  <div className="rounded-xl border border-white/10 bg-slate-950/35 p-3">
+                    <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">Poznámka k plánu</div>
+                    <p className="mt-1 text-sm text-slate-200 whitespace-pre-wrap">{selectedBatch.note}</p>
+                  </div>
+                )}
+                {selectedBatch.shiftLog && (
+                  <div className="rounded-xl border border-white/10 bg-slate-950/35 p-3">
+                    <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">Směnový záznam</div>
+                    <p className="mt-1 text-sm text-slate-200 whitespace-pre-wrap">{selectedBatch.shiftLog}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {canManage && selectedBatch.status !== 'done' && (
+              <div className="grid gap-2 sm:grid-cols-3">
+                {selectedBatch.status === 'planned' && (
+                  <button
+                    onClick={() => { startBatch(selectedBatch.id); setSelectedBatch(null); }}
+                    className="py-3 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-300 font-black flex items-center justify-center gap-2"
+                  >
+                    <Play className="w-4 h-4" /> Start
+                  </button>
+                )}
+                {selectedBatch.status === 'running' && (
+                  <button
+                    onClick={() => { stopBatch(selectedBatch.id); setSelectedBatch(null); }}
+                    className="py-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-black flex items-center justify-center gap-2"
+                  >
+                    <Square className="w-4 h-4" /> Dokončit
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    setShiftLogId(selectedBatch.id);
+                    setShiftLogText(selectedBatch.shiftLog || '');
+                    setSelectedBatch(null);
+                  }}
+                  className="py-3 rounded-2xl bg-white/5 border border-white/10 text-slate-200 font-black flex items-center justify-center gap-2"
+                >
+                  <Clock className="w-4 h-4" /> Záznam směny
+                </button>
+              </div>
+            )}
           </div>
         </ModalShell>
       )}
