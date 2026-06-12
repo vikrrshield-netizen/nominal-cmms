@@ -72,6 +72,31 @@
         { "fieldPath": "collection", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "production_machine_recipes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "machineId", "order": "ASCENDING" },
+        { "fieldPath": "productName", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "production_machine_recipes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "machineId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "productName", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "production_machine_recipes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "productId", "order": "ASCENDING" },
+        { "fieldPath": "machineName", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

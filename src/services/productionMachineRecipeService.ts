@@ -1,5 +1,6 @@
 import {
   collection,
+  deleteField,
   doc,
   getDoc,
   onSnapshot,
@@ -49,7 +50,7 @@ function normalizeRecipe(value: unknown): ProductionRecipeItem[] | undefined {
         ratio: Number(item.ratio || 0),
       };
     })
-    .filter((row) => row.materialName && row.ratio > 0);
+    .filter((row) => row.materialId && row.materialName && row.ratio > 0);
   return rows.length ? rows : undefined;
 }
 
@@ -147,7 +148,7 @@ export async function saveProductionMachineRecipe(input: SaveProductionMachineRe
     productName: input.productName,
     productNumber: input.productNumber,
     status: input.status,
-    recipe: normalizeRecipe(input.recipe),
+    recipe: normalizeRecipe(input.recipe) ?? deleteField(),
     note: input.note || '',
     updatedAt: serverTimestamp(),
     updatedById: userId,
