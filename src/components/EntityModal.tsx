@@ -7,6 +7,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { collection, query, where, onSnapshot, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import appConfig from '../appConfig';
+import { brandLogoHtml } from '../lib/branding';
 import {
   Building2, Layers, Wrench, Package, ClipboardList, Clock,
   ChevronRight, Edit2, AlertTriangle, Loader2, Save, X, FileText,
@@ -429,8 +430,8 @@ function PdfPreviewOverlay({ data, activeTasks, childAssets, rooms, st, onClose 
     ).join('');
 
     w.document.write(`<!DOCTYPE html><html><head><title>Pasport — ${data.name}</title>
-<style>body{font-family:Arial,sans-serif;margin:40px;color:#333}h1{color:#1e293b;border-bottom:3px solid ${appConfig.PRIMARY_COLOR};padding-bottom:10px}h2{color:#475569;margin-top:30px}table{width:100%;border-collapse:collapse;margin-top:10px}.logo{display:flex;align-items:center;gap:12px;margin-bottom:20px}.logo-box{width:48px;height:48px;background:linear-gradient(135deg,${appConfig.PRIMARY_COLOR},#f59e0b);border-radius:12px;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:20px}.meta{color:#64748b;font-size:13px;margin-top:4px}@media print{body{margin:20px}}</style></head><body>
-<div class="logo"><div class="logo-box">${appConfig.LOGO_LETTER}</div><div><div style="font-size:18px;font-weight:bold">${appConfig.APP_NAME}</div><div class="meta">Pasport — ${data.type === 'building' ? 'Budova' : data.type === 'room' ? 'Místnost' : 'Zařízení'}</div></div></div>
+<style>body{font-family:Arial,sans-serif;margin:40px;color:#333}h1{color:#1e293b;border-bottom:3px solid ${appConfig.PRIMARY_COLOR};padding-bottom:10px}h2{color:#475569;margin-top:30px}table{width:100%;border-collapse:collapse;margin-top:10px}.logo{display:flex;align-items:center;gap:12px;margin-bottom:20px}.logo-box{width:48px;height:48px;background:linear-gradient(135deg,${appConfig.PRIMARY_COLOR},#f59e0b);border-radius:12px;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:20px;object-fit:contain}.meta{color:#64748b;font-size:13px;margin-top:4px}@media print{body{margin:20px}}</style></head><body>
+<div class="logo">${brandLogoHtml()}<div><div style="font-size:18px;font-weight:bold">${appConfig.APP_NAME}</div><div class="meta">Pasport — ${data.type === 'building' ? 'Budova' : data.type === 'room' ? 'Místnost' : 'Zařízení'}</div></div></div>
 <h1>${data.name}</h1>
 <p class="meta">Vytištěno: ${new Date().toLocaleDateString('cs-CZ')} ${new Date().toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}</p>
 <h2>Rodný list</h2><table>${fieldsHtml}</table>
@@ -466,12 +467,16 @@ ${activeTasks.length > 0 ? `<h2>Otevřené úkoly (${activeTasks.length})</h2><t
         <div className="w-full max-w-xl bg-white rounded-2xl shadow-2xl p-8 text-gray-800">
           {/* Header */}
           <div className="flex items-center gap-3 mb-6 pb-4 border-b-2" style={{ borderColor: appConfig.PRIMARY_COLOR }}>
-            <div
-              className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-xl"
-              style={{ background: `linear-gradient(135deg, ${appConfig.PRIMARY_COLOR}, #f59e0b)` }}
-            >
-              {appConfig.LOGO_LETTER}
-            </div>
+            {appConfig.LOGO_URL ? (
+              <img src={appConfig.LOGO_URL} alt={appConfig.APP_NAME} className="w-12 h-12 rounded-xl object-contain bg-white p-1" />
+            ) : (
+              <div
+                className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-xl"
+                style={{ background: `linear-gradient(135deg, ${appConfig.PRIMARY_COLOR}, #f59e0b)` }}
+              >
+                {appConfig.LOGO_LETTER}
+              </div>
+            )}
             <div>
               <div className="text-lg font-bold text-gray-900">{appConfig.APP_NAME}</div>
               <div className="text-sm text-gray-500">

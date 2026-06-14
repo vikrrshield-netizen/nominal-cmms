@@ -1481,7 +1481,7 @@ export default function AssetCardPage() {
                   </button>
                   )}
                 </div>
-                {false && canReportGearboxProblem && (
+                {problemOpen && canReportGearboxProblem && (
                   <button
                     type="button"
                     onClick={() => setProblemOpen(true)}

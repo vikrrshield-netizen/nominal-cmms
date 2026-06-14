@@ -1844,7 +1844,7 @@ function ErrorMonitorTab() {
             };
           })
           .filter((log) => log.isErrorLog)
-          .map(({ isErrorLog, ...log }) => log);
+          .map(({ isErrorLog: _isErrorLog, ...log }) => log);
 
         setLogs(loaded);
         setLoading(false);

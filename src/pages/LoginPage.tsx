@@ -4,8 +4,8 @@
 import { useState } from 'react';
 import { useAuthContext } from '../context/AuthContext';
 import { isSandboxLoginEnabled } from '../lib/firebase';
-import { Shield, Delete, LogIn } from 'lucide-react';
-import appConfig from '../appConfig';
+import { Delete, LogIn } from 'lucide-react';
+import BrandMark from '../components/ui/BrandMark';
 
 export default function LoginPage() {
   const { login } = useAuthContext();
@@ -49,13 +49,7 @@ export default function LoginPage() {
       
       {/* Logo */}
       <div className="flex flex-col items-center gap-2 mb-8">
-        <div className="w-16 h-16 bg-gradient-to-br from-[#1e3a5f] to-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/20">
-          <Shield className="w-9 h-9 text-white" />
-        </div>
-        <div className="text-center">
-          <h1 className="text-2xl font-black tracking-tight text-white">{appConfig.BRAND_NAME}</h1>
-          <p className="text-blue-400/80 text-[10px] font-medium tracking-widest uppercase">{appConfig.PRODUCT_NAME_SHORT}</p>
-        </div>
+        <BrandMark size="lg" tone="light" className="flex-col text-center" />
       </div>
 
       {/* PIN Display */}

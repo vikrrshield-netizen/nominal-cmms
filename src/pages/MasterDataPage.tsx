@@ -8,6 +8,7 @@ import { useAuthContext } from '../context/AuthContext';
 import { db, storage } from '../lib/firebase';
 import { MATERIAL_SEED, PRODUCT_SEED, materialBatch, productBatch } from '../data/productionMasterSeed';
 import { showToast } from '../components/ui/Toast';
+import appConfig from '../appConfig';
 import type { GearboxTemperatureLog } from '../types/gearbox';
 
 type Tab = 'materials' | 'products';
@@ -1268,7 +1269,7 @@ export default function MasterDataPage() {
   const exportXlsx = async () => {
     const { headers, rows } = getExportData();
     const workbook = new ExcelJS.Workbook();
-    workbook.creator = 'VIKRR Asset Shield';
+    workbook.creator = appConfig.APP_NAME;
     workbook.created = new Date();
     const sheet = workbook.addWorksheet(tab === 'materials' ? 'Suroviny' : 'Výrobky');
     sheet.views = [{ state: 'frozen', ySplit: 1 }];

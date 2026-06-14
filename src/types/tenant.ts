@@ -9,6 +9,9 @@
 export interface TenantSettings {
   id: string;           // tenantId e.g. 'main_firm'
   name: string;         // Display name e.g. 'Nominal s.r.o.'
+  appName?: string;
+  logoUrl?: string;
+  logoLetter?: string;
   activeModules: string[]; // Module IDs from MODULE_DEFINITIONS
   updatedAt: Date;
   updatedByName: string;

@@ -1,30 +1,29 @@
 // src/appConfig.ts
-// Central branding configuration — VIKRR Ecosystem
-// Change these values to rebrand the entire application.
+// Central branding configuration. Change this file to rebrand a company instance.
 
 const appConfig = {
-  // ── Umbrella Brand ──
+  // Umbrella brand.
   BRAND_NAME: 'VIKRR',
-  // ── Product Identity ──
+  // Product identity.
   PRODUCT_NAME: 'VIKRR Asset Shield',
   PRODUCT_NAME_SHORT: 'Asset Shield',
-  // ── Legacy aliases (used across codebase) ──
+  // Legacy aliases used across the app.
   APP_NAME: 'VIKRR Asset Shield',
   APP_NAME_SHORT: 'VIKRR',
-  // ── Company ──
+  // Company identity.
   COMPANY_NAME: 'VIKRR',
   COMPANY_ADDRESS: 'Kozlov 68, 594 51',
-  // ── Domain ──
+  // Domain.
   DOMAIN: 'shield.vikrr.com',
-  // ── Legal ──
+  // Legal.
   COPYRIGHT: '© 2026 VIKRR. Všechna práva vyhrazena.',
-  // ── Visual Identity ──
-  PRIMARY_COLOR: '#1e3a5f',          // Deep Blue
-  ACCENT_COLOR: '#3b82f6',           // Blue-500 accent
-  SECONDARY_COLOR: '#64748b',        // Industrial Gray
-  LOGO_URL: '',                      // Optional: URL to logo image
-  LOGO_LETTER: 'V',                  // Fallback letter when no LOGO_URL
-  // ── Meta ──
+  // Visual identity.
+  PRIMARY_COLOR: '#1e3a5f',
+  ACCENT_COLOR: '#3b82f6',
+  SECONDARY_COLOR: '#64748b',
+  LOGO_URL: '',
+  LOGO_LETTER: 'V',
+  // Meta.
   VERSION: 'v2.0',
 } as const;
 

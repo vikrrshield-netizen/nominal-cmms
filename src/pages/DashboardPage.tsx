@@ -37,6 +37,7 @@ import RequestModal from '../components/dashboard/RequestModal';
 import AiModal from '../components/dashboard/AiModal';
 import GearboxProblemModal from '../components/gearbox/GearboxProblemModal';
 import GearboxRepairModal from '../components/gearbox/GearboxRepairModal';
+import BrandMark from '../components/ui/BrandMark';
 
 function asDate(value: any): Date | null {
   if (!value) return null;
@@ -1735,16 +1736,7 @@ function KioskDashboard() {
       <div className="relative z-10 flex flex-col min-h-screen">
         <header className="p-6 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-gradient-to-br from-[#1e3a5f] to-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/25">
-              <Settings className="w-7 h-7 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-white">{appConfig.BRAND_NAME}</h1>
-              <p className="text-slate-400 text-sm flex items-center gap-2">
-                <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
-                Kiosek
-              </p>
-            </div>
+            <BrandMark size="md" tone="light" />
           </div>
           <button onClick={() => logout()} className="p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition">
             <LogOut className="w-5 h-5 text-slate-400" />
@@ -1988,11 +1980,14 @@ function FullDashboard() {
 
         {/* HEADER */}
         <div className="flex items-center justify-between mb-5 rounded-2xl border border-stone-200 bg-white px-4 py-3 shadow-sm shadow-stone-200/70">
-          <div>
-            <div className="text-[10px] text-emerald-700 uppercase tracking-widest font-bold">{appConfig.APP_NAME}</div>
-            <h1 className="text-xl font-black text-slate-950 mt-0.5">{greeting()}, {userName}</h1>
+          <div className="flex min-w-0 items-center gap-3">
+            <BrandMark size="sm" tone="dark" showText={false} />
+            <div className="min-w-0">
+              <div className="truncate text-[10px] text-emerald-700 uppercase tracking-widest font-bold">{appConfig.APP_NAME}</div>
+              <h1 className="truncate text-xl font-black text-slate-950 mt-0.5">{greeting()}, {userName}</h1>
             <div className="text-xs text-slate-500 mt-0.5">
               {time.toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+            </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
