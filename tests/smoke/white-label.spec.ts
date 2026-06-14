@@ -76,6 +76,7 @@ test.describe('white-label smoke', () => {
     await expect(page.getByRole('button', { name: /Zobrazit|Skrýt/ })).toBeVisible();
     await page.getByRole('button', { name: /Zobrazit/ }).click();
     await expect(page.getByText('Další přehledy')).toBeVisible();
+    await expect(page.getByRole('button', { name: /ehled aktivit/i })).toBeVisible();
     await expectNoBannedPublicData(page);
   });
 
