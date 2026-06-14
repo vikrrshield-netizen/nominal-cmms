@@ -1329,13 +1329,21 @@ function nameList(value: unknown): string {
   return Array.isArray(value) ? value.map((name) => String(name).trim()).filter(Boolean).join(', ') : '';
 }
 
-function useActivityTimeline() {
+function useActivityTimeline(enabled = true) {
   const [workItems, setWorkItems] = useState<ActivityTimelineItem[]>([]);
   const [taskItems, setTaskItems] = useState<ActivityTimelineItem[]>([]);
   const [inspectionItems, setInspectionItems] = useState<ActivityTimelineItem[]>([]);
   const [gearboxItems, setGearboxItems] = useState<ActivityTimelineItem[]>([]);
 
   useEffect(() => {
+    if (!enabled) {
+      setWorkItems([]);
+      setTaskItems([]);
+      setInspectionItems([]);
+      setGearboxItems([]);
+      return;
+    }
+
     const unsubs: (() => void)[] = [];
 
     unsubs.push(onSnapshot(collection(db, 'workLogs'), (snap) => {
@@ -1452,7 +1460,7 @@ function useActivityTimeline() {
     }, (err) => console.error('[Dashboard] activity gearbox logs error:', err)));
 
     return () => unsubs.forEach((unsub) => unsub());
-  }, []);
+  }, [enabled]);
 
   const weekItems = useMemo(
     () => [...workItems, ...taskItems, ...inspectionItems, ...gearboxItems].sort((a, b) => b.date.getTime() - a.date.getTime()),
@@ -1903,9 +1911,10 @@ function FullDashboard() {
   const navigate = useNavigate();
   const { user, logout, isSandbox, hasPermission } = useAuthContext();
   const role = (user?.role ?? 'VYROBA') as UserRole;
+  const [showMorePanels, setShowMorePanels] = useState(false);
   const rawStats = useDashboardStats();
   const todayOps = useTodayOperations();
-  const activity = useActivityTimeline();
+  const activity = useActivityTimeline(showMorePanels);
   const tenantId = (user as any)?.tenantId || 'main_firm';
   const dashboardProfile = useMemo(() => getDashboardRoleProfile(role), [role]);
   const vacationAlerts = useVacationAlerts(tenantId);
@@ -1943,7 +1952,6 @@ function FullDashboard() {
 
   // Quick action modals
   const [activeModal, setActiveModal] = useState<'idea' | 'request' | 'ai' | 'fault' | null>(null);
-  const [showMorePanels, setShowMorePanels] = useState(false);
   const watchStorageKey = useMemo(() => `nominal-dashboard-watch-collapsed:${user?.id || role}`, [role, user?.id]);
   const [watchCollapsed, setWatchCollapsed] = useState(false);
   useEffect(() => {
