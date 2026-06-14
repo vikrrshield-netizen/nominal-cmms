@@ -1,7 +1,7 @@
 // src/pages/DashboardPage.tsx
 // VIKRR — Asset Shield — Dashboard (refactored: widget system)
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -16,6 +16,7 @@ import {
   Sparkles, Wrench, BarChart3,
   Clock, FileText, PlusCircle, Search, ShieldCheck, X, User, MapPin,
   Calendar, Building2, Package, Wind, Cog, Thermometer, Monitor, Factory, FlaskConical, Users,
+  ChevronUp, ChevronDown,
 } from 'lucide-react';
 import appConfig from '../appConfig';
 import { DEFAULT_ENABLED_MODULES, MODULE_DEFINITIONS } from '../types/user';
@@ -1809,13 +1810,104 @@ function KioskDashboard() {
 // FULL DASHBOARD — Widget Grid System
 // ═══════════════════════════════════════════════════════
 
+interface DashboardRoleProfile {
+  todayDescription: string;
+  watchDescription: string;
+  moreDescription: string;
+  showAssetWatchlist: boolean;
+  showCustomWidgets: boolean;
+  showGearbox: boolean;
+  showProductionMaster: boolean;
+}
+
+function getDashboardRoleProfile(role: UserRole): DashboardRoleProfile {
+  switch (role) {
+    case 'SKLADNIK':
+      return {
+        todayDescription: 'Práce, zásoby a upozornění pro sklad.',
+        watchDescription: 'Sledované položky skladu, dataloggerů a vlastních filtrů.',
+        moreDescription: 'Méně časté moduly, aktivita, audit a rozvrh.',
+        showAssetWatchlist: true,
+        showCustomWidgets: true,
+        showGearbox: false,
+        showProductionMaster: false,
+      };
+    case 'VYROBA':
+      return {
+        todayDescription: 'Poruchy, úkoly a provoz výroby na dnešek.',
+        watchDescription: 'Výroba, sledované stroje a vlastní provozní widgety.',
+        moreDescription: 'Moduly, aktivita, audit, tipy a rozvrh.',
+        showAssetWatchlist: true,
+        showCustomWidgets: true,
+        showGearbox: false,
+        showProductionMaster: true,
+      };
+    case 'UDRZBA':
+      return {
+        todayDescription: 'Poruchy, úkoly, prodlení a dnešní práce údržby.',
+        watchDescription: 'Sledovaná zařízení, převodovky a vlastní servisní widgety.',
+        moreDescription: 'Moduly, aktivita, audit, tipy a rozvrh.',
+        showAssetWatchlist: true,
+        showCustomWidgets: true,
+        showGearbox: true,
+        showProductionMaster: false,
+      };
+    case 'MAJITEL':
+    case 'VEDENI':
+    case 'SUPERADMIN':
+      return {
+        todayDescription: 'Rizika, prodlení, závady a stav provozu.',
+        watchDescription: 'Klíčové widgety napříč provozem a vlastní sledování.',
+        moreDescription: 'Moduly, aktivita, audit, tipy a rozvrh.',
+        showAssetWatchlist: true,
+        showCustomWidgets: true,
+        showGearbox: true,
+        showProductionMaster: true,
+      };
+    default:
+      return {
+        todayDescription: 'Dnešní práce a provozní upozornění.',
+        watchDescription: 'Sledované položky a vlastní widgety.',
+        moreDescription: 'Moduly, aktivita, audit, tipy a rozvrh.',
+        showAssetWatchlist: true,
+        showCustomWidgets: true,
+        showGearbox: false,
+        showProductionMaster: false,
+      };
+  }
+}
+
+function DashboardZone({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="mb-6">
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-2 px-1">
+        <div>
+          <div className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700">{title}</div>
+          <div className="mt-1 text-sm font-semibold text-slate-600">{description}</div>
+        </div>
+      </div>
+      {children}
+    </section>
+  );
+}
+
 function FullDashboard() {
   const navigate = useNavigate();
   const { user, logout, isSandbox, hasPermission } = useAuthContext();
+  const role = (user?.role ?? 'VYROBA') as UserRole;
   const rawStats = useDashboardStats();
   const todayOps = useTodayOperations();
   const activity = useActivityTimeline();
   const tenantId = (user as any)?.tenantId || 'main_firm';
+  const dashboardProfile = useMemo(() => getDashboardRoleProfile(role), [role]);
   const vacationAlerts = useVacationAlerts(tenantId);
   const gearboxDashboard = useGearboxDashboard(tenantId);
   const canReadProductionMaster = hasPermission('production.read') || hasPermission('production.manage') || hasPermission('report.read');
@@ -1836,7 +1928,7 @@ function FullDashboard() {
   // Widget config (Firestore + localStorage + role defaults)
   const { widgets, loading: configLoading } = useDashboardConfig(
     user?.id,
-    user?.role ?? 'VYROBA'
+    role
   );
 
   // Live data hooks
@@ -1851,6 +1943,7 @@ function FullDashboard() {
 
   // Quick action modals
   const [activeModal, setActiveModal] = useState<'idea' | 'request' | 'ai' | 'fault' | null>(null);
+  const [showMorePanels, setShowMorePanels] = useState(false);
 
   // Tile data (defensive — all hook data accessed safely)
   const invStats = inventory?.stats ?? { low: 0, critical: 0, out: 0 };
@@ -2020,84 +2113,121 @@ function FullDashboard() {
           </div>
         )}
 
-        <QuickActions onNavigate={(path) => {
-          if (path === 'fault') {
-            setActiveModal('fault');
-            return;
-          }
-          navigate(path);
-        }} />
+        <DashboardZone title="Dnes řešit" description={dashboardProfile.todayDescription}>
+          <QuickActions onNavigate={(path) => {
+            if (path === 'fault') {
+              setActiveModal('fault');
+              return;
+            }
+            navigate(path);
+          }} />
 
-        <OperationalAlerts
-          newKioskTasks={(stats as any).newKioskTasks || 0}
-          criticalTasks={stats.criticalTasks || 0}
-          overdueTasks={(stats as any).overdueTasks || 0}
-          expiredRevisions={revStats.expired ?? 0}
-          expiringRevisions={revStats.expiring ?? 0}
-          lowStockCount={lowStockCount}
-          todayDefects={todayOps.todayDefects}
-          todayAbsences={vacationAlerts.todayVacations.length}
-          onNavigate={navigate}
-        />
-
-        <DailyOperations
-          openTasks={stats.openTasks || 0}
-          criticalTasks={stats.criticalTasks || 0}
-          overdueTasks={(stats as any).overdueTasks || 0}
-          todayLogs={todayOps.todayLogs}
-          todayMinutes={todayOps.todayMinutes}
-          todayDefects={todayOps.todayDefects}
-          onNavigate={navigate}
-        />
-
-        <GearboxDashboardWidget
-          data={gearboxDashboard}
-          onNavigate={navigate}
-          user={user as any}
-          tenantId={tenantId}
-          canWriteTemp={hasPermission('gearbox.temperature.write') || hasPermission('asset.update')}
-          canReportProblem={hasPermission('wo.create')}
-          canLogRepair={hasPermission('asset.update')}
-        />
-
-        {canReadProductionMaster && (
-          <ProductionMasterDashboardWidget
-            data={productionMasterDashboard}
+          <OperationalAlerts
+            newKioskTasks={(stats as any).newKioskTasks || 0}
+            criticalTasks={stats.criticalTasks || 0}
+            overdueTasks={(stats as any).overdueTasks || 0}
+            expiredRevisions={revStats.expired ?? 0}
+            expiringRevisions={revStats.expiring ?? 0}
+            lowStockCount={lowStockCount}
+            todayDefects={todayOps.todayDefects}
+            todayAbsences={vacationAlerts.todayVacations.length}
             onNavigate={navigate}
           />
-        )}
 
-        <VacationNotice
-          todayVacations={vacationAlerts.todayVacations}
-          upcomingVacations={vacationAlerts.upcomingVacations}
-          onNavigate={navigate}
-        />
-
-        <ModuleShortcuts onNavigate={navigate} />
-
-        <OptionalActivityPanel
-          todayItems={activity.todayItems}
-          weekItems={activity.weekItems}
-          onNavigate={navigate}
-        />
-
-        <AuditReadiness
-          todayLogs={todayOps.todayLogs}
-          openTasks={stats.openTasks || 0}
-          todayDefects={todayOps.todayDefects}
-          onNavigate={navigate}
-        />
-
-        <AiTipCard stats={stats} />
-        <ReminderStrip tasks={recurringToday} onNavigate={() => navigate('/schedules')} />
-
-        {!configLoading && filteredWidgets.length > 0 && (
-          <SecondaryModules
-            widgets={filteredWidgets}
-            getTileData={getTileData}
-            onTileClick={handleTileClick}
+          <DailyOperations
+            openTasks={stats.openTasks || 0}
+            criticalTasks={stats.criticalTasks || 0}
+            overdueTasks={(stats as any).overdueTasks || 0}
+            todayLogs={todayOps.todayLogs}
+            todayMinutes={todayOps.todayMinutes}
+            todayDefects={todayOps.todayDefects}
+            onNavigate={navigate}
           />
-        )}
+        </DashboardZone>
+
+        <DashboardZone title="Moje sledování" description={dashboardProfile.watchDescription}>
+          {dashboardProfile.showGearbox && (
+            <GearboxDashboardWidget
+              data={gearboxDashboard}
+              onNavigate={navigate}
+              user={user as any}
+              tenantId={tenantId}
+              canWriteTemp={hasPermission('gearbox.temperature.write') || hasPermission('asset.update')}
+              canReportProblem={hasPermission('wo.create')}
+              canLogRepair={hasPermission('asset.update')}
+            />
+          )}
+
+          {dashboardProfile.showProductionMaster && canReadProductionMaster && (
+            <ProductionMasterDashboardWidget
+              data={productionMasterDashboard}
+              onNavigate={navigate}
+            />
+          )}
+
+          {!dashboardProfile.showGearbox && !(dashboardProfile.showProductionMaster && canReadProductionMaster) && (
+            <div className="rounded-2xl border border-dashed border-stone-300 bg-white/70 p-4 text-sm font-semibold text-slate-500">
+              Pro tuto roli zatím nejsou připnuté sledované widgety. Další přehledy jsou sbalené níže.
+            </div>
+          )}
+        </DashboardZone>
+
+        <section className="mb-5 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm shadow-stone-200/70">
+          <button
+            type="button"
+            onClick={() => setShowMorePanels((value) => !value)}
+            className="flex w-full items-center justify-between gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-stone-50 active:scale-[0.99]"
+          >
+            <div>
+              <div className="text-sm font-black text-slate-950">Další přehledy</div>
+              <div className="mt-0.5 text-xs font-semibold text-slate-500">
+                {dashboardProfile.moreDescription}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="rounded-full border border-stone-200 bg-stone-50 px-2.5 py-1 text-xs font-black text-slate-600">
+                {showMorePanels ? 'Skrýt' : 'Zobrazit'}
+              </span>
+              {showMorePanels ? <ChevronUp className="h-4 w-4 text-slate-500" /> : <ChevronDown className="h-4 w-4 text-slate-500" />}
+            </div>
+          </button>
+
+          {showMorePanels && (
+            <div className="mt-3 space-y-4">
+              <VacationNotice
+                todayVacations={vacationAlerts.todayVacations}
+                upcomingVacations={vacationAlerts.upcomingVacations}
+                onNavigate={navigate}
+              />
+
+              <ModuleShortcuts onNavigate={navigate} />
+
+              <OptionalActivityPanel
+                todayItems={activity.todayItems}
+                weekItems={activity.weekItems}
+                onNavigate={navigate}
+              />
+
+              <AuditReadiness
+                todayLogs={todayOps.todayLogs}
+                openTasks={stats.openTasks || 0}
+                todayDefects={todayOps.todayDefects}
+                onNavigate={navigate}
+              />
+
+              <AiTipCard stats={stats} />
+              <ReminderStrip tasks={recurringToday} onNavigate={() => navigate('/schedules')} />
+
+              {!configLoading && filteredWidgets.length > 0 && (
+                <SecondaryModules
+                  widgets={filteredWidgets}
+                  getTileData={getTileData}
+                  onTileClick={handleTileClick}
+                />
+              )}
+            </div>
+          )}
+        </section>
       </div>
 
       {/* ACTION MODALS */}
