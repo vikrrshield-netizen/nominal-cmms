@@ -64,10 +64,10 @@ function safeInspectionStatus(value: unknown): InspectionPoint['status'] {
 // CONFIG
 // ═══════════════════════════════════════════════════
 const STATUS_STYLES: Record<string, { bg: string; border: string; badge: string; label: string }> = {
-  pending: { bg: 'bg-slate-500/10', border: 'border-slate-500/20', badge: 'bg-amber-500/20 text-amber-400', label: 'Chybí' },
-  ok: { bg: 'bg-emerald-500/8', border: 'border-emerald-500/20', badge: 'bg-emerald-500/20 text-emerald-400', label: 'OK' },
-  issue: { bg: 'bg-red-500/10', border: 'border-red-500/25', badge: 'bg-red-500/20 text-red-400', label: 'Závada' },
-  missing: { bg: 'bg-amber-500/10', border: 'border-amber-500/25', badge: 'bg-amber-500/20 text-amber-400', label: 'Chybí' },
+  pending: { bg: 'bg-white', border: 'border-[#e7dfd2]', badge: 'bg-amber-50 text-amber-800 border border-amber-200', label: 'Čeká' },
+  ok: { bg: 'bg-emerald-50/70', border: 'border-emerald-200', badge: 'bg-emerald-100 text-emerald-800 border border-emerald-200', label: 'OK' },
+  issue: { bg: 'bg-red-50/80', border: 'border-red-200', badge: 'bg-red-100 text-red-800 border border-red-200', label: 'Závada' },
+  missing: { bg: 'bg-amber-50/80', border: 'border-amber-200', badge: 'bg-amber-100 text-amber-800 border border-amber-200', label: 'Chybí' },
 };
 
 const BUILDINGS = [
@@ -193,39 +193,39 @@ function InspectionCard({ point, onOk, onIssue, onReset, onEdit, onDelete, onOpe
   const style = STATUS_STYLES[point.status] || STATUS_STYLES.pending;
 
   return (
-    <div className={`p-3.5 rounded-2xl border ${style.bg} ${style.border} relative`}>
+    <article className={`relative rounded-[22px] border ${style.bg} ${style.border} p-4 shadow-sm`}>
       {/* Admin controls */}
       {isAdmin && (
-        <div className="absolute top-2 right-2 flex gap-1">
-          <button onClick={onEdit} className="w-6 h-6 rounded-lg bg-white/5 flex items-center justify-center text-slate-500 hover:text-blue-400 transition active:scale-90">
+        <div className="absolute top-3 right-3 flex gap-1.5">
+          <button onClick={onEdit} className="w-8 h-8 rounded-xl border border-slate-200 bg-white flex items-center justify-center text-slate-600 hover:text-blue-700 transition active:scale-90">
             <Pencil className="w-3 h-3" />
           </button>
-          <button onClick={onDelete} className="w-6 h-6 rounded-lg bg-white/5 flex items-center justify-center text-slate-500 hover:text-red-400 transition active:scale-90">
+          <button onClick={onDelete} className="w-8 h-8 rounded-xl border border-red-200 bg-red-50 flex items-center justify-center text-red-600 hover:text-red-800 transition active:scale-90">
             <Trash2 className="w-3 h-3" />
           </button>
         </div>
       )}
 
       {/* Header */}
-      <div className="flex items-center gap-2 mb-2 pr-14">
-        <span className="text-[11px] font-bold text-slate-400">{point.roomCode}</span>
-        <span className="text-[11px] text-slate-600">{point.floor}</span>
+      <div className="flex items-center gap-2 mb-3 pr-20">
+        <span className="text-xs font-black text-slate-950">{point.roomCode}</span>
+        <span className="text-xs font-bold text-slate-500">{point.floor}</span>
         {point.category && (
-          <span className="text-[11px] px-1.5 py-0.5 rounded-md bg-white/5 text-slate-500">{point.category}</span>
+          <span className="text-xs px-2 py-1 rounded-lg bg-[#efe7dc] text-slate-700">{point.category}</span>
         )}
-        <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ml-auto ${style.badge}`}>
+        <span className={`px-2.5 py-1 rounded-full text-xs font-black ml-auto ${style.badge}`}>
           {style.label}
         </span>
       </div>
 
       {/* Name + description */}
-      <h3 className="text-[14px] font-semibold text-white leading-tight mb-1">{point.roomName}</h3>
-      <p className="text-[12px] text-slate-500 leading-relaxed mb-3">{point.description}</p>
+      <h3 className="text-lg font-black text-slate-950 leading-tight mb-1">{point.roomName}</h3>
+      <p className="text-sm text-slate-700 leading-relaxed mb-3 break-words whitespace-pre-wrap">{point.description}</p>
 
       {/* Issue note */}
       {point.status === 'issue' && point.issueNote && (
-        <div className="px-2.5 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 mb-3">
-          <p className="text-[11px] text-red-400">⚠ {point.issueNote}</p>
+        <div className="px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 mb-3">
+          <p className="text-sm font-semibold text-slate-950 break-words whitespace-pre-wrap">⚠ {point.issueNote}</p>
         </div>
       )}
 
@@ -233,7 +233,7 @@ function InspectionCard({ point, onOk, onIssue, onReset, onEdit, onDelete, onOpe
         <button
           type="button"
           onClick={onOpenTask}
-          className="w-full mb-3 px-3 py-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold flex items-center justify-center gap-2 active:scale-[0.98]"
+          className="w-full mb-3 px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm font-black flex items-center justify-center gap-2 active:scale-[0.98]"
         >
           <ClipboardList className="w-4 h-4" />
           Otevřít úkol k závadě
@@ -242,7 +242,7 @@ function InspectionCard({ point, onOk, onIssue, onReset, onEdit, onDelete, onOpe
 
       {/* Inspector info */}
       {point.lastInspectedBy && (
-        <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mb-3">
+        <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 mb-3">
           <User className="w-3 h-3" />
           <span>{point.lastInspectedBy}</span>
           {point.lastInspectedAt && (
@@ -255,26 +255,26 @@ function InspectionCard({ point, onOk, onIssue, onReset, onEdit, onDelete, onOpe
       )}
 
       {/* Action buttons */}
-      <div className="flex gap-1.5">
-        <button onClick={onReset} className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-500 hover:text-white transition active:scale-90">
+      <div className="grid grid-cols-[44px_1fr_1fr] gap-2">
+        <button onClick={onReset} className="w-11 h-11 rounded-xl bg-white border border-[#e7dfd2] flex items-center justify-center text-slate-500 hover:text-slate-900 transition active:scale-90">
           <RotateCcw className="w-4 h-4" />
         </button>
         <button
           onClick={onOk}
-          className={`flex-1 py-2 rounded-xl text-[13px] font-semibold transition-all active:scale-95 flex items-center justify-center gap-1.5
-            ${point.status === 'ok' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30' : 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-400'}`}
+          className={`min-h-11 rounded-xl text-sm font-black transition-all active:scale-95 flex items-center justify-center gap-1.5
+            ${point.status === 'ok' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-emerald-50 border border-emerald-200 text-emerald-800'}`}
         >
           <CheckCircle className="w-4 h-4" /> OK
         </button>
         <button
           onClick={onIssue}
-          className={`flex-1 py-2 rounded-xl text-[13px] font-semibold transition-all active:scale-95 flex items-center justify-center gap-1.5
-            ${point.status === 'issue' ? 'bg-red-500 text-white shadow-lg shadow-red-500/30' : 'bg-red-500/15 border border-red-500/30 text-red-400'}`}
+          className={`min-h-11 rounded-xl text-sm font-black transition-all active:scale-95 flex items-center justify-center gap-1.5
+            ${point.status === 'issue' ? 'bg-red-600 text-white shadow-sm' : 'bg-red-50 border border-red-200 text-red-800'}`}
         >
           <AlertTriangle className="w-4 h-4" /> Závada
         </button>
       </div>
-    </div>
+    </article>
   );
 }
 
