@@ -1944,6 +1944,25 @@ function FullDashboard() {
   // Quick action modals
   const [activeModal, setActiveModal] = useState<'idea' | 'request' | 'ai' | 'fault' | null>(null);
   const [showMorePanels, setShowMorePanels] = useState(false);
+  const watchStorageKey = useMemo(() => `nominal-dashboard-watch-collapsed:${user?.id || role}`, [role, user?.id]);
+  const [watchCollapsed, setWatchCollapsed] = useState(false);
+  useEffect(() => {
+    try {
+      setWatchCollapsed(localStorage.getItem(watchStorageKey) === '1');
+    } catch {
+      setWatchCollapsed(false);
+    }
+  }, [watchStorageKey]);
+
+  const toggleWatchCollapsed = () => {
+    setWatchCollapsed((current) => {
+      const next = !current;
+      try {
+        localStorage.setItem(watchStorageKey, next ? '1' : '0');
+      } catch { /* ignore */ }
+      return next;
+    });
+  };
 
   // Tile data (defensive — all hook data accessed safely)
   const invStats = inventory?.stats ?? { low: 0, critical: 0, out: 0 };
@@ -2146,29 +2165,48 @@ function FullDashboard() {
         </DashboardZone>
 
         <DashboardZone title="Moje sledování" description={dashboardProfile.watchDescription}>
-          {dashboardProfile.showGearbox && (
-            <GearboxDashboardWidget
-              data={gearboxDashboard}
-              onNavigate={navigate}
-              user={user as any}
-              tenantId={tenantId}
-              canWriteTemp={hasPermission('gearbox.temperature.write') || hasPermission('asset.update')}
-              canReportProblem={hasPermission('wo.create')}
-              canLogRepair={hasPermission('asset.update')}
-            />
-          )}
+          <div className="mb-3 flex justify-end">
+            <button
+              type="button"
+              onClick={toggleWatchCollapsed}
+              className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 text-xs font-black text-slate-600 transition hover:bg-stone-50 active:scale-[0.99]"
+            >
+              {watchCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+              {watchCollapsed ? 'Rozbalit sledování' : 'Minimalizovat sledování'}
+            </button>
+          </div>
 
-          {dashboardProfile.showProductionMaster && canReadProductionMaster && (
-            <ProductionMasterDashboardWidget
-              data={productionMasterDashboard}
-              onNavigate={navigate}
-            />
-          )}
-
-          {!dashboardProfile.showGearbox && !(dashboardProfile.showProductionMaster && canReadProductionMaster) && (
-            <div className="rounded-2xl border border-dashed border-stone-300 bg-white/70 p-4 text-sm font-semibold text-slate-500">
-              Pro tuto roli zatím nejsou připnuté sledované widgety. Další přehledy jsou sbalené níže.
+          {watchCollapsed ? (
+            <div className="rounded-2xl border border-stone-200 bg-white/80 p-4 text-sm font-semibold text-slate-500">
+              Sledované widgety jsou skryté na tomto zařízení.
             </div>
+          ) : (
+            <>
+              {dashboardProfile.showGearbox && (
+                <GearboxDashboardWidget
+                  data={gearboxDashboard}
+                  onNavigate={navigate}
+                  user={user as any}
+                  tenantId={tenantId}
+                  canWriteTemp={hasPermission('gearbox.temperature.write') || hasPermission('asset.update')}
+                  canReportProblem={hasPermission('wo.create')}
+                  canLogRepair={hasPermission('asset.update')}
+                />
+              )}
+
+              {dashboardProfile.showProductionMaster && canReadProductionMaster && (
+                <ProductionMasterDashboardWidget
+                  data={productionMasterDashboard}
+                  onNavigate={navigate}
+                />
+              )}
+
+              {!dashboardProfile.showGearbox && !(dashboardProfile.showProductionMaster && canReadProductionMaster) && (
+                <div className="rounded-2xl border border-dashed border-stone-300 bg-white/70 p-4 text-sm font-semibold text-slate-500">
+                  Pro tuto roli zatím nejsou připnuté sledované widgety. Další přehledy jsou sbalené níže.
+                </div>
+              )}
+            </>
           )}
         </DashboardZone>
 
