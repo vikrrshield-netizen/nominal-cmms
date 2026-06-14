@@ -6,6 +6,8 @@ import { collection, limit, onSnapshot, orderBy, query, Timestamp, where } from 
 import { db } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
 import { useBackNavigation } from '../hooks/useBackNavigation';
+import appConfig from '../appConfig';
+import { brandFilePrefix } from '../lib/branding';
 import {
   BarChart3,
   FileSpreadsheet, ArrowLeft,
@@ -659,7 +661,7 @@ function exportCSV(rows: TaskRow[], rangeLabel: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `VIKRR_Report_${rangeLabel.replace(/\s+/g, '_')}.csv`;
+  a.download = `${brandFilePrefix('Report')}_${rangeLabel.replace(/\s+/g, '_')}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -685,7 +687,7 @@ function exportPDF(tasks: TaskRow[], inspections: InspectionLogRow[], rangeLabel
   </tr>`).join('');
 
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
-    <title>VIKRR Report — ${rangeLabel}</title>
+    <title>${appConfig.APP_NAME} Report — ${rangeLabel}</title>
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
       body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px; color: #1e293b; padding: 20px; }
@@ -700,7 +702,7 @@ function exportPDF(tasks: TaskRow[], inspections: InspectionLogRow[], rangeLabel
       @media print { body { padding: 10px; } }
     </style></head><body>
     <h1>Nominal CMMS — Technický report událostí</h1>
-    <div class="subtitle">${rangeLabel} · Vygenerováno: ${new Date().toLocaleDateString('cs-CZ')} · VIKRR Asset Shield</div>
+    <div class="subtitle">${rangeLabel} · Vygenerováno: ${new Date().toLocaleDateString('cs-CZ')} · ${appConfig.APP_NAME}</div>
     <h2>Úkoly a opravy (${tasks.length})</h2>
     <table><thead><tr><th>Vytvořeno</th><th>Dokončeno</th><th>Prior.</th><th>Stroj</th><th>Úkol</th><th>Řešení</th><th>Technik</th><th>Čas</th></tr></thead>
     <tbody>${taskRows || '<tr><td colspan="8">Žádné záznamy</td></tr>'}</tbody></table>
@@ -787,7 +789,7 @@ function exportExpandedCSV(tasks: TaskRow[], inspections: InspectionLogRow[], wo
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `VIKRR_Audit_Report_${rangeLabel.replace(/\s+/g, '_')}.csv`;
+  a.download = `${brandFilePrefix('Audit_Report')}_${rangeLabel.replace(/\s+/g, '_')}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -837,7 +839,7 @@ function exportExpandedPDF(tasks: TaskRow[], inspections: InspectionLogRow[], wo
   </tr>`).join('');
 
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
-    <title>VIKRR audit report - ${rangeLabel}</title>
+    <title>${appConfig.APP_NAME} audit report - ${rangeLabel}</title>
     <style>
       * { box-sizing: border-box; }
       body { font-family: Arial, sans-serif; font-size: 11px; color: #0f172a; padding: 18px; }
@@ -856,7 +858,7 @@ function exportExpandedPDF(tasks: TaskRow[], inspections: InspectionLogRow[], wo
       @page { margin: 12mm; size: A4 landscape; }
     </style></head><body>
     <h1>Nominal CMMS - auditni report udalosti</h1>
-    <div class="subtitle">${rangeLabel} · vygenerovano ${new Date().toLocaleDateString('cs-CZ')} · VIKRR Asset Shield</div>
+    <div class="subtitle">${rangeLabel} · vygenerovano ${new Date().toLocaleDateString('cs-CZ')} · ${appConfig.APP_NAME}</div>
     <div class="summary">
       <div class="box"><strong>${audit.completedTasks}</strong><span>Dokoncene ukoly</span></div>
       <div class="box"><strong>${inspections.length}</strong><span>Kontroly</span></div>

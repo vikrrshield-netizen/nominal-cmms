@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, Clock, ClipboardList, FileSpreadsheet, FileText, Link2, Loader2, MapPin, Minus, NotebookPen, Plus, Search, ShieldCheck, User, Wrench } from 'lucide-react';
 import { useAuthContext } from '../context/AuthContext';
 import { useBackNavigation } from '../hooks/useBackNavigation';
+import { brandFilePrefix } from '../lib/branding';
 import { useEmployeeNames } from '../hooks/useEmployeeDirectory';
 import MicButton from '../components/ui/MicButton';
 import { addWorkLog, subscribeToRecentWorkLogs, updateWorkLog } from '../services/workLogService';
@@ -198,7 +199,7 @@ function exportDiaryCSV(logs: WorkLog[], label: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `VIKRR_Denik_udrzby_${label}_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.download = `${brandFilePrefix('Denik_udrzby')}_${label}_${new Date().toISOString().slice(0, 10)}.csv`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

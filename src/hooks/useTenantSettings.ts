@@ -22,6 +22,9 @@ export function useTenantSettings() {
           return {
             id: d.id,
             name: data.name || d.id,
+            appName: data.appName || '',
+            logoUrl: data.logoUrl || '',
+            logoLetter: data.logoLetter || '',
             activeModules: data.activeModules || ALL_MODULE_IDS,
             updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(),
             updatedByName: data.updatedByName || '',
@@ -33,6 +36,9 @@ export function useTenantSettings() {
           docs.push({
             id: 'main_firm',
             name: 'Nominal s.r.o.',
+            appName: '',
+            logoUrl: '',
+            logoLetter: '',
             activeModules: ALL_MODULE_IDS,
             updatedAt: new Date(),
             updatedByName: '',
@@ -69,5 +75,17 @@ export function useTenantSettings() {
     } catch { /* ignore */ }
   };
 
-  return { tenants, loading, updateModules };
+  const updateBrand = async (
+    tenantId: string,
+    brand: { name?: string; appName?: string; logoUrl?: string; logoLetter?: string },
+    userName: string,
+  ) => {
+    await setDoc(doc(db, 'tenant_settings', tenantId), {
+      ...brand,
+      updatedAt: serverTimestamp(),
+      updatedByName: userName,
+    }, { merge: true });
+  };
+
+  return { tenants, loading, updateModules, updateBrand };
 }

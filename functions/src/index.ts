@@ -8,7 +8,15 @@ admin.initializeApp();
 const db = admin.firestore();
 
 // Bezpečné přihlášení PINem (custom token + lockout) + správa PINů
-export { loginWithPin, adminSetUserPin, backfillPinHashes, disableLegacyLogin } from './auth';
+export {
+  loginWithPin,
+  adminSetUserPin,
+  adminCreateUser,
+  backfillPinHashes,
+  deletePlaintextPins,
+  disableLegacyLogin,
+  migrateAuthEmails,
+} from './auth';
 
 const OPEN_TASK_STATUSES = new Set(['backlog', 'planned', 'in_progress', 'paused']);
 const PUSH_TARGET_ROLES = new Set(['SUPERADMIN', 'VEDENI', 'UDRZBA']);

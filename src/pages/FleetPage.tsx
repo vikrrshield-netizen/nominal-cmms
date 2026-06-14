@@ -9,6 +9,7 @@ import { db } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
 import { useEntityLogs } from '../hooks/useEntityLogs';
 import appConfig from '../appConfig';
+import { brandLogoHtml } from '../lib/branding';
 import {
   EntityCardCompact,
   computeEntityStatus, getFieldSemaphore,
@@ -118,8 +119,8 @@ function printVehicleReport(entity: Entity, blueprint: Blueprint | null, logs: E
   }).join('');
 
   w.document.write(`<!DOCTYPE html><html><head><title>${entity.name} — Report</title>
-<style>body{font-family:Arial,sans-serif;margin:40px;color:#333}h1{color:#1e293b;border-bottom:3px solid #3b82f6;padding-bottom:10px}h2{color:#475569;margin-top:30px}table{width:100%;border-collapse:collapse;margin-top:10px}.logo{display:flex;align-items:center;gap:12px;margin-bottom:20px}.logo-box{width:48px;height:48px;background:linear-gradient(135deg,#3b82f6,#6366f1);border-radius:12px;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:20px}.meta{color:#64748b;font-size:13px;margin-top:4px}@media print{body{margin:20px}}</style></head><body>
-<div class="logo"><div class="logo-box">${appConfig.LOGO_LETTER}</div><div><div style="font-size:18px;font-weight:bold">${appConfig.APP_NAME}</div><div class="meta">Vozový park — Karta vozidla</div></div></div>
+<style>body{font-family:Arial,sans-serif;margin:40px;color:#333}h1{color:#1e293b;border-bottom:3px solid #3b82f6;padding-bottom:10px}h2{color:#475569;margin-top:30px}table{width:100%;border-collapse:collapse;margin-top:10px}.logo{display:flex;align-items:center;gap:12px;margin-bottom:20px}.logo-box{width:48px;height:48px;background:linear-gradient(135deg,#3b82f6,#6366f1);border-radius:12px;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:20px;object-fit:contain}.meta{color:#64748b;font-size:13px;margin-top:4px}@media print{body{margin:20px}}</style></head><body>
+<div class="logo">${brandLogoHtml()}<div><div style="font-size:18px;font-weight:bold">${appConfig.APP_NAME}</div><div class="meta">Vozový park — Karta vozidla</div></div></div>
 <h1>${entity.name}</h1>
 <p class="meta">Kód: ${entity.code} &nbsp;|&nbsp; Vytištěno: ${new Date().toLocaleDateString('cs-CZ')} ${new Date().toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}</p>
 <h2>Technické údaje</h2>

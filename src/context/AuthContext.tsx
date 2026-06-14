@@ -18,7 +18,6 @@ interface User {
   uid: string;
   displayName: string;
   role: UserRole; // zachováno pro zpětnou kompatibilitu
-  pin: string;
   color?: string;
   tenantId: string; // Multi-tenant skeleton
 
@@ -117,7 +116,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             uid: firebaseUser.uid,
             displayName: 'Ucen (Demo)',
             role: 'UDRZBA',
-            pin: '',
             tenantId: 'main_firm',
             roleIds: [],
             primaryRoleId: '',
@@ -137,7 +135,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               uid: firebaseUser.uid,
               displayName: sandboxActive ? 'Učeň (Demo)' : (data.displayName || 'Neznámý'),
               role: (sandboxActive ? 'UDRZBA' : data.role) as UserRole,
-              pin: data.pin || '',
               color: data.color,
               tenantId: data.tenantId || 'main_firm',
 
@@ -153,7 +150,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               uid: firebaseUser.uid,
               displayName: sandboxActive ? 'Učeň (Demo)' : (firebaseUser.email || 'Neznámý'),
               role: sandboxActive ? 'UDRZBA' : 'OPERATOR',
-              pin: '',
               tenantId: 'main_firm',
               roleIds: sandboxActive ? [] : ['role_operator'],
               primaryRoleId: sandboxActive ? '' : 'role_operator',
@@ -168,7 +164,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             uid: firebaseUser.uid,
             displayName: sandboxActive ? 'Učeň (Demo)' : (firebaseUser.email || 'Neznámý'),
             role: sandboxActive ? 'UDRZBA' : 'OPERATOR',
-            pin: '',
             tenantId: 'main_firm',
             roleIds: sandboxActive ? [] : ['role_operator'],
             primaryRoleId: sandboxActive ? '' : 'role_operator',

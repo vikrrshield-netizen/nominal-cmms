@@ -1,11 +1,8 @@
-// src/pages/LoginPage.tsx
-// VIKRR — Asset Shield — Přihlášení PIN kódem
-
 import { useState } from 'react';
 import { useAuthContext } from '../context/AuthContext';
 import { isSandboxLoginEnabled } from '../lib/firebase';
-import { Shield, Delete, LogIn } from 'lucide-react';
-import appConfig from '../appConfig';
+import { Delete, LogIn } from 'lucide-react';
+import BrandMark from '../components/ui/BrandMark';
 
 export default function LoginPage() {
   const { login } = useAuthContext();
@@ -19,7 +16,7 @@ export default function LoginPage() {
       setPin(newPin);
       setError(false);
 
-      // Auto-submit at full length (6); 4–5 confirm via button
+      // Auto-submit at full length (6); 4-5 digits confirm via button.
       if (newPin.length === 6) {
         handleLogin(newPin);
       }
@@ -27,7 +24,7 @@ export default function LoginPage() {
   };
 
   const handleDelete = () => {
-    setPin(prev => prev.slice(0, -1));
+    setPin((prev) => prev.slice(0, -1));
     setError(false);
   };
 
@@ -35,30 +32,20 @@ export default function LoginPage() {
     setIsLoading(true);
     const success = await login(pinToUse);
     setIsLoading(false);
-    
+
     if (!success) {
       setError(true);
       setPin('');
-      // Vibrate on error (if supported)
       if (navigator.vibrate) navigator.vibrate(200);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6">
-      
-      {/* Logo */}
+    <div data-testid="login-screen" className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6">
       <div className="flex flex-col items-center gap-2 mb-8">
-        <div className="w-16 h-16 bg-gradient-to-br from-[#1e3a5f] to-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/20">
-          <Shield className="w-9 h-9 text-white" />
-        </div>
-        <div className="text-center">
-          <h1 className="text-2xl font-black tracking-tight text-white">{appConfig.BRAND_NAME}</h1>
-          <p className="text-blue-400/80 text-[10px] font-medium tracking-widest uppercase">{appConfig.PRODUCT_NAME_SHORT}</p>
-        </div>
+        <BrandMark size="lg" tone="light" className="flex-col text-center" />
       </div>
 
-      {/* PIN Display */}
       <div className="mb-8">
         <div className="flex gap-2 mb-3">
           {[0, 1, 2, 3, 4, 5].map((i) => (
@@ -87,7 +74,6 @@ export default function LoginPage() {
         )}
       </div>
 
-      {/* Numpad */}
       <div className="grid grid-cols-3 gap-3 max-w-xs">
         {['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'].map((key) => {
           if (key === '') return <div key="empty" />;
@@ -95,6 +81,8 @@ export default function LoginPage() {
             return (
               <button
                 key="del"
+                data-testid="pin-delete"
+                type="button"
                 onClick={handleDelete}
                 disabled={pin.length === 0 || isLoading}
                 className="w-20 h-16 rounded-xl bg-slate-700 text-white flex items-center justify-center hover:bg-slate-600 active:scale-95 transition disabled:opacity-30"
@@ -106,6 +94,8 @@ export default function LoginPage() {
           return (
             <button
               key={key}
+              data-testid={`pin-${key}`}
+              type="button"
               onClick={() => handleDigit(key)}
               disabled={isLoading}
               className="w-20 h-16 rounded-xl bg-slate-800 border border-slate-700 text-white text-2xl font-bold hover:bg-slate-700 active:scale-95 active:bg-blue-600 transition disabled:opacity-50"
@@ -116,8 +106,9 @@ export default function LoginPage() {
         })}
       </div>
 
-      {/* Submit (pro 4–5místné PINy; 6místný se odešle sám) */}
       <button
+        data-testid="pin-submit"
+        type="button"
         onClick={() => handleLogin(pin)}
         disabled={pin.length < 4 || isLoading}
         className="mt-5 w-full max-w-xs h-14 rounded-xl bg-blue-600 text-white text-lg font-bold flex items-center justify-center gap-2 hover:bg-blue-500 active:scale-95 transition disabled:opacity-30 disabled:cursor-not-allowed"
@@ -126,7 +117,6 @@ export default function LoginPage() {
         Přihlásit
       </button>
 
-      {/* Loading */}
       {isLoading && (
         <div className="mt-6 flex items-center gap-2 text-blue-400">
           <LogIn className="w-5 h-5 animate-pulse" />
@@ -134,7 +124,6 @@ export default function LoginPage() {
         </div>
       )}
 
-      {/* CSS for shake animation */}
       <style>{`
         @keyframes shake {
           0%, 100% { transform: translateX(0); }

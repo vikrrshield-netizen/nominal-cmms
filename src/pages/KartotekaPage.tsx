@@ -485,7 +485,11 @@ function RootCard({ asset, allAssets, expanded, onToggle, onDetail, onAddChild, 
           {/* Název = rozbalit/sbalit větev (jinak otevře rodný list) */}
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); hasChildren ? onToggle(asset.id) : onDetail(asset); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (hasChildren) onToggle(asset.id);
+              else onDetail(asset);
+            }}
             title={hasChildren ? (isExpanded ? 'Sbalit' : 'Rozbalit') : 'Otevřít rodný list'}
             style={{
               display: 'flex', alignItems: 'center', gap: 8,

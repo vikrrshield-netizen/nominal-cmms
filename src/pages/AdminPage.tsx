@@ -2,15 +2,13 @@
 // VIKRR — Asset Shield — Administrace uživatelů a nastavení
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { collection, doc, setDoc, addDoc, updateDoc, onSnapshot, serverTimestamp, Timestamp, query, orderBy, limit, writeBatch } from 'firebase/firestore';
-import { initializeApp, deleteApp } from 'firebase/app';
-import { getAuth, createUserWithEmailAndPassword, signOut as firebaseSignOut } from 'firebase/auth';
-import { db, firebaseConfig, adminSetUserPin, adminBackfillPinHashes, adminDisableLegacyLogin } from '../lib/firebase';
+import { collection, doc, addDoc, updateDoc, onSnapshot, serverTimestamp, Timestamp, query, orderBy, limit, writeBatch } from 'firebase/firestore';
+import { db, adminCreateUser, adminSetUserPin, adminBackfillPinHashes, adminDisableLegacyLogin, adminMigrateAuthEmails } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
 import { useBackNavigation } from '../hooks/useBackNavigation';
 import {
   Users, Shield, Edit2, Trash2, Save,
-  X, ArrowLeft, AlertTriangle, Eye, EyeOff, UserPlus,
+  X, ArrowLeft, AlertTriangle, UserPlus,
   Lock, Unlock, History, Building2, Settings2, Plus, Check, Loader2, LayoutGrid, Briefcase,
   Upload, FileSpreadsheet, Download, CheckCircle2, Bug, Search,
 } from 'lucide-react';
@@ -32,7 +30,7 @@ type UserRole = 'SUPERADMIN' | 'VEDENI' | 'MAJITEL' | 'UDRZBA' | 'SKLADNIK' | 'V
 interface AdminUser {
   id: string;
   displayName: string;
-  pin: string;
+  pin?: string;
   role: UserRole;
   email?: string;
   phone?: string;
@@ -214,7 +212,6 @@ export default function AdminPage() {
           return {
             id: d.id,
             displayName: data.displayName || '',
-            pin: data.pin || '',
             role: data.role || 'OPERATOR',
             email: data.email || '',
             phone: data.phone || '',
@@ -233,7 +230,7 @@ export default function AdminPage() {
         }).sort((a, b) => a.displayName.localeCompare(b.displayName, 'cs'));
 
         // Only update state if data actually changed (prevents unnecessary re-renders)
-        const hash = loaded.map(u => `${u.id}:${u.displayName}:${u.pin}:${u.role}:${u.active}:${u.building}:${u.positionId}:${JSON.stringify(u.customPermissions)}:${JSON.stringify(u.scope)}`).join('|');
+        const hash = loaded.map(u => `${u.id}:${u.displayName}:${u.role}:${u.active}:${u.building}:${u.positionId}:${JSON.stringify(u.customPermissions)}:${JSON.stringify(u.scope)}`).join('|');
         if (hash !== usersHashRef.current) {
           usersHashRef.current = hash;
           setUsers(loaded);
@@ -269,7 +266,6 @@ export default function AdminPage() {
       if (!needle) return true;
       return normalizeAdminSearch([
         u.displayName,
-        u.pin,
         u.role,
         ROLE_CONFIG[u.role]?.label,
         u.email,
@@ -466,7 +462,7 @@ export default function AdminPage() {
                   <input
                     value={userSearch}
                     onChange={(event) => setUserSearch(event.target.value)}
-                    placeholder="Hledat pracovníka podle jména, PINu, role, budovy..."
+                    placeholder="Hledat pracovníka podle jména, role, budovy..."
                     className="h-12 w-full bg-transparent text-base font-semibold text-slate-900 outline-none placeholder:text-slate-400"
                   />
                 </div>
@@ -580,7 +576,6 @@ export default function AdminPage() {
       {/* New User Modal */}
       {showNewUserModal && canEdit && (
         <NewUserModal
-          existingPins={users.map(u => u.pin)}
           onClose={() => setShowNewUserModal(false)}
           onCreated={() => setShowNewUserModal(false)}
         />
@@ -623,8 +618,8 @@ function AdminUserCard({ adminUser, onSelect }: { adminUser: AdminUser; onSelect
         )}
       </div>
       <div className="text-right shrink-0">
-        <div className="font-mono text-lg text-slate-900">{adminUser.pin}</div>
-        <div className="text-xs text-slate-400">PIN</div>
+        <div className="text-xs font-bold text-emerald-700">PIN chráněn</div>
+        <div className="text-xs text-slate-400">reset v detailu</div>
       </div>
     </button>
   );
@@ -645,10 +640,9 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
   const { user: authUser } = useAuthContext();
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [showPin, setShowPin] = useState(false);
   const [formData, setFormData] = useState({
     displayName: user.displayName,
-    pin: user.pin,
+    pin: '',
     role: user.role,
     email: user.email || '',
     phone: user.phone || '',
@@ -660,7 +654,8 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
   const roleCfg = ROLE_CONFIG[user.role];
 
   const handleSave = async () => {
-    if (!/^\d{4,6}$/.test(formData.pin)) {
+    const nextPin = formData.pin.trim();
+    if (nextPin && !/^\d{4,6}$/.test(nextPin)) {
       showToast('PIN musí mít 4 až 6 číslic.', 'error');
       return;
     }
@@ -673,7 +668,6 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
 
       batch.update(doc(db, 'users', user.id), {
         displayName: formData.displayName.trim(),
-        pin: formData.pin,
         role: formData.role,
         email: formData.email.trim() || '',
         phone: formData.phone.trim() || '',
@@ -702,13 +696,12 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
 
       await batch.commit();
 
-      // PIN se hashuje na serveru (kvůli pepperu). Když se změnil, pošli na funkci.
-      if (formData.pin !== user.pin) {
+      if (nextPin) {
         try {
-          await adminSetUserPin(user.id, formData.pin);
+          await adminSetUserPin(user.id, nextPin);
         } catch (pinErr) {
           console.warn('[AdminPage] adminSetUserPin selhalo (funkce nasazena?):', pinErr);
-          showToast('Pozn.: bezpečné uložení PINu zatím neběží (Cloud Function nenasazena).', 'error');
+          showToast('Bezpečné uložení PINu selhalo.', 'error');
         }
       }
 
@@ -751,16 +744,9 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500">PIN kód</span>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-2xl text-slate-900">
-                      {showPin ? user.pin : '••••'}
-                    </span>
-                    <button
-                      onClick={() => setShowPin(!showPin)}
-                      className="p-1 hover:bg-slate-200 rounded"
-                    >
-                      {showPin ? <EyeOff className="w-4 h-4 text-slate-500" /> : <Eye className="w-4 h-4 text-slate-500" />}
-                    </button>
+                  <div className="text-right">
+                    <div className="text-sm font-bold text-emerald-700">Nezobrazuje se</div>
+                    <div className="text-xs text-slate-500">reset přes Upravit</div>
                   </div>
                 </div>
               </div>
@@ -855,13 +841,14 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
               </div>
               
               <div>
-                <label className="text-sm text-slate-600">PIN (4–6 číslic)</label>
+                <label className="text-sm text-slate-600">Nový PIN (4–6 číslic, prázdné = beze změny)</label>
                 <input
                   type="text"
                   inputMode="numeric"
                   value={formData.pin}
                   onChange={e => setFormData(prev => ({ ...prev, pin: e.target.value.replace(/\D/g, '').slice(0, 6) }))}
                   className="w-full p-2 bg-[#fbf9f4] border border-slate-200 rounded-lg mt-1 text-slate-900 font-mono text-xl"
+                  placeholder="nezadávat, pokud se nemění"
                   maxLength={6}
                 />
               </div>
@@ -1287,8 +1274,7 @@ function UserScopeEditor({
 // NEW USER MODAL
 // ═══════════════════════════════════════════════════════════════════
 
-function NewUserModal({ existingPins, onClose, onCreated }: {
-  existingPins: string[];
+function NewUserModal({ onClose, onCreated }: {
   onClose: () => void;
   onCreated: () => void;
 }) {
@@ -1307,7 +1293,7 @@ function NewUserModal({ existingPins, onClose, onCreated }: {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const isPinValid = /^\d{4,6}$/.test(formData.pin) && !existingPins.includes(formData.pin);
+  const isPinValid = /^\d{4,6}$/.test(formData.pin);
   const isFormValid = formData.displayName.trim() && isPinValid;
 
   const handleSubmit = async () => {
@@ -1315,60 +1301,29 @@ function NewUserModal({ existingPins, onClose, onCreated }: {
     setSaving(true);
     setError('');
 
-    let secondaryApp;
     try {
-      // Secondary App pattern — creates Auth user without logging out current admin
-      secondaryApp = initializeApp(firebaseConfig, 'WorkerRegApp');
-      const secondaryAuth = getAuth(secondaryApp);
-
-      const dummyEmail = `pin_${formData.pin}@nominal.local`;
-      const dummyPassword = `${formData.pin}00`;
-
-      const credential = await createUserWithEmailAndPassword(secondaryAuth, dummyEmail, dummyPassword);
-      const newUid = credential.user.uid;
-
-      // Sign out from secondary app immediately
-      await firebaseSignOut(secondaryAuth);
-
-      // Write Firestore doc with UID as document ID (setDoc, not addDoc)
-      await setDoc(doc(db, 'users', newUid), {
+      await adminCreateUser({
         displayName: formData.displayName.trim(),
         pin: formData.pin,
         role: formData.role,
-        email: dummyEmail,
         phone: formData.email.trim() || '',
-        buildingId: formData.building || '',
+        email: formData.email.trim() || undefined,
+        building: formData.building || undefined,
         positionId: formData.positionId || '',
-        color: '#64748b',
-        active: true,
-        isActive: true,
-        uid: newUid,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        tenantId,
       });
-
-      // pinHash (pro bezpečné přihlášení) počítá server kvůli pepperu
-      try {
-        await adminSetUserPin(newUid, formData.pin);
-      } catch (pinErr) {
-        console.warn('[AdminPage] adminSetUserPin selhalo (funkce nasazena?):', pinErr);
-      }
 
       showToast(`Uživatel "${formData.displayName.trim()}" vytvořen`, 'success');
       onCreated();
     } catch (err: unknown) {
       console.error('[AdminPage] Create user failed:', err);
-      const firebaseErr = err as { code?: string };
-      if (firebaseErr.code === 'auth/email-already-in-use') {
-        setError('Tento PIN je již zaregistrován ve Firebase Auth.');
+      const firebaseErr = err as { code?: string; message?: string };
+      if (firebaseErr.code === 'functions/already-exists' || firebaseErr.message?.toLowerCase().includes('pin')) {
+        setError('Tento PIN už používá jiný uživatel.');
       } else {
         setError('Chyba při vytváření uživatele: ' + (err instanceof Error ? err.message : 'Neznámá chyba'));
       }
     } finally {
-      // Always clean up secondary app
-      if (secondaryApp) {
-        await deleteApp(secondaryApp).catch(() => {});
-      }
       setSaving(false);
     }
   };
@@ -1411,7 +1366,7 @@ function NewUserModal({ existingPins, onClose, onCreated }: {
               placeholder="0000"
             />
             {formData.pin.length >= 4 && !isPinValid && (
-              <p className="text-red-600 text-xs mt-1">Tento PIN už existuje</p>
+              <p className="text-red-600 text-xs mt-1">PIN musí mít 4 až 6 číslic.</p>
             )}
           </div>
 
@@ -1599,7 +1554,7 @@ const DEFAULT_CONFIG_SECTIONS: ConfigSection[] = [
 ];
 
 function LoginSecurityPanel({ canEdit }: { canEdit: boolean }) {
-  const [busy, setBusy] = useState<'' | 'backfill' | 'disable'>('');
+  const [busy, setBusy] = useState<'' | 'backfill' | 'emails' | 'disable'>('');
   const [result, setResult] = useState('');
   const [confirmText, setConfirmText] = useState('');
 
@@ -1631,6 +1586,21 @@ function LoginSecurityPanel({ canEdit }: { canEdit: boolean }) {
     setBusy('');
   };
 
+  const runEmailMigration = async () => {
+    setBusy('emails');
+    setResult('');
+    try {
+      const r = await adminMigrateAuthEmails();
+      setResult(
+        `Auth emaily migrovány: ${r.authMigrated}, už čisté: ${r.authAlreadyClean}, chyby: ${r.authFailures}, profily upraveny: ${r.firestoreUpdated}.`,
+      );
+      showToast('Auth emaily bez PINu migrovány.', 'success');
+    } catch (err) {
+      showToast(`Chyba: ${(err as Error).message}`, 'error');
+    }
+    setBusy('');
+  };
+
   return (
     <div className="vik-card p-4 space-y-4 mb-4">
       <div className="flex items-center gap-3">
@@ -1645,7 +1615,7 @@ function LoginSecurityPanel({ canEdit }: { canEdit: boolean }) {
 
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
         <div className="text-sm font-bold text-slate-900">F1 — Doplnit pinHash</div>
-        <p className="text-xs text-slate-500">Bezpečné. Spočítá hash PINů na serveru. Stará cesta dál funguje.</p>
+        <p className="text-xs text-slate-500">Bezpečné. Spočítá hash PINů na serveru a smaže plaintext PIN z profilu.</p>
         <button
           type="button"
           disabled={!canEdit || busy !== ''}
@@ -1654,6 +1624,23 @@ function LoginSecurityPanel({ canEdit }: { canEdit: boolean }) {
         >
           {busy === 'backfill' ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
           Doplnit pinHash (F1)
+        </button>
+      </div>
+
+      <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-2">
+        <div className="text-sm font-bold text-amber-900">F3 — Skrýt PIN emaily</div>
+        <p className="text-xs text-amber-800/90">
+          Přepíše Auth emaily ve tvaru <span className="font-mono">pin_****@nominal.local</span> na technické
+          <span className="font-mono"> u_&lt;uid&gt;@nominal.local</span> a smaže plaintext PIN z profilů.
+        </p>
+        <button
+          type="button"
+          disabled={!canEdit || busy !== ''}
+          onClick={runEmailMigration}
+          className="vik-button px-4 disabled:opacity-50"
+        >
+          {busy === 'emails' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
+          Migrovat Auth emaily
         </button>
       </div>
 
@@ -1844,7 +1831,7 @@ function ErrorMonitorTab() {
             };
           })
           .filter((log) => log.isErrorLog)
-          .map(({ isErrorLog, ...log }) => log);
+          .map(({ isErrorLog: _isErrorLog, ...log }) => log);
 
         setLogs(loaded);
         setLoading(false);
@@ -1961,7 +1948,7 @@ const AUDIT_LOG_ENTRIES = [
   { time: '16.2.2026 16:45', user: 'Vilém', action: 'Role změna', detail: 'UDRZBA: povoleno canExport', type: 'role' },
   { time: '16.2.2026 14:20', user: 'Martina', action: 'Nový uživatel', detail: 'Vytvořen: Karel Horák (UDRZBA)', type: 'user' },
   { time: '15.2.2026 11:00', user: 'Vilém', action: 'Konfigurace', detail: 'Přidána budova: F — Expedice', type: 'config' },
-  { time: '14.2.2026 14:32', user: 'Vilém', action: 'Přihlášení', detail: 'PIN 3333', type: 'auth' },
+  { time: '14.2.2026 14:32', user: 'Admin', action: 'Přihlášení', detail: 'Token login', type: 'auth' },
   { time: '14.2.2026 14:15', user: 'Pavla', action: 'Schválení úkolu', detail: 'WO-2026-004', type: 'task' },
   { time: '14.2.2026 13:45', user: 'Zdeněk', action: 'Nahlášení poruchy', detail: 'Balička Karel — zaseknutý materiál', type: 'task' },
   { time: '13.2.2026 16:20', user: 'Vilém', action: 'Změna role', detail: 'Petr Volf → UDRZBA', type: 'role' },
