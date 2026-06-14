@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "seed:empty": "node --experimental-strip-types scripts/seed-empty.ts"
+    "seed:empty": "node --experimental-strip-types scripts/seed-empty.ts",
+    "seed:demo": "node --experimental-strip-types scripts/seed-demo.ts"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.18",
