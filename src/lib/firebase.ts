@@ -1,12 +1,11 @@
 import { initializeApp } from 'firebase/app';
 import {
   getAuth,
-  signInWithEmailAndPassword,
   signInWithCustomToken,
   signOut as firebaseSignOut,
   onAuthStateChanged,
   setPersistence,
-  browserLocalPersistence
+  browserLocalPersistence,
 } from 'firebase/auth';
 import type { User as FirebaseUser } from 'firebase/auth';
 import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
@@ -27,8 +26,7 @@ export const isFirebaseConfigured =
 export const isSandboxLoginEnabled =
   import.meta.env.DEV || import.meta.env.VITE_ENABLE_SANDBOX_LOGIN === 'true';
 
-// F2 přepínač: true = přihlášení přes Cloud Function loginWithPin (custom token),
-// false = stará cesta (e-mail/heslo odvozené z PINu). Default false do F2.
+// F3: production login is token-only. Legacy PIN-derived Auth e-mail login is removed.
 export const useTokenLogin = import.meta.env.VITE_USE_TOKEN_LOGIN === 'true';
 
 export const firebaseConfig = {
@@ -37,7 +35,7 @@ export const firebaseConfig = {
   projectId: envProjectId || 'nominal-local-demo',
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'nominal-local-demo.appspot.com',
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '000000000000',
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:000000000000:web:localdemo'
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:000000000000:web:localdemo',
 };
 
 export const app = initializeApp(firebaseConfig);
@@ -53,7 +51,6 @@ enableIndexedDbPersistence(db).catch((err) => {
   console.warn('Offline persistence:', err.code);
 });
 
-const pinToEmail = (pin: string): string => `pin_${pin}@nominal.local`;
 const LOGIN_DEVICE_ID_KEY = 'nominal-login-device-id';
 const sandboxUser = {
   uid: 'sandbox-user',
@@ -95,40 +92,70 @@ export const signInWithPin = async (pin: string): Promise<FirebaseUser> => {
     throw new Error('Firebase neni nastaveny. Pro lokalni ukazku pouzij PIN 0000.');
   }
 
-  // F2+: přihlášení přes Cloud Function (PIN se nepřevádí na heslo)
-  if (useTokenLogin) {
-    const callable = httpsCallable<{ pin: string; deviceId: string }, { token: string }>(functions, 'loginWithPin');
-    const res = await callable({ pin, deviceId: getLoginDeviceId() });
-    const token = res.data?.token;
-    if (!token) throw new Error('Přihlášení selhalo.');
-    const result = await signInWithCustomToken(auth, token);
-    return result.user;
+  if (!useTokenLogin) {
+    throw new Error('Token login is disabled. Nastav VITE_USE_TOKEN_LOGIN=true.');
   }
 
-  // Legacy (F1): e-mail + heslo odvozené z PINu
-  const email = pinToEmail(pin);
-  const password = pin + '00';
-  const result = await signInWithEmailAndPassword(auth, email, password);
+  const callable = httpsCallable<{ pin: string; deviceId: string }, { token: string }>(functions, 'loginWithPin');
+  const res = await callable({ pin, deviceId: getLoginDeviceId() });
+  const token = res.data?.token;
+  if (!token) throw new Error('Prihlaseni selhalo.');
+  const result = await signInWithCustomToken(auth, token);
   return result.user;
 };
 
-// Admin: nastavit/změnit PIN uživatele (hash počítá server kvůli pepperu)
+export type AdminCreateUserInput = {
+  displayName: string;
+  pin: string;
+  role: string;
+  email?: string;
+  phone?: string;
+  building?: string;
+  positionId?: string;
+  tenantId?: string;
+};
+
+export const adminCreateUser = async (
+  input: AdminCreateUserInput,
+): Promise<{ uid: string; email: string; clearedAttempts: number }> => {
+  const callable = httpsCallable<AdminCreateUserInput, { uid: string; email: string; clearedAttempts: number }>(
+    functions,
+    'adminCreateUser',
+  );
+  const res = await callable(input);
+  return res.data;
+};
+
 export const adminSetUserPin = async (userId: string, pin: string): Promise<void> => {
   const callable = httpsCallable<{ userId: string; pin: string }, { ok: boolean }>(functions, 'adminSetUserPin');
   await callable({ userId, pin });
 };
 
-// Admin/migrace: doplnit pinHash všem (F1) — stará cesta dál funguje
 export const adminBackfillPinHashes = async (): Promise<{ updated: number; skipped: number }> => {
   const callable = httpsCallable<Record<string, never>, { updated: number; skipped: number }>(functions, 'backfillPinHashes');
   const res = await callable({});
   return res.data;
 };
 
-// Admin/migrace: vypnout starou cestu (F3, NEVRATNÉ) — náhodná hesla + smazat plaintext PIN
 export const adminDisableLegacyLogin = async (): Promise<{ processed: number; missingSecret: number }> => {
   const callable = httpsCallable<{ confirm: string }, { processed: number; missingSecret: number }>(functions, 'disableLegacyLogin');
   const res = await callable({ confirm: 'ANO' });
+  return res.data;
+};
+
+export const adminMigrateAuthEmails = async (): Promise<{
+  authMigrated: number;
+  authAlreadyClean: number;
+  authFailures: number;
+  firestoreUpdated: number;
+}> => {
+  const callable = httpsCallable<Record<string, never>, {
+    authMigrated: number;
+    authAlreadyClean: number;
+    authFailures: number;
+    firestoreUpdated: number;
+  }>(functions, 'migrateAuthEmails');
+  const res = await callable({});
   return res.data;
 };
 
