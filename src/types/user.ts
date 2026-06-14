@@ -6,12 +6,12 @@
 // ═══════════════════════════════════════════════════════════════════
 
 export type UserRole =
-  | 'MAJITEL'      // 👑 Milan — vidí vše, read-only
-  | 'VEDENI'       // 🏢 Martina — výkonná ředitelka, HR, finance
-  | 'SUPERADMIN'   // 🛠️ Vilém — technika, BEZ financí
-  | 'UDRZBA'       // 🔧 Zdeněk — stroje, sklad
+  | 'MAJITEL'      // 👑 owner — vidí vše, read-only
+  | 'VEDENI'       // 🏢 management — HR, finance
+  | 'SUPERADMIN'   // 🛠️ technical owner — bez financí
+  | 'UDRZBA'       // 🔧 maintenance — stroje, sklad
   | 'SKLADNIK'     // 📦 Skladník — sklad ND, inventura
-  | 'VYROBA'       // 🏭 Pavla — zóny, priority
+  | 'VYROBA'       // 🏭 production — zóny, priority
   | 'OPERATOR';    // 👷 Kiosk — tablet na zdi
 
 // ═══════════════════════════════════════════════════════════════════
@@ -155,7 +155,7 @@ export const ROLE_META: Record<UserRole, RoleMeta> = {
 // ═══════════════════════════════════════════════════════════════════
 
 export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
-  // 👑 MAJITEL (Milan) — Vidí VŠE, ale NEMŮŽE editovat
+  // 👑 MAJITEL — vidí vše, ale nemůže editovat
   MAJITEL: [
     'wo.read',
     'asset.read',
@@ -172,7 +172,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'shifts.view',
   ],
 
-  // 🏢 VEDENÍ (Martina) — Výkonná ředitelka
+  // 🏢 VEDENÍ — management
   VEDENI: [
     'wo.read', 'wo.approve',
     'asset.read',
@@ -190,7 +190,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'shifts.view', 'shifts.manage',
   ],
 
-  // 🛠️ SUPERADMIN (Vilém) — Technika, BEZ financí
+  // 🛠️ SUPERADMIN — technická správa, bez financí
   SUPERADMIN: [
     'wo.create', 'wo.update', 'wo.delete', 'wo.read', 'wo.approve', 'wo.close', 'wo.plan', 'wo.assign',
     'asset.create', 'asset.update', 'asset.delete', 'asset.read',
@@ -214,7 +214,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'shifts.view', 'shifts.manage',
   ],
 
-  // 🔧 ÚDRŽBA (Zdeněk) — Stroje, sklad
+  // 🔧 ÚDRŽBA — stroje, sklad
   UDRZBA: [
     'wo.create', 'wo.update', 'wo.read', 'wo.close',
     'asset.read', 'asset.update',
@@ -230,7 +230,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'shifts.view', 'shifts.manage',
   ],
 
-  // 🏭 VÝROBA (Pavla) — Zóny, priority
+  // 🏭 VÝROBA — zóny, priority
   VYROBA: [
     'wo.create', 'wo.read', 'wo.approve', 'wo.plan',
     'asset.read',
@@ -294,19 +294,6 @@ export interface AppUser {
   updatedAt: Date;
   lastLoginAt?: Date;
 }
-
-// ═══════════════════════════════════════════════════════════════════
-// SAMPLE USERS (pro vývoj)
-// ═══════════════════════════════════════════════════════════════════
-
-export const SAMPLE_USERS: Omit<AppUser, 'createdAt' | 'updatedAt'>[] = [
-  { uid: 'usr-milan',    email: 'pin_1111@nominal.local', displayName: 'Milan Novák',      role: 'MAJITEL',    plantId: 'kozlov', tenantId: 'main_firm', pin: '1111', isActive: true },
-  { uid: 'usr-martina',  email: 'pin_2222@nominal.local', displayName: 'Martina Nováková', role: 'VEDENI',     plantId: 'kozlov', tenantId: 'main_firm', pin: '2222', isActive: true },
-  { uid: 'usr-vilem',    email: 'pin_3333@nominal.local', displayName: 'Vilém',            role: 'SUPERADMIN', plantId: 'kozlov', tenantId: 'main_firm', pin: '3333', isActive: true },
-  { uid: 'usr-zdenek',   email: 'pin_4444@nominal.local', displayName: 'Zdeněk Mička',     role: 'UDRZBA',     plantId: 'kozlov', tenantId: 'main_firm', pin: '4444', isActive: true },
-  { uid: 'usr-pavla',    email: 'pin_5555@nominal.local', displayName: 'Pavla Drápelová',  role: 'VYROBA',     plantId: 'kozlov', tenantId: 'main_firm', pin: '5555', isActive: true },
-  { uid: 'usr-kiosk',    email: 'pin_0000@nominal.local', displayName: 'Kiosk Tablet',     role: 'OPERATOR',   plantId: 'kozlov', tenantId: 'main_firm', pin: '0000', isActive: true },
-];
 
 // ═══════════════════════════════════════════════════════════════════
 // HELPER FUNCTIONS
