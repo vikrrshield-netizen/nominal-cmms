@@ -64,34 +64,35 @@ function makeInstances(ids: string[]): WidgetInstance[] {
   });
 }
 
-// Admin roles see everything including full-width widgets above tiles
-const ADMIN_ORDER = [
-  'semaphore', 'top5', 'lemon',
-  'fault', 'tasks', 'revisions', 'inventory',
-  'fleet', 'hvac', 'dataloggers', 'inspections', 'calendar', 'ai', 'reports',
-  'idea', 'request', 'noticeboard', 'academy', 'production', 'warehouse', 'shifts', 'admin',
+const OWNER_ORDER = [
+  'semaphore', 'top5',
+  'tasks', 'revisions', 'inventory', 'dataloggers', 'inspections', 'fleet', 'hvac',
+  'reports', 'calendar', 'admin',
+];
+
+const MANAGEMENT_ORDER = [
+  'semaphore', 'top5',
+  'tasks', 'revisions', 'inventory', 'dataloggers', 'inspections', 'fleet', 'hvac',
+  'reports', 'calendar',
 ];
 
 const VYROBA_ORDER = [
-  'fault', 'tasks', 'production', 'warehouse', 'shifts', 'inspections', 'calendar',
-  'inventory', 'hvac', 'revisions', 'noticeboard', 'idea', 'request', 'academy',
+  'fault', 'tasks', 'inspections', 'calendar', 'shifts', 'inventory', 'dataloggers',
 ];
 
 const UDRZBA_ORDER = [
   'semaphore', 'top5',
-  'fault', 'tasks', 'production', 'warehouse', 'shifts', 'revisions', 'inventory',
-  'fleet', 'hvac', 'dataloggers', 'inspections', 'calendar', 'ai',
-  'idea', 'request', 'noticeboard', 'academy',
+  'fault', 'tasks', 'revisions', 'inventory', 'hvac', 'dataloggers', 'inspections', 'calendar',
 ];
 
 const SKLADNIK_ORDER = [
-  'inventory', 'hvac', 'dataloggers', 'tasks', 'fault', 'noticeboard', 'idea', 'request', 'academy',
+  'inventory', 'dataloggers', 'tasks', 'inspections', 'calendar',
 ];
 
 const DEFAULT_CONFIGS: Record<UserRole, string[]> = {
-  MAJITEL:    ADMIN_ORDER,
-  VEDENI:     ADMIN_ORDER,
-  SUPERADMIN: ADMIN_ORDER,
+  MAJITEL:    OWNER_ORDER,
+  VEDENI:     MANAGEMENT_ORDER,
+  SUPERADMIN: OWNER_ORDER,
   UDRZBA:     UDRZBA_ORDER,
   SKLADNIK:   SKLADNIK_ORDER,
   VYROBA:     VYROBA_ORDER,
@@ -99,5 +100,5 @@ const DEFAULT_CONFIGS: Record<UserRole, string[]> = {
 };
 
 export function getDefaultConfig(role: UserRole): WidgetInstance[] {
-  return makeInstances(DEFAULT_CONFIGS[role] || ADMIN_ORDER);
+  return makeInstances(DEFAULT_CONFIGS[role] || MANAGEMENT_ORDER);
 }
