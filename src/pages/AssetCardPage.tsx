@@ -55,17 +55,17 @@ import type { WorkLog } from '../types/workLog';
 interface Asset {
   id: string;
   name: string;
-  code?: string;
+  code?: string | null;
   buildingId: string;
   areaName: string;
   entityType?: string;
-  location?: string;
+  location?: string | null;
   floorId?: string;
   category?: string;
-  manufacturer?: string;
-  model?: string;
-  serialNumber?: string;
-  year?: number;
+  manufacturer?: string | null;
+  model?: string | null;
+  serialNumber?: string | null;
+  year?: number | null;
   status?: string;
   mthCounter?: number;
   controlPoints?: string[];
@@ -2320,7 +2320,6 @@ function FaultModal({ asset, user, onClose, onCreated }: {
         buildingId: asset.buildingId,
         assigneeId: assignee || '',
         assigneeName: selectedAssignee?.displayName || '',
-        assignedWorkerNames: selectedAssignee ? [selectedAssignee.displayName] : undefined,
         createdById: user?.id || 'unknown',
         createdByName: user?.displayName || 'Neznámý',
       });

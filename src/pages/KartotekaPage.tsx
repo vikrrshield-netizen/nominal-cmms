@@ -81,15 +81,6 @@ function countDescendants(parentId: string, allAssets: Asset[]) {
   return { total, broken, maintenance, operational, stopped };
 }
 
-/** Get worst status from descendants */
-function worstStatus(parentId: string, allAssets: Asset[]): AssetStatus {
-  const c = countDescendants(parentId, allAssets);
-  if (c.broken > 0) return 'broken';
-  if (c.maintenance > 0) return 'maintenance';
-  if (c.stopped > 0) return 'stopped';
-  return 'operational';
-}
-
 // ═══════════════════════════════════════════════════════════════════
 // CHILD TREE NODE — recursive list item for non-root assets
 // ═══════════════════════════════════════════════════════════════════
@@ -230,7 +221,6 @@ function RootCard({ asset, allAssets, expanded, onToggle, onDetail, onAddChild, 
   const hasChildren = children.length > 0;
   const isExpanded = expanded.has(asset.id);
   const desc = countDescendants(asset.id, allAssets);
-  const ws = worstStatus(asset.id, allAssets);
   const dotClass = STATUS_DOT[asset.status] || 'bg-slate-400';
 
   return (
