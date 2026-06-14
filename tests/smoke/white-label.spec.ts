@@ -24,14 +24,26 @@ const roleCases: SmokeRole[] = [
   { name: 'production', pinEnv: 'SMOKE_PRODUCTION_PIN', allowedPath: '/production', deniedPath: '/admin' },
 ];
 
-async function loginByPin(page: Page, pin: string) {
+async function loginByPin(page: Page, pin: string, options: { expectTokenCallable?: boolean } = {}) {
   await page.goto('/');
   await expect(page.getByTestId('login-screen')).toBeVisible();
+
+  const tokenResponsePromise = options.expectTokenCallable
+    ? page.waitForResponse(
+        (response) => response.url().includes('loginWithPin') && response.request().method() === 'POST',
+        { timeout: 20_000 },
+      )
+    : undefined;
+
   for (const digit of pin) {
     await page.getByTestId(`pin-${digit}`).click();
   }
   if (pin.length < 6) {
     await page.getByTestId('pin-submit').click();
+  }
+  if (tokenResponsePromise) {
+    const tokenResponse = await tokenResponsePromise;
+    expect(tokenResponse.status(), 'PIN login must call loginWithPin successfully').toBeLessThan(400);
   }
   await expect(page.getByTestId('login-screen')).toHaveCount(0, { timeout: 20_000 });
   await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => undefined);
@@ -85,6 +97,15 @@ test.describe('white-label smoke', () => {
       });
     }
   }
+
+  test('real PIN login uses token callable in production', async ({ page }) => {
+    const pin = process.env.SMOKE_ADMIN_PIN;
+    test.skip(!process.env.SMOKE_BASE_URL, 'Set SMOKE_BASE_URL to run token-callable smoke against deployed app.');
+    test.skip(!pin, 'Set SMOKE_ADMIN_PIN to run token-callable smoke.');
+
+    await loginByPin(page, pin, { expectTokenCallable: true });
+    await expect(page.locator('body')).not.toContainText(/invalid-credential|INTERNAL|Token login is disabled/i);
+  });
 
   test('empty instance smoke does not expose seeded production data', async ({ page }) => {
     const pin = process.env.SMOKE_EMPTY_ADMIN_PIN;
