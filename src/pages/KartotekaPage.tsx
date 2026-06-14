@@ -9,7 +9,7 @@ import { addDoc, collection, doc, serverTimestamp, setDoc, Timestamp } from 'fir
 import {
   ArrowLeft, Building2, Search, Upload, Plus, X,
   ChevronRight, ChevronDown, FileText, Loader2, Trash2,
-  ClipboardCheck, Cog,
+  ClipboardCheck, Cog, LayoutGrid, ListTree,
 } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
@@ -60,6 +60,7 @@ function getEntityColor(entityType: string | undefined): string {
 // ── Helpers ──────────────────────────────────────────────────────
 type FilterKey = 'all' | 'broken' | 'maintenance' | 'stopped' | 'operational' | 'gearbox';
 type CreateKind = 'building' | 'room' | 'asset' | 'gearbox' | 'inspection';
+type ViewMode = 'tree' | 'tiles';
 type InspectionFrequency = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
 
 const INSPECTION_FREQUENCY_OPTIONS: Array<{ value: InspectionFrequency; label: string }> = [
@@ -634,6 +635,81 @@ function RootCard({ asset, allAssets, expanded, onToggle, onDetail, onAddChild, 
 // ═══════════════════════════════════════════════════════════════════
 // MAIN PAGE COMPONENT
 // ═══════════════════════════════════════════════════════════════════
+interface TileCardProps {
+  asset: DisplayAsset;
+  allAssets: DisplayAsset[];
+  onDetail: (asset: DisplayAsset) => void;
+  onAddChild: (parentId: string) => void;
+  onDelete: (asset: DisplayAsset) => void;
+  canCreateAsset: boolean;
+}
+
+function TileCard({ asset, allAssets, onDetail, onAddChild, onDelete, canCreateAsset }: TileCardProps) {
+  const color = getEntityColor(asset.entityType);
+  const dotClass = STATUS_DOT[asset.status] || 'bg-slate-400';
+  const desc = countDescendants(asset.id, allAssets);
+  const parentPath = collectAncestorIds(asset.id, allAssets)
+    .reverse()
+    .map((id) => allAssets.find((item) => item.id === id)?.name)
+    .filter(Boolean)
+    .join(' / ');
+  const statusLabel = ASSET_STATUS_CONFIG[asset.status as AssetStatus]?.label || asset.status || 'Stav';
+  const location = [asset.buildingId ? `Budova ${asset.buildingId}` : '', asset.floor || '', safeText(asset.areaName) || safeText(asset.location)]
+    .filter(Boolean)
+    .join(' · ');
+
+  return (
+    <article className="k-tile-card" style={{ boxShadow: `inset 4px 0 0 ${color}cc` }}>
+      <div className={`k-root-status-dot ${dotClass}`} />
+      <button type="button" className="k-tile-main" onClick={() => onDetail(asset)}>
+        <span
+          className="k-tile-icon"
+          style={{ background: `${color}18`, color, borderColor: `${color}35` }}
+        >
+          {rootIconLabel(asset)}
+        </span>
+        <span className="k-tile-copy">
+          <span className="k-tile-name">{safeText(asset.name) || 'Bez názvu'}</span>
+          <span className="k-tile-type">{safeText(asset.entityType) || 'Položka'} · {statusLabel}</span>
+        </span>
+      </button>
+
+      <div className="k-tile-meta">
+        {asset.code && <span>{asset.code}</span>}
+        {location && <span>{location}</span>}
+        {parentPath && <span>{parentPath}</span>}
+      </div>
+
+      {desc.total > 0 && (
+        <div className="k-tile-stats">
+          <span>{desc.total} položek</span>
+          {desc.operational > 0 && <span><span style={{ color: '#22c55e' }}>●</span> {desc.operational}</span>}
+          {desc.maintenance > 0 && <span><span style={{ color: '#eab308' }}>●</span> {desc.maintenance}</span>}
+          {desc.broken > 0 && <span className="is-alert"><span style={{ color: '#ef4444' }}>●</span> {desc.broken}</span>}
+          {desc.stopped > 0 && <span><span style={{ color: '#6b7280' }}>●</span> {desc.stopped}</span>}
+        </div>
+      )}
+
+      <div className="k-tile-actions">
+        <button type="button" className="k-root-action-btn" onClick={() => onDetail(asset)}>
+          <FileText size={16} />
+          <span className="k-action-label">Rodný list</span>
+        </button>
+        {canCreateAsset && (
+          <button type="button" className="k-root-action-btn" onClick={() => onAddChild(asset.id)}>
+            <Plus size={16} />
+            <span className="k-action-label">Přidat</span>
+          </button>
+        )}
+        <button type="button" className="k-root-action-btn" onClick={() => onDelete(asset)}>
+          <Trash2 size={16} />
+          <span className="k-action-label">Smazat</span>
+        </button>
+      </div>
+    </article>
+  );
+}
+
 export default function KartotekaPage() {
   const navigate = useNavigate();
   const goBack = useBackNavigation('/');
@@ -651,6 +727,10 @@ export default function KartotekaPage() {
   const [filter, setFilter] = useState<FilterKey>('all');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [showImport, setShowImport] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    if (typeof window === 'undefined') return 'tree';
+    return window.localStorage.getItem('kartoteka:viewMode') === 'tiles' ? 'tiles' : 'tree';
+  });
 
   // ── Delete state ───
   const [deleteTarget, setDeleteTarget] = useState<DisplayAsset | null>(null);
@@ -1218,6 +1298,16 @@ export default function KartotekaPage() {
       .sort((a, b) => safeText(a.name).localeCompare(safeText(b.name), 'cs'));
   }, [visibleAssets]);
 
+  const tileAssets = useMemo(() => {
+    return visibleAssets
+      .filter((asset) => !asset.isVirtual)
+      .sort((a, b) => {
+        const aKey = `${a.buildingId || ''} ${a.floor || ''} ${safeText(a.areaName)} ${safeText(a.name)}`;
+        const bKey = `${b.buildingId || ''} ${b.floor || ''} ${safeText(b.areaName)} ${safeText(b.name)}`;
+        return aKey.localeCompare(bKey, 'cs');
+      });
+  }, [visibleAssets]);
+
   const createParentOptions = useMemo(() => {
     return treeAssets
       .filter((asset) => {
@@ -1266,6 +1356,10 @@ export default function KartotekaPage() {
   const collapseTree = useCallback(() => {
     setExpanded(new Set());
   }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem('kartoteka:viewMode', viewMode);
+  }, [viewMode]);
 
   // ── Auto-expand when filtering ───
   useEffect(() => {
@@ -1410,7 +1504,25 @@ export default function KartotekaPage() {
         </button>
       </div>
 
-      <div className="k-tree-tools">
+      <div className={`k-tree-tools is-${viewMode}`}>
+        <div className="k-view-toggle" aria-label="Zobrazeni kartoteky">
+          <button
+            type="button"
+            className={viewMode === 'tree' ? 'active' : ''}
+            onClick={() => setViewMode('tree')}
+          >
+            <ListTree size={16} />
+            Strom
+          </button>
+          <button
+            type="button"
+            className={viewMode === 'tiles' ? 'active' : ''}
+            onClick={() => setViewMode('tiles')}
+          >
+            <LayoutGrid size={16} />
+            Dlaždice
+          </button>
+        </div>
         <button type="button" onClick={expandVisibleTree}>
           Rozbalit vše
         </button>
@@ -1446,10 +1558,24 @@ export default function KartotekaPage() {
       {/* ── Main content: root card grid + tree ── */}
       {!loading && !error && assets.length > 0 && (
         <div className="k-content">
-          {rootAssets.length === 0 && (search || filter !== 'all') ? (
+          {(viewMode === 'tiles' ? tileAssets.length === 0 : rootAssets.length === 0) && (search || filter !== 'all') ? (
             <div className="k-empty">
               <Search size={32} />
               <span>Žádné výsledky</span>
+            </div>
+          ) : viewMode === 'tiles' ? (
+            <div className="k-tile-grid">
+              {tileAssets.map((asset) => (
+                <TileCard
+                  key={asset.id}
+                  asset={asset}
+                  allAssets={visibleAssets}
+                  onDetail={handleDetail}
+                  onAddChild={openCreateModal}
+                  onDelete={handleDelete}
+                  canCreateAsset={canCreateAsset}
+                />
+              ))}
             </div>
           ) : (
             <div className="k-grid">
