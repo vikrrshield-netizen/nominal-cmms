@@ -71,6 +71,11 @@ test.describe('white-label smoke', () => {
 
     await loginByPin(page, sandboxPin);
     await expect(page.locator('body')).not.toContainText(/invalid-credential|INTERNAL/i);
+    await expect(page.getByText('Dnes řešit')).toBeVisible();
+    await expect(page.getByText('Moje sledování')).toBeVisible();
+    await expect(page.getByRole('button', { name: /Zobrazit|Skrýt/ })).toBeVisible();
+    await page.getByRole('button', { name: /Zobrazit/ }).click();
+    await expect(page.getByText('Další přehledy')).toBeVisible();
     await expectNoBannedPublicData(page);
   });
 
