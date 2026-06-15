@@ -316,7 +316,7 @@ function ModuleShortcuts({ onNavigate }: { onNavigate: (path: string) => void })
     { label: 'Suroviny', detail: 'šarže, alergeny, dodavatelé', path: '/materials', icon: Package, tone: 'text-emerald-700', permissions: ['production.read', 'production.manage', 'report.read'] },
     { label: 'Výrobky', detail: 'receptury a šarže', path: '/products', icon: Factory, tone: 'text-emerald-700', permissions: ['production.read', 'production.manage', 'report.read'] },
     { label: 'Vzduchotechnika', detail: 'filtry a výměny', path: '/hvac', icon: Wind, tone: 'text-sky-600', permissions: ['hvac.read', 'hvac.manage'] },
-    { label: 'SmÄ›ny', detail: 'plĂˇnovĂˇnĂ­ smÄ›n', path: '/shifts', icon: Users, tone: 'text-violet-600', permissions: ['shifts.view', 'shifts.manage'] },
+    { label: 'Směny', detail: 'plánování směn', path: '/shifts', icon: Users, tone: 'text-violet-600', permissions: ['shifts.view', 'shifts.manage'] },
     ...(user?.role === 'SUPERADMIN'
       ? [{ label: 'Výroba', detail: 'plán extrudoven', path: '/production', icon: Factory, tone: 'text-emerald-700', permissions: ['production.manage'] }]
       : []),
