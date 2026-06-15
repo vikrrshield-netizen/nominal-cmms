@@ -1,0 +1,2210 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VIKRR | High-End 3D Industrial Showcase</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-dark: #f0f4f8; /* Světlé šedomodré pozadí */
+      --neon-green: #10b981; /* Přirozenější zelená */
+      --neon-blue: #0ea5e9; /* Přirozenější modrá */
+      --neon-red: #ef4444; /* Červená pro poruchu */
+      --text-main: #0f172a; /* Tmavý text pro dobrou čitelnost */
+      --text-muted: #475569;
+      --glass-bg: rgba(255, 255, 255, 0.75); /* Světlé poloprůhledné sklo */
+      --glass-border: rgba(15, 23, 42, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      overflow: hidden;
+      position: relative;
+      padding: 20px;
+    }
+
+    /* Ambient background grid */
+    .bg-grid {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      background-size: 40px 40px;
+      background-image: 
+        linear-gradient(to right, rgba(15, 23, 42, 0.03) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(15, 23, 42, 0.03) 1px, transparent 1px);
+      pointer-events: none;
+    }
+
+    /* Header styling */
+    .header {
+      width: 100%;
+      max-width: 1200px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 10;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo {
+      width: 40px;
+      height: 40px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #0ea5e9 0%, #10b981 100%);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #ffffff;
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+      font-size: 1.3rem;
+      box-shadow: 0 8px 25px rgba(14, 165, 233, 0.25);
+    }
+
+    .title {
+      font-weight: 900;
+      font-size: 1.35rem;
+      letter-spacing: -0.02em;
+      background: linear-gradient(to right, #0ea5e9, #10b981);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .subtitle {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Viewport Area */
+    .viewport-container {
+      width: 100%;
+      max-width: 1200px;
+      height: 65vh;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 24px;
+      position: relative;
+      z-index: 5;
+      overflow: hidden;
+      box-shadow: 
+        0 30px 80px rgba(0, 0, 0, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    }
+
+    #webgl-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Glassmorphic Dashboard Widget (Provoz 360) */
+    .glass-widget {
+      position: absolute;
+      right: 24px;
+      top: 24px;
+      width: 280px;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 20px;
+      padding: 20px;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      box-shadow: 0 20px 40px rgba(15, 23, 42, 0.06);
+      z-index: 20;
+      pointer-events: none;
+      transition: border-color 0.5s ease, box-shadow 0.5s ease;
+    }
+
+    .glass-widget.critical {
+      border-color: rgba(220, 38, 38, 0.3);
+      box-shadow: 
+        0 20px 40px rgba(220, 38, 38, 0.08),
+        0 0 30px rgba(220, 38, 38, 0.02);
+    }
+
+    .widget-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.72rem;
+      font-weight: 800;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 16px;
+    }
+
+    .pulse-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background-color: var(--neon-green);
+      animation: pulseGreen 1.8s infinite;
+    }
+
+    .pulse-dot.red {
+      background-color: var(--neon-red);
+      animation: pulseRed 1.8s infinite;
+    }
+
+    .widget-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .widget-stat {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .stat-val {
+      font-size: 1.6rem;
+      font-weight: 900;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-main);
+    }
+
+    .stat-val.green { color: var(--neon-green); }
+    .stat-val.red { color: var(--neon-red); }
+
+    .stat-label {
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Live Mini Chart */
+    .mini-chart {
+      width: 100%;
+      height: 40px;
+      fill: none;
+      stroke: var(--neon-blue);
+      stroke-width: 2.2;
+      stroke-linecap: round;
+      filter: drop-shadow(0 0 2px rgba(37, 99, 235, 0.15));
+    }
+
+    .mini-chart.red {
+      stroke: var(--neon-red);
+      filter: drop-shadow(0 0 2px rgba(220, 38, 38, 0.15));
+    }
+
+    @keyframes pulseGreen {
+      0%, 100% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.4); }
+      50% { transform: scale(1.2); opacity: 0.7; box-shadow: 0 0 8px 2px rgba(22, 163, 74, 0.15); }
+    }
+
+    @keyframes pulseRed {
+      0%, 100% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4); }
+      50% { transform: scale(1.2); opacity: 0.7; box-shadow: 0 0 8px 2px rgba(220, 38, 38, 0.15); }
+    }
+
+    /* Error Console Overlay */
+    #error-console {
+      position: fixed;
+      inset: 0;
+      background: rgba(220, 38, 38, 0.98);
+      color: white;
+      padding: 40px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      z-index: 99999;
+      display: none;
+      overflow: auto;
+    }
+
+    #error-console h2 {
+      font-size: 22px;
+      margin-bottom: 15px;
+      color: #ffffff;
+    }
+
+    /* Controls */
+    .controls-panel {
+      width: 100%;
+      max-width: 1200px;
+      display: flex;
+      gap: 16px;
+      z-index: 10;
+    }
+
+    .btn-ctrl {
+      background: #0f172a;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: var(--text-main);
+      padding: 14px 28px;
+      border-radius: 14px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 700;
+      transition: all 0.2s;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    }
+
+    .btn-ctrl:hover {
+      background: #1e293b;
+      border-color: rgba(255, 255, 255, 0.2);
+      transform: translateY(-1px);
+    }
+
+    .btn-ctrl:active {
+      transform: translateY(1px);
+    }
+
+    .btn-ctrl.red {
+      background: rgba(220, 38, 38, 0.04);
+      border-color: rgba(220, 38, 38, 0.2);
+      color: var(--neon-red);
+    }
+
+    .btn-ctrl.red:hover {
+      background: rgba(220, 38, 38, 0.08);
+      border-color: rgba(220, 38, 38, 0.35);
+    }
+
+    .btn-ctrl.green {
+      background: rgba(22, 163, 74, 0.04);
+      border-color: rgba(22, 163, 74, 0.2);
+      color: var(--neon-green);
+    }
+
+    .btn-ctrl.green:hover {
+      background: rgba(22, 163, 74, 0.08);
+      border-color: rgba(22, 163, 74, 0.35);
+    }
+
+    .btn-ctrl:disabled {
+      opacity: 0.25;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    .tips {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      text-align: center;
+      line-height: 1.6;
+      z-index: 10;
+    }
+  </style>
+
+  <!-- Load Three.js & OrbitControls locally -->
+  <script src="three.min.js"></script>
+  <script src="OrbitControls.js"></script>
+  <!-- Loaders & Postprocessing for Three.js r128 -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/VignetteShader.js"></script>
+</head>
+<body>
+
+  <!-- Error console overlay for debugging -->
+  <div id="error-console">
+    <h2>Kritická chyba při spouštění 3D scény:</h2>
+    <hr style="margin: 15px 0; border: none; border-top: 1px solid rgba(255,255,255,0.2);">
+    <div id="error-log"></div>
+  </div>
+
+  <div class="bg-grid"></div>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="brand">
+      <div class="logo">V</div>
+      <div>
+        <h1 class="title">VIKRR Provoz 360</h1>
+        <p class="subtitle">Prémiová 3D vizualizace procesů v reálném čase</p>
+      </div>
+    </div>
+  </header>
+
+  <!-- Viewport Area -->
+  <div class="viewport-container" id="viewport">
+    <canvas id="webgl-canvas"></canvas>
+
+    <!-- Glassmorphic Live Widget -->
+    <div class="glass-widget" id="widget">
+      <div class="widget-header">
+        <span class="pulse-dot" id="widgetDot"></span>
+        Provoz 360 · živě
+      </div>
+      
+      <div class="widget-grid">
+        <div class="widget-stat">
+          <span class="stat-val green" id="statTasks">34</span>
+          <span class="stat-label">úkoly</span>
+        </div>
+        <div class="widget-stat">
+          <span class="stat-val" id="statTemp">55°C</span>
+          <span class="stat-label">extruder</span>
+        </div>
+      </div>
+
+      <svg class="mini-chart" id="chart" viewBox="0 0 210 40">
+        <path d="M 5,25 L 30,22 L 55,28 L 80,18 L 105,25 L 130,12 L 155,20 L 180,8 L 205,15" id="chartPath" />
+      </svg>
+    </div>
+  </div>
+
+  <!-- Controls Panel -->
+  <div class="controls-panel">
+    <button class="btn-ctrl red" id="btnTriggerFault">Simulovat poruchu extruderu</button>
+    <button class="btn-ctrl green" id="btnResolveFault" disabled>Vyřešit incident (Technik)</button>
+    <button class="btn-ctrl" id="btnSendTruck">Příjem materiálu (Kamion)</button>
+  </div>
+
+  <div class="tips">
+    Uchopte scénu myší a **otáčejte celou továrnou ve 3D prostoru**.<br>
+    Všimněte si **detailů postaviček** (nohy, helmy, vesty), **trubek a ventilů** u stroje, a **detailů kamionu** (zrcátka, mřížka, výfuk).
+  </div>
+
+  <script>
+    // ────────────────────────────────────────────────────────
+    // ERROR LOGGER (Definován ihned na startu)
+    // ────────────────────────────────────────────────────────
+    const errConsole = document.getElementById('error-console');
+    const errLog = document.getElementById('error-log');
+    
+    function logError(msg) {
+      console.error(msg);
+      errConsole.style.display = 'block';
+      errLog.innerHTML += '<div style="margin-bottom: 12px; border-left: 3px solid #ff3366; padding-left: 10px;">' + msg + '</div>';
+    }
+
+    window.onerror = function(message, source, lineno, colno, error) {
+      logError('JS Error: ' + message + ' v souboru ' + source + ' na řádku ' + lineno);
+      return false;
+    };
+
+    // Okamžitá kontrola načtení Three.js
+    if (typeof THREE === 'undefined') {
+      logError('Kritická chyba: Knihovna THREE není definována. Pravděpodobně se nepodařilo načíst script z CDN (cdnjs / jsdelivr). Zkontrolujte připojení k internetu nebo nastavení firewallu.');
+    } else if (typeof THREE.OrbitControls === 'undefined') {
+      logError('Kritická chyba: THREE.OrbitControls není definováno. Nepodařilo se stáhnout OrbitControls skript z CDN.');
+    }
+
+    // ────────────────────────────────────────────────────────
+    // THREE.JS SCENE SETUP
+    // ────────────────────────────────────────────────────────
+    try {
+      const canvas = document.getElementById('webgl-canvas');
+      const viewport = document.getElementById('viewport');
+      
+      const width = viewport.clientWidth || 800;
+      const height = viewport.clientHeight || 500;
+
+      const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false });
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap; 
+      renderer.toneMapping = THREE.ACESFilmicToneMapping; 
+      renderer.toneMappingExposure = 1.0;
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0xebe6dd);
+      scene.fog = new THREE.FogExp2(0xebe6dd, 0.00015);
+      
+      // Camera
+      const camera = new THREE.PerspectiveCamera(38, width / height, 1, 1000);
+      camera.position.set(200, 110, 200);
+
+      // Orbit Controls
+      const controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.maxPolarAngle = Math.PI / 2 - 0.05; 
+      controls.minDistance = 50;
+      controls.maxDistance = 380;
+      controls.target.set(25, 10, -10);
+
+      // EffectComposer & Postprocessing (MSAA + Bloom + Vignette)
+      const renderTarget = new THREE.WebGLMultisampleRenderTarget(width, height, {
+        format: THREE.RGBAFormat,
+        encoding: THREE.sRGBEncoding
+      });
+      renderTarget.samples = 4; // 4x hardware MSAA
+
+      const composer = new THREE.EffectComposer(renderer, renderTarget);
+      composer.addPass(new THREE.RenderPass(scene, camera));
+
+      const bloomPass = new THREE.UnrealBloomPass(
+        new THREE.Vector2(width, height),
+        0.18,  // Ztlumená zář pro den
+        0.3,   // Menší poloměr záře
+        0.95   // Vysoký práh
+      );
+      composer.addPass(bloomPass);
+
+      const vignettePass = new THREE.ShaderPass(THREE.VignetteShader);
+      vignettePass.uniforms["darkness"].value = 0.8;
+      vignettePass.uniforms["offset"].value = 1.05;
+      composer.addPass(vignettePass);
+
+      // ────────────────────────────────────────────────────────
+      // PROCEDURAL ENVIRONMENT MAP
+      // ────────────────────────────────────────────────────────
+      function createEnvMap() {
+        const size = 256;
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        
+        const grad = ctx.createLinearGradient(0, 0, 0, size);
+        grad.addColorStop(0, '#bae6fd'); // Světle modrá
+        grad.addColorStop(0.4, '#e0f2fe'); // Velmi světlá obloha
+        grad.addColorStop(0.6, '#ffffff'); // Horizont
+        grad.addColorStop(0.8, '#fef3c7'); // Teplé slunce
+        grad.addColorStop(1, '#bae6fd');   // Světle modrá nahoře
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, size, size);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(size/2, size/4, 40, 0, Math.PI*2);
+        ctx.fill();
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.mapping = THREE.EquirectangularReflectionMapping;
+        return texture;
+      }
+      const envMap = createEnvMap();
+
+      // ────────────────────────────────────────────────────────
+      async function buildScene() {
+        const loader = new THREE.GLTFLoader();
+        const models = {};
+        
+        function loadModel(name, path) {
+          return new Promise((resolve) => {
+            loader.load(path, (gltf) => {
+              models[name] = gltf.scene;
+              resolve();
+            }, undefined, (err) => {
+              console.warn("Failed to load model " + name + ": " + err.message);
+              resolve();
+            });
+          });
+        }
+
+        await Promise.all([
+          loadModel('suv', 'models/suv.glb'),
+          loadModel('delivery', 'models/delivery.glb'),
+          loadModel('machine_generator', 'models/machine_generator.glb'),
+          loadModel('machine_barrel', 'models/machine_barrel.glb'),
+          loadModel('barrels', 'models/barrels.glb'),
+          loadModel('pottedPlant', 'models/pottedPlant.glb'),
+          loadModel('satelliteDish', 'models/satelliteDish.glb'),
+          loadModel('pipe_straight', 'models/pipe_straight.glb'),
+          loadModel('pipe_corner', 'models/pipe_corner.glb'),
+          loadModel('cardboardBox', 'models/cardboardBox.glb'),
+          loadModel('astronaut', 'models/astronaut.glb'),
+          loadModel('desk', 'models/desk.glb'),
+          loadModel('chair', 'models/chair.glb'),
+          loadModel('monitor', 'models/monitor.glb'),
+          loadModel('sofa', 'models/sofa.glb'),
+          loadModel('bush', 'models/bush.glb'),
+          loadModel('palm', 'models/palm.glb')
+        ]);
+
+        function getModel(name, fallbackCreator) {
+          if (models[name]) {
+            const clone = models[name].clone();
+            clone.traverse(child => {
+              if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+                if (child.material) {
+                  if (child.material.isMeshStandardMaterial || child.material.isMeshPhysicalMaterial) {
+                    child.material.envMap = envMap;
+                    child.material.envMapIntensity = 1.2;
+                  }
+                }
+              }
+            });
+            return clone;
+          }
+          return fallbackCreator();
+        }
+
+        // 3D Voxel Text Font & Generator (5x5 grid)
+        const font = {
+          'A': [0x0e, 0x11, 0x1f, 0x11, 0x11],
+          'B': [0x1e, 0x11, 0x1e, 0x11, 0x1e],
+          'C': [0x0f, 0x10, 0x10, 0x10, 0x0f],
+          'D': [0x1c, 0x12, 0x11, 0x12, 0x1c],
+          'E': [0x1f, 0x10, 0x1f, 0x10, 0x1f],
+          'F': [0x1f, 0x10, 0x1e, 0x10, 0x10],
+          'G': [0x0f, 0x10, 0x13, 0x11, 0x0f],
+          'H': [0x11, 0x11, 0x1f, 0x11, 0x11],
+          'I': [0x0e, 0x04, 0x04, 0x04, 0x0e],
+          'J': [0x07, 0x02, 0x02, 0x12, 0x0c],
+          'K': [0x11, 0x12, 0x1c, 0x12, 0x11],
+          'L': [0x10, 0x10, 0x10, 0x10, 0x1f],
+          'M': [0x11, 0x1b, 0x15, 0x11, 0x11],
+          'N': [0x11, 0x19, 0x15, 0x13, 0x11],
+          'O': [0x0e, 0x11, 0x11, 0x11, 0x0e],
+          'P': [0x1e, 0x11, 0x1e, 0x10, 0x10],
+          'Q': [0x0e, 0x11, 0x15, 0x12, 0x0d],
+          'R': [0x1e, 0x11, 0x1e, 0x12, 0x11],
+          'S': [0x0f, 0x10, 0x0e, 0x01, 0x1e],
+          'T': [0x1f, 0x04, 0x04, 0x04, 0x04],
+          'U': [0x11, 0x11, 0x11, 0x11, 0x0e],
+          'V': [0x11, 0x11, 0x11, 0x0a, 0x04],
+          'W': [0x11, 0x11, 0x15, 0x1b, 0x11],
+          'X': [0x11, 0x0a, 0x04, 0x0a, 0x11],
+          'Y': [0x11, 0x0a, 0x04, 0x04, 0x04],
+          'Z': [0x1f, 0x02, 0x04, 0x08, 0x1f],
+          ' ': [0x00, 0x00, 0x00, 0x00, 0x00],
+          '3': [0x1f, 0x02, 0x0e, 0x02, 0x1f],
+          '6': [0x0f, 0x10, 0x1e, 0x11, 0x0e],
+          '0': [0x0e, 0x11, 0x11, 0x11, 0x0e]
+        };
+
+        function create3DLabel(text, parentGroup, colorHex = 0xffffff, size = 1) {
+          const labelGroup = new THREE.Group();
+          const mat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.8 });
+          const charWidth = 6 * size;
+          const boxSize = size;
+          
+          for (let i = 0; i < text.length; i++) {
+            const char = text[i].toUpperCase();
+            const rows = font[char] || font[' '];
+            
+            for (let r = 0; r < 5; r++) {
+              const rowVal = rows[r];
+              for (let c = 0; c < 5; c++) {
+                if ((rowVal >> (4 - c)) & 1) {
+                  const voxel = new THREE.Mesh(new THREE.BoxGeometry(boxSize, boxSize, boxSize), mat);
+                  voxel.position.set(
+                    i * charWidth + c * size,
+                    (4 - r) * size,
+                    0
+                  );
+                  voxel.castShadow = true;
+                  labelGroup.add(voxel);
+                }
+              }
+            }
+          }
+          parentGroup.add(labelGroup);
+          return labelGroup;
+        }
+
+        // Shared materials & geometries
+        const chromeMat = new THREE.MeshStandardMaterial({ 
+          color: 0xffffff, 
+          metalness: 1.0, 
+          roughness: 0.05,
+          envMap: envMap,
+          envMapIntensity: 2.0
+        });
+        const glassMat = new THREE.MeshPhysicalMaterial({
+          color: 0x00d2ff,
+          transparent: true,
+          opacity: 0.25,
+          roughness: 0.05,
+          metalness: 0.9,
+          transmission: 0.9,
+          ior: 1.5,
+          thickness: 1,
+          envMap: envMap,
+          envMapIntensity: 2.0,
+          side: THREE.DoubleSide
+        });
+        const metalDarkMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.9, roughness: 0.2 });
+        const orangeVestaMat = new THREE.MeshStandardMaterial({ color: 0xf97316, roughness: 0.5 });
+        const reflectiveStripeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const pantsMat = new THREE.MeshStandardMaterial({ color: 0x1d4ed8, roughness: 0.6 }); 
+
+        const indMatGreen = new THREE.MeshStandardMaterial({ 
+          color: 0x22c55e, 
+          emissive: 0x22c55e, 
+          emissiveIntensity: 0.2 
+        });
+        const indMatRed = new THREE.MeshStandardMaterial({ 
+          color: 0xef4444, 
+          emissive: 0xef4444, 
+          emissiveIntensity: 1.2 
+        });
+        
+        const boxGeo = new THREE.BoxGeometry(4, 4, 4);
+        const boxMat = new THREE.MeshStandardMaterial({ 
+          color: 0xd97706, 
+          roughness: 0.8 
+        });
+        
+        const tabGeo = new THREE.BoxGeometry(3, 2, 0.4);
+        const tabMat = new THREE.MeshStandardMaterial({ 
+          color: 0x0f172a, 
+          roughness: 0.4 
+        });
+        
+        const headMat = new THREE.MeshStandardMaterial({ 
+          color: 0xffdbac, 
+          roughness: 0.4 
+        });
+        
+        const stripeGeo = new THREE.BoxGeometry(32.1, 1, 11.2);
+        const redMat = new THREE.MeshStandardMaterial({ 
+          color: 0xdc2626, 
+          roughness: 0.4 
+        });
+        
+        const spoilerGeo = new THREE.BoxGeometry(8, 2, 8);
+        
+        const glassTruckMat2 = new THREE.MeshStandardMaterial({ 
+          color: 0x93c5fd, 
+          transparent: true, 
+          opacity: 0.4, 
+          roughness: 0.1 
+        });
+        
+        const lightG = new THREE.BoxGeometry(0.2, 1, 2);
+        const lightM = new THREE.MeshBasicMaterial({ 
+          color: 0xffffff 
+        });
+
+        // Bright friendly corporate aesthetics
+        const factoryWallMat = new THREE.MeshStandardMaterial({ color: 0xd1d5db, roughness: 0.5, metalness: 0.1 }); 
+        const factoryAccentMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.4, metalness: 0.2 }); 
+        const officeWoodMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.8, metalness: 0.1 }); // black wood frames
+        const solarPanelMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9, roughness: 0.15, envMap: envMap });
+        const concreteMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.8, metalness: 0.1 });
+
+        // ────────────────────────────────────────────────────────
+        // LIGHTING (Bright Warm Day Lighting)
+        // ────────────────────────────────────────────────────────
+        const ambientLight = new THREE.AmbientLight(0xebe6dd, 0.55); 
+        scene.add(ambientLight);
+
+        const keyLight = new THREE.DirectionalLight(0xfffbf0, 1.3); 
+        keyLight.position.set(160, 200, 80);
+        keyLight.castShadow = true;
+        keyLight.shadow.mapSize.width = 4096;
+        keyLight.shadow.mapSize.height = 4096;
+        keyLight.shadow.bias = -0.0001;
+        keyLight.shadow.camera.near = 20;
+        keyLight.shadow.camera.far = 420;
+        const d = 200; 
+        keyLight.shadow.camera.left = -d;
+        keyLight.shadow.camera.right = d;
+        keyLight.shadow.camera.top = d;
+        keyLight.shadow.camera.bottom = -d;
+        scene.add(keyLight);
+
+        const fillLight = new THREE.DirectionalLight(0xfef08a, 0.25); 
+        fillLight.position.set(-100, 50, -80);
+        scene.add(fillLight);
+
+        const rimLight = new THREE.DirectionalLight(0x86efac, 0.3); 
+        rimLight.position.set(-30, -50, -120);
+        scene.add(rimLight);
+
+        const alarmLight = new THREE.PointLight(0xff3366, 0, 100);
+        alarmLight.position.set(-20, 20, 0);
+        scene.add(alarmLight);
+
+        // ────────────────────────────────────────────────────────
+        // GROUND & NATURE ENVIRONMENT
+        // ────────────────────────────────────────────────────────
+        const floorGeo = new THREE.PlaneGeometry(600, 600);
+        const floorMat = new THREE.MeshStandardMaterial({ 
+          color: 0xebe6dd, 
+          roughness: 0.95, 
+          metalness: 0.01
+        });
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        floor.position.y = -0.2; 
+        floor.receiveShadow = true;
+        scene.add(floor);
+
+        const grassMat = new THREE.MeshStandardMaterial({
+          color: 0xa7c957, 
+          roughness: 0.9, 
+          metalness: 0.02
+        });
+
+        const shadowMat = new THREE.MeshBasicMaterial({ 
+          color: 0x1e293b, 
+          transparent: true, 
+          opacity: 0.35, 
+          depthWrite: false 
+        });
+
+        function addContactShadow(x, z, w, h, isCircle = false) {
+          let shadowGeo;
+          if (isCircle) {
+            shadowGeo = new THREE.RingGeometry(0, w / 2, 32);
+          } else {
+            shadowGeo = new THREE.PlaneGeometry(w, h);
+          }
+          const shadowMesh = new THREE.Mesh(shadowGeo, shadowMat);
+          shadowMesh.rotation.x = -Math.PI / 2;
+          shadowMesh.position.set(x, 0.01, z);
+          scene.add(shadowMesh);
+          return shadowMesh;
+        }
+
+        // 1. Grassy Islands
+        const factoryGrass = new THREE.Mesh(new THREE.BoxGeometry(195, 0.3, 110), grassMat);
+        factoryGrass.position.set(0, -0.1, 0);
+        factoryGrass.receiveShadow = true;
+        scene.add(factoryGrass);
+
+        const officeGrass = new THREE.Mesh(new THREE.BoxGeometry(85, 0.3, 90), grassMat);
+        officeGrass.position.set(103, -0.1, 0);
+        officeGrass.receiveShadow = true;
+        scene.add(officeGrass);
+
+        const lbGrass = new THREE.Mesh(new THREE.CylinderGeometry(20, 22, 0.3, 16), grassMat);
+        lbGrass.position.set(-105, -0.1, 75);
+        lbGrass.receiveShadow = true;
+        scene.add(lbGrass);
+
+        const mbGrass = new THREE.Mesh(new THREE.CylinderGeometry(25, 27, 0.3, 16), grassMat);
+        mbGrass.position.set(10, -0.1, 65);
+        mbGrass.receiveShadow = true;
+        scene.add(mbGrass);
+
+        // 2. Hills (raised grassy platforms)
+        const leftHill = new THREE.Mesh(new THREE.CylinderGeometry(30, 38, 10, 8), grassMat);
+        leftHill.position.set(-120, 4.8, -100);
+        leftHill.receiveShadow = true;
+        scene.add(leftHill);
+        addContactShadow(-120, -100, 76, 76, true);
+
+        const rightBackHill = new THREE.Mesh(new THREE.CylinderGeometry(40, 50, 14, 8), grassMat);
+        rightBackHill.position.set(130, 6.8, -90);
+        rightBackHill.receiveShadow = true;
+        scene.add(rightBackHill);
+        addContactShadow(130, -90, 100, 100, true);
+
+        const rightBottomHill = new THREE.Mesh(new THREE.CylinderGeometry(30, 38, 10, 8), grassMat);
+        rightBottomHill.position.set(135, 4.8, 80);
+        rightBottomHill.receiveShadow = true;
+        scene.add(rightBottomHill);
+        addContactShadow(135, 80, 76, 76, true);
+
+        // 3. Sandy Winding Path
+        const pathMat = new THREE.MeshStandardMaterial({ color: 0xddb892, roughness: 0.9 });
+        function addPathSegment(x, z, w, d, rY = 0) {
+          const p = new THREE.Mesh(new THREE.BoxGeometry(w, 0.1, d), pathMat);
+          p.position.set(x, 0.02, z);
+          p.rotation.y = rY;
+          p.receiveShadow = true;
+          scene.add(p);
+        }
+
+        // From bottom left to between factory and office
+        addPathSegment(-60, 48, 100, 10, 0.1);
+        addPathSegment(-10, 42, 40, 10, -0.3);
+        // Curve between factory and office
+        addPathSegment(12, 25, 45, 10, -1.2);
+        // Passing by the office entrance
+        addPathSegment(25, 5, 30, 10, -0.2);
+        // Curve towards the right side of the office
+        addPathSegment(48, 15, 40, 10, 0.5);
+        addPathSegment(75, 25, 30, 10, 0.9);
+        // Upwards to the maintenance hill
+        addPathSegment(90, 5, 45, 10, -0.9);
+        addPathSegment(105, -25, 40, 10, -0.4);
+        addPathSegment(120, -55, 40, 10, -0.8);
+
+        // 4. Wind Turbines
+        const turbineBlades = [];
+        function createWindTurbine(x, y, z, height = 30, rotY = 0) {
+          const group = new THREE.Group();
+          group.position.set(x, y, z);
+          group.rotation.y = rotY;
+          
+          const poleMat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.1, roughness: 0.5 });
+          const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.6, height, 8), poleMat);
+          pole.position.y = height / 2;
+          pole.castShadow = true;
+          group.add(pole);
+          
+          const head = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 2.5), poleMat);
+          head.position.y = height;
+          head.castShadow = true;
+          group.add(head);
+          
+          const bladeGroup = new THREE.Group();
+          bladeGroup.position.set(0, height, 1.3);
+          
+          const bladeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 });
+          for (let i = 0; i < 3; i++) {
+            const blade = new THREE.Mesh(new THREE.BoxGeometry(0.6, height * 0.4, 0.15), bladeMat);
+            blade.position.y = (height * 0.4) / 2;
+            const bladeAnchor = new THREE.Group();
+            bladeAnchor.rotation.z = (i * Math.PI * 2) / 3;
+            bladeAnchor.add(blade);
+            bladeGroup.add(bladeAnchor);
+          }
+          
+          group.add(bladeGroup);
+          turbineBlades.push(bladeGroup);
+          scene.add(group);
+          addContactShadow(x, z, 6, 6, true);
+        }
+
+        // Place wind turbines
+        createWindTurbine(-120, 9.8, -100, 32, -Math.PI / 4); // Left hill
+        createWindTurbine(115, 13.8, -110, 30, -Math.PI / 4); // Right hill back 1
+        createWindTurbine(145, 13.8, -105, 34, -Math.PI / 4); // Right hill back 2
+        createWindTurbine(135, 9.8, 80, 30, -Math.PI / 4);   // Right bottom hill
+
+        // 5. Solar Panels
+        function createSolarPanelArray(x, y, z, rY = 0) {
+          const group = new THREE.Group();
+          group.position.set(x, y, z);
+          group.rotation.y = rY;
+          
+          const standMat = new THREE.MeshStandardMaterial({ color: 0xd1d5db, metalness: 0.8, roughness: 0.2 });
+          const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 4, 6), standMat);
+          leg.position.set(0, 2, 0);
+          leg.rotation.x = 0.2;
+          leg.castShadow = true;
+          group.add(leg);
+          
+          const panel = new THREE.Mesh(new THREE.BoxGeometry(12, 0.4, 8), solarPanelMat);
+          panel.position.set(0, 4, 0);
+          panel.rotation.x = -0.4;
+          panel.castShadow = true;
+          group.add(panel);
+          
+          scene.add(group);
+          addContactShadow(x, z, 8, 6);
+        }
+
+        createSolarPanelArray(-135, 9.8, -80, Math.PI / 4);  // Left hill panels
+        createSolarPanelArray(-105, 9.8, -110, Math.PI / 4);
+        createSolarPanelArray(150, 9.8, 65, Math.PI / 4);   // Right bottom panels
+        createSolarPanelArray(120, 9.8, 95, Math.PI / 4);
+
+        // 6. 3D Voxel Labels
+        const labelFactory = new THREE.Group();
+        labelFactory.position.set(-52, 0.2, 54);
+        labelFactory.rotation.x = -Math.PI / 2;
+        labelFactory.rotation.z = -0.4;
+        create3DLabel("MAIN PRODUCTION HALL", labelFactory, 0xffffff, 0.65);
+        scene.add(labelFactory);
+
+        const labelOffice = new THREE.Group();
+        labelOffice.position.set(58, 0.2, 45);
+        labelOffice.rotation.x = -Math.PI / 2;
+        labelOffice.rotation.z = -0.4;
+        create3DLabel("MANAGEMENT OFFICE", labelOffice, 0xffffff, 0.65);
+        scene.add(labelOffice);
+
+        const labelMaint = new THREE.Group();
+        labelMaint.position.set(100, 14.2, -45); // placed on the hill ramp
+        labelMaint.rotation.x = -Math.PI / 2;
+        labelMaint.rotation.z = -0.4;
+        create3DLabel("MAINTENANCE", labelMaint, 0xffffff, 0.65);
+        scene.add(labelMaint);
+
+        // 7. Billboard "PROVOZ 360 BY VIKRR"
+        const billboard = new THREE.Group();
+        billboard.position.set(-110, 0, -40);
+        billboard.rotation.y = Math.PI / 4.5;
+        
+        const pill1 = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 25, 6), metalDarkMat);
+        pill1.position.set(-12, 12.5, 0);
+        pill1.castShadow = true;
+        billboard.add(pill1);
+        
+        const pill2 = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 25, 6), metalDarkMat);
+        pill2.position.set(12, 12.5, 0);
+        pill2.castShadow = true;
+        billboard.add(pill2);
+        
+        const board = new THREE.Mesh(new THREE.BoxGeometry(32, 11, 0.6), new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.8 }));
+        board.position.set(0, 20, 0);
+        board.castShadow = true;
+        billboard.add(board);
+        
+        const boardTextGroup = new THREE.Group();
+        boardTextGroup.position.set(-14, 21, 0.4);
+        create3DLabel("PROVOZ 360", boardTextGroup, 0x1e293b, 0.6);
+        
+        const boardTextGroup2 = new THREE.Group();
+        boardTextGroup2.position.set(-14, 17.5, 0.4);
+        create3DLabel("BY VIKRR", boardTextGroup2, 0x0ea5e9, 0.45);
+        
+        billboard.add(boardTextGroup);
+        billboard.add(boardTextGroup2);
+        scene.add(billboard);
+        addContactShadow(-110, -40, 24, 6);
+
+        // Smoke particles
+        const smokeParticles = [];
+
+        function createMaintenanceHouse(hx, hz, hrY) {
+          const houseGroup = new THREE.Group();
+          // Stand on top of the hill (top of hill is Y = 14)
+          houseGroup.position.set(hx, 14.0, hz);
+          houseGroup.rotation.y = hrY;
+
+          // Gray house body (slate-400 / 0x94a3b8)
+          const houseBody = new THREE.Mesh(
+            new THREE.BoxGeometry(22, 14, 18),
+            new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.8, metalness: 0.1 })
+          );
+          houseBody.position.y = 7;
+          houseBody.castShadow = true;
+          houseBody.receiveShadow = true;
+          houseGroup.add(houseBody);
+
+          // Dark roof - gabled (two inclined boxes)
+          const roofMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.6, metalness: 0.2 });
+          const roofL = new THREE.Mesh(new THREE.BoxGeometry(24, 0.8, 11), roofMat);
+          roofL.position.set(0, 17, -4.5);
+          roofL.rotation.x = 0.5;
+          roofL.castShadow = true;
+          houseGroup.add(roofL);
+          
+          const roofR = new THREE.Mesh(new THREE.BoxGeometry(24, 0.8, 11), roofMat);
+          roofR.position.set(0, 17, 4.5);
+          roofR.rotation.x = -0.5;
+          roofR.castShadow = true;
+          houseGroup.add(roofR);
+
+          // Garage door (dark gray box on the left side)
+          const garageDoor = new THREE.Mesh(new THREE.BoxGeometry(0.2, 7, 8), metalDarkMat);
+          garageDoor.position.set(-10.9, 3.5, -3);
+          garageDoor.castShadow = true;
+          houseGroup.add(garageDoor);
+
+          // Large window/balcony on the first floor
+          const balconyGlass = new THREE.Mesh(new THREE.BoxGeometry(0.2, 5, 6), glassMat);
+          balconyGlass.position.set(-10.9, 10.5, 3);
+          houseGroup.add(balconyGlass);
+
+          // Balcony frame
+          const balconyFrame = new THREE.Mesh(new THREE.BoxGeometry(0.4, 6, 7), metalDarkMat);
+          balconyFrame.position.set(-10.8, 10.5, 3);
+          balconyFrame.castShadow = true;
+          houseGroup.add(balconyFrame);
+
+          // Maintenance operator sitting with laptop
+          const engGroup = buildCharacter(0x2563eb); // blue suit (from image)
+          engGroup.scale.set(4, 4, 4);
+          engGroup.position.set(-9.2, 7.5, 3);
+          engGroup.rotation.y = -Math.PI / 2;
+          houseGroup.add(engGroup);
+
+          // Laptop (opened)
+          const laptopBase = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.05, 0.6), chromeMat);
+          laptopBase.position.set(-10.0, 9.6, 3);
+          houseGroup.add(laptopBase);
+
+          const laptopScreen = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.6, 0.05), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+          laptopScreen.position.set(-10.2, 9.9, 3);
+          laptopScreen.rotation.z = -0.5;
+          houseGroup.add(laptopScreen);
+
+          scene.add(houseGroup);
+        }
+
+        createMaintenanceHouse(130, -80, -0.4);
+
+        // Organic nature replacement
+        function createTree(x, z) {
+          const treeGroup = new THREE.Group();
+          treeGroup.position.set(x, 0, z);
+
+          // Random scale multiplier and rotation for organic feel
+          const scaleMult = 0.75 + Math.random() * 0.5;
+          const randomRotY = Math.random() * Math.PI * 2;
+
+          const isPalm = Math.random() > 0.45;
+          if (isPalm) {
+            const palm = getModel('palm', () => {
+              const t = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.5, 7, 6), new THREE.MeshStandardMaterial({color: 0x5c4033}));
+              t.position.y = 3.5;
+              return t;
+            });
+            palm.scale.set(4.5 * scaleMult, 4.5 * scaleMult, 4.5 * scaleMult);
+            palm.rotation.y = randomRotY;
+            treeGroup.add(palm);
+          } else {
+            const bush = getModel('bush', () => {
+              return new THREE.Mesh(new THREE.SphereGeometry(2, 6, 6), new THREE.MeshStandardMaterial({color: 0x00ff66}));
+            });
+            bush.scale.set(5.5 * scaleMult, 5.5 * scaleMult, 5.5 * scaleMult);
+            bush.rotation.y = randomRotY;
+            treeGroup.add(bush);
+          }
+
+          addContactShadow(x, z, 5.5 * scaleMult, 5.5 * scaleMult, true);
+          scene.add(treeGroup);
+        }
+
+        // Procedural Forest Generation with Collision Avoidance
+        const minX = -270, maxX = 270;
+        const minZ = -270, maxZ = 270;
+        let generatedTrees = 0;
+        const targetTreesCount = 280;
+        
+        // Ensure deterministic-like spread but check areas
+        for (let attempt = 0; attempt < 1200; attempt++) {
+          if (generatedTrees >= targetTreesCount) break;
+
+          const tx = THREE.MathUtils.randFloat(minX, maxX);
+          const tz = THREE.MathUtils.randFloat(minZ, maxZ);
+
+          // 1. Avoid Factory building structure: X in [-75, 78] and Z in [-32, 32]
+          const inFactory = (tx > -75 && tx < 78 && tz > -32 && tz < 32);
+          
+          // 2. Avoid Office building structure: X in [78, 128] and Z in [-32, 32]
+          const inOffice = (tx > 78 && tx < 128 && tz > -32 && tz < 32);
+
+          // 3. Avoid Maintenance house on hill: X in [115, 145] and Z in [-95, -65]
+          const inMaint = (tx > 115 && tx < 145 && tz > -95 && tz < -65);
+
+          // 4. Avoid Winding Path: Check distance to path points
+          let nearRoad = false;
+          const roadPoints = [
+            {x: -60, z: 48}, {x: -10, z: 42}, {x: 12, z: 25}, {x: 25, z: 5},
+            {x: 48, z: 15}, {x: 75, z: 25}, {x: 90, z: 5}, {x: 105, z: -25}, {x: 120, z: -55}
+          ];
+          for (const rp of roadPoints) {
+            const dist = Math.sqrt((tx - rp.x) ** 2 + (tz - rp.z) ** 2);
+            if (dist < 11) {
+              nearRoad = true;
+              break;
+            }
+          }
+
+          if (!inFactory && !inOffice && !inMaint && !nearRoad) {
+            createTree(tx, tz);
+            generatedTrees++;
+          }
+        }
+
+        // ────────────────────────────────────────────────────────
+        // THE 3D FACTORY STRUCTURE
+        // ────────────────────────────────────────────────────────
+        const buildGroup = new THREE.Group();
+        scene.add(buildGroup);
+
+
+
+        // 1. EXTENDED FACTORY HALL (x = -70 to x = 75, height 45, depth 60)
+        // Left wall
+        const wallLeft = new THREE.Mesh(new THREE.BoxGeometry(2, 45, 60), factoryWallMat);
+        wallLeft.position.set(-70, 22.5, 0);
+        wallLeft.castShadow = true;
+        wallLeft.receiveShadow = true;
+        buildGroup.add(wallLeft);
+
+        // Back wall of the hall (wider: width 145, centered at 2.5)
+        const wallBack = new THREE.Mesh(new THREE.BoxGeometry(145, 45, 2), factoryWallMat);
+        wallBack.position.set(2.5, 22.5, -30);
+        wallBack.castShadow = true;
+        wallBack.receiveShadow = true;
+        buildGroup.add(wallBack);
+
+        // Right wall of the hall (at x = 75)
+        const wallDivider = new THREE.Mesh(new THREE.BoxGeometry(2, 45, 60), factoryWallMat);
+        wallDivider.position.set(75, 22.5, 0);
+        wallDivider.castShadow = true;
+        wallDivider.receiveShadow = true;
+        buildGroup.add(wallDivider);
+
+        // Front-side elements
+        // Huge glass front covering the entire facade (from image)
+        const factoryWindow = new THREE.Mesh(new THREE.BoxGeometry(145, 45, 0.4), glassMat);
+        factoryWindow.position.set(2.5, 22.5, 30);
+        buildGroup.add(factoryWindow);
+
+        // Uniform dark gray/black columns spacing across the facade (from image)
+        for (let x = -70; x <= 75; x += 24.1) {
+          const pillar = new THREE.Mesh(new THREE.BoxGeometry(1.8, 45, 2.2), factoryAccentMat);
+          pillar.position.set(x, 22.5, 30.6);
+          pillar.castShadow = true;
+          pillar.receiveShadow = true;
+          buildGroup.add(pillar);
+        }
+
+        // Gabled Factory Roof
+        const roofMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.6, metalness: 0.1 });
+        const roofFactoryL = new THREE.Mesh(new THREE.BoxGeometry(148, 1.5, 34), roofMat);
+        roofFactoryL.position.set(2.5, 48.2, -15.5);
+        roofFactoryL.rotation.x = 0.22;
+        roofFactoryL.castShadow = true;
+        roofFactoryL.receiveShadow = true;
+        buildGroup.add(roofFactoryL);
+
+        const roofFactoryR = new THREE.Mesh(new THREE.BoxGeometry(148, 1.5, 34), roofMat);
+        roofFactoryR.position.set(2.5, 48.2, 15.5);
+        roofFactoryR.rotation.x = -0.22;
+        roofFactoryR.castShadow = true;
+        roofFactoryR.receiveShadow = true;
+        buildGroup.add(roofFactoryR);
+
+        const pedimentL = new THREE.Mesh(new THREE.ConeGeometry(33, 7.5, 4), factoryWallMat);
+        pedimentL.position.set(-70, 48.75, 0);
+        pedimentL.rotation.y = Math.PI / 4;
+        pedimentL.scale.set(1, 1, 0.05);
+        buildGroup.add(pedimentL);
+
+        const pedimentR = new THREE.Mesh(new THREE.ConeGeometry(33, 7.5, 4), factoryWallMat);
+        pedimentR.position.set(75, 48.75, 0);
+        pedimentR.rotation.y = Math.PI / 4;
+        pedimentR.scale.set(1, 1, 0.05);
+        buildGroup.add(pedimentR);
+
+        const spinningVents = [];
+
+        // Loading ramp
+        const rampGeo = new THREE.BoxGeometry(45, 1.2, 5);
+        const ramp = new THREE.Mesh(rampGeo, concreteMat);
+        ramp.position.set(-45, 0.6, 29);
+        ramp.receiveShadow = true;
+        ramp.castShadow = true;
+        buildGroup.add(ramp);
+
+        addContactShadow(-45, 29, 45, 5);
+
+        const shelterGeo = new THREE.BoxGeometry(45, 0.4, 6);
+        const shelter = new THREE.Mesh(shelterGeo, metalDarkMat);
+        shelter.position.set(-45, 24, 27);
+        shelter.rotation.x = 0.08;
+        shelter.castShadow = true;
+        buildGroup.add(shelter);
+
+        for (let sx = -65; sx <= -25; sx += 10) {
+          const strut = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 6, 6), chromeMat);
+          strut.position.set(sx, 25.5, 28);
+          strut.rotation.x = -0.7;
+          strut.castShadow = true;
+          buildGroup.add(strut);
+        }
+
+        // Tank
+        const tankGroup = new THREE.Group();
+        tankGroup.position.set(-15, 0, 44);
+
+        addContactShadow(-15, 44, 7, 7, true);
+
+        const tankBody = new THREE.Mesh(
+          new THREE.CylinderGeometry(6, 6, 12, 16),
+          new THREE.MeshStandardMaterial({ color: 0x0b111e, metalness: 0.85, roughness: 0.1, envMap: envMap })
+        );
+        tankBody.position.y = 6;
+        tankBody.castShadow = true;
+        tankBody.receiveShadow = true;
+        tankGroup.add(tankBody);
+
+        const tankRoof = new THREE.Mesh(
+          new THREE.CylinderGeometry(6, 6, 0.4, 16),
+          concreteMat
+        );
+        tankRoof.position.y = 12.1;
+        tankRoof.castShadow = true;
+        tankGroup.add(tankRoof);
+
+        const bandGeo = new THREE.TorusGeometry(6.05, 0.15, 4, 16);
+        for (let ty = 2.5; ty <= 11.5; ty += 3.0) {
+          const band = new THREE.Mesh(bandGeo, metalDarkMat);
+          band.position.y = ty;
+          band.rotation.x = Math.PI / 2;
+          tankGroup.add(band);
+        }
+
+        const tankLadder = new THREE.Group();
+        tankLadder.position.set(0, 0, 6.2);
+        const tankRailL = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 12, 6), metalDarkMat); tankRailL.position.set(-0.5, 6, 0); tankLadder.add(tankRailL);
+        const tankRailR = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 12, 6), metalDarkMat); tankRailR.position.set(0.5, 6, 0); tankLadder.add(tankRailR);
+        for (let ly = 0.5; ly <= 11.5; ly += 1.2) {
+          const rung = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.0, 6), metalDarkMat);
+          rung.position.set(0, ly, 0);
+          rung.rotation.z = Math.PI / 2;
+          tankLadder.add(rung);
+        }
+        tankGroup.add(tankLadder);
+        scene.add(tankGroup);
+
+        // Server Room
+        const serverWallF = new THREE.Mesh(new THREE.BoxGeometry(15, 15, 0.3), glassMat);
+        serverWallF.position.set(2.5, 7.5, 10);
+        buildGroup.add(serverWallF);
+
+        const serverWallL = new THREE.Mesh(new THREE.BoxGeometry(0.3, 15, 20), glassMat);
+        serverWallL.position.set(-5, 7.5, 20);
+        buildGroup.add(serverWallL);
+
+        const serverRack1 = new THREE.Mesh(new THREE.BoxGeometry(3.5, 11, 4.5), metalDarkMat);
+        serverRack1.position.set(-1, 5.5, 20);
+        serverRack1.castShadow = true;
+        buildGroup.add(serverRack1);
+
+        const serverRack2 = new THREE.Mesh(new THREE.BoxGeometry(3.5, 11, 4.5), metalDarkMat);
+        serverRack2.position.set(5, 5.5, 20);
+        serverRack2.castShadow = true;
+        buildGroup.add(serverRack2);
+
+        const serverLights = [];
+        const blinkMatBlue = new THREE.MeshBasicMaterial({ color: 0x00d2ff });
+        const blinkMatGreen = new THREE.MeshBasicMaterial({ color: 0x00ff66 });
+        for (let sy = 2.0; sy <= 9.5; sy += 1.8) {
+          const led1 = new THREE.Mesh(new THREE.SphereGeometry(0.18, 6, 6), blinkMatBlue);
+          led1.position.set(-1, sy + 1, 22.3);
+          buildGroup.add(led1);
+          serverLights.push(led1);
+
+          const led2 = new THREE.Mesh(new THREE.SphereGeometry(0.18, 6, 6), blinkMatGreen);
+          led2.position.set(5, sy + 1, 22.3);
+          buildGroup.add(led2);
+          serverLights.push(led2);
+        }
+
+        // 2. OFFICE BUILDING ON THE GROUND (x = 78 to x = 128, centered at x = 103, y = 0)
+        // Using a group with offset (x = +53, y = -36) relative to original coordinates
+        const officeGroup = new THREE.Group();
+        officeGroup.position.set(53, -36, 0); // shifts from original (50, 36) to (103, 0)
+        scene.add(officeGroup);
+
+        addContactShadow(103, 0, 52, 62); // Ground shadow for the office building
+
+        // Office Floor
+        const floorOffice = new THREE.Mesh(new THREE.BoxGeometry(50, 1.2, 60), concreteMat);
+        floorOffice.position.set(50, 36, 0);
+        floorOffice.receiveShadow = true;
+        officeGroup.add(floorOffice);
+
+        // Office walls
+        const wallOfficeBack = new THREE.Mesh(new THREE.BoxGeometry(50, 18, 1.5), metalDarkMat);
+        wallOfficeBack.position.set(50, 45, -30);
+        wallOfficeBack.castShadow = true;
+        wallOfficeBack.receiveShadow = true;
+        officeGroup.add(wallOfficeBack);
+
+        const wallOfficeRightSolid = new THREE.Mesh(new THREE.BoxGeometry(1.5, 18, 20), metalDarkMat);
+        wallOfficeRightSolid.position.set(75, 45, -20);
+        wallOfficeRightSolid.castShadow = true;
+        wallOfficeRightSolid.receiveShadow = true;
+        officeGroup.add(wallOfficeRightSolid);
+
+        // Glass facades
+        const glassFront = new THREE.Mesh(new THREE.BoxGeometry(50, 18, 0.4), glassMat);
+        glassFront.position.set(50, 45, 30);
+        officeGroup.add(glassFront);
+
+        const glassRight = new THREE.Mesh(new THREE.BoxGeometry(0.4, 18, 40), glassMat);
+        glassRight.position.set(75, 45, 10);
+        officeGroup.add(glassRight);
+
+        // Window Frames
+        for (let x = 25; x <= 75; x += 10) {
+          const winFrame = new THREE.Mesh(new THREE.BoxGeometry(0.6, 18, 0.8), metalDarkMat);
+          winFrame.position.set(x, 45, 30.1);
+          winFrame.castShadow = true;
+          officeGroup.add(winFrame);
+        }
+        for (let z = -10; z <= 30; z += 10) {
+          const winFrame = new THREE.Mesh(new THREE.BoxGeometry(0.8, 18, 0.6), metalDarkMat);
+          winFrame.position.set(75.1, 45, z);
+          winFrame.castShadow = true;
+          officeGroup.add(winFrame);
+        }
+
+        // Office Divider
+        const officeDividerWall = new THREE.Mesh(new THREE.BoxGeometry(0.3, 18, 60), glassMat);
+        officeDividerWall.position.set(48, 45, 0);
+        officeGroup.add(officeDividerWall);
+
+        // Sofa model
+        const sofa = getModel('sofa', () => {
+          const sofaGroup = new THREE.Group();
+          const sofaSeat = new THREE.Mesh(new THREE.BoxGeometry(4, 2, 14), new THREE.MeshStandardMaterial({ color: 0x3b4252, roughness: 0.7 }));
+          sofaSeat.position.set(55, 37, 0);
+          sofaGroup.add(sofaSeat);
+          return sofaGroup;
+        });
+        sofa.scale.set(6.5, 6.5, 6.5);
+        sofa.position.set(55, 37, 0);
+        sofa.rotation.y = Math.PI / 2;
+        officeGroup.add(sofa);
+
+        const coffeeTable = new THREE.Mesh(new THREE.BoxGeometry(6, 0.4, 10), officeWoodMat);
+        coffeeTable.position.set(62, 37.6, 0);
+        coffeeTable.castShadow = true;
+        officeGroup.add(coffeeTable);
+
+        const coffeeTableLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 1.6, 8), metalDarkMat);
+        coffeeTableLeg.position.set(62, 36.8, 0);
+        officeGroup.add(coffeeTableLeg);
+
+        // Wooden beams
+        for (let z = -30; z <= 30; z += 15) {
+          const beam = new THREE.Mesh(new THREE.BoxGeometry(1, 18, 1), officeWoodMat);
+          beam.position.set(75, 45, z);
+          officeGroup.add(beam);
+        }
+        for (let x = 25; x <= 75; x += 12.5) {
+          const beam = new THREE.Mesh(new THREE.BoxGeometry(1, 18, 1), officeWoodMat);
+          beam.position.set(x, 45, 30);
+          officeGroup.add(beam);
+        }
+
+        // Terrace/Deck
+        const terraceDeck = new THREE.Mesh(new THREE.BoxGeometry(38, 0.6, 10), officeWoodMat);
+        terraceDeck.position.set(50, 35.7, 35);
+        terraceDeck.receiveShadow = true;
+        officeGroup.add(terraceDeck);
+
+        const railingGroup = new THREE.Group();
+        railingGroup.position.set(0, 36, 39.7);
+        for (let rx = 32; rx <= 68; rx += 6) {
+          const post = new THREE.Mesh(new THREE.BoxGeometry(0.25, 3, 0.25), metalDarkMat);
+          post.position.set(rx, 1.5, 0);
+          railingGroup.add(post);
+        }
+        const topRail = new THREE.Mesh(new THREE.BoxGeometry(38, 0.2, 0.4), officeWoodMat);
+        topRail.position.set(50, 3.0, 0);
+        railingGroup.add(topRail);
+        officeGroup.add(railingGroup);
+
+        // Flat Roof (from image)
+        const officeRoof = new THREE.Mesh(new THREE.BoxGeometry(52, 1.2, 62), concreteMat);
+        officeRoof.position.set(50, 54, 0);
+        officeRoof.castShadow = true;
+        officeRoof.receiveShadow = true;
+        officeGroup.add(officeRoof);
+
+        // Procedural Ivy Generator (from image)
+        const ivyMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.9 });
+        const ivyMatDark = new THREE.MeshStandardMaterial({ color: 0x14532d, roughness: 0.9 });
+        
+        function addIvyCluster(parent, px, py, pz, scale = 1.0) {
+          const ivyGroup = new THREE.Group();
+          ivyGroup.position.set(px, py, pz);
+          const leafCount = 3 + Math.floor(Math.random() * 3);
+          for (let i = 0; i < leafCount; i++) {
+            const r = (1.5 + Math.random() * 1.5) * scale;
+            const leaf = new THREE.Mesh(
+              new THREE.SphereGeometry(r, 6, 6),
+              Math.random() > 0.45 ? ivyMat : ivyMatDark
+            );
+            leaf.position.set(
+              (Math.random() - 0.5) * r * 0.9,
+              (Math.random() - 0.5) * r * 0.9,
+              (Math.random() - 0.5) * r * 0.9
+            );
+            ivyGroup.add(leaf);
+          }
+          parent.add(ivyGroup);
+        }
+
+        // 1. Cover office roof with climbing ivy/foliage
+        for (let x = 27; x <= 73; x += 5.5) {
+          for (let z = -27; z <= 27; z += 7.5) {
+            if (Math.random() > 0.15) {
+              addIvyCluster(officeGroup, x, 54.6, z, 0.9);
+            }
+          }
+        }
+
+        // 2. Wrap columns and side frames in ivy
+        // Front facade (Z = 30)
+        for (let x = 25; x <= 75; x += 10) {
+          for (let y = 36; y <= 54; y += 3.5) {
+            if (Math.random() > 0.15) {
+              addIvyCluster(officeGroup, x, y, 30.3, 0.75);
+            }
+          }
+        }
+        // Back facade (Z = -30)
+        for (let x = 25; x <= 75; x += 10) {
+          for (let y = 36; y <= 54; y += 3.5) {
+            if (Math.random() > 0.15) {
+              addIvyCluster(officeGroup, x, y, -30.3, 0.75);
+            }
+          }
+        }
+        // Right facade (X = 75)
+        for (let z = -30; z <= 30; z += 8) {
+          for (let y = 36; y <= 54; y += 3.5) {
+            if (Math.random() > 0.2) {
+              addIvyCluster(officeGroup, 75.3, y, z, 0.75);
+            }
+          }
+        }
+
+        // ────────────────────────────────────────────────────────
+        // MACHINERY & SILO (With pipes and details)
+        // ────────────────────────────────────────────────────────
+        const productionGroup = new THREE.Group();
+        scene.add(productionGroup);
+
+        const siloGroup = new THREE.Group();
+        siloGroup.position.set(-52, 0, -12);
+        productionGroup.add(siloGroup);
+
+        addContactShadow(-52, -12, 11, 11, true);
+
+        const siloBodyGeo = new THREE.CylinderGeometry(8, 8, 26, 24);
+        const siloBodyMat = new THREE.MeshStandardMaterial({ 
+          color: 0x0f172a, 
+          metalness: 0.95, 
+          roughness: 0.1,
+          envMap: envMap,
+          envMapIntensity: 1.5
+        });
+        const siloBody = new THREE.Mesh(siloBodyGeo, siloBodyMat);
+        siloBody.position.y = 17;
+        siloBody.castShadow = true;
+        siloBody.receiveShadow = true;
+        siloGroup.add(siloBody);
+
+        const ringGeo = new THREE.TorusGeometry(8.1, 0.4, 8, 24);
+        for (let y = 8; y <= 26; y += 9) {
+          const ring = new THREE.Mesh(ringGeo, chromeMat);
+          ring.position.y = y;
+          ring.rotation.x = Math.PI / 2;
+          siloGroup.add(ring);
+        }
+
+        const ladderGroup = new THREE.Group();
+        ladderGroup.position.set(8.2, 0, 0);
+        const railL = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 30, 6), metalDarkMat); railL.position.set(0, 15, -0.6); ladderGroup.add(railL);
+        const railR = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 30, 6), metalDarkMat); railR.position.set(0, 15, 0.6); ladderGroup.add(railR);
+        for (let ly = 1.5; ly <= 29; ly += 1.8) {
+          const rung = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.2, 6), metalDarkMat);
+          rung.position.set(0, ly, 0);
+          rung.rotation.x = Math.PI / 2;
+          ladderGroup.add(rung);
+        }
+        siloGroup.add(ladderGroup);
+
+        // Silo Pipes
+        const siloPipeGroup = new THREE.Group();
+        
+        const mainSiloPipe = getModel('pipe_straight', () => new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 42, 8), chromeMat));
+        mainSiloPipe.scale.set(3.5, 21, 3.5);
+        mainSiloPipe.position.set(21, 24, 0);
+        mainSiloPipe.rotation.z = Math.PI / 2;
+        siloPipeGroup.add(mainSiloPipe);
+        
+        const verticalSiloPipe = getModel('pipe_straight', () => new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 8, 8), chromeMat));
+        verticalSiloPipe.scale.set(3.5, 4, 3.5);
+        verticalSiloPipe.position.set(0, 20, 0);
+        siloPipeGroup.add(verticalSiloPipe);
+        siloGroup.add(siloPipeGroup);
+
+        // Extruder
+        const machGroup = new THREE.Group();
+        machGroup.position.set(-18, 0, -10);
+        productionGroup.add(machGroup);
+
+        const generatorModel = getModel('machine_generator', () => {
+          const base = new THREE.Mesh(new THREE.BoxGeometry(24, 6, 22), new THREE.MeshStandardMaterial({ color: 0x0f172a }));
+          base.position.y = 3;
+          return base;
+        });
+        generatorModel.scale.set(6.5, 6.5, 6.5);
+        generatorModel.position.set(0, 0, 0);
+        machGroup.add(generatorModel);
+
+        const gear1 = new THREE.Mesh(new THREE.CylinderGeometry(5.5, 5.5, 2.5, 12), chromeMat);
+        gear1.position.set(-4, 12, 9.8);
+        gear1.rotation.x = Math.PI / 2;
+        gear1.castShadow = true;
+        machGroup.add(gear1);
+
+        const gear2 = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.2, 2.2, 12), chromeMat);
+        gear2.position.set(4, 12, 9.8);
+        gear2.rotation.x = Math.PI / 2;
+        gear2.castShadow = true;
+        machGroup.add(gear2);
+
+        const indGeo = new THREE.SphereGeometry(1.2, 16, 16);
+        const indicator = new THREE.Mesh(indGeo, indMatGreen);
+        indicator.position.set(6, 15, 9.2);
+        machGroup.add(indicator);
+
+        // Conveyor belt inside the factory
+        const conveyorGeo = new THREE.BoxGeometry(66, 1.8, 8);
+        const conveyorMat = new THREE.MeshStandardMaterial({ color: 0x03050a, roughness: 0.95, metalness: 0.8 });
+        const conveyor = new THREE.Mesh(conveyorGeo, conveyorMat);
+        conveyor.position.set(28, 3, -10);
+        conveyor.receiveShadow = true;
+        productionGroup.add(conveyor);
+
+        const rollerGeo = new THREE.CylinderGeometry(1, 1, 8.2, 12);
+        const rollers = [];
+        for (let x = 0; x <= 60; x += 15) {
+          const roller = new THREE.Mesh(rollerGeo, chromeMat);
+          roller.position.set(-2 + x, 3, -10);
+          roller.rotation.x = Math.PI / 2;
+          productionGroup.add(roller);
+          rollers.push(roller);
+        }
+
+        // Orange Robotic Arms (from image)
+        function createRoboticArm(x, z) {
+          const armGroup = new THREE.Group();
+          armGroup.position.set(x, 3.9, z);
+          
+          const orangeMat = new THREE.MeshStandardMaterial({ color: 0xf97316, roughness: 0.4 });
+          const jointMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.8, roughness: 0.2 });
+          
+          const base = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.8, 2, 8), jointMat);
+          base.position.y = 1;
+          base.castShadow = true;
+          armGroup.add(base);
+          
+          const lowerArm = new THREE.Mesh(new THREE.BoxGeometry(1.2, 8, 1.2), orangeMat);
+          lowerArm.position.set(0, 4.5, 0.8);
+          lowerArm.rotation.x = 0.4;
+          lowerArm.castShadow = true;
+          armGroup.add(lowerArm);
+          
+          const elbow = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 1.6, 8), jointMat);
+          elbow.position.set(0, 7.5, 2.4);
+          elbow.rotation.z = Math.PI / 2;
+          elbow.castShadow = true;
+          armGroup.add(elbow);
+          
+          const upperArm = new THREE.Mesh(new THREE.BoxGeometry(1.0, 7, 1.0), orangeMat);
+          upperArm.position.set(0, 9.5, 1.0);
+          upperArm.rotation.x = -0.7;
+          upperArm.castShadow = true;
+          armGroup.add(upperArm);
+          
+          const wrist = new THREE.Mesh(new THREE.SphereGeometry(0.6, 8, 8), jointMat);
+          wrist.position.set(0, 11.5, -1.2);
+          armGroup.add(wrist);
+          
+          productionGroup.add(armGroup);
+          return armGroup;
+        }
+
+        createRoboticArm(10, -15);
+        createRoboticArm(35, -15);
+
+        // Boxes (Kenney model cardboard box)
+        const boxes = [];
+        for (let i = 0; i < 3; i++) {
+          const box = getModel('cardboardBox', () => new THREE.Mesh(boxGeo, boxMat));
+          box.scale.set(5.5, 5.5, 5.5);
+          box.position.set(2 + i * 22, 6.4, -10);
+          productionGroup.add(box);
+          boxes.push(box);
+        }
+
+        const binGeo = new THREE.BoxGeometry(11, 8, 11);
+        const bin = new THREE.Mesh(binGeo, metalDarkMat);
+        bin.position.set(66, 4, -10);
+        bin.receiveShadow = true;
+        productionGroup.add(bin);
+
+        // 3. DISPEČINK (Inside the ground-level office building)
+        const dispatchGroup = new THREE.Group();
+        dispatchGroup.position.set(32, 36, 0); // Position relative to officeGroup floor
+        officeGroup.add(dispatchGroup);
+
+        const deskGroup = new THREE.Group();
+        deskGroup.position.set(8, 0, -10);
+        dispatchGroup.add(deskGroup);
+
+        // Desk model
+        const deskModel = getModel('desk', () => {
+          return new THREE.Mesh(new THREE.BoxGeometry(25, 1.2, 10), officeWoodMat);
+        });
+        deskModel.scale.set(6, 6, 6);
+        deskModel.position.set(0, 0, 0);
+        deskGroup.add(deskModel);
+
+        const mugGroup = new THREE.Group();
+        mugGroup.position.set(-8, 9, 2);
+        deskGroup.add(mugGroup);
+        const mug = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 2, 8), new THREE.MeshStandardMaterial({ color: 0x00d2ff }));
+        mug.castShadow = true;
+        mugGroup.add(mug);
+        const mugHandle = new THREE.Mesh(new THREE.TorusGeometry(0.6, 0.2, 4, 8), new THREE.MeshStandardMaterial({ color: 0x00d2ff }));
+        mugHandle.position.x = 1;
+        mugGroup.add(mugHandle);
+
+        // Monitor model
+        const monitor = getModel('monitor', () => {
+          return new THREE.Mesh(new THREE.BoxGeometry(18, 9, 0.8), metalDarkMat);
+        });
+        monitor.scale.set(6, 6, 6);
+        monitor.position.set(8, 8.6, -13);
+        monitor.rotation.y = -0.15;
+        dispatchGroup.add(monitor);
+
+        // Chart bars on monitor
+        const barMatG = new THREE.MeshBasicMaterial({ color: 0x00ff66 });
+        const barMatR = new THREE.MeshBasicMaterial({ color: 0xff3366 });
+        for (let i = 0; i < 5; i++) {
+          const h = 2 + i * 1.0;
+          const bar = new THREE.Mesh(new THREE.BoxGeometry(1.2, h, 0.1), i === 4 ? barMatR : barMatG);
+          bar.position.set(-5 + i * 2.5, 13.5 + h/2 - 3.8, -12); // adjusted height for screen
+          bar.rotation.y = -0.15;
+          dispatchGroup.add(bar);
+        }
+
+        const kbd = new THREE.Mesh(new THREE.BoxGeometry(10, 0.4, 3.8), new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.8 }));
+        kbd.position.set(8, 8.8, -8);
+        kbd.rotation.y = -0.15;
+        dispatchGroup.add(kbd);
+
+        const mouse = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.35, 1.8), new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.8 }));
+        mouse.position.set(15, 8.8, -7.5);
+        mouse.rotation.y = -0.15;
+        dispatchGroup.add(mouse);
+
+        // Chair model
+        const chair = getModel('chair', () => {
+          return new THREE.Mesh(new THREE.BoxGeometry(6, 0.8, 6), metalDarkMat);
+        });
+        chair.scale.set(6, 6, 6);
+        chair.position.set(5, 0, -3);
+        chair.rotation.y = -Math.PI / 4;
+        dispatchGroup.add(chair);
+
+        // Fallback character
+        function buildFallbackCharacter(bodyColorMaterial, helmetColor) {
+          const group = new THREE.Group();
+          const legGeo = new THREE.CylinderGeometry(0.8, 0.6, 5, 8);
+          const shoeGeo = new THREE.BoxGeometry(1.6, 0.8, 2.2);
+          const shoeMat = new THREE.MeshStandardMaterial({ color: 0x090d16 });
+          const legL = new THREE.Mesh(legGeo, pantsMat); legL.position.set(-1.2, 2.5, 0); group.add(legL);
+          const legR = new THREE.Mesh(legGeo, pantsMat); legR.position.set(1.2, 2.5, 0); group.add(legR);
+          const shoeL = new THREE.Mesh(shoeGeo, shoeMat); shoeL.position.set(-1.2, 0.4, 0.5); group.add(shoeL);
+          const shoeR = new THREE.Mesh(shoeGeo, shoeMat); shoeR.position.set(1.2, 0.4, 0.5); group.add(shoeR);
+          const torso = new THREE.Mesh(new THREE.CylinderGeometry(2, 2.4, 7, 12), bodyColorMaterial);
+          torso.position.y = 8.5;
+          group.add(torso);
+          return group;
+        }
+
+        // 3D Astronaut personnel
+        function buildCharacter(colorHex) {
+          const astronaut = getModel('astronaut', () => {
+            return buildFallbackCharacter(new THREE.MeshStandardMaterial({color: colorHex}), 0xffffff);
+          });
+          astronaut.scale.set(5.2, 5.2, 5.2);
+          astronaut.traverse(child => {
+            if (child.isMesh && child.material) {
+              if (child.material.name.toLowerCase().includes('suit') || child.name.toLowerCase().includes('suit')) {
+                child.material = new THREE.MeshStandardMaterial({
+                  color: colorHex,
+                  roughness: 0.4,
+                  metalness: 0.1
+                });
+              }
+            }
+          });
+          return astronaut;
+        }
+
+        const operatorGroup = buildCharacter(0x2563eb); // Blue suit operator (from image)
+        operatorGroup.position.set(-10, 0, 38);
+        operatorGroup.rotation.y = -Math.PI / 3.5;
+        productionGroup.add(operatorGroup);
+        
+        const tablet = new THREE.Mesh(tabGeo, tabMat);
+        tablet.position.set(2.2, 8.2, 2.4);
+        tablet.rotation.z = -0.6;
+        tablet.rotation.x = -0.2;
+        operatorGroup.add(tablet);
+
+        const dispatcherGroup = buildCharacter(0x00d2ff); // Cyan suit dispatcher
+        dispatcherGroup.position.set(5, 0, -3);
+        dispatchGroup.add(dispatcherGroup);
+
+        // Satellite Dish on office roof
+        const satGroup = new THREE.Group();
+        satGroup.position.set(60, 58, -10);
+
+        const satBase = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.2, 3, 5), metalDarkMat);
+        satBase.position.y = 1.5;
+        satBase.castShadow = true;
+        satGroup.add(satBase);
+
+        const satDish = getModel('satelliteDish', () => {
+          return new THREE.Mesh(new THREE.CylinderGeometry(1.5, 0.3, 1.0, 8), chromeMat);
+        });
+        satDish.scale.set(4, 4, 4);
+        satDish.position.set(0, 3, 0);
+        satDish.rotation.x = -0.4;
+        satDish.rotation.y = Math.PI / 4;
+        satGroup.add(satDish);
+
+        const satGlow = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 8), new THREE.MeshBasicMaterial({ color: 0x00d2ff }));
+        satGlow.position.set(0, 3.1, 0);
+        satGroup.add(satGlow);
+        officeGroup.add(satGroup);
+
+        // Plant
+        const plantPot = getModel('pottedPlant', () => {
+          return new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.6, 2, 8), metalDarkMat);
+        });
+        plantPot.scale.set(5.5, 5.5, 5.5);
+        plantPot.position.set(43, 37, 24);
+        officeGroup.add(plantPot);
+
+        // Office warm lighting
+        const officeWarmLight = new THREE.PointLight(0x00d2ff, 1.9, 45); 
+        officeWarmLight.position.set(88, 11, -5);
+        officeWarmLight.castShadow = true;
+        officeWarmLight.shadow.bias = -0.002;
+        scene.add(officeWarmLight);
+
+        // ────────────────────────────────────────────────────────
+        // DETAILED 3D TRUCK & VEHICLES
+        // ────────────────────────────────────────────────────────
+        const truckGroup = new THREE.Group();
+        truckGroup.position.set(-160, 0, 18);
+        scene.add(truckGroup);
+
+        const wheels = [];
+        const truckShadow = new THREE.Mesh(new THREE.PlaneGeometry(42, 12), shadowMat);
+        truckShadow.rotation.x = -Math.PI / 2;
+        truckShadow.position.set(0, 0.05, 0);
+        truckGroup.add(truckShadow);
+
+        const truckModel = getModel('delivery', () => {
+          // Fallback kamion z BoxGeometry
+          const g = new THREE.Group();
+          const cab = new THREE.Mesh(new THREE.BoxGeometry(10, 8, 8), new THREE.MeshStandardMaterial({ color: 0x00d2ff, metalness: 0.5, roughness: 0.2 }));
+          cab.position.set(12, 4.5, 0);
+          cab.castShadow = true;
+          g.add(cab);
+          
+          const trailer = new THREE.Mesh(new THREE.BoxGeometry(26, 10, 9), new THREE.MeshStandardMaterial({ color: 0x111625, metalness: 0.2, roughness: 0.5 }));
+          trailer.position.set(-6, 5.5, 0);
+          trailer.castShadow = true;
+          g.add(trailer);
+
+          const wheelGeo = new THREE.CylinderGeometry(2.2, 2.2, 2, 12);
+          wheelGeo.rotateX(Math.PI / 2);
+          const wheelMat = new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.8 });
+          
+          const wheelPositions = [
+            [10, 2.2, 4.2], [10, 2.2, -4.2],
+            [-10, 2.2, 4.2], [-10, 2.2, -4.2],
+            [-4, 2.2, 4.2], [-4, 2.2, -4.2]
+          ];
+          wheelPositions.forEach(pos => {
+            const w = new THREE.Mesh(wheelGeo, wheelMat);
+            w.position.set(pos[0], pos[1], pos[2]);
+            w.castShadow = true;
+            g.add(w);
+            wheels.push(w);
+          });
+          return g;
+        });
+
+        if (truckModel) {
+          const isFallback = truckModel.children.length > 0 && truckModel.children[0].geometry && truckModel.children[0].geometry.type === 'BoxGeometry';
+          if (!isFallback) {
+            truckModel.scale.set(6, 6, 6);
+            truckModel.rotation.y = Math.PI; 
+            truckModel.position.set(0, 0, 0);
+            
+            truckModel.traverse(child => {
+              if (child.isMesh && (child.name.toLowerCase().includes('wheel') || child.name.toLowerCase().includes('tire') || child.name.toLowerCase().includes('kolo'))) {
+                wheels.push(child);
+              }
+            });
+            if (wheels.length === 0) {
+              truckModel.traverse(child => {
+                if (child.isMesh && child.position.y < 1.0) {
+                  wheels.push(child);
+                }
+              });
+            }
+          }
+          truckGroup.add(truckModel);
+        }
+
+        // Parkující SUV auta u kanceláře (střed x = 103, y = 0, z = -36 až 30)
+        const createSUV = (x, z, rotY) => {
+          const suvGroup = new THREE.Group();
+          suvGroup.position.set(x, 0, z);
+          suvGroup.rotation.y = rotY;
+          scene.add(suvGroup);
+
+          const suvShadow = new THREE.Mesh(new THREE.PlaneGeometry(16, 8), shadowMat);
+          suvShadow.rotation.x = -Math.PI / 2;
+          suvShadow.position.set(0, 0.05, 0);
+          suvGroup.add(suvShadow);
+
+          const suvModel = getModel('suv', () => {
+            // Fallback auto z BoxGeometry
+            const g = new THREE.Group();
+            const body = new THREE.Mesh(new THREE.BoxGeometry(10, 4, 5), new THREE.MeshStandardMaterial({ color: 0xe06c75, metalness: 0.6, roughness: 0.2 }));
+            body.position.set(0, 2.5, 0);
+            body.castShadow = true;
+            g.add(body);
+            
+            const cabin = new THREE.Mesh(new THREE.BoxGeometry(5, 3, 4.4), new THREE.MeshStandardMaterial({ color: 0x1d212a, metalness: 0.1, roughness: 0.1 }));
+            cabin.position.set(-1, 5, 0);
+            cabin.castShadow = true;
+            g.add(cabin);
+
+            const wheelGeo = new THREE.CylinderGeometry(1.2, 1.2, 1.2, 10);
+            wheelGeo.rotateX(Math.PI / 2);
+            const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
+            const wPositions = [
+              [3, 1.2, 2.3], [3, 1.2, -2.3],
+              [-3, 1.2, 2.3], [-3, 1.2, -2.3]
+            ];
+            wPositions.forEach(pos => {
+              const w = new THREE.Mesh(wheelGeo, wheelMat);
+              w.position.set(pos[0], pos[1], pos[2]);
+              w.castShadow = true;
+              g.add(w);
+            });
+            return g;
+          });
+
+          if (suvModel) {
+            const isFallback = suvModel.children.length > 0 && suvModel.children[0].geometry && suvModel.children[0].geometry.type === 'BoxGeometry';
+            if (!isFallback) {
+              suvModel.scale.set(5.5, 5.5, 5.5);
+              suvModel.rotation.y = Math.PI; 
+              suvModel.position.set(0, 0, 0);
+            }
+            suvGroup.add(suvModel);
+          }
+        };
+
+        // Zaparkujeme dvě SUV auta napravo od kanceláře
+        createSUV(105, 50, 0);
+        createSUV(120, 50, Math.PI / 12);
+
+        // ────────────────────────────────────────────────────────
+        // PLASMA DATA STREAM (5 Curves)
+        // ────────────────────────────────────────────────────────
+        const curveExtruderToServer = new THREE.QuadraticBezierCurve3(
+          new THREE.Vector3(-18, 10, -10),
+          new THREE.Vector3(-8, 30, 5),
+          new THREE.Vector3(2, 6, 20)
+        );
+        const curveSiloToServer = new THREE.QuadraticBezierCurve3(
+          new THREE.Vector3(-52, 26, -12),
+          new THREE.Vector3(-25, 30, 4),
+          new THREE.Vector3(2, 6, 20)
+        );
+        // Ends at Dispatch desk absolute (93, 10, -10)
+        const curveOperatorToDispatch = new THREE.QuadraticBezierCurve3(
+          new THREE.Vector3(-36, 12, -8),
+          new THREE.Vector3(28.5, 35, -9),
+          new THREE.Vector3(93, 10, -10)
+        );
+        const curveServerToDispatch = new THREE.QuadraticBezierCurve3(
+          new THREE.Vector3(2, 6, 20),
+          new THREE.Vector3(47.5, 25, 5),
+          new THREE.Vector3(93, 10, -10)
+        );
+        // Starts at office roof satDish absolute (113, 23.5, -10)
+        const curveDispatchToVillage = new THREE.QuadraticBezierCurve3(
+          new THREE.Vector3(113, 23.5, -10),
+          new THREE.Vector3(99, 45, -42),
+          new THREE.Vector3(85, 29, -75)
+        );
+
+        const particles = [];
+        const pGeo = new THREE.SphereGeometry(0.7, 6, 6);
+        
+        const pMatGreen = new THREE.MeshBasicMaterial({ color: 0x22c55e, transparent: true, opacity: 0.85 });
+        const pMatBlue = new THREE.MeshBasicMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.85 });
+        const pMatCyan = new THREE.MeshBasicMaterial({ color: 0x06b6d4, transparent: true, opacity: 0.85 });
+        const pMatYellow = new THREE.MeshBasicMaterial({ color: 0xeab308, transparent: true, opacity: 0.9 });
+        const pMatRed = new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.85 });
+
+        function addParticles(curve, count, mat, speed) {
+          for (let i = 0; i < count; i++) {
+            const mesh = new THREE.Mesh(pGeo, mat);
+            scene.add(mesh);
+            particles.push({
+              mesh: mesh,
+              curve: curve,
+              progress: i / count,
+              speed: speed,
+              defaultMat: mat
+            });
+          }
+        }
+
+        addParticles(curveExtruderToServer, 12, pMatGreen, 0.007);
+        addParticles(curveSiloToServer, 12, pMatBlue, 0.005);
+        addParticles(curveOperatorToDispatch, 12, pMatCyan, 0.006);
+        addParticles(curveServerToDispatch, 12, pMatCyan, 0.008);
+        addParticles(curveDispatchToVillage, 25, pMatYellow, 0.0035);
+
+        // ────────────────────────────────────────────────────────
+        // ANIMATION & TRIGGERS
+        // ────────────────────────────────────────────────────────
+        let isRunning = true;
+        let truckTargetX = -160;
+        let truckSpeed = 0;
+
+        const btnTriggerFault = document.getElementById('btnTriggerFault');
+        const btnResolveFault = document.getElementById('btnResolveFault');
+        const btnSendTruck = document.getElementById('btnSendTruck');
+
+        const widget = document.getElementById('widget');
+        const widgetDot = document.getElementById('widgetDot');
+        const statTasks = document.getElementById('statTasks');
+        const statTemp = document.getElementById('statTemp');
+        const chart = document.getElementById('chart');
+        const chartPath = document.getElementById('chartPath');
+
+        btnTriggerFault.addEventListener('click', () => {
+          if (!isRunning) return;
+          isRunning = false;
+
+          btnTriggerFault.disabled = true;
+          btnResolveFault.disabled = false;
+
+          alarmLight.intensity = 4.0;
+          indicator.material = indMatRed;
+
+          glassMat.color.setHex(0xff3366);
+          factoryAccentMat.color.setHex(0xff3366);
+
+          particles.forEach(p => {
+            p.mesh.material = pMatRed;
+          });
+
+          operatorGroup.rotation.y = Math.PI;
+          operatorGroup.position.x = -32;
+
+          widget.classList.add('critical');
+          widgetDot.classList.add('red');
+          statTasks.textContent = '35';
+          statTasks.classList.add('red');
+          statTasks.classList.remove('green');
+          statTemp.textContent = '108°C';
+          statTemp.style.color = 'var(--neon-red)';
+          
+          chart.classList.add('red');
+          chartPath.setAttribute('d', 'M 5,25 L 30,22 L 55,28 L 80,4 C 105,4 120,38 135,38 L 155,38 L 180,35 L 205,38');
+        });
+
+        btnResolveFault.addEventListener('click', () => {
+          if (isRunning) return;
+          btnResolveFault.disabled = true;
+
+          dispatcherGroup.position.y = 2;
+          setTimeout(() => { dispatcherGroup.position.y = 0; }, 200);
+
+          setTimeout(() => {
+            isRunning = true;
+            btnTriggerFault.disabled = false;
+
+            indicator.material = indMatGreen;
+            alarmLight.intensity = 0;
+
+            glassMat.color.setHex(0x00d2ff); 
+            factoryAccentMat.color.setHex(0x00ff66); 
+
+            particles.forEach(p => {
+              p.mesh.material = p.defaultMat;
+            });
+
+            operatorGroup.rotation.y = 0;
+            operatorGroup.position.x = -36;
+
+            widget.classList.remove('critical');
+            widgetDot.classList.remove('red');
+            statTasks.textContent = '34';
+            statTasks.classList.remove('red');
+            statTasks.classList.add('green');
+            statTemp.textContent = '55°C';
+            statTemp.style.color = 'var(--text-main)';
+            
+            chart.classList.remove('red');
+            chartPath.setAttribute('d', 'M 5,25 L 30,22 L 55,28 L 80,18 L 105,25 L 130,12 L 155,20 L 180,8 L 205,15');
+
+            alert("Incident vyřešen přes 3D dispečink. Všechny procesy v zeleném pásmu.");
+          }, 1200);
+        });
+
+        btnSendTruck.addEventListener('click', () => {
+          if (truckGroup.position.x > -150 && truckGroup.position.x < 150) return;
+          btnSendTruck.disabled = true;
+
+          truckTargetX = -26;
+          truckSpeed = 1.4;
+          
+          setTimeout(() => {
+            let flashes = 0;
+            const flashInt = setInterval(() => {
+              siloBody.material.emissive.setHex(flashes % 2 === 0 ? 0x00d2ff : 0x000000);
+              siloBody.material.emissiveIntensity = 0.4;
+              flashes++;
+              if (flashes > 5) {
+                clearInterval(flashInt);
+                siloBody.material.emissive.setHex(0x000000);
+                
+                truckTargetX = 160;
+                truckSpeed = 1.8;
+              }
+            }, 300);
+
+          }, 3000);
+        });
+
+        // ────────────────────────────────────────────────────────
+        // RENDER LOOP
+        // ────────────────────────────────────────────────────────
+        const clock = new THREE.Clock();
+
+        function animate() {
+          requestAnimationFrame(animate);
+
+          const elapsedTime = clock.getElapsedTime();
+
+          controls.update();
+
+          if (elapsedTime % 0.4 < 0.2) {
+            serverLights.forEach((led, idx) => {
+              led.visible = (idx % 2 === 0);
+            });
+          } else {
+            serverLights.forEach((led, idx) => {
+              led.visible = (idx % 2 !== 0);
+            });
+          }
+
+          turbineBlades.forEach(bladeGroup => {
+            bladeGroup.rotation.z += 0.018;
+          });
+
+          if (isRunning) {
+            gear1.rotation.y += 0.04;
+            gear2.rotation.y -= 0.06;
+            operatorGroup.position.y = Math.sin(elapsedTime * 6) * 0.2;
+            spinningVents.forEach(vent => vent.rotation.y += 0.08);
+          }
+
+          if (isRunning) {
+            rollers.forEach(r => r.rotation.y += 0.06);
+
+            boxes.forEach(box => {
+              box.position.x += 0.22;
+              if (box.position.x > 62) {
+                box.position.x = -4;
+              }
+              if (box.position.x > 58) {
+                box.position.y = 6.4 - (box.position.x - 58) * 1.6;
+              } else {
+                box.position.y = 6.4;
+              }
+            });
+          }
+
+          if (!isRunning) {
+            alarmLight.intensity = 2.5 + Math.sin(elapsedTime * 10) * 1.5;
+          }
+
+          particles.forEach(p => {
+            p.progress += p.speed;
+            if (p.progress > 1) {
+              p.progress = 0;
+            }
+            const pos = p.curve.getPointAt(p.progress);
+            p.mesh.position.copy(pos);
+          });
+
+          smokeParticles.forEach(p => {
+            p.mesh.position.y += p.speed;
+            p.mesh.position.x = 2.4 + Math.sin(elapsedTime * p.wobbleSpeed + p.wobbleOffset) * 0.2;
+            p.mesh.position.z = 1.2 + Math.cos(elapsedTime * p.wobbleSpeed + p.wobbleOffset) * 0.2;
+            
+            const life = (p.mesh.position.y - p.startY) / 7.0;
+            p.mesh.scale.setScalar(1.0 + life * 1.5);
+            p.mesh.material.opacity = 0.25 * (1.0 - life);
+
+            if (p.mesh.position.y > p.startY + 7.0) {
+              p.mesh.position.y = p.startY;
+              p.mesh.position.x = 2.4;
+              p.mesh.position.z = 1.2;
+              p.mesh.scale.setScalar(1.0);
+              p.mesh.material.opacity = 0.25;
+            }
+          });
+
+          if (Math.abs(truckGroup.position.x - truckTargetX) > 1) {
+            const dir = Math.sign(truckTargetX - truckGroup.position.x);
+            truckGroup.position.x += dir * truckSpeed;
+
+            wheels.forEach(w => {
+              w.rotation.z += dir * 0.08;
+            });
+          } else {
+            if (truckTargetX === 160) {
+              truckGroup.position.x = -160;
+              truckTargetX = -160;
+              btnSendTruck.disabled = false;
+            }
+          }
+
+          composer.render();
+        }
+
+        animate();
+
+        // Resize
+        window.addEventListener('resize', () => {
+          const w = viewport.clientWidth || 800;
+          const h = viewport.clientHeight || 500;
+          camera.aspect = w / h;
+          camera.updateProjectionMatrix();
+          renderer.setSize(w, h);
+          composer.setSize(w, h);
+        });
+      }
+
+      buildScene().catch(e => logError("Chyba při sestavování scény: " + e.message + "<br><pre style='font-size: 10px; color: #ffa4b7; text-align: left; overflow: auto;'>" + (e.stack || e) + "</pre>"));
+    } catch (e) {
+      logError('Chyba při inicializaci Three.js scény: ' + e.message + '<br><pre style="font-size: 10px; color: #ffa4b7; text-align: left; overflow: auto;">' + (e.stack || e) + '</pre>');
+    }
+  </script>
+</body>
+</html>
