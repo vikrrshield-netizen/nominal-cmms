@@ -31,6 +31,12 @@ service firebase.storage {
       return hasTokenPermission('production.manage')
         || request.auth.token.role in ['SUPERADMIN', 'VEDENI', 'UDRZBA', 'VYROBA'];
     }
+
+    function isSafeImageUpload(maxSizeBytes) {
+      return request.resource != null
+        && request.resource.size <= maxSizeBytes
+        && request.resource.contentType.matches('image/.*');
+    }
     
     // Revision documents
     match /revisions/{revisionId}/{allPaths=**} {
@@ -53,13 +59,15 @@ service firebase.storage {
     // Fault report photos
     match /fault_photos/{allPaths=**} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn();
+      allow create, update: if isSignedIn() && isSafeImageUpload(10 * 1024 * 1024);
+      allow delete: if isSignedIn();
     }
 
     // Gearbox temperature / camera checks
     match /gearbox_checks/{gearboxId}/{allPaths=**} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn();
+      allow create, update: if isSignedIn() && isSafeImageUpload(10 * 1024 * 1024);
+      allow delete: if isSignedIn();
     }
 
     // Production master data documents: materials/products card attachments
