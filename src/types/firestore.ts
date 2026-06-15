@@ -81,9 +81,13 @@ export interface TaskDoc {
   // Vztahy
   assetId?: string;
   assetName?: string;
+  roomId?: string;
+  roomName?: string;
   buildingId?: BuildingId;
-  sourceRefType?: 'inspection_log' | 'manual' | 'asset' | 'work_log' | 'datalogger_temperature';
+  sourceRefType?: 'inspection_log' | 'inspection_run' | 'manual' | 'asset' | 'work_log' | 'datalogger_temperature';
   sourceRefId?: string;
+  sourceRunId?: string;
+  sourceRunItemId?: string;
   inspectionLogId?: string;
   
   // Přiřazení

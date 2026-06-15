@@ -663,6 +663,23 @@ service cloud.firestore {
       allow update: if canWriteInspection();
       allow delete: if hasPermission('asset.delete');
     }
+
+    match /inspection_runs/{docId} {
+      allow read: if hasPermission('asset.read') || hasPermission('report.read');
+      allow create: if canWriteInspection()
+        && request.resource.data.status == 'draft'
+        && request.resource.data.startedAt is timestamp
+        && request.resource.data.items is list
+        && hasTimestamp();
+      allow update: if canWriteInspection()
+        && hasTimestamp()
+        && (
+          resource.data.status == 'draft'
+          || (resource.data.status == 'closed' && request.resource.data.status == 'draft')
+        );
+      allow delete: if isSuperAdmin();
+    }
+
     // ENTITIES â€” univerzĂˇlnĂ­ entity (Matryoshka)
     // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     match /inspection_run_logs/{docId} {
