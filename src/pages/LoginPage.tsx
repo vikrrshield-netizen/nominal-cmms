@@ -3,9 +3,11 @@ import { useAuthContext } from '../context/AuthContext';
 import { isSandboxLoginEnabled } from '../lib/firebase';
 import { Delete, LogIn } from 'lucide-react';
 import BrandMark from '../components/ui/BrandMark';
+import { useNavigate } from 'react-router-dom';
 
 export default function LoginPage() {
   const { login } = useAuthContext();
+  const navigate = useNavigate();
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -33,7 +35,9 @@ export default function LoginPage() {
     const success = await login(pinToUse);
     setIsLoading(false);
 
-    if (!success) {
+    if (success) {
+      navigate('/', { replace: true });
+    } else {
       setError(true);
       setPin('');
       if (navigator.vibrate) navigator.vibrate(200);
