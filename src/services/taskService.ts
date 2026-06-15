@@ -228,13 +228,15 @@ export async function completeTask(
   resolution?: string, 
   actualMinutes?: number
 ): Promise<void> {
-  await updateDoc(doc(db, COLLECTION, taskId), {
+  const updateData: Record<string, unknown> = {
     status: 'completed',
     completedAt: serverTimestamp(),
-    resolution,
-    actualMinutes,
     updatedAt: serverTimestamp(),
-  });
+  };
+  if (resolution !== undefined) updateData.resolution = resolution;
+  if (actualMinutes !== undefined) updateData.actualMinutes = actualMinutes;
+
+  await updateDoc(doc(db, COLLECTION, taskId), updateData);
 }
 
 // Zrušit úkol

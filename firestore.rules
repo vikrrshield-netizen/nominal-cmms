@@ -66,7 +66,97 @@ service cloud.firestore {
     // Soft delete check â€” update MUST only set isDeleted=true, not actually delete
     function isSoftDelete() {
       return request.resource.data.isDeleted == true
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'isDeleted',
+          'deletedAt',
+          'deletedBy',
+          'updatedAt'
+        ])
         && resource.data.isDeleted != true;
+    }
+
+    function isSafeOwnUserUpdate(userId) {
+      return request.auth.uid == userId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'displayName',
+          'phone',
+          'color',
+          'nickname',
+          'workwear',
+          'workwearSizes',
+          'updatedAt',
+          'updatedBy'
+        ]);
+    }
+
+    function isSafeManagedUserUpdate() {
+      return isManagement()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'displayName',
+          'phone',
+          'email',
+          'color',
+          'buildingId',
+          'plantId',
+          'active',
+          'isActive',
+          'pinLength',
+          'nickname',
+          'workwear',
+          'workwearSizes',
+          'updatedAt',
+          'updatedBy'
+        ]);
+    }
+
+    function isTaskStartOnlyUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status',
+          'startedAt',
+          'updatedAt'
+        ])
+        && !(resource.data.status in ['completed', 'cancelled'])
+        && request.resource.data.status == 'in_progress'
+        && request.resource.data.startedAt is timestamp;
+    }
+
+    function isClientAuditLogCreate() {
+      return request.resource.data.userId == request.auth.uid
+        && request.resource.data.action is string
+        && (
+          request.resource.data.documentId is string
+          || request.resource.data.category == 'app_error'
+        )
+        && (
+          request.resource.data.createdAt is timestamp
+          || request.resource.data.timestamp is timestamp
+        );
+    }
+
+    function canCreateNotification() {
+      return hasPermission('admin.manage')
+        || hasPermission('wo.create')
+        || hasPermission('wo.update')
+        || hasPermission('asset.update')
+        || hasPermission('inv.manage')
+        || hasPermission('inv.restock')
+        || hasPermission('datalogger.temperature.write')
+        || hasPermission('datalogger.manage')
+        || hasPermission('production.manage')
+        || hasPermission('schedule.manage');
+    }
+
+    function isValidNotificationCreate() {
+      return canCreateNotification()
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.type is string
+        && (
+          (request.resource.data.userId is string)
+          || (
+            request.resource.data.targetType in ['role', 'user', 'all']
+            && request.resource.data.targetId is string
+          )
+        );
     }
 
     // Verify updatedAt timestamp is present on writes
@@ -205,6 +295,7 @@ service cloud.firestore {
           'tenantId',
           'lastTemperatureC',
           'lastTemperatureAt',
+          'lastMotorLoadAmps',
           'lastGearboxPhotoUrl',
           'updatedAt'
         ])
@@ -223,19 +314,8 @@ service cloud.firestore {
       // CizĂ­ profil jen SUPERADMIN/MAJITEL/VEDENI
       allow update: if isAuth() && (
         // VlastnĂ­ profil â€” nesmĂ­ mÄ›nit role
-        (request.auth.uid == userId
-          && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-            'role',
-            'roleIds',
-            'primaryRoleId',
-            'customPermissions',
-            'scope',
-            'tenantId',
-            'pin',
-            'isActive'
-          ]))
-        // Nebo management
-        || isManagement()
+        isSafeOwnUserUpdate(userId)
+        || isSafeManagedUserUpdate()
       ) && hasTimestamp();
 
       // VytvoĹ™enĂ­ jen SUPERADMIN
@@ -333,7 +413,7 @@ service cloud.firestore {
         hasPermission('wo.delete')
         || hasPermission('wo.update')
         || hasPermission('wo.close')
-        || (!(resource.data.status in ['completed', 'cancelled']) && hasPermission('wo.read'))
+        || (hasPermission('wo.read') && isTaskStartOnlyUpdate())
       );
       allow delete: if hasPermission('wo.delete');
     }
@@ -518,7 +598,7 @@ service cloud.firestore {
       allow read: if isAdmin();
 
       // ZĂˇpis â€” kdokoliv pĹ™ihlĂˇĹˇenĂ˝ (hook zapisuje automaticky)
-      allow create: if isAnyRole();
+      allow create: if isAnyRole() && isClientAuditLogCreate();
 
       // NIKDO nesmĂ­ editovat ani mazat audit logy!
       allow update: if false;
@@ -535,7 +615,7 @@ service cloud.firestore {
         || isManagement()
       );
 
-      allow create: if isAnyRole();
+      allow create: if isAnyRole() && isValidNotificationCreate();
 
       // OznaÄŤit jako pĹ™eÄŤtenĂ©
       allow update: if isAuth() && (
@@ -595,7 +675,7 @@ service cloud.firestore {
           && hasTimestamp()
           && request.resource.data.diff(resource.data).changedKeys().hasOnly(['acknowledgedBy', 'acknowledgedByName', 'updatedAt'])
         );
-      allow delete: if isAnyRole();
+      allow delete: if isManagement() || isSuperAdmin();
     }
 
     // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
