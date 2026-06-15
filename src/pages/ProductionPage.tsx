@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { showToast } from '../components/ui/Toast';
 import MicButton from '../components/ui/MicButton';
+import { formatCounter, nextCounterValue } from '../services/counterService';
 import { isExtruderAsset, normalizeGearboxText } from '../services/gearboxService';
 import { materialBatch, productBatch } from '../data/productionMasterSeed';
 
@@ -424,22 +425,31 @@ function useAssetsPicker(category?: string) {
 // HELPERS
 // ═══════════════════════════════════════════════════════════════════
 
-function generateBatchId(): string {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const d = String(now.getDate()).padStart(2, '0');
-  const seq = String(Math.floor(Math.random() * 900) + 100);
-  return `EX-${y}${m}${d}-${seq}`;
+function counterScope(value: string): string {
+  return normalizeGearboxText(value || 'general')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 40) || 'general';
 }
 
-function generateProductId(): string {
+async function generateBatchId(scope = 'general'): Promise<string> {
   const now = new Date();
   const y = now.getFullYear();
   const m = String(now.getMonth() + 1).padStart(2, '0');
   const d = String(now.getDate()).padStart(2, '0');
-  const seq = String(Math.floor(Math.random() * 900) + 100);
-  return `PK-${y}${m}${d}-${seq}`;
+  const dateKey = `${y}${m}${d}`;
+  const seq = await nextCounterValue(`production_extrusion_${dateKey}_${counterScope(scope)}`);
+  return `EX-${dateKey}-${formatCounter(seq)}`;
+}
+
+async function generateProductId(scope = 'general'): Promise<string> {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  const dateKey = `${y}${m}${d}`;
+  const seq = await nextCounterValue(`production_packaging_${dateKey}_${counterScope(scope)}`);
+  return `PK-${dateKey}-${formatCounter(seq)}`;
 }
 
 function firstNumber(value: string): string {
@@ -798,8 +808,9 @@ export default function ProductionPage() {
     const rawMaterial = selectedMaterial?.name || batchForm.rawMaterial;
     setBatchSaving(true);
     try {
+      const batchId = await generateBatchId(machineIds[0] || selectedLine?.id || batchForm.productionArea);
       await addDoc(collection(db, 'production_extrusion'), {
-        batchId: generateBatchId(),
+        batchId,
         planDate: batchForm.planDate || localDateKey(),
         productionArea: selectedLine?.areaId || batchForm.productionArea,
         productionAreaLabel: selectedLine?.areaName || areaOptions.find((area) => area.id === batchForm.productionArea)?.name || '',
@@ -875,8 +886,9 @@ export default function ProductionPage() {
     if (!orderForm.packagingType || !orderForm.palletCount) return;
     setOrderSaving(true);
     try {
+      const productId = await generateProductId(orderForm.lineId || orderForm.lineName || orderForm.packagingType);
       await addDoc(collection(db, 'production_packaging'), {
-        productId: generateProductId(),
+        productId,
         packagingType: orderForm.packagingType,
         palletCount: Number(orderForm.palletCount),
         lineId: orderForm.lineId,

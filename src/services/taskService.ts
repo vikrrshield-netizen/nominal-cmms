@@ -18,6 +18,7 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { formatCounter, nextCounterValue } from './counterService';
 import type { TaskDoc, TaskStatus, TaskPriority, TaskType, TaskSource } from '../types/firestore';
 
 const COLLECTION = 'tasks';
@@ -87,26 +88,11 @@ export interface UpdateTaskInput {
 async function generateTaskCode(): Promise<string> {
   const year = new Date().getFullYear();
   const prefix = `WO-${year}-`;
+  const nextValue = await nextCounterValue(`tasks_wo_${year}`);
+  return `${prefix}${formatCounter(nextValue)}`;
   
   // Najít nejvyšší číslo v tomto roce
-  const q = query(
-    collection(db, COLLECTION),
-    where('code', '>=', prefix),
-    where('code', '<', prefix + '\uf8ff'),
-    orderBy('code', 'desc')
-  );
   
-  const snapshot = await getDocs(q);
-  
-  if (snapshot.empty) {
-    return `${prefix}001`;
-  }
-  
-  const lastCode = snapshot.docs[0].data().code as string;
-  const lastNumber = parseInt(lastCode.split('-').pop() || '0', 10);
-  const nextNumber = (lastNumber + 1).toString().padStart(3, '0');
-  
-  return `${prefix}${nextNumber}`;
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -114,7 +100,7 @@ async function generateTaskCode(): Promise<string> {
 // ═══════════════════════════════════════════════════════════════════
 
 // Vytvořit nový úkol
-export async function createTask(input: CreateTaskInput): Promise<string> {
+export async function buildTaskData(input: CreateTaskInput): Promise<Record<string, any>> {
   const code = await generateTaskCode();
   
   const taskData: Record<string, any> = {
@@ -157,6 +143,11 @@ export async function createTask(input: CreateTaskInput): Promise<string> {
   if (input.foodSafetyHazardType) taskData.foodSafetyHazardType = input.foodSafetyHazardType;
   if (input.foodSafetyImpact) taskData.foodSafetyImpact = input.foodSafetyImpact;
 
+  return taskData;
+}
+
+export async function createTask(input: CreateTaskInput): Promise<string> {
+  const taskData = await buildTaskData(input);
   const docRef = await addDoc(collection(db, COLLECTION), taskData);
   return docRef.id;
 }

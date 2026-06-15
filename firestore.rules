@@ -712,6 +712,27 @@ service cloud.firestore {
     // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     // ROLES â€” definice rolĂ­ (RBAC)
     // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    match /counters/{counterId} {
+      allow read: if isAnyRole();
+      allow create: if (
+        hasPermission('wo.create')
+        || hasPermission('production.read')
+        || hasPermission('production.manage')
+      )
+        && request.resource.data.keys().hasOnly(['value', 'updatedAt'])
+        && request.resource.data.value == 1
+        && hasTimestamp();
+      allow update: if (
+        hasPermission('wo.create')
+        || hasPermission('production.read')
+        || hasPermission('production.manage')
+      )
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['value', 'updatedAt'])
+        && request.resource.data.value == resource.data.value + 1
+        && hasTimestamp();
+      allow delete: if false;
+    }
+
     match /roles/{roleId} {
       allow read: if request.auth != null;
       allow write: if hasPermission('admin.manage');

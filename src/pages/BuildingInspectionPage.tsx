@@ -8,7 +8,6 @@ import { db } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
 import { useBackNavigation } from '../hooks/useBackNavigation';
 import { useEmployeeNames } from '../hooks/useEmployeeDirectory';
-import { createTask } from '../services/taskService';
 import {
   ArrowLeft,
   Loader2,
@@ -352,7 +351,6 @@ export default function BuildingInspectionPage() {
   // Modals
   const [showIssueModal, setShowIssueModal] = useState<InspectionPoint | null>(null);
   const [issueNote, setIssueNote] = useState('');
-  const [createTaskFromIssue, setCreateTaskFromIssue] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState<InspectionPoint | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<InspectionPoint | null>(null);
@@ -408,37 +406,15 @@ export default function BuildingInspectionPage() {
   const openIssueModal = (point: InspectionPoint) => {
     setShowIssueModal(point);
     setIssueNote(point.issueNote || '');
-    setCreateTaskFromIssue(!point.taskId);
   };
 
   const submitIssue = async () => {
     if (!showIssueModal || !issueNote.trim()) return;
     const inspector = selectedInspector || user?.displayName || 'Unknown';
     const now = Timestamp.now();
-    let taskId = showIssueModal.taskId || '';
+    const taskId = showIssueModal.taskId || '';
     setSaving(true);
     try {
-      if (createTaskFromIssue && !taskId) {
-        taskId = await createTask({
-          title: `Závada: ${showIssueModal.roomCode} ${showIssueModal.roomName}`,
-          description: [
-            `Vzniklo z kontroly budovy ${buildingLabel(showIssueModal.buildingId)}.`,
-            `Místnost: ${showIssueModal.roomCode} - ${showIssueModal.roomName}`,
-            `Co se kontroluje: ${showIssueModal.description}`,
-            `Závada: ${issueNote.trim()}`,
-          ].join('\n'),
-          priority: 'P2',
-          type: 'corrective',
-          source: 'inspection',
-          sourceRefType: 'manual',
-          sourceRefId: showIssueModal.id,
-          inspectionPointId: showIssueModal.id,
-          buildingId: showIssueModal.buildingId,
-          createdById: user?.uid || user?.id || 'unknown',
-          createdByName: inspector,
-        });
-      }
-
       await updateDoc(doc(db, 'inspections', showIssueModal.id), {
         status: 'issue',
         issueNote: issueNote.trim(),
@@ -927,29 +903,11 @@ export default function BuildingInspectionPage() {
                 Úkol už je založený - otevřít
               </button>
             ) : (
-              <button
-                type="button"
-                onClick={() => setCreateTaskFromIssue((value) => !value)}
-                className={`w-full mb-3 px-3 py-3 rounded-xl border text-left transition active:scale-[0.98] ${
-                  createTaskFromIssue
-                    ? 'bg-amber-500/15 border-amber-500/35 text-amber-200'
-                    : 'bg-white/5 border-white/10 text-slate-300'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <span className={`w-5 h-5 rounded border flex items-center justify-center text-xs ${
-                    createTaskFromIssue ? 'bg-amber-500 border-amber-300 text-slate-950' : 'border-slate-500 text-transparent'
-                  }`}>
-                    ✓
-                  </span>
-                  <span className="text-sm font-bold">Rovnou založit úkol do úkolníčku</span>
-                </div>
-                <div className="text-xs text-slate-400 mt-1 pl-7">
-                  Závada pak bude dohledatelná v úkolech a reportech.
-                </div>
-              </button>
+              <div className="w-full mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm font-bold text-amber-900">
+                Závada se uloží do kontroly. Úkol vznikne až při uzavření kontroly.
+              </div>
             )}
-            <SubmitButton label={createTaskFromIssue && !showIssueModal.taskId ? 'Nahlásit závadu a založit úkol' : 'Nahlásit závadu'} onClick={submitIssue} loading={saving} color="red" />
+            <SubmitButton label="Nahlásit závadu" onClick={submitIssue} loading={saving} color="red" />
           </>
         )}
       </BottomSheet>

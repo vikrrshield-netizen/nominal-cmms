@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { collection, query, where, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, Timestamp, writeBatch, getDoc, setDoc, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
-import { createTask } from '../services/taskService';
+import { buildTaskData, createTask } from '../services/taskService';
 import { BUILDING_INSPECTION_TEMPLATES } from '../data/buildingInspectionTemplates';
 import type { TaskPriority } from '../types/firestore';
 import type { InspectionRun, InspectionRunAuditEntry, InspectionRunItem, InspectionRunSummary } from '../types/inspectionRun';
@@ -313,7 +313,25 @@ async function addInspectionRunLog(
   performedById: string,
   detail: Record<string, unknown> = {},
 ) {
-  await addDoc(collection(db, 'inspection_run_logs'), {
+  await addDoc(collection(db, 'inspection_run_logs'), buildInspectionRunLogData(
+    log,
+    logId,
+    result,
+    performedBy,
+    performedById,
+    detail,
+  ));
+}
+
+function buildInspectionRunLogData(
+  log: InspectionLog | undefined,
+  logId: string,
+  result: 'ok' | 'defect' | 'task_created',
+  performedBy: string,
+  performedById: string,
+  detail: Record<string, unknown> = {},
+) {
+  return {
     inspectionLogId: logId,
     templateId: log?.templateId || '',
     assetId: log?.sourceAssetId || '',
@@ -332,7 +350,7 @@ async function addInspectionRunLog(
     createdAt: serverTimestamp(),
     isDeleted: false,
     ...detail,
-  });
+  };
 }
 
 async function createMonthlyInspectionLogs(month: string, createdByName: string) {
@@ -639,6 +657,8 @@ export function useInspections(month?: string) {
     const performedBy = userName(user);
     const performedById = userId(user);
 
+    const batch = writeBatch(db);
+
     for (const item of items) {
       if (item.status !== 'defect' || item.taskId) continue;
       const priority = item.taskPriority || 'P2';
@@ -653,7 +673,9 @@ export function useInspections(month?: string) {
         item.foodSafetyRisk ? `Food safety: ANO (${item.foodSafetyHazardType || 'neurceno'}, dopad: ${item.foodSafetyImpact || 'neurceno'})` : '',
       ].filter(Boolean).join('\n');
 
-      const taskId = await createTask({
+      const taskRef = doc(collection(db, 'tasks'));
+      const taskId = taskRef.id;
+      const taskData = await buildTaskData({
         title: `Zavada: ${item.roomName || 'Neznama mistnost'} - ${(item.defectNote || item.checkPoints || '').slice(0, 80)}`,
         description,
         type: 'corrective',
@@ -676,22 +698,28 @@ export function useInspections(month?: string) {
         createdById: performedById,
         createdByName: performedBy,
       });
+      batch.set(taskRef, taskData);
       item.taskId = taskId;
       taskIds.push(taskId);
 
-      await updateDoc(doc(db, 'inspection_logs', item.logId), {
-        taskId,
-        updatedAt: serverTimestamp(),
-      });
-      await addInspectionRunLog(logs.find((log) => log.id === item.logId), item.logId, 'task_created', performedBy, performedById, {
+      const sourceLogId = item.logId || item.id;
+      if (sourceLogId) {
+        batch.update(doc(db, 'inspection_logs', sourceLogId), {
+          taskId,
+          updatedAt: serverTimestamp(),
+        });
+      }
+
+      const runLogRef = doc(collection(db, 'inspection_run_logs'));
+      batch.set(runLogRef, buildInspectionRunLogData(logs.find((log) => log.id === sourceLogId), sourceLogId, 'task_created', performedBy, performedById, {
         taskId,
         taskPriority: priority,
         sourceRunId: run.id,
         defectNote: item.defectNote,
-      });
+      }));
     }
 
-    await updateDoc(doc(db, 'inspection_runs', run.id), {
+    batch.update(doc(db, 'inspection_runs', run.id), {
       status: 'closed',
       closedAt: serverTimestamp(),
       closedById: performedById,
@@ -702,6 +730,7 @@ export function useInspections(month?: string) {
       auditTrail: [...(run.auditTrail || []), auditEntry('closed', user, 'Kontrola uzavrena.')],
       updatedAt: serverTimestamp(),
     });
+    await batch.commit();
   }
 
   // Označit jako OK
