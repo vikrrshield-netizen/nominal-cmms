@@ -1,4 +1,4 @@
-import appConfig from '../../appConfig';
+import { useBrandSettings } from '../../hooks/useBrandSettings';
 
 type BrandMarkSize = 'sm' | 'md' | 'lg';
 type BrandMarkTone = 'light' | 'dark';
@@ -17,32 +17,33 @@ const sizeMap = {
 } as const;
 
 export default function BrandMark({ size = 'md', tone = 'light', showText = true, className = '' }: BrandMarkProps) {
+  const brand = useBrandSettings();
   const s = sizeMap[size];
   const titleColor = tone === 'light' ? 'text-white' : 'text-slate-950';
   const subtitleColor = tone === 'light' ? 'text-blue-300/80' : 'text-slate-500';
 
   return (
     <div className={`flex items-center ${s.gap} ${className}`}>
-      {appConfig.LOGO_URL ? (
+      {brand.logoUrl ? (
         <img
-          src={appConfig.LOGO_URL}
-          alt={appConfig.APP_NAME}
+          src={brand.logoUrl}
+          alt={brand.companyName}
           className={`${s.box} object-contain bg-white p-1 shadow-sm`}
         />
       ) : (
         <div
           className={`${s.box} flex items-center justify-center bg-gradient-to-br from-[#1e3a5f] to-blue-600 font-black text-white shadow-lg shadow-blue-500/20`}
         >
-          {appConfig.LOGO_LETTER}
+          {brand.logoLetter}
         </div>
       )}
       {showText && (
         <div className="flex min-w-0 flex-col leading-none">
           <span className={`${s.title} ${titleColor} truncate font-black tracking-tight`}>
-            {appConfig.BRAND_NAME}
+            {brand.companyName}
           </span>
           <span className={`${s.subtitle} ${subtitleColor} truncate font-bold uppercase tracking-widest`}>
-            {appConfig.PRODUCT_NAME_SHORT}
+            {brand.productLockup}
           </span>
         </div>
       )}

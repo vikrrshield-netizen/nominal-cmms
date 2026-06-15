@@ -20,7 +20,7 @@ export const WIDGET_DEFINITIONS: WidgetDefinition[] = [
   { id: 'dataloggers', type: 'tile',   label: 'Datalogery',       icon: '🌡️', gradient: 'from-cyan-500 to-blue-600',      defaultSize: '1x1', component: 'TileWidget', requiredPermission: 'datalogger.read' },
   { id: 'inspections', type: 'tile',   label: 'Kontroly',         icon: '✅', gradient: 'from-teal-500 to-emerald-600',   defaultSize: '1x1', component: 'TileWidget' },
   { id: 'calendar',    type: 'tile',   label: 'Kalendář',         icon: '📅', gradient: 'from-indigo-500 to-purple-600',  defaultSize: '1x1', component: 'TileWidget' },
-  { id: 'ai',          type: 'action', label: 'VIKRR AI',         icon: '🤖', gradient: 'from-pink-500 to-rose-600',      defaultSize: '1x1', component: 'TileWidget', requiredPermission: 'ai.use' },
+  { id: 'ai',          type: 'action', label: 'AI asistent',      icon: '🤖', gradient: 'from-pink-500 to-rose-600',      defaultSize: '1x1', component: 'TileWidget', requiredPermission: 'ai.use' },
   { id: 'reports',     type: 'tile',   label: 'Reporty',          icon: '📊', gradient: 'from-slate-500 to-gray-600',     defaultSize: '1x1', component: 'TileWidget', requiredPermission: 'report.read' },
   { id: 'idea',        type: 'action', label: 'Nápad',            icon: '💡', gradient: 'from-violet-500 to-purple-600',  defaultSize: '1x1', component: 'TileWidget' },
   { id: 'request',     type: 'action', label: 'Požadavky',        icon: '🔧', gradient: 'from-sky-500 to-blue-600',       defaultSize: '1x1', component: 'TileWidget' },

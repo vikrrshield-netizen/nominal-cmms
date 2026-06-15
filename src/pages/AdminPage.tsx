@@ -6,6 +6,7 @@ import { collection, doc, addDoc, updateDoc, onSnapshot, serverTimestamp, Timest
 import { db, adminCreateUser, adminSetUserPin, adminBackfillPinHashes, adminDisableLegacyLogin, adminMigrateAuthEmails } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
 import { useBackNavigation } from '../hooks/useBackNavigation';
+import appConfig from '../appConfig';
 import {
   Users, Shield, Edit2, Trash2, Save,
   X, ArrowLeft, AlertTriangle, UserPlus,
@@ -1678,6 +1679,121 @@ function LoginSecurityPanel({ canEdit }: { canEdit: boolean }) {
   );
 }
 
+function BrandSettingsPanel({ canEdit }: { canEdit: boolean }) {
+  const { user } = useAuthContext();
+  const { tenants, updateBrand } = useTenantSettings();
+  const tenantId = (user as { tenantId?: string } | null)?.tenantId || 'main_firm';
+  const tenant = tenants.find((item) => item.id === tenantId);
+  const [companyName, setCompanyName] = useState(tenant?.name || appConfig.COMPANY_NAME);
+  const [appName, setAppName] = useState(tenant?.appName || appConfig.PRODUCT_NAME);
+  const [logoUrl, setLogoUrl] = useState(tenant?.logoUrl || appConfig.LOGO_URL);
+  const [logoLetter, setLogoLetter] = useState(tenant?.logoLetter || appConfig.LOGO_LETTER);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setCompanyName(tenant?.name || appConfig.COMPANY_NAME);
+    setAppName(tenant?.appName || appConfig.PRODUCT_NAME);
+    setLogoUrl(tenant?.logoUrl || appConfig.LOGO_URL);
+    setLogoLetter(tenant?.logoLetter || appConfig.LOGO_LETTER);
+  }, [tenant?.name, tenant?.appName, tenant?.logoUrl, tenant?.logoLetter]);
+
+  const saveBrand = async () => {
+    setSaving(true);
+    try {
+      await updateBrand(
+        tenantId,
+        {
+          name: companyName.trim() || appConfig.COMPANY_NAME,
+          appName: appName.trim() || appConfig.PRODUCT_NAME,
+          logoUrl: logoUrl.trim(),
+          logoLetter: (logoLetter.trim() || appConfig.LOGO_LETTER).slice(0, 2).toUpperCase(),
+        },
+        user?.displayName || '',
+      );
+      showToast('Branding uložen. Pro jistotu obnov stránku, pokud se logo nezmění hned.', 'success');
+    } catch (err) {
+      showToast(`Branding se nepodařilo uložit: ${(err as Error).message}`, 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="vik-card p-4 space-y-4">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center font-black">
+          {(logoLetter || companyName || appConfig.LOGO_LETTER).slice(0, 1).toUpperCase()}
+        </div>
+        <div>
+          <h3 className="font-bold text-slate-900">Brand firmy</h3>
+          <p className="text-xs text-slate-500">Nahoře se zobrazuje firma, pod ní produktový lockup.</p>
+        </div>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        <label className="space-y-1">
+          <span className="text-xs font-bold uppercase text-slate-500">Název firmy</span>
+          <input
+            value={companyName}
+            onChange={(e) => setCompanyName(e.target.value)}
+            disabled={!canEdit}
+            className="w-full rounded-xl border border-slate-200 bg-[#fbf9f4] px-3 py-2 text-sm text-slate-900 disabled:opacity-60"
+            placeholder={appConfig.COMPANY_NAME}
+          />
+        </label>
+        <label className="space-y-1">
+          <span className="text-xs font-bold uppercase text-slate-500">Produktový název</span>
+          <input
+            value={appName}
+            onChange={(e) => setAppName(e.target.value)}
+            disabled={!canEdit}
+            className="w-full rounded-xl border border-slate-200 bg-[#fbf9f4] px-3 py-2 text-sm text-slate-900 disabled:opacity-60"
+            placeholder={appConfig.PRODUCT_NAME}
+          />
+        </label>
+        <label className="space-y-1 md:col-span-2">
+          <span className="text-xs font-bold uppercase text-slate-500">Logo URL</span>
+          <input
+            value={logoUrl}
+            onChange={(e) => setLogoUrl(e.target.value)}
+            disabled={!canEdit}
+            className="w-full rounded-xl border border-slate-200 bg-[#fbf9f4] px-3 py-2 text-sm text-slate-900 disabled:opacity-60"
+            placeholder="https://.../logo.png"
+          />
+        </label>
+        <label className="space-y-1">
+          <span className="text-xs font-bold uppercase text-slate-500">Fallback písmeno</span>
+          <input
+            value={logoLetter}
+            onChange={(e) => setLogoLetter(e.target.value)}
+            disabled={!canEdit}
+            className="w-full rounded-xl border border-slate-200 bg-[#fbf9f4] px-3 py-2 text-sm text-slate-900 disabled:opacity-60"
+            placeholder={appConfig.LOGO_LETTER}
+            maxLength={2}
+          />
+        </label>
+        <div className="rounded-xl border border-slate-200 bg-white p-3">
+          <div className="text-xs uppercase font-bold text-slate-500">Náhled</div>
+          <div className="mt-2 text-lg font-black text-slate-950">{companyName || appConfig.COMPANY_NAME}</div>
+          <div className="text-xs font-bold uppercase tracking-widest text-slate-500">
+            {(appName || appConfig.PRODUCT_NAME)} by {appConfig.BRAND_NAME}
+          </div>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        disabled={!canEdit || saving}
+        onClick={saveBrand}
+        className="vik-button-primary px-4 disabled:opacity-50"
+      >
+        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+        Uložit branding
+      </button>
+    </div>
+  );
+}
+
 function DynamicConfigTab({ canEdit }: { canEdit: boolean }) {
   const [sections, setSections] = useState<ConfigSection[]>(() => {
     try {
@@ -1716,6 +1832,8 @@ function DynamicConfigTab({ canEdit }: { canEdit: boolean }) {
 
   return (
     <div className="space-y-4">
+      <BrandSettingsPanel canEdit={canEdit} />
+
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-700">
         <Settings2 className="w-4 h-4 inline mr-2" />
         Zde můžete upravovat hodnoty dropdown seznamů v celém systému.

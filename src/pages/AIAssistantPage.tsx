@@ -303,7 +303,7 @@ export default function AIAssistantPage() {
               <Sparkles className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-white">Search &amp; VIKRR AI</h1>
+              <h1 className="text-lg font-bold text-white">{appConfig.PRODUCT_NAME} AI</h1>
               <p className="text-xs text-slate-400">
                 {isListening ? '🎤 Poslouchám...' : isProcessing ? '🤔 Přemýšlím...' : '✨ Připraven'}
               </p>
