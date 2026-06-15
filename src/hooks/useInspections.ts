@@ -44,6 +44,30 @@ export interface InspectionLog {
   foodSafetyImpact?: string;
 }
 
+interface LegacyInspectionLog extends InspectionLog {
+  areaId?: string;
+  areaLabel?: string;
+  buildingId?: string;
+  completedById?: string;
+  performedBy?: string;
+  performedById?: string;
+  performedAt?: Timestamp | null;
+  inspectorName?: string;
+  inspectorUid?: string;
+  timestamp?: Timestamp | null;
+  issues?: Array<{
+    roomId?: string;
+    roomCode?: string;
+    roomName?: string;
+    floor?: string;
+    description?: string;
+    checkPoints?: string;
+    note?: string;
+    defectNote?: string;
+    taskId?: string;
+  }>;
+}
+
 export interface InspectionStats {
   total: number;
   ok: number;
@@ -113,6 +137,172 @@ function auditEntry(action: InspectionRunAuditEntry['action'], user: ReturnType<
 
 function runTime(run: InspectionRun): number {
   return run.closedAt?.toMillis?.() || run.startedAt?.toMillis?.() || run.updatedAt?.toMillis?.() || 0;
+}
+
+function dateFromFirestore(value: unknown): Date | null {
+  if (!value) return null;
+  if (typeof value === 'object' && value && 'toDate' in value && typeof (value as { toDate: () => Date }).toDate === 'function') {
+    return (value as { toDate: () => Date }).toDate();
+  }
+  if (typeof value === 'string' || typeof value === 'number') {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  return null;
+}
+
+function monthFromDate(value: unknown, fallback = ''): string {
+  const date = dateFromFirestore(value);
+  if (!date) return fallback;
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function dayKeyFromDate(value: unknown): string {
+  const date = dateFromFirestore(value);
+  if (!date) return '';
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function timestampFromDate(value: unknown): Timestamp | null {
+  const date = dateFromFirestore(value);
+  return date ? Timestamp.fromDate(date) : null;
+}
+
+function buildLegacyInspectionRuns(logs: LegacyInspectionLog[], representedLogIds: Set<string>): InspectionRun[] {
+  const groups = new Map<string, {
+    month: string;
+    building: string;
+    inspectorId: string;
+    inspectorName: string;
+    firstAt: Timestamp | null;
+    lastAt: Timestamp | null;
+    items: InspectionRunItem[];
+  }>();
+
+  for (const log of logs) {
+    if (log.isDeleted === true) continue;
+    if (representedLogIds.has(log.id)) continue;
+
+    const rawStatus = log.status;
+    const completedAtRaw = log.completedAt || log.performedAt || log.timestamp;
+    const dayKey = dayKeyFromDate(completedAtRaw);
+    if (!dayKey) continue;
+
+    const building = log.building || log.areaId || log.buildingId || '';
+    const inspectorId = log.completedById || log.performedById || log.inspectorUid || 'legacy';
+    const inspectorName = log.completedBy || log.performedBy || log.inspectorName || 'Neznámý';
+    const groupKey = `${dayKey}_${building || 'all'}_${inspectorId}_${inspectorName}`;
+    const completedAt = timestampFromDate(completedAtRaw);
+    const current = groups.get(groupKey) || {
+      month: log.month || monthFromDate(completedAtRaw),
+      building,
+      inspectorId,
+      inspectorName,
+      firstAt: completedAt,
+      lastAt: completedAt,
+      items: [],
+    };
+
+    const pushItem = (item: InspectionRunItem) => {
+      current.items.push(item);
+    };
+
+    if (Array.isArray(log.issues) && log.issues.length > 0 && !log.roomName && !log.checkPoints) {
+      log.issues.forEach((issue, index) => {
+        const issueId = `${log.id}_${index}`;
+        pushItem({
+          id: issueId,
+          logId: log.id,
+          templateId: log.templateId || '',
+          building,
+          floor: issue.floor || log.floor || '',
+          roomId: issue.roomId || issue.roomCode || issue.roomName || issueId,
+          roomName: issue.roomName || 'Místnost',
+          roomCode: issue.roomCode || '',
+          checkPoints: issue.checkPoints || issue.description || log.checkPoints || 'Závada z historického dokladu',
+          frequency: log.frequency,
+          status: 'defect',
+          defectNote: issue.note || issue.defectNote || log.defectNote || '',
+          inspectionNote: log.inspectionNote || '',
+          completedBy: inspectorName,
+          completedById: inspectorId,
+          completedAt,
+          taskId: issue.taskId || log.taskId || '',
+          sortOrder: log.sortOrder,
+          sourceAssetId: log.sourceAssetId || null,
+          foodSafetyRisk: log.foodSafetyRisk === true,
+          foodSafetyHazardType: log.foodSafetyHazardType || '',
+          foodSafetyImpact: log.foodSafetyImpact || '',
+        });
+      });
+    } else if (rawStatus === 'ok' || rawStatus === 'defect') {
+      pushItem({
+        id: log.id,
+        logId: log.id,
+        templateId: log.templateId || '',
+        building,
+        floor: log.floor || '',
+        roomId: roomId(log),
+        roomName: log.roomName || '',
+        roomCode: log.roomCode || '',
+        checkPoints: log.checkPoints || '',
+        frequency: log.frequency,
+        status: rawStatus,
+        defectNote: log.defectNote || '',
+        inspectionNote: log.inspectionNote || '',
+        completedBy: inspectorName,
+        completedById: inspectorId,
+        completedAt,
+        taskId: log.taskId || '',
+        sortOrder: log.sortOrder,
+        sourceAssetId: log.sourceAssetId || null,
+        foodSafetyRisk: log.foodSafetyRisk === true,
+        foodSafetyHazardType: log.foodSafetyHazardType || '',
+        foodSafetyImpact: log.foodSafetyImpact || '',
+      });
+    }
+
+    const currentFirst = current.firstAt?.toMillis?.() || Number.MAX_SAFE_INTEGER;
+    const currentLast = current.lastAt?.toMillis?.() || 0;
+    const next = completedAt?.toMillis?.() || 0;
+    if (next && next < currentFirst) current.firstAt = completedAt;
+    if (next && next > currentLast) current.lastAt = completedAt;
+    groups.set(groupKey, current);
+  }
+
+  return Array.from(groups.entries())
+    .map(([key, group]) => {
+      const items = group.items
+        .slice()
+        .sort((a, b) => (a.sortOrder ?? 9999) - (b.sortOrder ?? 9999));
+      return {
+        id: `legacy_${key}`,
+        legacyLogId: key,
+        month: group.month,
+        status: 'closed',
+        items,
+        summary: summarizeRunItems(items),
+        startedAt: group.firstAt || undefined,
+        startedById: group.inspectorId,
+        startedByName: group.inspectorName,
+        closedAt: group.lastAt || undefined,
+        closedById: group.inspectorId,
+        closedByName: group.inspectorName,
+        buildingScope: Array.from(new Set(items.map((item) => item.building).filter(Boolean))),
+        taskIds: Array.from(new Set(items.map((item) => item.taskId).filter(Boolean))) as string[],
+        auditTrail: [{
+          action: 'closed',
+          at: group.lastAt?.toDate?.().toISOString() || new Date().toISOString(),
+          byId: group.inspectorId,
+          byName: group.inspectorName,
+          note: 'Starší doklad vytvořený ze záznamů inspection_logs.',
+        }],
+        createdAt: group.firstAt || undefined,
+        updatedAt: group.lastAt || undefined,
+      } satisfies InspectionRun;
+    })
+    .filter((run) => run.items.length > 0)
+    .sort((a, b) => runTime(b) - runTime(a));
 }
 
 async function addInspectionRunLog(
@@ -223,6 +413,7 @@ async function createMonthlyInspectionLogs(month: string, createdByName: string)
 
 export function useInspections(month?: string) {
   const [logs, setLogs] = useState<InspectionLog[]>([]);
+  const [legacyLogs, setLegacyLogs] = useState<LegacyInspectionLog[]>([]);
   const [inspectionRuns, setInspectionRuns] = useState<InspectionRun[]>([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuthContext();
@@ -300,6 +491,15 @@ export function useInspections(month?: string) {
     return () => unsub();
   }, []);
 
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'inspection_logs'), (snap) => {
+      const data = snap.docs.map((d) => ({ id: d.id, ...d.data() } as LegacyInspectionLog));
+      setLegacyLogs(data);
+    });
+
+    return () => unsub();
+  }, []);
+
   // Stats
   const stats: InspectionStats = useMemo(() => {
     const total = logs.length;
@@ -336,9 +536,28 @@ export function useInspections(month?: string) {
     [currentMonthRuns],
   );
 
+  const representedLogIds = useMemo(() => {
+    const ids = new Set<string>();
+    inspectionRuns.forEach((run) => {
+      run.items?.forEach((item) => {
+        if (item.logId) ids.add(item.logId);
+        if (item.id) ids.add(item.id);
+      });
+    });
+    return ids;
+  }, [inspectionRuns]);
+
+  const legacyRuns = useMemo(
+    () => buildLegacyInspectionRuns(legacyLogs, representedLogIds),
+    [legacyLogs, representedLogIds],
+  );
+
   const closedRuns = useMemo(
-    () => inspectionRuns.filter((run) => run.status === 'closed'),
-    [inspectionRuns],
+    () => [
+      ...inspectionRuns.filter((run) => run.status === 'closed'),
+      ...legacyRuns,
+    ].sort((a, b) => runTime(b) - runTime(a)),
+    [inspectionRuns, legacyRuns],
   );
 
   const currentRun = draftRun || currentMonthRuns[0] || null;

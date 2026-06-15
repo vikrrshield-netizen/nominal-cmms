@@ -51,6 +51,7 @@ export interface InspectionRunAuditEntry {
 
 export interface InspectionRun {
   id: string;
+  legacyLogId?: string;
   month: string;
   status: InspectionRunStatus;
   items: InspectionRunItem[];

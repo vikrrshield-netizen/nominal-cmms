@@ -644,6 +644,10 @@ export default function InspectionsPage() {
   };
 
   const handleReopenRun = async (run: InspectionRun) => {
+    if (run.legacyLogId) {
+      showToast('Starší doklad jde otevřít a exportovat, ale nejde znovu otevřít jako draft.', 'success');
+      return;
+    }
     setRunExporting('pdf');
     try {
       await reopenInspectionRun(run.id);
