@@ -372,6 +372,7 @@ export default function AdminPage() {
 
             {canEdit && (
               <button
+                data-testid="admin-new-user"
                 onClick={() => setShowNewUserModal(true)}
                 className="vik-button-primary flex items-center gap-2 px-4"
               >
@@ -593,6 +594,8 @@ function AdminUserCard({ adminUser, onSelect }: { adminUser: AdminUser; onSelect
   const roleCfg = ROLE_CONFIG[adminUser.role];
   return (
     <button
+      data-testid="admin-user-card"
+      data-user-name={adminUser.displayName}
       onClick={onSelect}
       className={`w-full flex items-center gap-4 p-4 rounded-2xl border bg-white text-left transition hover:bg-slate-50 ${
         adminUser.active ? 'border-slate-200' : 'border-red-200 bg-red-50/50'
@@ -799,6 +802,7 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
                 <>
                   <div className="flex gap-2 pt-4">
                     <button
+                      data-testid="admin-user-edit"
                       onClick={() => setIsEditing(true)}
                       className="flex-1 flex items-center justify-center gap-2 p-3 bg-blue-500 text-white rounded-xl"
                     >
@@ -844,6 +848,7 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
               <div>
                 <label className="text-sm text-slate-600">Nový PIN (4–6 číslic, prázdné = beze změny)</label>
                 <input
+                  data-testid="admin-user-pin"
                   type="text"
                   inputMode="numeric"
                   value={formData.pin}
@@ -911,6 +916,7 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
                   Zrušit
                 </button>
                 <button
+                  data-testid="admin-user-save"
                   onClick={handleSave}
                   disabled={saving}
                   className="flex-1 flex items-center justify-center gap-2 p-3 bg-emerald-500 text-white rounded-xl disabled:opacity-50"
@@ -1343,6 +1349,7 @@ function NewUserModal({ onClose, onCreated }: {
           <div>
             <label className="text-sm text-slate-600">Jméno *</label>
             <input
+              data-testid="admin-new-user-name"
               type="text"
               value={formData.displayName}
               onChange={e => setFormData(prev => ({ ...prev, displayName: e.target.value }))}
@@ -1354,6 +1361,7 @@ function NewUserModal({ onClose, onCreated }: {
           <div>
             <label className="text-sm text-slate-600">PIN (4–6 číslic) *</label>
             <input
+              data-testid="admin-new-user-pin"
               type="text"
               inputMode="numeric"
               value={formData.pin}
@@ -1374,6 +1382,7 @@ function NewUserModal({ onClose, onCreated }: {
           <div>
             <label className="text-sm text-slate-600">Role *</label>
             <select
+              data-testid="admin-new-user-role"
               value={formData.role}
               onChange={e => setFormData(prev => ({ ...prev, role: e.target.value as UserRole }))}
               className="w-full p-2 bg-[#fbf9f4] border border-slate-200 rounded-lg mt-1 text-slate-900"
@@ -1387,6 +1396,7 @@ function NewUserModal({ onClose, onCreated }: {
           <div>
             <label className="text-sm text-slate-600">Email</label>
             <input
+              data-testid="admin-new-user-email"
               type="email"
               value={formData.email}
               onChange={e => setFormData(prev => ({ ...prev, email: e.target.value }))}
@@ -1437,6 +1447,7 @@ function NewUserModal({ onClose, onCreated }: {
               Zrušit
             </button>
             <button
+              data-testid="admin-new-user-submit"
               onClick={handleSubmit}
               disabled={!isFormValid || saving}
               className="flex-1 flex items-center justify-center gap-2 p-3 bg-emerald-500 text-white rounded-xl disabled:opacity-50"

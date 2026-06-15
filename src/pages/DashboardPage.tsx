@@ -2125,6 +2125,7 @@ function FullDashboard() {
               )}
             </button>
             <button
+              data-testid="dashboard-logout"
               onClick={() => logout()}
               className="w-10 h-10 rounded-xl bg-stone-50 border border-stone-200 flex items-center justify-center text-slate-600 hover:text-red-700 transition"
             >

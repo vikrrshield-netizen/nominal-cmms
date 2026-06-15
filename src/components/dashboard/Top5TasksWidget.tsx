@@ -93,6 +93,7 @@ export default function Top5TasksWidget() {
               )}
               {task.status === 'in_progress' && (
                 <button
+                  data-testid="top5-task-complete"
                   onClick={() => handleComplete(task.id)}
                   disabled={actionLoading === task.id}
                   className="px-2.5 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[11px] font-semibold hover:bg-emerald-500/25 transition flex items-center gap-1"
