@@ -3,7 +3,7 @@
 // Root items = large cards in grid (MapPage style)
 // Children = indented collapsible list under each card
 
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback, type DragEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { addDoc, collection, doc, serverTimestamp, setDoc, Timestamp } from 'firebase/firestore';
 import {
@@ -94,6 +94,8 @@ type DisplayAsset = Asset & {
   sourceBuildingId?: string;
   sourceAreaName?: string;
 };
+
+type DropPlacement = 'before' | 'after';
 
 function slug(value: string) {
   return safeText(value).toLowerCase().trim().replace(/[^a-z0-9]+/gi, '_') || 'unknown';
@@ -1403,8 +1405,11 @@ export default function KartotekaPage() {
       .map((group) => ({
         ...group,
         assets: group.assets.sort((a, b) => {
-          const aKey = `${a.inspectionItemOrder ?? Number.MAX_SAFE_INTEGER} ${safeText(a.code)} ${safeText(a.name)}`;
-          const bKey = `${b.inspectionItemOrder ?? Number.MAX_SAFE_INTEGER} ${safeText(b.code)} ${safeText(b.name)}`;
+          const aOrder = Number.isFinite(a.inspectionItemOrder) ? a.inspectionItemOrder! : Number.MAX_SAFE_INTEGER;
+          const bOrder = Number.isFinite(b.inspectionItemOrder) ? b.inspectionItemOrder! : Number.MAX_SAFE_INTEGER;
+          if (aOrder !== bOrder) return aOrder - bOrder;
+          const aKey = `${safeText(a.code)} ${safeText(a.name)}`;
+          const bKey = `${safeText(b.code)} ${safeText(b.name)}`;
           return aKey.localeCompare(bKey, 'cs');
         }),
         targetIds: group.targetIds.size > 0 ? Array.from(group.targetIds) : group.assets.map((asset) => asset.id),
@@ -1489,7 +1494,22 @@ export default function KartotekaPage() {
     );
   }, [tenantId]);
 
-  const reorderRouteAsset = useCallback(async (groupKey: string, sourceAssetId: string, targetAssetId: string) => {
+  const getRouteAssetDropPlacement = useCallback((event: DragEvent<HTMLElement>): DropPlacement => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const horizontalBias = Math.abs(event.clientX - (rect.left + rect.width / 2));
+    const verticalBias = Math.abs(event.clientY - (rect.top + rect.height / 2));
+    if (horizontalBias > verticalBias) {
+      return event.clientX < rect.left + rect.width / 2 ? 'before' : 'after';
+    }
+    return event.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
+  }, []);
+
+  const reorderRouteAsset = useCallback(async (
+    groupKey: string,
+    sourceAssetId: string,
+    targetAssetId: string,
+    placement: DropPlacement = 'before'
+  ) => {
     if (!canManageRoute || sourceAssetId === targetAssetId) return;
     const group = routeGroups.find((item) => item.key === groupKey);
     if (!group) return;
@@ -1499,7 +1519,9 @@ export default function KartotekaPage() {
 
     const nextAssets = [...group.assets];
     const [moved] = nextAssets.splice(sourceIndex, 1);
-    nextAssets.splice(targetIndex, 0, moved);
+    const targetIndexAfterRemoval = sourceIndex < targetIndex ? targetIndex - 1 : targetIndex;
+    const insertIndex = placement === 'after' ? targetIndexAfterRemoval + 1 : targetIndexAfterRemoval;
+    nextAssets.splice(Math.max(0, Math.min(insertIndex, nextAssets.length)), 0, moved);
 
     setRouteSavingKey(groupKey);
     try {
@@ -1920,7 +1942,14 @@ export default function KartotekaPage() {
                           event.stopPropagation();
                           const rawId = event.dataTransfer.getData('text/plain');
                           const sourceAssetId = routeAssetDraggingId || rawId.replace(/^route-asset:/, '');
-                          if (sourceAssetId) void reorderRouteAsset(group.key, sourceAssetId, asset.id);
+                          if (sourceAssetId) {
+                            void reorderRouteAsset(
+                              group.key,
+                              sourceAssetId,
+                              asset.id,
+                              getRouteAssetDropPlacement(event)
+                            );
+                          }
                         }}
                         onDragEnd={() => {
                           setRouteAssetDraggingId(null);
