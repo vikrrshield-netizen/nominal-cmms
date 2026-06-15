@@ -1373,7 +1373,8 @@ select.k-input {
   border-radius: 12px;
 }
 
-.kartoteka-page .k-tree-tools.is-tiles > button {
+.kartoteka-page .k-tree-tools.is-tiles > button,
+.kartoteka-page .k-tree-tools.is-route > button {
   display: none;
 }
 
@@ -1399,6 +1400,51 @@ select.k-input {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 12px;
+}
+
+.kartoteka-page .k-floor-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+
+.kartoteka-page .k-floor-filters > span {
+  color: #5c6b61;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.kartoteka-page .k-route-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.kartoteka-page .k-route-group {
+  border: 1px solid #e7dfd2;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
+  padding: 12px;
+}
+
+.kartoteka-page .k-route-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  color: #1b2620;
+  font-weight: 950;
+}
+
+.kartoteka-page .k-route-header small {
+  color: #607080;
+  font-size: 0.78rem;
+  font-weight: 800;
 }
 
 .kartoteka-page .k-tile-card {

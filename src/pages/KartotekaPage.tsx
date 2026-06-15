@@ -60,8 +60,9 @@ function getEntityColor(entityType: string | undefined): string {
 // ── Helpers ──────────────────────────────────────────────────────
 type FilterKey = 'all' | 'broken' | 'maintenance' | 'stopped' | 'operational' | 'gearbox';
 type CreateKind = 'building' | 'room' | 'asset' | 'gearbox' | 'inspection';
-type ViewMode = 'tree' | 'tiles';
+type ViewMode = 'tree' | 'tiles' | 'route';
 type InspectionFrequency = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+const NO_FLOOR = '__no_floor';
 
 const INSPECTION_FREQUENCY_OPTIONS: Array<{ value: InspectionFrequency; label: string }> = [
   { value: 'daily', label: 'Denně' },
@@ -102,6 +103,14 @@ function normalizeText(value: unknown): string {
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '');
+}
+
+function getFloorValue(asset: Pick<Asset, 'floor'>) {
+  return safeText(asset.floor).trim() || NO_FLOOR;
+}
+
+function getFloorLabel(value: string) {
+  return value === NO_FLOOR ? 'Bez patra' : value;
 }
 
 function isBuildingAsset(asset: Asset) {
@@ -169,6 +178,7 @@ function makeVirtualNode(input: {
   kind: 'building' | 'room';
   buildingId?: string;
   areaName?: string;
+  floor?: string;
 }): DisplayAsset {
   return {
     id: input.id,
@@ -181,6 +191,7 @@ function makeVirtualNode(input: {
     criticality: 'low',
     buildingId: input.buildingId,
     areaName: input.areaName,
+    floor: input.floor,
     isVirtual: true,
     virtualKind: input.kind,
     sourceBuildingId: input.buildingId,
@@ -256,6 +267,7 @@ function buildRoomTree(realAssets: Asset[], tenantId: string): DisplayAsset[] {
         kind: 'room',
         buildingId,
         areaName: roomName,
+        floor: asset.floor,
       }));
       result.push({ ...asset, parentId: roomNodeId });
     } else {
@@ -729,8 +741,10 @@ export default function KartotekaPage() {
   const [showImport, setShowImport] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     if (typeof window === 'undefined') return 'tree';
-    return window.localStorage.getItem('kartoteka:viewMode') === 'tiles' ? 'tiles' : 'tree';
+    const saved = window.localStorage.getItem('kartoteka:viewMode');
+    return saved === 'tiles' || saved === 'route' ? saved : 'tree';
   });
+  const [floorFilter, setFloorFilter] = useState('all');
 
   // ── Delete state ───
   const [deleteTarget, setDeleteTarget] = useState<DisplayAsset | null>(null);
@@ -1276,8 +1290,12 @@ export default function KartotekaPage() {
         : matching.filter((a) => a.isVirtual || a.status === filter);
     }
 
+    if (floorFilter !== 'all') {
+      matching = matching.filter((a) => a.isVirtual || getFloorValue(a) === floorFilter);
+    }
+
     // Include ancestors so tree stays intact
-    if (search.trim() || filter !== 'all') {
+    if (search.trim() || filter !== 'all' || floorFilter !== 'all') {
       const idSet = new Set<string>();
       for (const a of matching) {
         idSet.add(a.id);
@@ -1289,7 +1307,15 @@ export default function KartotekaPage() {
     }
 
     return { visibleAssets: treeAssets };
-  }, [treeAssets, search, filter]);
+  }, [treeAssets, search, filter, floorFilter]);
+
+  const floorOptions = useMemo(() => {
+    const values = new Set<string>();
+    for (const asset of treeAssets) {
+      if (!asset.isVirtual) values.add(getFloorValue(asset));
+    }
+    return Array.from(values).sort((a, b) => getFloorLabel(a).localeCompare(getFloorLabel(b), 'cs'));
+  }, [treeAssets]);
 
   const rootAssets = useMemo(() => {
     const visibleIds = new Set(visibleAssets.map((a) => a.id));
@@ -1302,11 +1328,35 @@ export default function KartotekaPage() {
     return visibleAssets
       .filter((asset) => !asset.isVirtual)
       .sort((a, b) => {
-        const aKey = `${a.buildingId || ''} ${a.floor || ''} ${safeText(a.areaName)} ${safeText(a.name)}`;
-        const bKey = `${b.buildingId || ''} ${b.floor || ''} ${safeText(b.areaName)} ${safeText(b.name)}`;
+        const aKey = `${a.buildingId || ''} ${a.floor || ''} ${safeText(a.code)} ${safeText(a.areaName)} ${safeText(a.name)}`;
+        const bKey = `${b.buildingId || ''} ${b.floor || ''} ${safeText(b.code)} ${safeText(b.areaName)} ${safeText(b.name)}`;
         return aKey.localeCompare(bKey, 'cs');
       });
   }, [visibleAssets]);
+
+  const routeGroups = useMemo(() => {
+    const groups = new Map<string, { key: string; title: string; assets: DisplayAsset[] }>();
+    for (const asset of tileAssets) {
+      const building = safeText(asset.buildingId).trim() || 'Bez budovy';
+      const floor = getFloorLabel(getFloorValue(asset));
+      const key = `${building}::${floor}`;
+      if (!groups.has(key)) {
+        groups.set(key, {
+          key,
+          title: `${building === 'Bez budovy' ? building : `Budova ${building}`} · ${floor}`,
+          assets: [],
+        });
+      }
+      groups.get(key)!.assets.push(asset);
+    }
+    return Array.from(groups.values());
+  }, [tileAssets]);
+
+  const currentViewCount = viewMode === 'tree'
+    ? rootAssets.length
+    : viewMode === 'route'
+      ? tileAssets.length
+      : tileAssets.length;
 
   const createParentOptions = useMemo(() => {
     return treeAssets
@@ -1363,11 +1413,11 @@ export default function KartotekaPage() {
 
   // ── Auto-expand when filtering ───
   useEffect(() => {
-    if (search.trim() || filter !== 'all') {
+    if (search.trim() || filter !== 'all' || floorFilter !== 'all') {
       const allIds = new Set(visibleAssets.map((a) => a.id));
       setExpanded(allIds);
     }
-  }, [search, filter, visibleAssets]);
+  }, [search, filter, floorFilter, visibleAssets]);
 
   // ── Filter config ───
   const filters: { key: FilterKey; label: string }[] = [
@@ -1504,6 +1554,29 @@ export default function KartotekaPage() {
         </button>
       </div>
 
+      {floorOptions.length > 1 && (
+        <div className="k-floor-filters" aria-label="Filtr podle patra">
+          <span>Patro</span>
+          <button
+            type="button"
+            className={`filter-chip${floorFilter === 'all' ? ' active' : ''}`}
+            onClick={() => setFloorFilter('all')}
+          >
+            Vše
+          </button>
+          {floorOptions.map((floor) => (
+            <button
+              key={floor}
+              type="button"
+              className={`filter-chip${floorFilter === floor ? ' active' : ''}`}
+              onClick={() => setFloorFilter(floorFilter === floor ? 'all' : floor)}
+            >
+              {getFloorLabel(floor)}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className={`k-tree-tools is-${viewMode}`}>
         <div className="k-view-toggle" aria-label="Zobrazeni kartoteky">
           <button
@@ -1521,6 +1594,14 @@ export default function KartotekaPage() {
           >
             <LayoutGrid size={16} />
             Dlaždice
+          </button>
+          <button
+            type="button"
+            className={viewMode === 'route' ? 'active' : ''}
+            onClick={() => setViewMode('route')}
+          >
+            <ClipboardCheck size={16} />
+            Trasa kontrol
           </button>
         </div>
         <button type="button" onClick={expandVisibleTree}>
@@ -1558,10 +1639,34 @@ export default function KartotekaPage() {
       {/* ── Main content: root card grid + tree ── */}
       {!loading && !error && assets.length > 0 && (
         <div className="k-content">
-          {(viewMode === 'tiles' ? tileAssets.length === 0 : rootAssets.length === 0) && (search || filter !== 'all') ? (
+          {currentViewCount === 0 && (search || filter !== 'all' || floorFilter !== 'all') ? (
             <div className="k-empty">
               <Search size={32} />
               <span>Žádné výsledky</span>
+            </div>
+          ) : viewMode === 'route' ? (
+            <div className="k-route-groups">
+              {routeGroups.map((group) => (
+                <section key={group.key} className="k-route-group">
+                  <div className="k-route-header">
+                    <span>{group.title}</span>
+                    <small>{group.assets.length} položek</small>
+                  </div>
+                  <div className="k-tile-grid k-route-grid">
+                    {group.assets.map((asset) => (
+                      <TileCard
+                        key={asset.id}
+                        asset={asset}
+                        allAssets={visibleAssets}
+                        onDetail={handleDetail}
+                        onAddChild={openCreateModal}
+                        onDelete={handleDelete}
+                        canCreateAsset={canCreateAsset}
+                      />
+                    ))}
+                  </div>
+                </section>
+              ))}
             </div>
           ) : viewMode === 'tiles' ? (
             <div className="k-tile-grid">
