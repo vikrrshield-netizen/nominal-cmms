@@ -206,7 +206,7 @@ function DailyOperations({ openTasks, criticalTasks, overdueTasks, todayLogs, to
   ];
 
   return (
-    <section className="mb-5">
+    <section className="rounded-2xl border border-stone-200 bg-[#fbf9f4] p-3 shadow-sm shadow-stone-200/70 sm:p-4">
       <div className="mb-3">
         <div className="text-[10px] text-emerald-700 uppercase tracking-widest font-bold">Dnešní provoz</div>
         <h2 className="text-lg font-black text-slate-950 mt-0.5">Co je potřeba hlídat dnes</h2>
@@ -246,7 +246,7 @@ function QuickActions({ onNavigate }: { onNavigate: (path: string) => void }) {
   ];
 
   return (
-    <section className="mb-5">
+    <section className="rounded-2xl border border-stone-200 bg-[#fbf9f4] p-3 shadow-sm shadow-stone-200/70 sm:p-4">
       <div className="mb-3">
         <div className="text-[10px] text-sky-700 uppercase tracking-widest font-bold">Rychlé akce</div>
         <h2 className="text-lg font-black text-slate-950 mt-0.5">Nejčastější práce na telefonu</h2>
@@ -265,16 +265,16 @@ function QuickActions({ onNavigate }: { onNavigate: (path: string) => void }) {
           </button>
         ))}
       </div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 mt-2.5">
+      <div className="mt-2.5 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
         {secondaryActions.map(({ label, detail, path, icon: Icon, tone }) => (
           <button key={label} type="button" onClick={() => onNavigate(path)}
-            className={`min-h-[62px] ${DASH_PANEL} ${DASH_PANEL_HOVER} p-3 text-left flex items-center gap-3`}>
-            <span className={DASH_ICON_BOX}>
-              <Icon className={`w-5 h-5 ${tone}`} />
+            className={`min-h-[68px] ${DASH_PANEL} ${DASH_PANEL_HOVER} p-3 text-left flex items-center gap-2.5`}>
+            <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border border-stone-200 bg-stone-50">
+              <Icon className={`h-4 w-4 ${tone}`} />
             </span>
-            <span className="min-w-0">
-              <span className="block text-sm font-black text-slate-950 truncate">{label}</span>
-              <span className="block text-xs font-semibold text-slate-500 truncate">{detail}</span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-black leading-tight text-slate-950">{label}</span>
+              <span className="mt-0.5 block text-xs font-semibold leading-snug text-slate-500">{detail}</span>
             </span>
           </button>
         ))}
@@ -290,7 +290,7 @@ function czNewMessages(n: number): string {
   return `${n} nových zpráv`;
 }
 
-function ModuleShortcuts({ onNavigate }: { onNavigate: (path: string) => void }) {
+function ModuleShortcuts({ onNavigate, showHeader = true }: { onNavigate: (path: string) => void; showHeader?: boolean }) {
   const { canViewSecretBox, hasPermission, user } = useAuthContext();
   const [trustboxNew, setTrustboxNew] = useState(0);
 
@@ -330,14 +330,16 @@ function ModuleShortcuts({ onNavigate }: { onNavigate: (path: string) => void })
   ].filter((mod) => canAny(mod.permissions));
 
   return (
-    <section className="mb-5">
-      <div className="flex items-end justify-between gap-3 mb-3">
-        <div>
-          <div className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Moduly</div>
-          <h2 className="text-lg font-black text-slate-950 mt-0.5">Kam chceš pokračovat</h2>
+    <section className={showHeader ? 'mb-5' : ''}>
+      {showHeader && (
+        <div className="flex items-end justify-between gap-3 mb-3">
+          <div>
+            <div className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Moduly</div>
+            <h2 className="text-lg font-black text-slate-950 mt-0.5">Kam chceš pokračovat</h2>
+          </div>
         </div>
-      </div>
-      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-2 2xl:grid-cols-3">
+      )}
+      <div className="grid grid-cols-2 gap-2.5 xl:grid-cols-1 2xl:grid-cols-2">
         {modules.map((mod) => {
           const { label, detail, path, icon: Icon, tone } = mod;
           const badge = (mod as { badge?: number }).badge ?? 0;
@@ -352,7 +354,7 @@ function ModuleShortcuts({ onNavigate }: { onNavigate: (path: string) => void })
               <Icon className={`w-5 h-5 ${tone}`} />
             </span>
             <span className="min-w-0">
-              <span className="block text-sm font-black text-slate-950 truncate">{label}</span>
+              <span className="block text-sm font-black leading-tight text-slate-950">{label}</span>
               <span className="block text-xs font-semibold text-slate-500 mt-0.5 leading-snug">{detail}</span>
             </span>
             {badge > 0 && (
@@ -1017,7 +1019,7 @@ function SecondaryModules({
     <section className="mb-5">
       <div className="flex items-end justify-between gap-3 mb-3">
         <div>
-          <div className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Ostatní moduly</div>
+          <div className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Další přehledy</div>
           <h2 className="text-lg font-black text-slate-950 mt-0.5">Méně časté vstupy</h2>
         </div>
       </div>
@@ -1844,7 +1846,7 @@ function getDashboardRoleProfile(role: UserRole): DashboardRoleProfile {
       return {
         todayDescription: 'Poruchy, úkoly a provoz výroby na dnešek.',
         watchDescription: 'Výroba, sledované stroje a vlastní provozní widgety.',
-        moreDescription: 'Moduly, aktivita, audit, tipy a rozvrh.',
+        moreDescription: 'Aktivita, audit, tipy a rozvrh.',
         showAssetWatchlist: true,
         showCustomWidgets: true,
         showGearbox: false,
@@ -1854,7 +1856,7 @@ function getDashboardRoleProfile(role: UserRole): DashboardRoleProfile {
       return {
         todayDescription: 'Poruchy, úkoly, prodlení a dnešní práce údržby.',
         watchDescription: 'Sledovaná zařízení, převodovky a vlastní servisní widgety.',
-        moreDescription: 'Moduly, aktivita, audit, tipy a rozvrh.',
+        moreDescription: 'Aktivita, audit, tipy a rozvrh.',
         showAssetWatchlist: true,
         showCustomWidgets: true,
         showGearbox: true,
@@ -1866,7 +1868,7 @@ function getDashboardRoleProfile(role: UserRole): DashboardRoleProfile {
       return {
         todayDescription: 'Rizika, prodlení, závady a stav provozu.',
         watchDescription: 'Klíčové widgety napříč provozem a vlastní sledování.',
-        moreDescription: 'Moduly, aktivita, audit, tipy a rozvrh.',
+        moreDescription: 'Aktivita, audit, tipy a rozvrh.',
         showAssetWatchlist: true,
         showCustomWidgets: true,
         showGearbox: true,
@@ -1876,7 +1878,7 @@ function getDashboardRoleProfile(role: UserRole): DashboardRoleProfile {
       return {
         todayDescription: 'Dnešní práce a provozní upozornění.',
         watchDescription: 'Sledované položky a vlastní widgety.',
-        moreDescription: 'Moduly, aktivita, audit, tipy a rozvrh.',
+        moreDescription: 'Aktivita, audit, tipy a rozvrh.',
         showAssetWatchlist: true,
         showCustomWidgets: true,
         showGearbox: false,
@@ -1895,14 +1897,14 @@ function DashboardZone({
   children: ReactNode;
 }) {
   return (
-    <section className="mb-6">
-      <div className="mb-3 flex flex-wrap items-end justify-between gap-2 px-1">
+    <section className="mb-5 rounded-3xl border border-stone-200 bg-white/90 p-4 shadow-sm shadow-stone-200/70">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
         <div>
           <div className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700">{title}</div>
           <div className="mt-1 text-sm font-semibold text-slate-600">{description}</div>
         </div>
       </div>
-      {children}
+      <div className="space-y-4">{children}</div>
     </section>
   );
 }
@@ -2098,7 +2100,7 @@ function FullDashboard() {
 
   return (
     <div className="dashboard-daylight min-h-screen bg-[#f1ece3] text-slate-950">
-      <div className="mx-auto max-w-[1600px] px-3 pt-4 pb-24 sm:px-4 xl:px-6">
+      <div className="mx-auto max-w-[1360px] px-3 pt-4 pb-24 sm:px-4 xl:px-5">
 
         {/* HEADER */}
         <div className="flex items-center justify-between mb-5 rounded-2xl border border-stone-200 bg-white px-4 py-3 shadow-sm shadow-stone-200/70">
@@ -2144,7 +2146,7 @@ function FullDashboard() {
         )}
 
         <DashboardZone title="Dnes řešit" description={dashboardProfile.todayDescription}>
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px] 2xl:grid-cols-[minmax(0,1fr)_430px] xl:items-start">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
             <div className="xl:order-2 xl:sticky xl:top-4">
               <QuickActions onNavigate={(path) => {
             if (path === 'fault') {
@@ -2181,7 +2183,7 @@ function FullDashboard() {
           </div>
         </DashboardZone>
 
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)] 2xl:grid-cols-[minmax(0,1.5fr)_minmax(430px,0.7fr)] xl:items-start">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_390px] xl:items-start">
           <main className="order-2 space-y-5 xl:order-1">
         <DashboardZone title="Moje sledování" description={dashboardProfile.watchDescription}>
           <div className="mb-3 flex justify-end">
@@ -2220,11 +2222,11 @@ function FullDashboard() {
                 />
               )}
 
-              {!dashboardProfile.showGearbox && !(dashboardProfile.showProductionMaster && canReadProductionMaster) && (
-                <div className="rounded-2xl border border-dashed border-stone-300 bg-white/70 p-4 text-sm font-semibold text-slate-500">
-                  Pro tuto roli zatím nejsou připnuté sledované widgety. Další přehledy jsou sbalené níže.
-                </div>
-              )}
+                  {!dashboardProfile.showGearbox && !(dashboardProfile.showProductionMaster && canReadProductionMaster) && (
+                    <div className="rounded-2xl border border-dashed border-stone-300 bg-stone-50 p-3 text-sm font-semibold text-slate-500">
+                      Přidat widget: zatím tu není nic připnutého pro tuto roli.
+                    </div>
+                  )}
             </>
           )}
         </DashboardZone>
@@ -2232,7 +2234,7 @@ function FullDashboard() {
 
           <aside className="order-1 space-y-5 xl:order-2 xl:sticky xl:top-4">
         <DashboardZone title="Moduly" description="Kompaktni menu podle opravneni a role.">
-          <ModuleShortcuts onNavigate={navigate} />
+          <ModuleShortcuts onNavigate={navigate} showHeader={false} />
         </DashboardZone>
 
         <section className="rounded-2xl border border-stone-200 bg-white p-3 shadow-sm shadow-stone-200/70">
