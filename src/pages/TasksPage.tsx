@@ -31,9 +31,6 @@ import {
   AlertTriangle,
   BellRing,
 } from 'lucide-react';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-
 import { cmmsConfig } from '../cmmsConfig';
 import { addWorkLog, subscribeToWorkLogs } from '../services/workLogService';
 import type { WorkLog } from '../types/workLog';
@@ -376,6 +373,69 @@ function taskWorkerNames(task: Task): string[] {
 function taskWorkerLabel(task: Task): string {
   const names = taskWorkerNames(task);
   return names.length ? names.join(', ') : '—';
+}
+
+function escapeTaskHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function formatTaskDate(value: unknown): string {
+  if (!value) return '—';
+  const date = value && typeof value === 'object' && 'toDate' in value && typeof (value as { toDate: () => Date }).toDate === 'function'
+    ? (value as { toDate: () => Date }).toDate()
+    : value instanceof Date
+      ? value
+      : new Date(String(value));
+  return Number.isNaN(date.getTime())
+    ? '—'
+    : date.toLocaleDateString('cs-CZ', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function exportCompletedTasksPrint(tasks: Task[]): void {
+  const rows = tasks.map((task) => `
+    <tr>
+      <td>${escapeTaskHtml(task.priority)}</td>
+      <td>${escapeTaskHtml(task.title)}</td>
+      <td>${escapeTaskHtml(task.assetName || '—')}</td>
+      <td>${escapeTaskHtml(formatTaskDate(task.completedAt))}</td>
+      <td>${escapeTaskHtml(taskWorkerLabel(task))}</td>
+    </tr>
+  `).join('');
+  const win = window.open('', '_blank', 'width=1000,height=900');
+  if (!win) {
+    showToast('Tiskové okno bylo zablokováno prohlížečem', 'error');
+    return;
+  }
+  win.document.write(`<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8" />
+  <title>Dokončené úkoly</title>
+  <style>
+    @page { size: A4 landscape; margin: 12mm; }
+    body { margin: 0; font-family: Arial, sans-serif; color: #1b2620; }
+    h1 { margin: 0 0 4px; font-size: 22px; }
+    .muted { color: #66756b; margin-bottom: 12px; }
+    table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    th { background: #1a6b4f; color: white; text-align: left; padding: 7px; }
+    td { border: 1px solid #d8d0c3; padding: 7px; vertical-align: top; }
+  </style>
+</head>
+<body>
+  <h1>Dokončené úkoly</h1>
+  <div class="muted">Export: ${escapeTaskHtml(new Date().toLocaleString('cs-CZ'))}</div>
+  <table>
+    <thead><tr><th>Priorita</th><th>Název úkolu</th><th>Zařízení</th><th>Dokončeno</th><th>Řešitel</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <script>window.onload = () => setTimeout(() => window.print(), 150);</script>
+</body>
+</html>`);
+  win.document.close();
 }
 
 function taskResultLabel(value?: string) {
@@ -1022,27 +1082,7 @@ export default function TasksPage() {
           </div>
           {filterTab === 'done' && (
             <button
-              onClick={() => {
-                const pdf = new jsPDF();
-                pdf.setFontSize(14);
-                pdf.text('Nominal CMMS — Dokončené úkoly', 14, 15);
-                pdf.setFontSize(9);
-                pdf.text(`Export: ${new Date().toLocaleDateString('cs-CZ')}`, 14, 22);
-                autoTable(pdf, {
-                  startY: 28,
-                  head: [['Priorita', 'Název úkolu', 'Zařízení', 'Dokončeno', 'Řešitel']],
-                  body: filteredTasks.map(t => [
-                    t.priority,
-                    t.title,
-                    t.assetName || '—',
-                    t.completedAt ? (t.completedAt.toDate ? t.completedAt.toDate() : new Date(t.completedAt)).toLocaleDateString('cs-CZ') : '—',
-                    taskWorkerLabel(t),
-                  ]),
-                  styles: { fontSize: 8 },
-                  headStyles: { fillColor: [30, 41, 59] },
-                });
-                pdf.save(`NOMINAL_hotove_${new Date().toISOString().slice(0, 10)}.pdf`);
-              }}
+              onClick={() => exportCompletedTasksPrint(filteredTasks)}
               className="vik-button w-10 h-10 p-0"
               title="Export PDF"
             >

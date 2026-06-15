@@ -2151,9 +2151,9 @@ function ImportExportTab({ canEdit }: { canEdit: boolean }) {
           </p>
           <label className="inline-block px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg cursor-pointer hover:bg-blue-500 transition">
             Vybrat soubor
-            <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFileInput} className="hidden" />
+            <input type="file" accept=".xlsx,.csv" onChange={handleFileInput} className="hidden" />
           </label>
-          <p className="text-slate-600 text-xs mt-2">Podporováno: .xlsx, .xls, .csv</p>
+          <p className="text-slate-600 text-xs mt-2">Podporováno: .xlsx, .csv</p>
         </div>
 
         {/* Preview */}

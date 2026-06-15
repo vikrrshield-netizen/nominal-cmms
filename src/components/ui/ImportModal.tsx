@@ -100,14 +100,14 @@ export default function ImportModal({ title, onClose, onImport }: ImportModalPro
                   <>
                     <Upload className="w-10 h-10 text-slate-400 mx-auto mb-3" />
                     <div className="font-medium text-slate-700">Klikněte nebo přetáhněte soubor</div>
-                    <div className="text-sm text-slate-500 mt-1">.xlsx, .xls, .csv</div>
+                    <div className="text-sm text-slate-500 mt-1">.xlsx, .csv</div>
                   </>
                 )}
               </div>
               <input
                 ref={fileRef}
                 type="file"
-                accept=".xlsx,.xls,.csv"
+                accept=".xlsx,.csv"
                 className="hidden"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
               />

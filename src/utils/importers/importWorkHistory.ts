@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx';
+import type { Worksheet } from 'exceljs';
 import { collection, doc, serverTimestamp, Timestamp, writeBatch } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import type { Asset } from '../../types/asset';
@@ -109,6 +109,14 @@ function parseExplicitYear(value: string): number | null {
   return match ? Number(match[1]) : null;
 }
 
+function excelSerialToDate(value: number): Date | null {
+  if (!Number.isFinite(value) || value < 1) return null;
+  const utcMs = Math.round((value - 25569) * 86400 * 1000);
+  const date = new Date(utcMs);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Date(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 12, 0, 0);
+}
+
 function parseHistoryDate(raw: unknown, state: DateState): Date | null {
   if (raw instanceof Date && !Number.isNaN(raw.getTime())) {
     state.year = raw.getFullYear();
@@ -117,11 +125,11 @@ function parseHistoryDate(raw: unknown, state: DateState): Date | null {
   }
 
   if (typeof raw === 'number') {
-    const parsed = XLSX.SSF.parse_date_code(raw);
-    if (parsed?.y && parsed?.m && parsed?.d) {
-      state.year = parsed.y;
-      state.lastMonth = parsed.m;
-      return new Date(parsed.y, parsed.m - 1, parsed.d, 12, 0, 0);
+    const parsed = excelSerialToDate(raw);
+    if (parsed) {
+      state.year = parsed.getFullYear();
+      state.lastMonth = parsed.getMonth() + 1;
+      return parsed;
     }
   }
 
@@ -210,13 +218,43 @@ function withoutUndefined(data: Record<string, unknown>) {
   );
 }
 
-function parseWorkbook(arrayBuffer: ArrayBuffer): ParsedHistoryRow[] {
-  const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: true });
+function cellValue(value: unknown): unknown {
+  if (value == null) return '';
+  if (value instanceof Date) return value;
+  if (typeof value === 'object') {
+    const result = (value as { result?: unknown }).result;
+    if (result != null) return result;
+    const textValue = (value as { text?: unknown }).text;
+    if (textValue != null) return textValue;
+    const richText = (value as { richText?: Array<{ text?: string }> }).richText;
+    if (Array.isArray(richText)) return richText.map((part) => part.text || '').join('');
+  }
+  return value;
+}
+
+function sheetToRows(sheet: Worksheet): unknown[][] {
+  const rows: unknown[][] = [];
+  const rowCount = sheet.actualRowCount || sheet.rowCount;
+  const colCount = sheet.actualColumnCount || sheet.columnCount;
+  for (let rowIndex = 1; rowIndex <= rowCount; rowIndex++) {
+    const row: unknown[] = [];
+    for (let colIndex = 1; colIndex <= colCount; colIndex++) {
+      row.push(cellValue(sheet.getCell(rowIndex, colIndex).value));
+    }
+    rows.push(row);
+  }
+  return rows;
+}
+
+async function parseWorkbook(arrayBuffer: ArrayBuffer): Promise<ParsedHistoryRow[]> {
+  const ExcelJS = await import('exceljs');
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(arrayBuffer);
   const parsedRows: ParsedHistoryRow[] = [];
 
-  for (const sheetName of workbook.SheetNames) {
-    const sheet = workbook.Sheets[sheetName];
-    const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: '', raw: true });
+  for (const sheet of workbook.worksheets) {
+    const sheetName = sheet.name;
+    const rows = sheetToRows(sheet);
     if (rows.length < 3) continue;
 
     const headerRowIndex = detectHeaderRow(rows);
@@ -267,7 +305,7 @@ function parseWorkbook(arrayBuffer: ArrayBuffer): ParsedHistoryRow[] {
 }
 
 export async function importWorkHistoryWorkbook(input: ImportWorkHistoryInput): Promise<WorkHistoryImportResult> {
-  const parsed = parseWorkbook(input.arrayBuffer);
+  const parsed = await parseWorkbook(input.arrayBuffer);
   const existingKeys = buildExistingKeys(input.existingLogs);
   const seenKeys = new Set<string>();
   const errors: string[] = [];

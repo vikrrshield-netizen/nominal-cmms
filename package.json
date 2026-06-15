@@ -20,14 +20,11 @@
     "file-saver": "^2.0.5",
     "firebase": "^12.9.0",
     "html5-qrcode": "^2.3.8",
-    "jspdf": "^4.2.0",
-    "jspdf-autotable": "^5.0.7",
     "lucide-react": "^0.563.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.13.0",
-    "tailwindcss": "^4.1.18",
-    "xlsx": "^0.18.5"
+    "tailwindcss": "^4.1.18"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

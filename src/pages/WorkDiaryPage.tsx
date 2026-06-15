@@ -1557,7 +1557,7 @@ export default function WorkDiaryPage() {
                 <input
                   ref={historyImportInputRef}
                   type="file"
-                  accept=".xlsx,.xls"
+                  accept=".xlsx"
                   className="hidden"
                   onChange={(event) => handleHistoryImportFile(event.target.files?.[0])}
                 />

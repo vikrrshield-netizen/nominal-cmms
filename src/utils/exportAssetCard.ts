@@ -1,21 +1,15 @@
-// src/utils/exportAssetCard.ts
-// VIKRR — Asset Shield — PDF & Excel export pro Rodný list (AssetCardPage)
-//
-// Obě funkce používají dynamický import (code splitting).
-// PDF: jsPDF + jspdf-autotable
-// Excel: SheetJS (xlsx) + file-saver
-
+import { saveAs } from 'file-saver';
+import type { Row, Worksheet } from 'exceljs';
 import type { Asset, AssetEvent } from '../types/asset';
 import { ASSET_STATUS_CONFIG, CRITICALITY_CONFIG } from '../types/asset';
+import appConfig from '../appConfig';
 
-// ═══════════════════════════════════════════
-// HELPERS
-// ═══════════════════════════════════════════
+type TableRow = Array<string | number>;
 
-function formatDateCZ(d?: string | null): string {
-  if (!d) return '—';
-  const date = new Date(d);
-  if (isNaN(date.getTime())) return d;
+function formatDateCZ(value?: string | null): string {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleDateString('cs-CZ', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
@@ -25,366 +19,209 @@ function formatDateFile(): string {
 }
 
 function safeName(name: string): string {
-  return name.replace(/[^a-zA-Z0-9áčďéěíňóřšťúůýžÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ _-]/g, '').substring(0, 40);
+  return name.replace(/[^\p{L}\p{N} _-]/gu, '').substring(0, 40) || 'asset';
+}
+
+function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 function getEventStatusLabel(evt: AssetEvent): string {
-  const today = new Date().toISOString().split('T')[0];
-  if (evt.nextDate) {
-    return evt.nextDate <= today ? 'Nesplněno' : 'Naplánováno';
-  }
+  const today = new Date().toISOString().slice(0, 10);
+  if (evt.nextDate) return evt.nextDate <= today ? 'Nesplněno' : 'Naplánováno';
   if (evt.lastDate) return 'Splněno';
   return '—';
 }
 
-// ═══════════════════════════════════════════
-// PDF EXPORT
-// ═══════════════════════════════════════════
-
-export async function exportAssetCardPDF(asset: Asset): Promise<string> {
-  const jsPDFModule = await import('jspdf');
-  const jsPDF = jsPDFModule.default || jsPDFModule.jsPDF;
-  await import('jspdf-autotable');
-
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const margin = 15;
-  let y = margin;
-
-  // Colors
-  const blue = [30, 64, 175] as const;       // #1e40af
-  const darkText = [30, 41, 59] as const;    // #1e293b
-  const lightGray = [148, 163, 184] as const; // #94a3b8
-
-  // ── Header ──
-  doc.setFontSize(18);
-  doc.setTextColor(...blue);
-  doc.text('VIKRR Asset Shield', margin, y + 6);
-
-  doc.setFontSize(10);
-  doc.setTextColor(...lightGray);
-  doc.text(`Exportováno: ${formatDateCZ(new Date().toISOString())}`, pageWidth - margin, y + 3, { align: 'right' });
-  doc.text('Rodný list zařízení', pageWidth - margin, y + 8, { align: 'right' });
-
-  y += 12;
-  doc.setDrawColor(...blue);
-  doc.setLineWidth(0.5);
-  doc.line(margin, y, pageWidth - margin, y);
-  y += 6;
-
-  // ── Asset title ──
-  doc.setFontSize(14);
-  doc.setTextColor(...darkText);
-  doc.text(asset.name, margin, y + 5);
-  y += 8;
-
-  if (asset.code) {
-    doc.setFontSize(10);
-    doc.setTextColor(...lightGray);
-    doc.text(`Kód: ${asset.code}`, margin, y + 3);
-    y += 6;
-  }
-
-  y += 4;
-
-  // ── Section helper ──
-  function sectionTitle(title: string) {
-    if (y > 265) { doc.addPage(); y = margin; }
-    doc.setFontSize(12);
-    doc.setTextColor(...blue);
-    doc.text(title, margin, y + 4);
-    y += 3;
-    doc.setDrawColor(226, 232, 240); // #e2e8f0
-    doc.setLineWidth(0.3);
-    doc.line(margin, y + 2, pageWidth - margin, y + 2);
-    y += 6;
-  }
-
-  // ── Sekce 1: Identifikace ──
-  sectionTitle('1 — Identifikace');
+function identRows(asset: Asset): TableRow[] {
   const statusLabel = ASSET_STATUS_CONFIG[asset.status]?.label ?? asset.status;
   const critLabel = CRITICALITY_CONFIG[asset.criticality]?.label ?? asset.criticality;
-
-  (doc as any).autoTable({
-    startY: y,
-    margin: { left: margin, right: margin },
-    theme: 'grid',
-    headStyles: { fillColor: [241, 245, 249], textColor: [30, 41, 59], fontStyle: 'bold', fontSize: 9 },
-    bodyStyles: { textColor: [30, 41, 59], fontSize: 10 },
-    columnStyles: { 0: { cellWidth: 45, fontStyle: 'bold' } },
-    head: [['Pole', 'Hodnota']],
-    body: [
-      ['Název', asset.name],
-      ['Kód', asset.code || '—'],
-      ['Typ entity', asset.entityType || '—'],
-      ['Stav', statusLabel],
-      ['Kritičnost', critLabel],
-    ],
-  });
-  y = (doc as any).lastAutoTable.finalY + 8;
-
-  // ── Sekce 2: Technický list ──
-  sectionTitle('2 — Technický list');
-  (doc as any).autoTable({
-    startY: y,
-    margin: { left: margin, right: margin },
-    theme: 'grid',
-    headStyles: { fillColor: [241, 245, 249], textColor: [30, 41, 59], fontStyle: 'bold', fontSize: 9 },
-    bodyStyles: { textColor: [30, 41, 59], fontSize: 10 },
-    columnStyles: { 0: { cellWidth: 45, fontStyle: 'bold' } },
-    head: [['Pole', 'Hodnota']],
-    body: [
-      ['Výrobce', asset.manufacturer || '—'],
-      ['Model', asset.model || '—'],
-      ['Sériové číslo', asset.serialNumber || '—'],
-      ['Rok výroby', asset.year ? String(asset.year) : '—'],
-      ['Lokace', asset.location || '—'],
-      ['MTH počítadlo', asset.mthCounter != null ? String(asset.mthCounter) : '—'],
-    ],
-  });
-  y = (doc as any).lastAutoTable.finalY + 8;
-
-  // ── Sekce 3: Události ──
-  const events = asset.events || [];
-  sectionTitle(`3 — Události (${events.length})`);
-
-  if (events.length === 0) {
-    doc.setFontSize(10);
-    doc.setTextColor(...lightGray);
-    doc.text('Žádné události', margin, y + 3);
-    y += 8;
-  } else {
-    const sortedEvents = [...events].sort((a, b) => {
-      const aD = a.nextDate || a.lastDate || '';
-      const bD = b.nextDate || b.lastDate || '';
-      return bD.localeCompare(aD);
-    });
-
-    (doc as any).autoTable({
-      startY: y,
-      margin: { left: margin, right: margin },
-      theme: 'grid',
-      headStyles: { fillColor: [241, 245, 249], textColor: [30, 41, 59], fontStyle: 'bold', fontSize: 8 },
-      bodyStyles: { textColor: [30, 41, 59], fontSize: 9 },
-      head: [['Název', 'Typ', 'Frekvence', 'Poslední', 'Příští', 'Status']],
-      body: sortedEvents.map((evt) => [
-        evt.name,
-        evt.eventType || '—',
-        evt.frequencyDays ? `${evt.frequencyDays} dní` : '—',
-        formatDateCZ(evt.lastDate),
-        formatDateCZ(evt.nextDate),
-        getEventStatusLabel(evt),
-      ]),
-    });
-    y = (doc as any).lastAutoTable.finalY + 8;
-  }
-
-  // ── Sekce 4: Historie oprav ──
-  const repairLog = asset.repairLog || [];
-  sectionTitle(`4 — Historie oprav (${repairLog.length})`);
-
-  if (repairLog.length === 0) {
-    doc.setFontSize(10);
-    doc.setTextColor(...lightGray);
-    doc.text('Žádné záznamy', margin, y + 3);
-    y += 8;
-  } else {
-    const sortedLog = [...repairLog].sort((a, b) => b.date.localeCompare(a.date));
-    const totalCost = repairLog.reduce((sum, e) => sum + (e.cost || 0), 0);
-
-    const bodyRows: string[][] = sortedLog.map((entry) => [
-      formatDateCZ(entry.date),
-      entry.description,
-      entry.technicianName || '—',
-      entry.parts?.join(', ') || '—',
-      entry.cost != null ? `${entry.cost.toLocaleString('cs-CZ')} Kč` : '—',
-    ]);
-
-    // Sum row
-    bodyRows.push(['', '', '', 'Celkem:', `${totalCost.toLocaleString('cs-CZ')} Kč`]);
-
-    (doc as any).autoTable({
-      startY: y,
-      margin: { left: margin, right: margin },
-      theme: 'grid',
-      headStyles: { fillColor: [241, 245, 249], textColor: [30, 41, 59], fontStyle: 'bold', fontSize: 8 },
-      bodyStyles: { textColor: [30, 41, 59], fontSize: 9 },
-      head: [['Datum', 'Popis', 'Technik', 'Díly', 'Náklady']],
-      body: bodyRows,
-      didParseCell: (data: any) => {
-        // Bold last row (sum)
-        if (data.row.index === bodyRows.length - 1) {
-          data.cell.styles.fontStyle = 'bold';
-        }
-      },
-    });
-    y = (doc as any).lastAutoTable.finalY + 8;
-  }
-
-  // ── Sekce 5: Dokumenty ──
-  const documents = asset.documents || [];
-  sectionTitle(`5 — Dokumenty (${documents.length})`);
-
-  if (documents.length === 0) {
-    doc.setFontSize(10);
-    doc.setTextColor(...lightGray);
-    doc.text('Žádné dokumenty', margin, y + 3);
-    y += 8;
-  } else {
-    (doc as any).autoTable({
-      startY: y,
-      margin: { left: margin, right: margin },
-      theme: 'grid',
-      headStyles: { fillColor: [241, 245, 249], textColor: [30, 41, 59], fontStyle: 'bold', fontSize: 9 },
-      bodyStyles: { textColor: [30, 41, 59], fontSize: 9 },
-      head: [['#', 'URL / Odkaz']],
-      body: documents.map((url, i) => [String(i + 1), url]),
-      columnStyles: { 0: { cellWidth: 12 } },
-    });
-    y = (doc as any).lastAutoTable.finalY + 8;
-  }
-
-  // ── Footer na každé stránce ──
-  const totalPages = doc.getNumberOfPages();
-  const footerText = `VIKRR Asset Shield — Automaticky generovaný dokument — ${formatDateCZ(new Date().toISOString())}`;
-  for (let i = 1; i <= totalPages; i++) {
-    doc.setPage(i);
-    doc.setFontSize(8);
-    doc.setTextColor(...lightGray);
-    doc.text(footerText, pageWidth / 2, 290, { align: 'center' });
-    doc.text(`${i} / ${totalPages}`, pageWidth - margin, 290, { align: 'right' });
-  }
-
-  // ── Save ──
-  const filename = `RL_${safeName(asset.name)}_${formatDateFile()}.pdf`;
-  doc.save(filename);
-  return filename;
-}
-
-// ═══════════════════════════════════════════
-// EXCEL EXPORT
-// ═══════════════════════════════════════════
-
-export async function exportAssetCardXLSX(asset: Asset): Promise<string> {
-  const XLSX = await import('xlsx');
-  const { saveAs } = await import('file-saver');
-
-  const wb = XLSX.utils.book_new();
-
-  // Helper: auto-fit column widths
-  function autoFit(ws: any, data: any[][]) {
-    const colWidths = data[0].map((_: any, colIdx: number) => ({
-      wch: Math.max(
-        ...data.map((row) => String(row[colIdx] ?? '').length)
-      ) + 2,
-    }));
-    ws['!cols'] = colWidths;
-  }
-
-  // ── Sheet 1: Identifikace ──
-  const statusLabel = ASSET_STATUS_CONFIG[asset.status]?.label ?? asset.status;
-  const critLabel = CRITICALITY_CONFIG[asset.criticality]?.label ?? asset.criticality;
-  const identRows = [
+  return [
     ['Pole', 'Hodnota'],
     ['Název', asset.name],
-    ['Kód', asset.code || ''],
-    ['Typ entity', asset.entityType || ''],
+    ['Kód', asset.code || '—'],
+    ['Typ entity', asset.entityType || asset.category || '—'],
     ['Stav', statusLabel],
     ['Kritičnost', critLabel],
+    ['Budova', asset.buildingId || '—'],
+    ['Patro', asset.floor || '—'],
+    ['Umístění', asset.location || asset.areaName || '—'],
   ];
-  const ws1 = XLSX.utils.aoa_to_sheet(identRows);
-  autoFit(ws1, identRows);
-  XLSX.utils.book_append_sheet(wb, ws1, 'Identifikace');
+}
 
-  // ── Sheet 2: Technický list ──
-  const techRows = [
+function technicalRows(asset: Asset): TableRow[] {
+  return [
     ['Pole', 'Hodnota'],
-    ['Výrobce', asset.manufacturer || ''],
-    ['Model', asset.model || ''],
-    ['Sériové číslo', asset.serialNumber || ''],
-    ['Rok výroby', asset.year ?? ''],
-    ['Lokace', asset.location || ''],
-    ['MTH počítadlo', asset.mthCounter ?? ''],
+    ['Výrobce', asset.manufacturer || '—'],
+    ['Model', asset.model || '—'],
+    ['Sériové číslo', asset.serialNumber || '—'],
+    ['Rok výroby', asset.year ?? '—'],
+    ['MTH počítadlo', asset.mthCounter ?? '—'],
+    ['KM počítadlo', asset.kmCounter ?? '—'],
+    ['Poslední servis', formatDateCZ(asset.lastService)],
+    ['Příští servis', formatDateCZ(asset.nextService)],
   ];
-  const ws2 = XLSX.utils.aoa_to_sheet(techRows);
-  autoFit(ws2, techRows);
-  XLSX.utils.book_append_sheet(wb, ws2, 'Technický list');
+}
 
-  // ── Sheet 3: Události ──
-  const events = asset.events || [];
-  const eventRows: (string | number)[][] = [
-    ['Název', 'Typ', 'Frekvence (dní)', 'Poslední', 'Příští', 'Status'],
-  ];
-  const sortedEvents = [...events].sort((a, b) => {
-    const aD = a.nextDate || a.lastDate || '';
-    const bD = b.nextDate || b.lastDate || '';
-    return bD.localeCompare(aD);
-  });
-  for (const evt of sortedEvents) {
-    eventRows.push([
+function eventRows(asset: Asset): TableRow[] {
+  const rows: TableRow[] = [['Název', 'Typ', 'Frekvence', 'Poslední', 'Příští', 'Status']];
+  [...(asset.events || [])]
+    .sort((a, b) => (b.nextDate || b.lastDate || '').localeCompare(a.nextDate || a.lastDate || ''))
+    .forEach((evt) => rows.push([
       evt.name,
-      evt.eventType || '',
-      evt.frequencyDays ?? '',
+      evt.eventType || '—',
+      evt.frequencyDays ? `${evt.frequencyDays} dní` : '—',
       formatDateCZ(evt.lastDate),
       formatDateCZ(evt.nextDate),
       getEventStatusLabel(evt),
-    ]);
-  }
-  const ws3 = XLSX.utils.aoa_to_sheet(eventRows);
-  autoFit(ws3, eventRows);
-  XLSX.utils.book_append_sheet(wb, ws3, 'Události');
+    ]));
+  return rows;
+}
 
-  // ── Sheet 4: Historie oprav ──
-  const repairLog = asset.repairLog || [];
-  const repairRows: (string | number)[][] = [
-    ['Datum', 'Popis', 'Technik', 'Díly', 'Náklady (Kč)'],
-  ];
-  const sortedLog = [...repairLog].sort((a, b) => b.date.localeCompare(a.date));
-  let totalCost = 0;
-  for (const entry of sortedLog) {
-    totalCost += entry.cost || 0;
-    repairRows.push([
-      formatDateCZ(entry.date),
-      entry.description,
-      entry.technicianName || '',
-      entry.parts?.join(', ') || '',
-      entry.cost ?? '',
-    ]);
-  }
-  // Sum row
-  repairRows.push(['', '', '', 'Celkem:', totalCost]);
-  const ws4 = XLSX.utils.aoa_to_sheet(repairRows);
-  autoFit(ws4, repairRows);
-  XLSX.utils.book_append_sheet(wb, ws4, 'Historie oprav');
+function repairRows(asset: Asset): TableRow[] {
+  const rows: TableRow[] = [['Datum', 'Popis', 'Technik', 'Díly', 'Náklady']];
+  let total = 0;
+  [...(asset.repairLog || [])]
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .forEach((entry) => {
+      total += entry.cost || 0;
+      rows.push([
+        formatDateCZ(entry.date),
+        entry.description,
+        entry.technicianName || '—',
+        entry.parts?.join(', ') || '—',
+        entry.cost != null ? entry.cost : '—',
+      ]);
+    });
+  rows.push(['', '', '', 'Celkem', total]);
+  return rows;
+}
 
-  // ── Sheet 5: Dokumenty ──
-  const documents = asset.documents || [];
-  const docRows: (string | number)[][] = [['#', 'URL / Odkaz']];
-  documents.forEach((url, i) => docRows.push([i + 1, url]));
-  if (documents.length === 0) {
-    docRows.push(['', 'Žádné dokumenty']);
-  }
-  const ws5 = XLSX.utils.aoa_to_sheet(docRows);
-  autoFit(ws5, docRows);
-  XLSX.utils.book_append_sheet(wb, ws5, 'Dokumenty');
+function documentRows(asset: Asset): TableRow[] {
+  const rows: TableRow[] = [['#', 'URL / odkaz']];
+  const docs = asset.documents || [];
+  if (!docs.length) rows.push(['', 'Žádné dokumenty']);
+  docs.forEach((url, index) => rows.push([index + 1, url]));
+  return rows;
+}
 
-  // ── Sheet 6: Info ──
-  const infoRows = [
+function styleHeader(row: Row): void {
+  row.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A6B4F' } };
+}
+
+function styleSheet(sheet: Worksheet): void {
+  sheet.columns.forEach((column) => {
+    let max = 12;
+    column.eachCell?.({ includeEmpty: true }, (cell) => {
+      max = Math.max(max, String(cell.value ?? '').length + 2);
+    });
+    column.width = Math.min(max, 46);
+    column.alignment = { vertical: 'top', wrapText: true };
+  });
+  sheet.eachRow((row) => {
+    row.eachCell((cell) => {
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FFE7E0D4' } },
+        left: { style: 'thin', color: { argb: 'FFE7E0D4' } },
+        bottom: { style: 'thin', color: { argb: 'FFE7E0D4' } },
+        right: { style: 'thin', color: { argb: 'FFE7E0D4' } },
+      };
+    });
+  });
+}
+
+function addSheet(workbook: import('exceljs').Workbook, name: string, rows: TableRow[]): void {
+  const sheet = workbook.addWorksheet(name, {
+    views: [{ state: 'frozen', ySplit: 1 }],
+    pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
+  });
+  sheet.addRows(rows);
+  styleHeader(sheet.getRow(1));
+  styleSheet(sheet);
+}
+
+function tableHtml(rows: TableRow[]): string {
+  const [header, ...body] = rows;
+  return `<table>
+    <thead><tr>${header.map((cell) => `<th>${escapeHtml(cell)}</th>`).join('')}</tr></thead>
+    <tbody>${body.map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`).join('')}</tbody>
+  </table>`;
+}
+
+export async function exportAssetCardPDF(asset: Asset): Promise<string> {
+  const filename = `RL_${safeName(asset.name)}_${formatDateFile()}.pdf`;
+  const win = window.open('', '_blank', 'width=1000,height=900');
+  if (!win) throw new Error('Tiskové okno bylo zablokováno prohlížečem.');
+
+  win.document.write(`<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8" />
+  <title>Rodný list - ${escapeHtml(asset.name)}</title>
+  <style>
+    @page { size: A4; margin: 12mm; }
+    body { margin: 0; font-family: Arial, sans-serif; color: #1b2620; background: #fff; }
+    h1 { margin: 0; font-size: 24px; }
+    h2 { margin: 18px 0 8px; font-size: 15px; color: #1a6b4f; }
+    .top { display: flex; justify-content: space-between; gap: 16px; border-bottom: 2px solid #1a6b4f; padding-bottom: 10px; margin-bottom: 12px; }
+    .meta { color: #66756b; font-size: 12px; text-align: right; }
+    table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    th { background: #1a6b4f; color: #fff; text-align: left; padding: 7px; }
+    td { border: 1px solid #d8d0c3; padding: 7px; vertical-align: top; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .footer { margin-top: 14px; color: #66756b; font-size: 10px; }
+  </style>
+</head>
+<body>
+  <div class="top">
+    <div>
+      <h1>Rodný list zařízení</h1>
+      <div>${escapeHtml(asset.name)}${asset.code ? ` · ${escapeHtml(asset.code)}` : ''}</div>
+    </div>
+    <div class="meta">
+      <div>${escapeHtml(appConfig.APP_NAME)}</div>
+      <div>Export: ${escapeHtml(new Date().toLocaleString('cs-CZ'))}</div>
+    </div>
+  </div>
+  <h2>Identifikace</h2>${tableHtml(identRows(asset))}
+  <h2>Technický list</h2>${tableHtml(technicalRows(asset))}
+  <h2>Události</h2>${tableHtml(eventRows(asset))}
+  <h2>Historie oprav</h2>${tableHtml(repairRows(asset))}
+  <h2>Dokumenty</h2>${tableHtml(documentRows(asset))}
+  <div class="footer">${escapeHtml(appConfig.APP_NAME)} · automaticky generovaný dokument</div>
+  <script>window.onload = () => setTimeout(() => window.print(), 150);</script>
+</body>
+</html>`);
+  win.document.close();
+  return filename;
+}
+
+export async function exportAssetCardXLSX(asset: Asset): Promise<string> {
+  const ExcelJS = await import('exceljs');
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = appConfig.APP_NAME;
+  workbook.created = new Date();
+
+  addSheet(workbook, 'Identifikace', identRows(asset));
+  addSheet(workbook, 'Technický list', technicalRows(asset));
+  addSheet(workbook, 'Události', eventRows(asset));
+  addSheet(workbook, 'Historie oprav', repairRows(asset));
+  addSheet(workbook, 'Dokumenty', documentRows(asset));
+  addSheet(workbook, 'Info', [
     ['Položka', 'Hodnota'],
     ['Zařízení', asset.name],
     ['Exportováno', new Date().toLocaleString('cs-CZ')],
-    ['Systém', 'VIKRR Asset Shield v2.0'],
-    ['Počet událostí', events.length],
-    ['Počet oprav', repairLog.length],
-    ['Celkové náklady', `${totalCost.toLocaleString('cs-CZ')} Kč`],
-  ];
-  const ws6 = XLSX.utils.aoa_to_sheet(infoRows);
-  autoFit(ws6, infoRows);
-  XLSX.utils.book_append_sheet(wb, ws6, 'Info');
+    ['Systém', `${appConfig.APP_NAME} ${appConfig.VERSION}`],
+    ['Počet událostí', asset.events?.length || 0],
+    ['Počet oprav', asset.repairLog?.length || 0],
+  ]);
 
-  // ── Save ──
   const filename = `RL_${safeName(asset.name)}_${formatDateFile()}.xlsx`;
-  const buffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-  saveAs(new Blob([buffer], { type: 'application/octet-stream' }), filename);
+  const buffer = await workbook.xlsx.writeBuffer();
+  saveAs(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), filename);
   return filename;
 }
