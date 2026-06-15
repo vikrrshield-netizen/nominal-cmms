@@ -337,7 +337,7 @@ function ModuleShortcuts({ onNavigate }: { onNavigate: (path: string) => void })
           <h2 className="text-lg font-black text-slate-950 mt-0.5">Kam chceš pokračovat</h2>
         </div>
       </div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-2 2xl:grid-cols-3">
         {modules.map((mod) => {
           const { label, detail, path, icon: Icon, tone } = mod;
           const badge = (mod as { badge?: number }).badge ?? 0;
@@ -1021,7 +1021,7 @@ function SecondaryModules({
           <h2 className="text-lg font-black text-slate-950 mt-0.5">Méně časté vstupy</h2>
         </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 2xl:grid-cols-3">
         {modules.map(({ widget, def, data }) => (
           <button
             key={widget.widgetId}
@@ -1911,7 +1911,9 @@ function FullDashboard() {
   const navigate = useNavigate();
   const { user, logout, isSandbox, hasPermission } = useAuthContext();
   const role = (user?.role ?? 'VYROBA') as UserRole;
-  const [showMorePanels, setShowMorePanels] = useState(false);
+  const [showMorePanels, setShowMorePanels] = useState(() => (
+    typeof window !== 'undefined' ? window.matchMedia('(min-width: 1280px)').matches : false
+  ));
   const rawStats = useDashboardStats();
   const todayOps = useTodayOperations();
   const activity = useActivityTimeline(showMorePanels);
@@ -2096,7 +2098,7 @@ function FullDashboard() {
 
   return (
     <div className="dashboard-daylight min-h-screen bg-[#f1ece3] text-slate-950">
-      <div className="max-w-6xl mx-auto px-3 pt-4 pb-24">
+      <div className="mx-auto max-w-[1600px] px-3 pt-4 pb-24 sm:px-4 xl:px-6">
 
         {/* HEADER */}
         <div className="flex items-center justify-between mb-5 rounded-2xl border border-stone-200 bg-white px-4 py-3 shadow-sm shadow-stone-200/70">
@@ -2142,15 +2144,19 @@ function FullDashboard() {
         )}
 
         <DashboardZone title="Dnes řešit" description={dashboardProfile.todayDescription}>
-          <QuickActions onNavigate={(path) => {
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px] 2xl:grid-cols-[minmax(0,1fr)_430px] xl:items-start">
+            <div className="xl:order-2 xl:sticky xl:top-4">
+              <QuickActions onNavigate={(path) => {
             if (path === 'fault') {
               setActiveModal('fault');
               return;
             }
             navigate(path);
-          }} />
+              }} />
+            </div>
 
-          <OperationalAlerts
+            <div className="space-y-4 xl:order-1">
+              <OperationalAlerts
             newKioskTasks={(stats as any).newKioskTasks || 0}
             criticalTasks={stats.criticalTasks || 0}
             overdueTasks={(stats as any).overdueTasks || 0}
@@ -2162,7 +2168,7 @@ function FullDashboard() {
             onNavigate={navigate}
           />
 
-          <DailyOperations
+              <DailyOperations
             openTasks={stats.openTasks || 0}
             criticalTasks={stats.criticalTasks || 0}
             overdueTasks={(stats as any).overdueTasks || 0}
@@ -2170,9 +2176,13 @@ function FullDashboard() {
             todayMinutes={todayOps.todayMinutes}
             todayDefects={todayOps.todayDefects}
             onNavigate={navigate}
-          />
+              />
+            </div>
+          </div>
         </DashboardZone>
 
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)] 2xl:grid-cols-[minmax(0,1.5fr)_minmax(430px,0.7fr)] xl:items-start">
+          <main className="order-2 space-y-5 xl:order-1">
         <DashboardZone title="Moje sledování" description={dashboardProfile.watchDescription}>
           <div className="mb-3 flex justify-end">
             <button
@@ -2218,8 +2228,14 @@ function FullDashboard() {
             </>
           )}
         </DashboardZone>
+          </main>
 
-        <section className="mb-5 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm shadow-stone-200/70">
+          <aside className="order-1 space-y-5 xl:order-2 xl:sticky xl:top-4">
+        <DashboardZone title="Moduly" description="Kompaktni menu podle opravneni a role.">
+          <ModuleShortcuts onNavigate={navigate} />
+        </DashboardZone>
+
+        <section className="rounded-2xl border border-stone-200 bg-white p-3 shadow-sm shadow-stone-200/70">
           <button
             type="button"
             onClick={() => setShowMorePanels((value) => !value)}
@@ -2247,8 +2263,6 @@ function FullDashboard() {
                 onNavigate={navigate}
               />
 
-              <ModuleShortcuts onNavigate={navigate} />
-
               <OptionalActivityPanel
                 todayItems={activity.todayItems}
                 weekItems={activity.weekItems}
@@ -2275,6 +2289,8 @@ function FullDashboard() {
             </div>
           )}
         </section>
+          </aside>
+        </div>
       </div>
 
       {/* ACTION MODALS */}
