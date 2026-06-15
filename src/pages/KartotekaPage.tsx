@@ -10,6 +10,7 @@ import {
   ArrowLeft, Building2, Search, Upload, Plus, X,
   ChevronRight, ChevronDown, FileText, Loader2, Trash2,
   ClipboardCheck, Cog, LayoutGrid, ListTree, ArrowUp, ArrowDown,
+  ChevronsUp, ChevronsDown, GripVertical,
 } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
@@ -768,6 +769,8 @@ export default function KartotekaPage() {
   const [routeSavingKey, setRouteSavingKey] = useState<string | null>(null);
   const [routeDraggingKey, setRouteDraggingKey] = useState<string | null>(null);
   const [routeDropKey, setRouteDropKey] = useState<string | null>(null);
+  const [routeAssetDraggingId, setRouteAssetDraggingId] = useState<string | null>(null);
+  const [routeAssetDropId, setRouteAssetDropId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     if (typeof window === 'undefined') return 'tree';
     const saved = window.localStorage.getItem('kartoteka:viewMode');
@@ -1400,8 +1403,8 @@ export default function KartotekaPage() {
       .map((group) => ({
         ...group,
         assets: group.assets.sort((a, b) => {
-          const aKey = `${a.inspectionOrder ?? Number.MAX_SAFE_INTEGER} ${safeText(a.code)} ${safeText(a.name)}`;
-          const bKey = `${b.inspectionOrder ?? Number.MAX_SAFE_INTEGER} ${safeText(b.code)} ${safeText(b.name)}`;
+          const aKey = `${a.inspectionItemOrder ?? Number.MAX_SAFE_INTEGER} ${safeText(a.code)} ${safeText(a.name)}`;
+          const bKey = `${b.inspectionItemOrder ?? Number.MAX_SAFE_INTEGER} ${safeText(b.code)} ${safeText(b.name)}`;
           return aKey.localeCompare(bKey, 'cs');
         }),
         targetIds: group.targetIds.size > 0 ? Array.from(group.targetIds) : group.assets.map((asset) => asset.id),
@@ -1436,11 +1439,12 @@ export default function KartotekaPage() {
     );
   }, [saveRouteGroupOrder]);
 
-  const reorderRouteGroup = useCallback(async (sourceKey: string, targetKey: string) => {
-    if (!canManageRoute || sourceKey === targetKey) return;
+  const moveRouteGroupToIndex = useCallback(async (sourceKey: string, requestedTargetIndex: number) => {
+    if (!canManageRoute) return;
     const sourceIndex = routeGroups.findIndex((group) => group.key === sourceKey);
-    const targetIndex = routeGroups.findIndex((group) => group.key === targetKey);
-    if (sourceIndex < 0 || targetIndex < 0) return;
+    if (sourceIndex < 0) return;
+    const targetIndex = Math.max(0, Math.min(requestedTargetIndex, routeGroups.length - 1));
+    if (sourceIndex === targetIndex) return;
 
     const nextGroups = [...routeGroups];
     const [moved] = nextGroups.splice(sourceIndex, 1);
@@ -1461,12 +1465,57 @@ export default function KartotekaPage() {
     }
   }, [canManageRoute, reloadAssets, routeGroups, saveRouteGroupSequence]);
 
+  const reorderRouteGroup = useCallback(async (sourceKey: string, targetKey: string) => {
+    if (sourceKey === targetKey) return;
+    const targetIndex = routeGroups.findIndex((group) => group.key === targetKey);
+    if (targetIndex < 0) return;
+    await moveRouteGroupToIndex(sourceKey, targetIndex);
+  }, [moveRouteGroupToIndex, routeGroups]);
+
   const handleMoveRouteGroup = useCallback(async (groupKey: string, direction: -1 | 1) => {
     const index = routeGroups.findIndex((group) => group.key === groupKey);
     const swapIndex = index + direction;
     if (index < 0 || swapIndex < 0 || swapIndex >= routeGroups.length) return;
-    await reorderRouteGroup(groupKey, routeGroups[swapIndex].key);
-  }, [reorderRouteGroup, routeGroups]);
+    await moveRouteGroupToIndex(groupKey, swapIndex);
+  }, [moveRouteGroupToIndex, routeGroups]);
+
+  const saveRouteAssetSequence = useCallback(async (orderedAssets: DisplayAsset[]) => {
+    await Promise.all(
+      orderedAssets
+        .filter((asset) => !asset.isVirtual)
+        .map((asset, index) =>
+          assetService.update(tenantId, asset.id, { inspectionItemOrder: (index + 1) * 1000 })
+        )
+    );
+  }, [tenantId]);
+
+  const reorderRouteAsset = useCallback(async (groupKey: string, sourceAssetId: string, targetAssetId: string) => {
+    if (!canManageRoute || sourceAssetId === targetAssetId) return;
+    const group = routeGroups.find((item) => item.key === groupKey);
+    if (!group) return;
+    const sourceIndex = group.assets.findIndex((asset) => asset.id === sourceAssetId);
+    const targetIndex = group.assets.findIndex((asset) => asset.id === targetAssetId);
+    if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return;
+
+    const nextAssets = [...group.assets];
+    const [moved] = nextAssets.splice(sourceIndex, 1);
+    nextAssets.splice(targetIndex, 0, moved);
+
+    setRouteSavingKey(groupKey);
+    try {
+      await saveRouteAssetSequence(nextAssets);
+      showToast('Pořadí zařízení uloženo.', 'success');
+      reloadAssets();
+    } catch (err) {
+      console.error(err);
+      showToast('Pořadí zařízení se nepodařilo uložit.', 'error');
+    } finally {
+      setRouteSavingKey(null);
+      setRouteAssetDraggingId(null);
+      setRouteAssetDropId(null);
+    }
+  }, [canManageRoute, reloadAssets, routeGroups, saveRouteAssetSequence]);
+
 
   const createParentOptions = useMemo(() => {
     return treeAssets
@@ -1760,15 +1809,8 @@ export default function KartotekaPage() {
                 <section
                   key={group.key}
                   className={`k-route-group ${routeDraggingKey === group.key ? 'is-dragging' : ''} ${routeDropKey === group.key && routeDraggingKey !== group.key ? 'is-drop-target' : ''}`}
-                  draggable={canManageRoute}
-                  onDragStart={(event) => {
-                    if (!canManageRoute) return;
-                    event.dataTransfer.effectAllowed = 'move';
-                    event.dataTransfer.setData('text/plain', group.key);
-                    setRouteDraggingKey(group.key);
-                  }}
                   onDragOver={(event) => {
-                    if (!canManageRoute || !routeDraggingKey || routeDraggingKey === group.key) return;
+                    if (!canManageRoute || routeAssetDraggingId || !routeDraggingKey || routeDraggingKey === group.key) return;
                     event.preventDefault();
                     event.dataTransfer.dropEffect = 'move';
                     setRouteDropKey(group.key);
@@ -1777,18 +1819,15 @@ export default function KartotekaPage() {
                     if (routeDropKey === group.key) setRouteDropKey(null);
                   }}
                   onDrop={(event) => {
-                    if (!canManageRoute) return;
+                    if (!canManageRoute || routeAssetDraggingId) return;
                     event.preventDefault();
-                    const sourceKey = routeDraggingKey || event.dataTransfer.getData('text/plain');
+                    const rawKey = event.dataTransfer.getData('text/plain');
+                    const sourceKey = routeDraggingKey || rawKey.replace(/^route-group:/, '');
                     if (sourceKey) void reorderRouteGroup(sourceKey, group.key);
-                  }}
-                  onDragEnd={() => {
-                    setRouteDraggingKey(null);
-                    setRouteDropKey(null);
                   }}
                 >
                   <div className="k-route-header">
-                    <span>
+                    <span className="k-route-title">
                       {group.title}
                       <small>{group.subtitle}</small>
                     </span>
@@ -1796,7 +1835,33 @@ export default function KartotekaPage() {
                       <small>{group.assets.length} položek</small>
                       {canManageRoute && (
                         <>
-                          <span className="k-route-drag-hint">Přetáhnout</span>
+                          <span
+                            className="k-route-drag-hint"
+                            draggable
+                            onDragStart={(event) => {
+                              event.stopPropagation();
+                              event.dataTransfer.effectAllowed = 'move';
+                              event.dataTransfer.setData('text/plain', `route-group:${group.key}`);
+                              setRouteDraggingKey(group.key);
+                            }}
+                            onDragEnd={() => {
+                              setRouteDraggingKey(null);
+                              setRouteDropKey(null);
+                            }}
+                            title="Přetáhnout místnost v trase"
+                          >
+                            <GripVertical size={14} />
+                            Přetáhnout
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => moveRouteGroupToIndex(group.key, 0)}
+                            disabled={index === 0 || routeSavingKey === group.key}
+                            aria-label="Posunout místnost na začátek"
+                            title="Na začátek"
+                          >
+                            <ChevronsUp size={15} />
+                          </button>
                           <button
                             type="button"
                             onClick={() => handleMoveRouteGroup(group.key, -1)}
@@ -1813,21 +1878,69 @@ export default function KartotekaPage() {
                           >
                             <ArrowDown size={15} />
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => moveRouteGroupToIndex(group.key, routeGroups.length - 1)}
+                            disabled={index === routeGroups.length - 1 || routeSavingKey === group.key}
+                            aria-label="Posunout místnost na konec"
+                            title="Na konec"
+                          >
+                            <ChevronsDown size={15} />
+                          </button>
                         </>
                       )}
                     </div>
                   </div>
                   <div className="k-tile-grid k-route-grid">
                     {group.assets.map((asset) => (
-                      <TileCard
+                      <div
                         key={asset.id}
-                        asset={asset}
-                        allAssets={visibleAssets}
-                        onDetail={handleDetail}
-                        onAddChild={openCreateModal}
-                        onDelete={handleDelete}
-                        canCreateAsset={canCreateAsset}
-                      />
+                        className={`k-route-tile-wrap ${routeAssetDraggingId === asset.id ? 'is-dragging' : ''} ${routeAssetDropId === asset.id && routeAssetDraggingId !== asset.id ? 'is-drop-target' : ''}`}
+                        draggable={canManageRoute}
+                        onDragStart={(event) => {
+                          if (!canManageRoute) return;
+                          event.stopPropagation();
+                          event.dataTransfer.effectAllowed = 'move';
+                          event.dataTransfer.setData('text/plain', `route-asset:${asset.id}`);
+                          setRouteAssetDraggingId(asset.id);
+                        }}
+                        onDragOver={(event) => {
+                          if (!canManageRoute || !routeAssetDraggingId || routeAssetDraggingId === asset.id) return;
+                          event.preventDefault();
+                          event.stopPropagation();
+                          event.dataTransfer.dropEffect = 'move';
+                          setRouteAssetDropId(asset.id);
+                        }}
+                        onDragLeave={() => {
+                          if (routeAssetDropId === asset.id) setRouteAssetDropId(null);
+                        }}
+                        onDrop={(event) => {
+                          if (!canManageRoute) return;
+                          event.preventDefault();
+                          event.stopPropagation();
+                          const rawId = event.dataTransfer.getData('text/plain');
+                          const sourceAssetId = routeAssetDraggingId || rawId.replace(/^route-asset:/, '');
+                          if (sourceAssetId) void reorderRouteAsset(group.key, sourceAssetId, asset.id);
+                        }}
+                        onDragEnd={() => {
+                          setRouteAssetDraggingId(null);
+                          setRouteAssetDropId(null);
+                        }}
+                      >
+                        {canManageRoute && (
+                          <span className="k-route-tile-grip" title="Přetáhnout zařízení">
+                            <GripVertical size={14} />
+                          </span>
+                        )}
+                        <TileCard
+                          asset={asset}
+                          allAssets={visibleAssets}
+                          onDetail={handleDetail}
+                          onAddChild={openCreateModal}
+                          onDelete={handleDelete}
+                          canCreateAsset={canCreateAsset}
+                        />
+                      </div>
                     ))}
                   </div>
                 </section>

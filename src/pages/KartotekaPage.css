@@ -1436,13 +1436,8 @@ select.k-input {
   transition: border-color 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease, transform 0.16s ease;
 }
 
-.kartoteka-page .k-route-group[draggable='true'] {
-  cursor: grab;
-}
-
 .kartoteka-page .k-route-group.is-dragging {
   opacity: 0.55;
-  cursor: grabbing;
 }
 
 .kartoteka-page .k-route-group.is-drop-target {
@@ -1461,7 +1456,7 @@ select.k-input {
   font-weight: 950;
 }
 
-.kartoteka-page .k-route-header > span {
+.kartoteka-page .k-route-title {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -1475,7 +1470,7 @@ select.k-input {
   font-weight: 800;
 }
 
-.kartoteka-page .k-route-header > span small {
+.kartoteka-page .k-route-title small {
   font-size: 0.76rem;
 }
 
@@ -1488,6 +1483,9 @@ select.k-input {
 }
 
 .kartoteka-page .k-route-drag-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   padding: 7px 10px;
   border: 1px dashed #cbbfae;
   border-radius: 999px;
@@ -1495,6 +1493,12 @@ select.k-input {
   font-size: 0.76rem;
   font-weight: 800;
   white-space: nowrap;
+  cursor: grab;
+  user-select: none;
+}
+
+.kartoteka-page .k-route-drag-hint:active {
+  cursor: grabbing;
 }
 
 .kartoteka-page .k-route-actions button {
@@ -1515,7 +1519,49 @@ select.k-input {
 }
 
 .kartoteka-page .k-route-grid {
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+}
+
+.kartoteka-page .k-route-tile-wrap {
+  position: relative;
+  min-width: 0;
+  border-radius: 14px;
+  transition: box-shadow 0.16s ease, transform 0.16s ease, opacity 0.16s ease;
+}
+
+.kartoteka-page .k-route-tile-wrap[draggable='true'] {
+  cursor: grab;
+}
+
+.kartoteka-page .k-route-tile-wrap.is-dragging {
+  opacity: 0.55;
+  cursor: grabbing;
+}
+
+.kartoteka-page .k-route-tile-wrap.is-drop-target {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.22);
+  transform: translateY(-2px);
+}
+
+.kartoteka-page .k-route-tile-wrap > .k-tile-card {
+  height: 100%;
+}
+
+.kartoteka-page .k-route-tile-grip {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  width: 26px;
+  height: 26px;
+  border: 1px solid #e1d6c7;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #64748b;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
 }
 
 .kartoteka-page .k-tile-card {
