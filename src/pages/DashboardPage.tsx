@@ -370,6 +370,70 @@ function ModuleShortcuts({ onNavigate, showHeader = true }: { onNavigate: (path:
   );
 }
 
+function FavoriteModules({ onNavigate }: { onNavigate: (path: string) => void }) {
+  const { hasPermission, user } = useAuthContext();
+  const canAny = (permissions: string[]) => permissions.some((permission) => hasPermission(permission));
+
+  const modules = [
+    { id: 'kartoteka', label: 'Kartoteka', path: '/kartoteka', icon: Building2, tone: 'text-sky-600', permissions: ['asset.read'] },
+    { id: 'tasks', label: 'Ukoly', path: '/tasks', icon: Wrench, tone: 'text-amber-600', permissions: ['wo.read', 'wo.create', 'wo.update'] },
+    { id: 'work-diary', label: 'Denik praci', path: '/work-diary', icon: FileText, tone: 'text-emerald-700', permissions: ['wo.read', 'wo.create', 'wo.update'] },
+    { id: 'inspections', label: 'Kontroly', path: '/inspections', icon: ClipboardCheck, tone: 'text-cyan-600', permissions: ['asset.read', 'weekly.modify'] },
+    { id: 'gearboxes', label: 'Prevodovky', path: '/gearboxes', icon: Cog, tone: 'text-violet-600', permissions: ['gearbox.temperature.write', 'gearbox.manage', 'asset.update', 'asset.read'] },
+    { id: 'dataloggers', label: 'Datalogery', path: '/dataloggers', icon: Thermometer, tone: 'text-cyan-700', permissions: ['datalogger.read', 'datalogger.temperature.write', 'datalogger.manage'] },
+    { id: 'inventory', label: 'Sklad ND', path: '/inventory', icon: Package, tone: 'text-orange-600', permissions: ['inv.consume', 'inv.restock', 'inv.manage', 'inv.order', 'report.read'] },
+    { id: 'production', label: 'Vyroba', path: '/production', icon: Factory, tone: 'text-emerald-700', permissions: ['production.read', 'production.manage'] },
+    { id: 'warehouse', label: 'Sklad vyroby', path: '/warehouse', icon: Package, tone: 'text-emerald-700', permissions: ['warehouse.view'] },
+    { id: 'shifts', label: 'Smeny', path: '/shifts', icon: Users, tone: 'text-violet-600', permissions: ['shifts.view', 'shifts.manage'] },
+    { id: 'reports', label: 'Reporty', path: '/reports', icon: BarChart3, tone: 'text-violet-600', permissions: ['report.read', 'audit.read'] },
+    { id: 'admin', label: 'Admin', path: '/admin', icon: Settings, tone: 'text-slate-600', permissions: ['admin.view', 'admin.manage', 'user.manage'] },
+  ];
+
+  const roleFavorites: Record<string, string[]> = {
+    SUPERADMIN: ['kartoteka', 'tasks', 'inspections', 'gearboxes', 'production', 'admin'],
+    MAJITEL: ['kartoteka', 'tasks', 'reports', 'gearboxes', 'inventory', 'production'],
+    VEDENI: ['tasks', 'reports', 'inspections', 'kartoteka', 'inventory', 'shifts'],
+    UDRZBA: ['tasks', 'work-diary', 'kartoteka', 'gearboxes', 'dataloggers', 'inspections'],
+    SKLAD: ['inventory', 'dataloggers', 'tasks', 'work-diary', 'kartoteka', 'warehouse'],
+    VYROBA: ['production', 'tasks', 'work-diary', 'dataloggers', 'inspections', 'kartoteka'],
+    OPERATOR: ['tasks', 'work-diary', 'dataloggers', 'inspections', 'kartoteka', 'production'],
+  };
+
+  const preferred = roleFavorites[user?.role || 'VYROBA'] ?? roleFavorites.VYROBA;
+  const visible = preferred
+    .map((id) => modules.find((module) => module.id === id))
+    .filter((module): module is NonNullable<typeof module> => Boolean(module && canAny(module.permissions)))
+    .slice(0, 6);
+
+  if (visible.length === 0) return null;
+
+  return (
+    <section className="rounded-2xl border border-stone-200 bg-[#fbf9f4] p-3 shadow-sm shadow-stone-200/70 sm:p-4">
+      <div className="mb-3 flex items-end justify-between gap-3">
+        <div>
+          <div className="text-[10px] font-bold uppercase tracking-widest text-emerald-700">Oblibene moduly</div>
+          <h2 className="mt-0.5 text-lg font-black text-slate-950">Rychly vstup podle role</h2>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-6">
+        {visible.map(({ id, label, path, icon: Icon, tone }) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => onNavigate(path)}
+            className={`${DASH_PANEL} ${DASH_PANEL_HOVER} min-h-[76px] p-3 text-left`}
+          >
+            <span className="mb-2 flex h-9 w-9 items-center justify-center rounded-lg border border-stone-200 bg-stone-50">
+              <Icon className={`h-4 w-4 ${tone}`} />
+            </span>
+            <span className="block text-sm font-black leading-tight text-slate-950">{label}</span>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function dashboardGearboxDate(value: unknown): Date | null {
   if (!value) return null;
   if (value instanceof Date) return value;
@@ -2179,6 +2243,8 @@ function FullDashboard() {
             todayDefects={todayOps.todayDefects}
             onNavigate={navigate}
               />
+
+              <FavoriteModules onNavigate={navigate} />
             </div>
           </div>
         </DashboardZone>
