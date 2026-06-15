@@ -139,6 +139,28 @@ function getRoomLabel(asset: Asset) {
   return safeText(asset.areaName) || safeText(asset.location) || '';
 }
 
+function resolveRouteMeta(asset: DisplayAsset, allAssets: DisplayAsset[]) {
+  const ancestors = collectAncestorIds(asset.id, allAssets)
+    .map((id) => allAssets.find((item) => item.id === id))
+    .filter(Boolean) as DisplayAsset[];
+  const ancestorRoom = ancestors.find((item) => isRoomAsset(item));
+  const roomName = isRoomAsset(asset)
+    ? safeText(asset.name) || safeText(asset.areaName)
+    : getRoomLabel(asset);
+  const matchedRoom = roomName
+    ? allAssets.find((item) => item.id !== asset.id && isRoomAsset(item) && slug(safeText(item.name) || safeText(item.areaName)) === slug(roomName))
+    : undefined;
+  const room = ancestorRoom || matchedRoom;
+  const ancestorBuilding = ancestors.find((item) => isBuildingAsset(item));
+  const building = safeText(asset.buildingId || room?.buildingId || ancestorBuilding?.buildingId).trim();
+  const floor = safeText(asset.floor || room?.floor).trim();
+  return {
+    building,
+    floor: floor || NO_FLOOR,
+    roomName: roomName || safeText(room?.name) || safeText(room?.areaName) || 'Bez místnosti',
+  };
+}
+
 function rootIconLabel(asset: DisplayAsset): string {
   if (asset.virtualKind === 'building' || isBuildingAsset(asset)) {
     return safeText(asset.sourceBuildingId || asset.buildingId || inferBuildingIdFromText(safeText(asset.name), safeText(asset.code))).slice(0, 2).toUpperCase() || 'B';
@@ -1335,27 +1357,29 @@ export default function KartotekaPage() {
   }, [visibleAssets]);
 
   const routeGroups = useMemo(() => {
-    const groups = new Map<string, { key: string; title: string; assets: DisplayAsset[] }>();
-    for (const asset of tileAssets) {
-      const building = safeText(asset.buildingId).trim() || 'Bez budovy';
-      const floor = getFloorLabel(getFloorValue(asset));
-      const key = `${building}::${floor}`;
+    const groups = new Map<string, { key: string; title: string; subtitle: string; assets: DisplayAsset[] }>();
+    for (const asset of tileAssets.filter((item) => !isBuildingAsset(item))) {
+      const meta = resolveRouteMeta(asset, visibleAssets);
+      const buildingLabel = meta.building ? `Budova ${meta.building}` : 'Bez budovy';
+      const floorLabel = getFloorLabel(meta.floor);
+      const key = `${meta.building || 'none'}::${meta.floor}::${slug(meta.roomName)}`;
       if (!groups.has(key)) {
         groups.set(key, {
           key,
-          title: `${building === 'Bez budovy' ? building : `Budova ${building}`} · ${floor}`,
+          title: meta.roomName,
+          subtitle: `${buildingLabel} · ${floorLabel}`,
           assets: [],
         });
       }
       groups.get(key)!.assets.push(asset);
     }
     return Array.from(groups.values());
-  }, [tileAssets]);
+  }, [tileAssets, visibleAssets]);
 
   const currentViewCount = viewMode === 'tree'
     ? rootAssets.length
     : viewMode === 'route'
-      ? tileAssets.length
+      ? routeGroups.length
       : tileAssets.length;
 
   const createParentOptions = useMemo(() => {
@@ -1649,7 +1673,10 @@ export default function KartotekaPage() {
               {routeGroups.map((group) => (
                 <section key={group.key} className="k-route-group">
                   <div className="k-route-header">
-                    <span>{group.title}</span>
+                    <span>
+                      {group.title}
+                      <small>{group.subtitle}</small>
+                    </span>
                     <small>{group.assets.length} položek</small>
                   </div>
                   <div className="k-tile-grid k-route-grid">

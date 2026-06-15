@@ -1408,6 +1408,10 @@ select.k-input {
   align-items: center;
   gap: 8px;
   margin: 8px 0 12px;
+  max-width: 1180px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 0 10px;
 }
 
 .kartoteka-page .k-floor-filters > span {
@@ -1441,10 +1445,22 @@ select.k-input {
   font-weight: 950;
 }
 
+.kartoteka-page .k-route-header > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 1.04rem;
+}
+
 .kartoteka-page .k-route-header small {
   color: #607080;
   font-size: 0.78rem;
   font-weight: 800;
+}
+
+.kartoteka-page .k-route-header > span small {
+  font-size: 0.76rem;
 }
 
 .kartoteka-page .k-tile-card {
