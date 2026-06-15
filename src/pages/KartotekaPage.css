@@ -1463,6 +1463,31 @@ select.k-input {
   font-size: 0.76rem;
 }
 
+.kartoteka-page .k-route-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.kartoteka-page .k-route-actions button {
+  width: 34px;
+  height: 34px;
+  border: 1px solid #d9cfbf;
+  border-radius: 10px;
+  background: #fff;
+  color: #233044;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.kartoteka-page .k-route-actions button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 .kartoteka-page .k-tile-card {
   position: relative;
   min-height: 210px;

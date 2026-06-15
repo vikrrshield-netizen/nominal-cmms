@@ -9,7 +9,7 @@ import { addDoc, collection, doc, serverTimestamp, setDoc, Timestamp } from 'fir
 import {
   ArrowLeft, Building2, Search, Upload, Plus, X,
   ChevronRight, ChevronDown, FileText, Loader2, Trash2,
-  ClipboardCheck, Cog, LayoutGrid, ListTree,
+  ClipboardCheck, Cog, LayoutGrid, ListTree, ArrowUp, ArrowDown,
 } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
@@ -158,6 +158,8 @@ function resolveRouteMeta(asset: DisplayAsset, allAssets: DisplayAsset[]) {
     building,
     floor: floor || NO_FLOOR,
     roomName: roomName || safeText(room?.name) || safeText(room?.areaName) || 'Bez místnosti',
+    roomId: room?.id,
+    order: room?.inspectionOrder ?? asset.inspectionOrder,
   };
 }
 
@@ -761,6 +763,7 @@ export default function KartotekaPage() {
   const [filter, setFilter] = useState<FilterKey>('all');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [showImport, setShowImport] = useState(false);
+  const [routeSavingKey, setRouteSavingKey] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     if (typeof window === 'undefined') return 'tree';
     const saved = window.localStorage.getItem('kartoteka:viewMode');
@@ -1357,23 +1360,52 @@ export default function KartotekaPage() {
   }, [visibleAssets]);
 
   const routeGroups = useMemo(() => {
-    const groups = new Map<string, { key: string; title: string; subtitle: string; assets: DisplayAsset[] }>();
+    const groups = new Map<string, {
+      key: string;
+      title: string;
+      subtitle: string;
+      assets: DisplayAsset[];
+      order: number;
+      fallbackKey: string;
+      targetIds: Set<string>;
+    }>();
     for (const asset of tileAssets.filter((item) => !isBuildingAsset(item))) {
       const meta = resolveRouteMeta(asset, visibleAssets);
       const buildingLabel = meta.building ? `Budova ${meta.building}` : 'Bez budovy';
       const floorLabel = getFloorLabel(meta.floor);
       const key = `${meta.building || 'none'}::${meta.floor}::${slug(meta.roomName)}`;
+      const fallbackKey = `${meta.building || ''} ${meta.floor} ${safeText(asset.code)} ${meta.roomName}`;
       if (!groups.has(key)) {
         groups.set(key, {
           key,
           title: meta.roomName,
-          subtitle: `${buildingLabel} · ${floorLabel}`,
+          subtitle: `${buildingLabel} - ${floorLabel}`,
           assets: [],
+          order: meta.order ?? Number.MAX_SAFE_INTEGER,
+          fallbackKey,
+          targetIds: new Set<string>(),
         });
       }
-      groups.get(key)!.assets.push(asset);
+      const group = groups.get(key)!;
+      group.assets.push(asset);
+      if (meta.roomId) group.targetIds.add(meta.roomId);
+      if (meta.order !== undefined) group.order = Math.min(group.order, meta.order);
+      if (fallbackKey.localeCompare(group.fallbackKey, 'cs') < 0) group.fallbackKey = fallbackKey;
     }
-    return Array.from(groups.values());
+    return Array.from(groups.values())
+      .map((group) => ({
+        ...group,
+        assets: group.assets.sort((a, b) => {
+          const aKey = `${a.inspectionOrder ?? Number.MAX_SAFE_INTEGER} ${safeText(a.code)} ${safeText(a.name)}`;
+          const bKey = `${b.inspectionOrder ?? Number.MAX_SAFE_INTEGER} ${safeText(b.code)} ${safeText(b.name)}`;
+          return aKey.localeCompare(bKey, 'cs');
+        }),
+        targetIds: group.targetIds.size > 0 ? Array.from(group.targetIds) : group.assets.map((asset) => asset.id),
+      }))
+      .sort((a, b) => {
+        if (a.order !== b.order) return a.order - b.order;
+        return a.fallbackKey.localeCompare(b.fallbackKey, 'cs');
+      });
   }, [tileAssets, visibleAssets]);
 
   const currentViewCount = viewMode === 'tree'
@@ -1381,6 +1413,44 @@ export default function KartotekaPage() {
     : viewMode === 'route'
       ? routeGroups.length
       : tileAssets.length;
+
+  const saveRouteGroupOrder = useCallback(async (targetIds: string[], order: number) => {
+    await Promise.all(
+      Array.from(new Set(targetIds)).map((assetId) =>
+        assetService.update(tenantId, assetId, { inspectionOrder: order })
+      )
+    );
+  }, [tenantId]);
+
+  const handleMoveRouteGroup = useCallback(async (groupKey: string, direction: -1 | 1) => {
+    const index = routeGroups.findIndex((group) => group.key === groupKey);
+    const swapIndex = index + direction;
+    if (index < 0 || swapIndex < 0 || swapIndex >= routeGroups.length) return;
+
+    const current = routeGroups[index];
+    const other = routeGroups[swapIndex];
+    const getEditableOrder = (order: number, fallbackIndex: number) =>
+      Number.isFinite(order) && order < Number.MAX_SAFE_INTEGER
+        ? order
+        : (fallbackIndex + 1) * 1000;
+    const currentOrder = getEditableOrder(current.order, index);
+    const otherOrder = getEditableOrder(other.order, swapIndex);
+
+    setRouteSavingKey(groupKey);
+    try {
+      await Promise.all([
+        saveRouteGroupOrder(current.targetIds, otherOrder),
+        saveRouteGroupOrder(other.targetIds, currentOrder),
+      ]);
+      showToast('Pořadí kontroly uloženo.', 'success');
+      reloadAssets();
+    } catch (err) {
+      console.error(err);
+      showToast('Pořadí se nepodařilo uložit.', 'error');
+    } finally {
+      setRouteSavingKey(null);
+    }
+  }, [reloadAssets, routeGroups, saveRouteGroupOrder]);
 
   const createParentOptions = useMemo(() => {
     return treeAssets
@@ -1670,14 +1740,36 @@ export default function KartotekaPage() {
             </div>
           ) : viewMode === 'route' ? (
             <div className="k-route-groups">
-              {routeGroups.map((group) => (
+              {routeGroups.map((group, index) => (
                 <section key={group.key} className="k-route-group">
                   <div className="k-route-header">
                     <span>
                       {group.title}
                       <small>{group.subtitle}</small>
                     </span>
-                    <small>{group.assets.length} položek</small>
+                    <div className="k-route-actions">
+                      <small>{group.assets.length} položek</small>
+                      {canCreateAsset && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleMoveRouteGroup(group.key, -1)}
+                            disabled={index === 0 || routeSavingKey === group.key}
+                            aria-label="Posunout mistnost nahoru"
+                          >
+                            <ArrowUp size={15} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleMoveRouteGroup(group.key, 1)}
+                            disabled={index === routeGroups.length - 1 || routeSavingKey === group.key}
+                            aria-label="Posunout mistnost dolu"
+                          >
+                            <ArrowDown size={15} />
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                   <div className="k-tile-grid k-route-grid">
                     {group.assets.map((asset) => (

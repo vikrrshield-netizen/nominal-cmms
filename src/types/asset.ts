@@ -76,6 +76,7 @@ export interface Asset {
   buildingId?: string;
   floor?: string;
   areaName?: string;
+  inspectionOrder?: number;
   gearboxStatus?: 'in_stock' | 'installed' | 'service';
   currentExtruderId?: string | null;
   currentExtruderName?: string | null;
