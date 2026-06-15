@@ -159,6 +159,7 @@ function resolveRouteMeta(asset: DisplayAsset, allAssets: DisplayAsset[]) {
     floor: floor || NO_FLOOR,
     roomName: roomName || safeText(room?.name) || safeText(room?.areaName) || 'Bez místnosti',
     roomId: room?.id,
+    roomIsVirtual: room?.isVirtual,
     order: room?.inspectionOrder ?? asset.inspectionOrder,
   };
 }
@@ -749,9 +750,10 @@ function TileCard({ asset, allAssets, onDetail, onAddChild, onDelete, canCreateA
 export default function KartotekaPage() {
   const navigate = useNavigate();
   const goBack = useBackNavigation('/');
-  const { user, isSandbox } = useAuthContext();
+  const { user, isSandbox, hasPermission } = useAuthContext();
   const tenantId = user?.tenantId ?? 'main_firm';
   const canCreateAsset = !isSandbox && ['SUPERADMIN', 'MAJITEL', 'VEDENI', 'UDRZBA', 'VYROBA'].includes(user?.role || '');
+  const canManageRoute = !isSandbox && hasPermission('asset.update');
 
   // ── Data state ───
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -764,6 +766,8 @@ export default function KartotekaPage() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [showImport, setShowImport] = useState(false);
   const [routeSavingKey, setRouteSavingKey] = useState<string | null>(null);
+  const [routeDraggingKey, setRouteDraggingKey] = useState<string | null>(null);
+  const [routeDropKey, setRouteDropKey] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     if (typeof window === 'undefined') return 'tree';
     const saved = window.localStorage.getItem('kartoteka:viewMode');
@@ -1388,7 +1392,7 @@ export default function KartotekaPage() {
       }
       const group = groups.get(key)!;
       group.assets.push(asset);
-      if (meta.roomId) group.targetIds.add(meta.roomId);
+      if (meta.roomId && !meta.roomIsVirtual) group.targetIds.add(meta.roomId);
       if (meta.order !== undefined) group.order = Math.min(group.order, meta.order);
       if (fallbackKey.localeCompare(group.fallbackKey, 'cs') < 0) group.fallbackKey = fallbackKey;
     }
@@ -1415,33 +1419,36 @@ export default function KartotekaPage() {
       : tileAssets.length;
 
   const saveRouteGroupOrder = useCallback(async (targetIds: string[], order: number) => {
+    const uniqueTargetIds = Array.from(new Set(targetIds)).filter(Boolean);
+    if (uniqueTargetIds.length === 0) return;
     await Promise.all(
-      Array.from(new Set(targetIds)).map((assetId) =>
+      uniqueTargetIds.map((assetId) =>
         assetService.update(tenantId, assetId, { inspectionOrder: order })
       )
     );
   }, [tenantId]);
 
-  const handleMoveRouteGroup = useCallback(async (groupKey: string, direction: -1 | 1) => {
-    const index = routeGroups.findIndex((group) => group.key === groupKey);
-    const swapIndex = index + direction;
-    if (index < 0 || swapIndex < 0 || swapIndex >= routeGroups.length) return;
+  const saveRouteGroupSequence = useCallback(async (orderedGroups: typeof routeGroups) => {
+    await Promise.all(
+      orderedGroups.map((group, index) =>
+        saveRouteGroupOrder(group.targetIds, (index + 1) * 1000)
+      )
+    );
+  }, [saveRouteGroupOrder]);
 
-    const current = routeGroups[index];
-    const other = routeGroups[swapIndex];
-    const getEditableOrder = (order: number, fallbackIndex: number) =>
-      Number.isFinite(order) && order < Number.MAX_SAFE_INTEGER
-        ? order
-        : (fallbackIndex + 1) * 1000;
-    const currentOrder = getEditableOrder(current.order, index);
-    const otherOrder = getEditableOrder(other.order, swapIndex);
+  const reorderRouteGroup = useCallback(async (sourceKey: string, targetKey: string) => {
+    if (!canManageRoute || sourceKey === targetKey) return;
+    const sourceIndex = routeGroups.findIndex((group) => group.key === sourceKey);
+    const targetIndex = routeGroups.findIndex((group) => group.key === targetKey);
+    if (sourceIndex < 0 || targetIndex < 0) return;
 
-    setRouteSavingKey(groupKey);
+    const nextGroups = [...routeGroups];
+    const [moved] = nextGroups.splice(sourceIndex, 1);
+    nextGroups.splice(targetIndex, 0, moved);
+
+    setRouteSavingKey(sourceKey);
     try {
-      await Promise.all([
-        saveRouteGroupOrder(current.targetIds, otherOrder),
-        saveRouteGroupOrder(other.targetIds, currentOrder),
-      ]);
+      await saveRouteGroupSequence(nextGroups);
       showToast('Pořadí kontroly uloženo.', 'success');
       reloadAssets();
     } catch (err) {
@@ -1449,8 +1456,17 @@ export default function KartotekaPage() {
       showToast('Pořadí se nepodařilo uložit.', 'error');
     } finally {
       setRouteSavingKey(null);
+      setRouteDraggingKey(null);
+      setRouteDropKey(null);
     }
-  }, [reloadAssets, routeGroups, saveRouteGroupOrder]);
+  }, [canManageRoute, reloadAssets, routeGroups, saveRouteGroupSequence]);
+
+  const handleMoveRouteGroup = useCallback(async (groupKey: string, direction: -1 | 1) => {
+    const index = routeGroups.findIndex((group) => group.key === groupKey);
+    const swapIndex = index + direction;
+    if (index < 0 || swapIndex < 0 || swapIndex >= routeGroups.length) return;
+    await reorderRouteGroup(groupKey, routeGroups[swapIndex].key);
+  }, [reorderRouteGroup, routeGroups]);
 
   const createParentOptions = useMemo(() => {
     return treeAssets
@@ -1741,7 +1757,36 @@ export default function KartotekaPage() {
           ) : viewMode === 'route' ? (
             <div className="k-route-groups">
               {routeGroups.map((group, index) => (
-                <section key={group.key} className="k-route-group">
+                <section
+                  key={group.key}
+                  className={`k-route-group ${routeDraggingKey === group.key ? 'is-dragging' : ''} ${routeDropKey === group.key && routeDraggingKey !== group.key ? 'is-drop-target' : ''}`}
+                  draggable={canManageRoute}
+                  onDragStart={(event) => {
+                    if (!canManageRoute) return;
+                    event.dataTransfer.effectAllowed = 'move';
+                    event.dataTransfer.setData('text/plain', group.key);
+                    setRouteDraggingKey(group.key);
+                  }}
+                  onDragOver={(event) => {
+                    if (!canManageRoute || !routeDraggingKey || routeDraggingKey === group.key) return;
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = 'move';
+                    setRouteDropKey(group.key);
+                  }}
+                  onDragLeave={() => {
+                    if (routeDropKey === group.key) setRouteDropKey(null);
+                  }}
+                  onDrop={(event) => {
+                    if (!canManageRoute) return;
+                    event.preventDefault();
+                    const sourceKey = routeDraggingKey || event.dataTransfer.getData('text/plain');
+                    if (sourceKey) void reorderRouteGroup(sourceKey, group.key);
+                  }}
+                  onDragEnd={() => {
+                    setRouteDraggingKey(null);
+                    setRouteDropKey(null);
+                  }}
+                >
                   <div className="k-route-header">
                     <span>
                       {group.title}
@@ -1749,13 +1794,14 @@ export default function KartotekaPage() {
                     </span>
                     <div className="k-route-actions">
                       <small>{group.assets.length} položek</small>
-                      {canCreateAsset && (
+                      {canManageRoute && (
                         <>
+                          <span className="k-route-drag-hint">Přetáhnout</span>
                           <button
                             type="button"
                             onClick={() => handleMoveRouteGroup(group.key, -1)}
                             disabled={index === 0 || routeSavingKey === group.key}
-                            aria-label="Posunout mistnost nahoru"
+                            aria-label="Posunout místnost nahoru"
                           >
                             <ArrowUp size={15} />
                           </button>
@@ -1763,7 +1809,7 @@ export default function KartotekaPage() {
                             type="button"
                             onClick={() => handleMoveRouteGroup(group.key, 1)}
                             disabled={index === routeGroups.length - 1 || routeSavingKey === group.key}
-                            aria-label="Posunout mistnost dolu"
+                            aria-label="Posunout místnost dolů"
                           >
                             <ArrowDown size={15} />
                           </button>

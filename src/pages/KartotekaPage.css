@@ -1433,6 +1433,22 @@ select.k-input {
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.72);
   padding: 12px;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease, transform 0.16s ease;
+}
+
+.kartoteka-page .k-route-group[draggable='true'] {
+  cursor: grab;
+}
+
+.kartoteka-page .k-route-group.is-dragging {
+  opacity: 0.55;
+  cursor: grabbing;
+}
+
+.kartoteka-page .k-route-group.is-drop-target {
+  border-color: #1a6b4f;
+  box-shadow: 0 0 0 3px rgba(26, 107, 79, 0.14);
+  transform: translateY(-2px);
 }
 
 .kartoteka-page .k-route-header {
@@ -1471,6 +1487,16 @@ select.k-input {
   flex: 0 0 auto;
 }
 
+.kartoteka-page .k-route-drag-hint {
+  padding: 7px 10px;
+  border: 1px dashed #cbbfae;
+  border-radius: 999px;
+  color: #516154;
+  font-size: 0.76rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .kartoteka-page .k-route-actions button {
   width: 34px;
   height: 34px;
@@ -1486,6 +1512,10 @@ select.k-input {
 .kartoteka-page .k-route-actions button:disabled {
   opacity: 0.35;
   cursor: not-allowed;
+}
+
+.kartoteka-page .k-route-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
 .kartoteka-page .k-tile-card {
