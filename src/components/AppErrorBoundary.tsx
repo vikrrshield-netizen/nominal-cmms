@@ -63,18 +63,18 @@ class AppErrorBoundaryInner extends Component<BoundaryProps, BoundaryState> {
     if (!this.state.error) return this.props.children;
 
     return (
-      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-4">
-        <div className="w-full max-w-lg rounded-2xl border border-red-500/30 bg-slate-900 p-6 shadow-2xl">
+      <div className="min-h-screen bg-[#f1ece3] text-slate-900 flex items-center justify-center p-4">
+        <div className="w-full max-w-lg rounded-2xl border border-red-200 bg-white p-6 shadow-2xl">
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-xl bg-red-500/15 text-red-300 flex items-center justify-center flex-shrink-0">
+            <div className="w-12 h-12 rounded-xl bg-red-50 text-red-600 flex items-center justify-center flex-shrink-0">
               <AlertTriangle className="w-6 h-6" />
             </div>
             <div className="min-w-0">
               <h1 className="text-xl font-bold">Aplikace narazila na chybu</h1>
-              <p className="text-slate-300 text-sm mt-2">
+              <p className="text-slate-600 text-sm mt-2">
                 Chyba se uložila do administrace do záložky Chyby. Můžeš obnovit stránku a pokračovat.
               </p>
-              <div className="mt-4 rounded-xl bg-black/30 border border-white/10 p-3 text-xs text-slate-400 break-words">
+              <div className="mt-4 rounded-xl bg-slate-50 border border-slate-200 p-3 text-xs text-slate-600 break-words">
                 {this.state.error.message || 'Neznámá chyba'}
               </div>
             </div>
@@ -84,7 +84,7 @@ class AppErrorBoundaryInner extends Component<BoundaryProps, BoundaryState> {
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="h-12 rounded-xl bg-blue-600 hover:bg-blue-500 transition text-white font-semibold flex items-center justify-center gap-2"
+              className="h-12 rounded-xl bg-emerald-600 hover:bg-emerald-700 transition text-white font-semibold flex items-center justify-center gap-2"
             >
               <RefreshCw className="w-4 h-4" />
               Zkusit obnovit
@@ -92,7 +92,7 @@ class AppErrorBoundaryInner extends Component<BoundaryProps, BoundaryState> {
             <button
               type="button"
               onClick={() => { window.location.href = '/'; }}
-              className="h-12 rounded-xl bg-white/10 hover:bg-white/15 transition text-white font-semibold flex items-center justify-center gap-2"
+              className="h-12 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 transition text-slate-700 font-semibold flex items-center justify-center gap-2"
             >
               <Home className="w-4 h-4" />
               Dashboard

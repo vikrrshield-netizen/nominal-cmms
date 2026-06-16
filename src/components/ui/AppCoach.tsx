@@ -180,35 +180,35 @@ export default function AppCoach() {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="flex items-center gap-2 rounded-full border border-blue-400/40 bg-slate-950/95 px-4 py-3 text-sm font-semibold text-blue-100 shadow-2xl shadow-slate-950/40 backdrop-blur hover:border-blue-300 hover:bg-slate-900"
+          className="flex items-center gap-2 rounded-full border border-emerald-600/30 bg-white px-4 py-3 text-sm font-semibold text-emerald-700 shadow-2xl hover:border-emerald-600 hover:bg-emerald-50"
           aria-label="Otevřít rychlou nápovědu"
         >
-          <HelpCircle className="h-5 w-5 text-blue-300" />
+          <HelpCircle className="h-5 w-5 text-emerald-700" />
           <span className="hidden sm:inline">Nápověda</span>
         </button>
       ) : (
-        <section className="w-[calc(100vw-2rem)] max-w-sm rounded-2xl border border-slate-700 bg-slate-950/95 p-4 text-slate-100 shadow-2xl shadow-slate-950/50 backdrop-blur">
+        <section className="w-[calc(100vw-2rem)] max-w-sm rounded-2xl border border-slate-200 bg-white p-4 text-slate-900 shadow-2xl">
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-blue-300">Rychlá orientace</p>
-              <h2 className="mt-1 text-lg font-bold text-white">{content.title}</h2>
+              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Rychlá orientace</p>
+              <h2 className="mt-1 text-lg font-bold text-slate-900">{content.title}</h2>
             </div>
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="rounded-xl border border-slate-700 p-2 text-slate-300 hover:bg-slate-800 hover:text-white"
+              className="rounded-xl border border-slate-200 p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
               aria-label="Zavřít rychlou nápovědu"
             >
               <X className="h-4 w-4" />
             </button>
           </div>
 
-          <p className="text-sm leading-6 text-slate-300">{content.lead}</p>
+          <p className="text-sm leading-6 text-slate-700">{content.lead}</p>
 
-          <ul className="mt-3 space-y-2 text-sm text-slate-300">
+          <ul className="mt-3 space-y-2 text-sm text-slate-600">
             {content.points.map((point) => (
               <li key={point} className="flex gap-2">
-                <ChevronRight className="mt-0.5 h-4 w-4 flex-none text-blue-300" />
+                <ChevronRight className="mt-0.5 h-4 w-4 flex-none text-emerald-700" />
                 <span>{point}</span>
               </li>
             ))}
@@ -223,14 +223,14 @@ export default function AppCoach() {
                   navigate(action.path);
                   setOpen(false);
                 }}
-                className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-left text-sm font-semibold text-slate-100 hover:border-blue-400 hover:bg-slate-800"
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-left text-sm font-semibold text-slate-900 hover:border-emerald-600 hover:bg-slate-50"
               >
                 {action.label}
               </button>
             ))}
           </div>
 
-          <div className="mt-4 flex items-center gap-3 border-t border-slate-800 pt-3 text-xs text-slate-400">
+          <div className="mt-4 flex items-center gap-3 border-t border-slate-200 pt-3 text-xs text-slate-500">
             <Search className="h-4 w-4 text-slate-500" />
             <NotebookPen className="h-4 w-4 text-slate-500" />
             <Package className="h-4 w-4 text-slate-500" />
