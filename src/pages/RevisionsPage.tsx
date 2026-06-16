@@ -94,8 +94,8 @@ export default function RevisionsPage() {
           ]} />
         <div className="flex justify-between items-center gap-3">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-              <Shield className="w-6 h-6 text-blue-400" />
+            <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+              <Shield className="w-6 h-6 text-emerald-700" />
               Revize
             </h1>
             {alertCount > 0 && (
@@ -139,7 +139,7 @@ export default function RevisionsPage() {
             onClick={() => setFilterStatus('all')}
             className={`vik-card-soft p-3 text-center ${filterStatus === 'all' ? 'border-blue-500' : ''}`}
           >
-            <div className="text-2xl font-bold text-white">{stats.total}</div>
+            <div className="text-2xl font-bold text-slate-900">{stats.total}</div>
             <div className="text-xs vik-muted">Celkem</div>
           </button>
           <button
@@ -269,7 +269,7 @@ function RevisionCard({ revision, onClick }: { revision: Revision; onClick: () =
             </span>
             <span className="text-xs text-slate-400">{typeCfg.label}</span>
           </div>
-          <h4 className="font-medium text-white truncate">{revision.title}</h4>
+          <h4 className="font-medium text-slate-900 truncate">{revision.title}</h4>
           <div className="flex items-center gap-3 mt-1 text-xs vik-muted">
             <span>{revision.assetName}</span>
             <span>•</span>
@@ -332,20 +332,20 @@ function RevisionDetailModal({ revision, onClose, canEdit, canDelete, onLog }: {
     <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={onClose}>
       <div className="vik-card rounded-t-2xl md:rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         {/* Header */}
-        <div className="sticky top-0 bg-slate-900/95 border-b border-white/10 p-4 flex items-center justify-between">
+        <div className="sticky top-0 bg-white border-b border-slate-200 p-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <span className="text-3xl">{typeCfg.icon}</span>
             <span className={`px-2 py-1 rounded-lg text-sm font-bold ${statusCfg.bgColor} ${statusCfg.color}`}>
               {statusCfg.label}
             </span>
           </div>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-white/10">
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <div className="p-4 space-y-4">
-          <h2 className="text-xl font-bold text-white">{revision.title}</h2>
+          <h2 className="text-xl font-bold text-slate-900">{revision.title}</h2>
 
           {/* Status big display */}
           <div className={`p-6 rounded-xl text-center ${statusCfg.bgColor}`}>
@@ -447,7 +447,7 @@ function RevisionDetailModal({ revision, onClose, canEdit, canDelete, onLog }: {
           )}
 
           {showLogForm && (
-            <div className="border-t border-white/10 pt-4 space-y-3">
+            <div className="border-t border-slate-200 pt-4 space-y-3">
               <div className="text-sm font-bold text-slate-700">Zápis nové revize</div>
               <input
                 type="date"
