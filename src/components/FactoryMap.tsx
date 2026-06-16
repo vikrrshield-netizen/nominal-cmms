@@ -21,8 +21,8 @@ export const FactoryMap = ({ onRoomSelect, selectedRoomId }: FactoryMapProps) =>
 
   return (
     <div className="space-y-4">
-      <div className="bg-slate-800 rounded-2xl p-4 border border-slate-700">
-        <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+      <div className="bg-white rounded-2xl p-4 border border-slate-200">
+        <h3 className="text-slate-900 font-semibold mb-3 flex items-center gap-2">
           <span>🏭</span> {appConfig.COMPANY_NAME} - {appConfig.COMPANY_ADDRESS}
         </h3>
         
@@ -34,13 +34,13 @@ export const FactoryMap = ({ onRoomSelect, selectedRoomId }: FactoryMapProps) =>
               className={`
                 relative p-3 rounded-xl transition-all duration-200
                 ${selectedBuilding === building.id 
-                  ? 'ring-2 ring-white scale-105' 
+                  ? 'ring-2 ring-emerald-500 scale-105' 
                   : 'hover:scale-102'}
               `}
               style={{ backgroundColor: building.color + '40', borderColor: building.color }}
             >
-              <div className="text-2xl font-bold text-white">{building.shortName}</div>
-              <div className="text-xs text-white/70 truncate">{building.name}</div>
+              <div className="text-2xl font-bold text-slate-900">{building.shortName}</div>
+              <div className="text-xs text-slate-600 truncate">{building.name}</div>
               <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-slate-900 text-xs text-white flex items-center justify-center">
                 {getBuildingRooms(building.id).length}
               </div>
@@ -65,8 +65,8 @@ export const FactoryMap = ({ onRoomSelect, selectedRoomId }: FactoryMapProps) =>
       </div>
 
       {selectedBuilding && (
-        <div className="bg-slate-800 rounded-2xl p-4 border border-slate-700">
-          <h4 className="text-white font-semibold mb-3">
+        <div className="bg-white rounded-2xl p-4 border border-slate-200">
+          <h4 className="text-slate-900 font-semibold mb-3">
             Budova {selectedBuilding} - {BUILDINGS.find(b => b.id === selectedBuilding)?.name}
           </h4>
           <div className="grid gap-2">
@@ -81,12 +81,12 @@ export const FactoryMap = ({ onRoomSelect, selectedRoomId }: FactoryMapProps) =>
                   className={`
                     flex items-center gap-3 p-3 rounded-xl text-left transition-all
                     ${zoneStyle.bg} border ${zoneStyle.border}
-                    ${isSelected ? 'ring-2 ring-white' : 'hover:brightness-110'}
+                    ${isSelected ? 'ring-2 ring-emerald-500' : 'hover:brightness-110'}
                   `}
                 >
                   <span className="text-xl">{CATEGORY_ICONS[room.category]}</span>
                   <div className="flex-1">
-                    <div className="text-white font-medium">{room.name}</div>
+                    <div className="text-slate-900 font-medium">{room.name}</div>
                     <div className="text-xs text-slate-400">
                       {room.id} • {room.floor === 0 ? 'Přízemí' : `${room.floor}. NP`}
                     </div>
@@ -102,8 +102,8 @@ export const FactoryMap = ({ onRoomSelect, selectedRoomId }: FactoryMapProps) =>
       )}
 
       {!selectedBuilding && (
-        <div className="bg-slate-800 rounded-2xl p-4 border border-slate-700">
-          <h4 className="text-white font-semibold mb-3">⚡ Kritické prostory</h4>
+        <div className="bg-white rounded-2xl p-4 border border-slate-200">
+          <h4 className="text-slate-900 font-semibold mb-3">⚡ Kritické prostory</h4>
           <div className="grid grid-cols-2 gap-2">
             {ROOMS.filter(r => ['D-EXT', 'D-VEL', 'D-MIC', 'D-BAL', 'D-KOT', 'D-KOM', 'E-DIL', 'E-SND'].includes(r.id)).map((room) => {
               const zoneStyle = ZONE_COLORS[room.zone];
@@ -120,7 +120,7 @@ export const FactoryMap = ({ onRoomSelect, selectedRoomId }: FactoryMapProps) =>
                   `}
                 >
                   <span>{CATEGORY_ICONS[room.category]}</span>
-                  <span className="text-white truncate">{room.name}</span>
+                  <span className="text-slate-900 truncate">{room.name}</span>
                 </button>
               );
             })}
