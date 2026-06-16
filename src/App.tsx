@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuthContext } from './context/AuthContext';
 import { LoadingSpinner } from './components/ui';
 import AppCoach from './components/ui/AppCoach';
+import AppShell from './components/AppShell';
 import ToastContainer, { showToast } from './components/ui/Toast';
 import { AppErrorBoundary, AppErrorListeners } from './components/AppErrorBoundary';
 import { useTenantSettings } from './hooks/useTenantSettings';
@@ -169,9 +170,10 @@ function ProtectedRoutes() {
     );
   }
 
-  // Normal app routes
+  // Normal app routes — na PC obaleno boční lištou (AppShell), na mobilu beze změny
   return (
     <Suspense fallback={<PageLoading />}>
+      <AppShell>
       <Routes>
         <Route path="/" element={<DashboardPage />} />
         <Route path="/inspection" element={<ProtectedPage moduleId="inspections" permissions={['asset.read', 'weekly.modify']}><BuildingInspectionPage /></ProtectedPage>} />
@@ -218,6 +220,7 @@ function ProtectedRoutes() {
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </AppShell>
       <AppCoach />
     </Suspense>
   );
