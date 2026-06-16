@@ -296,16 +296,16 @@ export default function NoticeboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 pb-24">
+    <div className="min-h-screen bg-[#f1ece3] pb-24">
       {/* Header */}
-      <div className="bg-slate-800/80 backdrop-blur-sm border-b border-slate-700/50 px-4 py-4 sticky top-0 z-20">
+      <div className="bg-white border-b border-slate-200 px-4 py-4 sticky top-0 z-20">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
-            <button onClick={() => goBack()} className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition">
+            <button onClick={() => goBack()} className="p-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 transition">
               <ArrowLeft className="w-5 h-5 text-slate-400" />
             </button>
             <div>
-              <h1 className="text-lg font-bold text-white">Nástěnka</h1>
+              <h1 className="text-lg font-bold text-slate-900">Nástěnka</h1>
               <p className="text-xs text-slate-500">{posts.length} zpráv</p>
             </div>
           </div>
@@ -319,7 +319,7 @@ export default function NoticeboardPage() {
             </button>
             <button
               onClick={() => setShowNew(true)}
-              className="px-3 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-500 transition flex items-center gap-1.5"
+              className="px-3 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 transition flex items-center gap-1.5"
             >
               <Send className="w-4 h-4" />
               <span className="hidden sm:inline">Přidat</span>
@@ -332,7 +332,7 @@ export default function NoticeboardPage() {
           <button
             onClick={() => setFilterCat('all')}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition ${
-              filterCat === 'all' ? 'bg-white text-slate-900' : 'bg-white/5 text-slate-400'
+              filterCat === 'all' ? 'bg-emerald-600 text-white' : 'bg-white border border-slate-200 text-slate-600'
             }`}
           >
             Vše ({posts.length})
@@ -344,7 +344,7 @@ export default function NoticeboardPage() {
                 key={cat}
                 onClick={() => setFilterCat(cat)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition flex items-center gap-1.5 ${
-                  filterCat === cat ? 'bg-white text-slate-900' : 'bg-white/5 text-slate-400'
+                  filterCat === cat ? 'bg-emerald-600 text-white' : 'bg-white border border-slate-200 text-slate-600'
                 }`}
               >
                 <cfg.icon className="w-3 h-3" />
@@ -367,7 +367,7 @@ export default function NoticeboardPage() {
         {!loading && filteredPosts.length === 0 && (
           <div className="text-center py-16">
             <MessageSquare className="w-14 h-14 text-slate-600 mx-auto mb-3" />
-            <h3 className="text-lg font-bold text-white mb-1">Žádné zprávy</h3>
+            <h3 className="text-lg font-bold text-slate-900 mb-1">Žádné zprávy</h3>
             <p className="text-slate-500 text-sm">
               {filterCat !== 'all' ? 'V této kategorii nejsou žádné zprávy' : 'Nástěnka je prázdná'}
             </p>
@@ -383,7 +383,7 @@ export default function NoticeboardPage() {
           return (
             <div
               key={post.id}
-              className={`bg-slate-800/60 backdrop-blur-sm rounded-2xl border overflow-hidden transition ${catCfg.border} ${
+              className={`bg-white rounded-2xl border overflow-hidden transition ${catCfg.border} ${
                 post.pinned ? 'ring-1 ring-amber-500/30' : ''
               }`}
             >
@@ -428,7 +428,7 @@ export default function NoticeboardPage() {
               {/* Footer */}
               <div className="px-4 pb-3 flex items-center justify-between">
                 <div className="flex items-center gap-2 text-xs text-slate-500">
-                  <div className="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-[10px] font-bold text-slate-400">
+                  <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-600">
                     {post.fromName.split(' ').map(w => w[0]).join('').slice(0, 2)}
                   </div>
                   <span className="font-medium">{post.fromName}</span>
@@ -458,15 +458,15 @@ export default function NoticeboardPage() {
 
       {/* ═══ NEW POST MODAL ═══ */}
       {showNew && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-[9999] flex items-end sm:items-center justify-center" onClick={() => setShowNew(false)}>
+        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-end sm:items-center justify-center" onClick={() => setShowNew(false)}>
           <div
-            className="bg-slate-800 rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-white/10"
+            className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-slate-200"
             onClick={e => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-white/10">
-              <h2 className="text-xl font-bold text-white">Nová zpráva</h2>
-              <button onClick={() => setShowNew(false)} className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-slate-400 hover:text-white transition">
+            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-200">
+              <h2 className="text-xl font-bold text-slate-900">Nová zpráva</h2>
+              <button onClick={() => setShowNew(false)} className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-700 transition">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -483,7 +483,7 @@ export default function NoticeboardPage() {
                       className={`py-2.5 rounded-xl text-xs font-semibold transition border flex flex-col items-center gap-1 ${
                         category === cat
                           ? `${cfg.bg} ${cfg.color} ${cfg.border}`
-                          : 'bg-white/5 border-white/10 text-slate-500'
+                          : 'bg-white border border-slate-200 text-slate-500'
                       }`}
                     >
                       <cfg.icon className="w-4 h-4" />
@@ -499,12 +499,12 @@ export default function NoticeboardPage() {
                 <select
                   value={recipientId}
                   onChange={e => setRecipientId(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-blue-500/50 transition"
+                  className="w-full px-4 py-3 rounded-xl bg-[#fbf9f4] border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-emerald-600 transition"
                   style={{ appearance: 'auto' }}
                 >
-                  <option value="all" className="bg-slate-800">Všichni</option>
+                  <option value="all" className="bg-white">Všichni</option>
                   {allUsers.filter(u => u.id !== uid).map(u => (
-                    <option key={u.id} value={u.id} className="bg-slate-800">{u.displayName}</option>
+                    <option key={u.id} value={u.id} className="bg-white">{u.displayName}</option>
                   ))}
                 </select>
               </div>
@@ -519,7 +519,7 @@ export default function NoticeboardPage() {
                     placeholder="Napište zprávu pro tým..."
                     rows={4}
                     autoFocus
-                    className="flex-1 px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-slate-600 focus:outline-none focus:border-blue-500/50 transition resize-none"
+                    className="flex-1 px-4 py-3 rounded-xl bg-[#fbf9f4] border border-slate-200 text-slate-900 text-sm placeholder-slate-400 focus:outline-none focus:border-emerald-600 transition resize-none"
                   />
                   <div className="pt-2">
                     <MicButton onTranscript={t => setContent(prev => prev ? prev + ' ' + t : t)} />
@@ -543,18 +543,18 @@ export default function NoticeboardPage() {
 
       {/* ═══ SHIFT HANDOVER MODAL ═══ */}
       {showShift && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-[9999] flex items-end sm:items-center justify-center" onClick={() => setShowShift(false)}>
+        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-end sm:items-center justify-center" onClick={() => setShowShift(false)}>
           <div
-            className="bg-slate-800 rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-white/10"
+            className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-slate-200"
             onClick={e => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-white/10">
+            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-200">
               <div className="flex items-center gap-2">
                 <RefreshCw className="w-5 h-5 text-amber-400" />
-                <h2 className="text-xl font-bold text-white">Předat směnu</h2>
+                <h2 className="text-xl font-bold text-slate-900">Předat směnu</h2>
               </div>
-              <button onClick={() => setShowShift(false)} className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-slate-400 hover:text-white transition">
+              <button onClick={() => setShowShift(false)} className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-700 transition">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -571,7 +571,7 @@ export default function NoticeboardPage() {
                       className={`py-3 rounded-xl text-xs font-semibold transition border text-center ${
                         shiftPreset === i
                           ? 'bg-amber-500/20 border-amber-500/30 text-amber-400'
-                          : 'bg-white/5 border-white/10 text-slate-500'
+                          : 'bg-white border border-slate-200 text-slate-500'
                       }`}
                     >
                       {preset.label}
@@ -615,7 +615,7 @@ export default function NoticeboardPage() {
                     onChange={e => setShiftNotes(e.target.value)}
                     placeholder="Co je potřeba vědět pro další směnu..."
                     rows={4}
-                    className="flex-1 px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-slate-600 focus:outline-none focus:border-amber-500/50 transition resize-none"
+                    className="flex-1 px-4 py-3 rounded-xl bg-[#fbf9f4] border border-slate-200 text-slate-900 text-sm placeholder-slate-400 focus:outline-none focus:border-emerald-600 transition resize-none"
                   />
                   <div className="pt-2">
                     <MicButton onTranscript={t => setShiftNotes(prev => prev ? prev + ' ' + t : t)} />

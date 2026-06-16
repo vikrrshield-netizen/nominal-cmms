@@ -306,7 +306,7 @@ function CalendarTaskCard({
           >
             {task.priority}
           </span>
-          <span className="text-[13px] font-medium text-white truncate">{task.title}</span>
+          <span className="text-[13px] font-medium text-slate-900 truncate">{task.title}</span>
         </div>
         <div className="flex items-center gap-3 text-[10px] text-slate-500">
           {task.estimatedMinutes && (
@@ -342,7 +342,7 @@ function CalendarTaskCard({
         {onUnschedule && (
           <button
             onClick={onUnschedule}
-            className="p-1 rounded hover:bg-white/10 text-slate-500 hover:text-red-400 transition"
+            className="p-1 rounded hover:bg-slate-100 text-slate-500 hover:text-red-400 transition"
             title="Odebrat z plánu"
           >
             <X className="w-4 h-4" />
@@ -382,16 +382,16 @@ function BacklogPanel({
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-end md:items-center justify-center" onClick={onClose}>
       <div
-        className="bg-slate-800 rounded-t-3xl md:rounded-3xl w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col"
+        className="bg-white rounded-t-3xl md:rounded-3xl w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-white/10">
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <Inbox className="w-5 h-5 text-blue-400" />
+        <div className="flex items-center justify-between p-4 border-b border-slate-200">
+          <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+            <Inbox className="w-5 h-5 text-blue-700" />
             Backlog ({sorted.length})
           </h2>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-white/10 text-slate-400">
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -411,8 +411,8 @@ function BacklogPanel({
                     selectedDay === dayIndex
                       ? 'bg-blue-600 text-white'
                       : isToday
-                      ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30'
-                      : 'bg-white/5 text-slate-400 hover:bg-white/10'
+                      ? 'bg-blue-500/15 text-blue-700 border border-blue-500/30'
+                      : 'bg-slate-50 text-slate-400 hover:bg-slate-100'
                   }`}
                 >
                   {DAY_SHORTS[day.getDay()]} {day.getDate()}.
@@ -445,7 +445,7 @@ function BacklogPanel({
                     >
                       {task.priority}
                     </span>
-                    <span className="text-[13px] font-medium text-white truncate">{task.title}</span>
+                    <span className="text-[13px] font-medium text-slate-900 truncate">{task.title}</span>
                   </div>
                   <div className="flex items-center gap-3 text-[10px] text-slate-500">
                     {task.estimatedMinutes && (
@@ -483,17 +483,17 @@ function VacationCard({ vacation, onCancel }: { vacation: VacationPlan; onCancel
       <div className="flex items-start gap-2">
         <Users className="w-4 h-4 text-emerald-300 mt-0.5 flex-shrink-0" />
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-bold text-white truncate">{vacation.workerName}</div>
-          <div className="text-[11px] text-emerald-200/80">
+          <div className="text-sm font-bold text-slate-900 truncate">{vacation.workerName}</div>
+          <div className="text-[11px] text-emerald-700/80">
             {absenceKindLabel(vacation.kind)} · {start ? formatFullDate(start) : '?'} - {end ? formatFullDate(end) : '?'}
           </div>
-          {vacation.note && <div className="text-xs text-slate-300 mt-1 line-clamp-2">{vacation.note}</div>}
+          {vacation.note && <div className="text-xs text-slate-600 mt-1 line-clamp-2">{vacation.note}</div>}
         </div>
         {onCancel && (
           <button
             type="button"
             onClick={onCancel}
-            className="p-1 rounded hover:bg-white/10 text-slate-500 hover:text-red-300 transition"
+            className="p-1 rounded hover:bg-slate-100 text-slate-500 hover:text-red-300 transition"
             title="Zrušit dovolenou"
           >
             <X className="w-4 h-4" />
@@ -556,15 +556,15 @@ function VacationModal({
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-end md:items-center justify-center" onClick={onClose}>
       <div
-        className="bg-slate-800 rounded-t-3xl md:rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
+        className="bg-white rounded-t-3xl md:rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-4 border-b border-white/10">
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+        <div className="flex items-center justify-between p-4 border-b border-slate-200">
+          <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
             <Users className="w-5 h-5 text-emerald-300" />
             Naplánovat dovolenou
           </h2>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-white/10 text-slate-400">
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -580,10 +580,10 @@ function VacationModal({
               }}
               onFocus={() => setShowEmployeeOptions(true)}
               placeholder="např. Jan Novák"
-              className="mt-1 w-full rounded-xl bg-slate-950/70 border border-white/10 px-3 py-3 text-white outline-none focus:border-emerald-400"
+              className="mt-1 w-full rounded-xl bg-[#fbf9f4] border border-slate-200 px-3 py-3 text-slate-900 outline-none focus:border-emerald-400"
             />
             {showEmployeeOptions && filteredEmployees.length > 0 && (
-              <div className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-xl border border-white/10 bg-slate-950 shadow-2xl">
+              <div className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
                 {filteredEmployees.map((name) => (
                   <button
                     key={name}
@@ -612,7 +612,7 @@ function VacationModal({
             <select
               value={kind}
               onChange={(e) => setKind(e.target.value as VacationPlanKind)}
-              className="mt-1 w-full rounded-xl bg-slate-950/70 border border-white/10 px-3 py-3 text-white outline-none focus:border-emerald-400"
+              className="mt-1 w-full rounded-xl bg-[#fbf9f4] border border-slate-200 px-3 py-3 text-slate-900 outline-none focus:border-emerald-400"
             >
               {ABSENCE_KIND_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
@@ -630,7 +630,7 @@ function VacationModal({
                   setStartDate(e.target.value);
                   if (endDate < e.target.value) setEndDate(e.target.value);
                 }}
-                className="mt-1 w-full rounded-xl bg-slate-950/70 border border-white/10 px-3 py-3 text-white outline-none focus:border-emerald-400"
+                className="mt-1 w-full rounded-xl bg-[#fbf9f4] border border-slate-200 px-3 py-3 text-slate-900 outline-none focus:border-emerald-400"
               />
             </label>
             <label className="block">
@@ -640,7 +640,7 @@ function VacationModal({
                 value={endDate}
                 min={startDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="mt-1 w-full rounded-xl bg-slate-950/70 border border-white/10 px-3 py-3 text-white outline-none focus:border-emerald-400"
+                className="mt-1 w-full rounded-xl bg-[#fbf9f4] border border-slate-200 px-3 py-3 text-slate-900 outline-none focus:border-emerald-400"
               />
             </label>
           </div>
@@ -652,13 +652,13 @@ function VacationModal({
               onChange={(e) => setNote(e.target.value)}
               rows={3}
               placeholder="např. náhrada, směna, poznámka pro výrobu..."
-              className="mt-1 w-full rounded-xl bg-slate-950/70 border border-white/10 px-3 py-3 text-white outline-none focus:border-emerald-400"
+              className="mt-1 w-full rounded-xl bg-[#fbf9f4] border border-slate-200 px-3 py-3 text-slate-900 outline-none focus:border-emerald-400"
             />
           </label>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 p-4 border-t border-white/10">
-          <button type="button" onClick={onClose} className="min-h-12 rounded-xl bg-white/5 border border-white/10 text-slate-300 font-bold">
+        <div className="grid grid-cols-2 gap-2 p-4 border-t border-slate-200">
+          <button type="button" onClick={onClose} className="min-h-12 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 font-bold">
             Zrušit
           </button>
           <button
@@ -835,19 +835,19 @@ export default function CalendarPage() {
   // ─────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-slate-900">
+    <div className="min-h-screen bg-[#f1ece3]">
       <div className="max-w-5xl mx-auto px-3 pt-4 pb-24">
         {/* Header */}
         <div className="flex items-center gap-3 mb-3">
           <button
             onClick={() => goBack()}
-            className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 hover:text-white transition"
+            className="w-9 h-9 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-700 transition"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="flex-1">
-            <h1 className="text-xl font-bold text-white flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-blue-400" />
+            <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-blue-700" />
               Týdenní plán
             </h1>
             <p className="text-xs text-slate-500">
@@ -860,7 +860,7 @@ export default function CalendarPage() {
               setVacationDefaultDate(new Date());
               setShowVacationModal(true);
             }}
-            className="h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 px-3 text-sm font-bold text-emerald-200 flex items-center gap-2"
+            className="h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 px-3 text-sm font-bold text-emerald-700 flex items-center gap-2"
           >
             <Users className="w-4 h-4" />
             Dovolená
@@ -869,29 +869,29 @@ export default function CalendarPage() {
         </div>
 
         {/* Week Navigation */}
-        <div className="bg-white/[0.03] backdrop-blur-sm rounded-2xl border border-white/[0.06] p-4 mb-4">
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 mb-4">
           <div className="flex items-center justify-between">
             <button
               onClick={handlePrevWeek}
-              className="p-2 rounded-lg hover:bg-white/10 text-slate-400 transition"
+              className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 transition"
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
             <div className="text-center">
-              <div className="text-lg font-bold text-white">
+              <div className="text-lg font-bold text-slate-900">
                 Týden {weekNumber} / {currentMonday.getFullYear()}
               </div>
               <div className="text-sm text-slate-500">
                 {formatDate(weekDays[0])} – {formatDate(weekDays[6])}
               </div>
               {isThisWeek ? (
-                <span className="inline-block mt-1 px-2 py-0.5 bg-blue-500/15 text-blue-400 text-[10px] font-medium rounded-full border border-blue-500/30">
+                <span className="inline-block mt-1 px-2 py-0.5 bg-blue-500/15 text-blue-700 text-[10px] font-medium rounded-full border border-blue-500/30">
                   Aktuální týden
                 </span>
               ) : (
                 <button
                   onClick={handleToday}
-                  className="inline-block mt-1 px-2 py-0.5 bg-white/5 text-slate-400 text-[10px] font-medium rounded-full hover:text-white transition"
+                  className="inline-block mt-1 px-2 py-0.5 bg-slate-50 text-slate-400 text-[10px] font-medium rounded-full hover:text-slate-700 transition"
                 >
                   Zpět na dnes
                 </button>
@@ -899,7 +899,7 @@ export default function CalendarPage() {
             </div>
             <button
               onClick={handleNextWeek}
-              className="p-2 rounded-lg hover:bg-white/10 text-slate-400 transition"
+              className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 transition"
             >
               <ChevronRight className="w-5 h-5" />
             </button>
@@ -907,20 +907,20 @@ export default function CalendarPage() {
 
           {/* Stats */}
           <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <div className="bg-white/5 p-2.5 rounded-xl text-center">
-              <div className="text-lg font-bold text-white">{weekTasks.length}</div>
+            <div className="bg-slate-50 p-2.5 rounded-xl text-center">
+              <div className="text-lg font-bold text-slate-900">{weekTasks.length}</div>
               <div className="text-[10px] text-slate-500">Naplánováno</div>
             </div>
-            <div className="bg-white/5 p-2.5 rounded-xl text-center">
-              <div className="text-lg font-bold text-white">{formatMinutes(weekMinutes) || '0h'}</div>
+            <div className="bg-slate-50 p-2.5 rounded-xl text-center">
+              <div className="text-lg font-bold text-slate-900">{formatMinutes(weekMinutes) || '0h'}</div>
               <div className="text-[10px] text-slate-500">Celkem</div>
             </div>
             <button
               onClick={() => setShowBacklog(true)}
               className="bg-blue-500/10 border border-blue-500/20 p-2.5 rounded-xl text-center hover:bg-blue-500/15 transition"
             >
-              <div className="text-lg font-bold text-blue-400">{backlogTasks.length}</div>
-              <div className="text-[10px] text-blue-400/70">V backlogu →</div>
+              <div className="text-lg font-bold text-blue-700">{backlogTasks.length}</div>
+              <div className="text-[10px] text-blue-700/70">V backlogu →</div>
             </button>
             <button
               onClick={() => {
@@ -949,29 +949,29 @@ export default function CalendarPage() {
             return (
               <div
                 key={dayIndex}
-                className={`bg-white/[0.03] backdrop-blur-sm rounded-2xl border overflow-hidden transition ${
+                className={`bg-white rounded-2xl border overflow-hidden transition ${
                   isToday
                     ? 'border-blue-500/40 ring-1 ring-blue-500/20'
-                    : 'border-white/[0.06]'
+                    : 'border-slate-200'
                 } ${isPast ? 'opacity-60' : ''}`}
               >
                 {/* Day header */}
                 <button
                   onClick={() => setExpandedDay(isExpanded ? null : dayIndex)}
-                  className="w-full p-3 flex items-center justify-between hover:bg-white/[0.02] transition"
+                  className="w-full p-3 flex items-center justify-between hover:bg-slate-50 transition"
                 >
                   <div className="flex items-center gap-3">
                     <div
                       className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm ${
                         isToday
                           ? 'bg-blue-600 text-white'
-                          : 'bg-white/5 text-slate-400 border border-white/10'
+                          : 'bg-slate-50 text-slate-400 border border-slate-200'
                       }`}
                     >
                       {date.getDate()}
                     </div>
                     <div className="text-left">
-                      <div className="font-medium text-white text-sm">{DAY_NAMES[dayIndex]}</div>
+                      <div className="font-medium text-slate-900 text-sm">{DAY_NAMES[dayIndex]}</div>
                       <div className="text-[11px] text-slate-500">
                         {dayTasks.length} úkolů{dayMinutes > 0 ? ` · ${formatMinutes(dayMinutes)}` : ''}
                       </div>
@@ -987,7 +987,7 @@ export default function CalendarPage() {
                       <span className="w-2 h-2 rounded-full bg-amber-500" />
                     )}
                     {dayVacations.length > 0 && (
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/25 text-[10px] font-bold text-emerald-200">
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/25 text-[10px] font-bold text-emerald-700">
                         {dayVacations.length}
                       </span>
                     )}
@@ -1001,7 +1001,7 @@ export default function CalendarPage() {
 
                 {/* Expanded tasks */}
                 {isExpanded && (
-                  <div className="px-3 pb-3 border-t border-white/[0.06] pt-2 space-y-2">
+                  <div className="px-3 pb-3 border-t border-slate-200 pt-2 space-y-2">
                     {dayVacations.length > 0 && (
                       <div className="space-y-2">
                         <div className="text-[10px] uppercase tracking-wider font-bold text-emerald-300">Dovolená</div>
@@ -1030,7 +1030,7 @@ export default function CalendarPage() {
                     )}
                     <button
                       onClick={() => setShowBacklog(true)}
-                      className="w-full py-2 border border-dashed border-white/10 rounded-xl text-slate-500 text-sm font-medium hover:border-blue-500/30 hover:text-blue-400 transition flex items-center justify-center gap-2"
+                      className="w-full py-2 border border-dashed border-slate-200 rounded-xl text-slate-500 text-sm font-medium hover:border-blue-500/30 hover:text-blue-700 transition flex items-center justify-center gap-2"
                     >
                       <Plus className="w-4 h-4" /> Přidat z backlogu
                     </button>
@@ -1055,7 +1055,7 @@ export default function CalendarPage() {
             const sunTasks = getTasksForDay(weekDays[0]);
             const weekendCount = satTasks.length + sunTasks.length;
             return (
-              <div className="bg-white/[0.02] rounded-2xl border border-white/[0.04] p-3">
+              <div className="bg-slate-50 rounded-2xl border border-slate-200 p-3">
                 <div className="flex items-center justify-between text-slate-600">
                   <span className="text-sm">Víkend (So–Ne)</span>
                   <span className="text-xs">
