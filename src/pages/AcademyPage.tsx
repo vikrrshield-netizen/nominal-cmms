@@ -330,16 +330,16 @@ function Accordion({ item, isOpen, onToggle }: {
   onToggle: () => void;
 }) {
   return (
-    <div className="border-b border-white/5 last:border-b-0">
+    <div className="border-b border-slate-200 last:border-b-0">
       <button
         onClick={onToggle}
         className="w-full flex items-center justify-between py-3.5 px-1 text-left group"
       >
-        <span className={`text-[14px] font-medium transition ${isOpen ? 'text-white' : 'text-slate-300 group-hover:text-white'}`}>
+        <span className={`text-[14px] font-medium transition ${isOpen ? 'text-slate-900' : 'text-slate-600 group-hover:text-slate-900'}`}>
           {item.title}
         </span>
         <ChevronDown
-          className={`w-4 h-4 text-slate-500 flex-shrink-0 ml-3 transition-transform duration-200 ${isOpen ? 'rotate-180 text-orange-400' : ''}`}
+          className={`w-4 h-4 text-slate-500 flex-shrink-0 ml-3 transition-transform duration-200 ${isOpen ? 'rotate-180 text-emerald-700' : ''}`}
         />
       </button>
       {isOpen && (
@@ -392,15 +392,15 @@ export default function AcademyPage() {
   const totalItems = SECTIONS.reduce((sum, s) => sum + s.items.length, 0);
 
   return (
-    <div className="min-h-screen bg-slate-900 pb-24">
+    <div className="min-h-screen bg-[#f1ece3] pb-24">
       {/* Header */}
-      <div className="bg-slate-800/80 backdrop-blur-sm border-b border-slate-700/50 px-4 py-4 flex items-center gap-3 sticky top-0 z-20">
-        <button onClick={() => goBack()} className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition">
-          <ArrowLeft className="w-5 h-5 text-slate-400" />
+      <div className="bg-white border-b border-slate-200 px-4 py-4 flex items-center gap-3 sticky top-0 z-20">
+        <button onClick={() => goBack()} className="p-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 transition">
+          <ArrowLeft className="w-5 h-5 text-slate-500" />
         </button>
         <div className="flex-1">
-          <h1 className="text-lg font-bold text-white flex items-center gap-2">
-            <Shield className="w-5 h-5 text-blue-400" />
+          <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+            <Shield className="w-5 h-5 text-emerald-700" />
             {appConfig.BRAND_NAME} Academy
           </h1>
           <p className="text-xs text-slate-500">{totalItems} článků — vše offline</p>
@@ -415,14 +415,14 @@ export default function AcademyPage() {
             <button
               onClick={handleStartTraining}
               disabled={startingTraining}
-              className="w-full flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-blue-600/20 to-cyan-600/20 border border-blue-500/40 hover:from-blue-600/30 hover:to-cyan-600/30 transition active:scale-[0.98] disabled:opacity-50"
+              className="w-full flex items-center gap-4 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 transition active:scale-[0.98] disabled:opacity-50"
             >
-              <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-blue-600/30">
+              <div className="w-12 h-12 rounded-xl bg-emerald-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-emerald-600/30">
                 <GraduationCap className="w-6 h-6 text-white" />
               </div>
               <div className="text-left flex-1">
-                <div className="text-[15px] font-semibold text-white">Spustit trenažér</div>
-                <div className="text-xs text-blue-300/70 mt-0.5">
+                <div className="text-[15px] font-semibold text-slate-900">Spustit trenažér</div>
+                <div className="text-xs text-emerald-700 mt-0.5">
                   Bezpečné prostředí pro učení — změny se neukládají
                 </div>
               </div>
@@ -437,13 +437,13 @@ export default function AcademyPage() {
                 <button
                   key={section.id}
                   onClick={() => setActiveSection(section.id)}
-                  className={`w-full flex items-center gap-4 p-4 rounded-2xl bg-slate-800/60 border ${section.borderColor} hover:bg-slate-800/80 transition active:scale-[0.98]`}
+                  className={`w-full flex items-center gap-4 p-4 rounded-2xl bg-white border ${section.borderColor} hover:bg-slate-50 transition active:scale-[0.98]`}
                 >
-                  <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center flex-shrink-0">
+                  <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0">
                     <Icon className={`w-6 h-6 ${section.color}`} />
                   </div>
                   <div className="text-left flex-1">
-                    <div className="text-[15px] font-semibold text-white">{section.label}</div>
+                    <div className="text-[15px] font-semibold text-slate-900">{section.label}</div>
                     <div className="text-xs text-slate-500 mt-0.5">{section.items.length} článků</div>
                   </div>
                   <ChevronDown className="w-5 h-5 text-slate-600 -rotate-90" />
@@ -470,21 +470,21 @@ export default function AcademyPage() {
               {/* Section header */}
               <button
                 onClick={() => setActiveSection(null)}
-                className="flex items-center gap-2 text-sm text-slate-500 hover:text-white transition mb-4"
+                className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 transition mb-4"
               >
                 <ArrowLeft className="w-4 h-4" />
                 Zpět na přehled
               </button>
 
               <div className="flex items-center gap-3 mb-5">
-                <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center">
                   <Icon className={`w-5 h-5 ${section.color}`} />
                 </div>
-                <h2 className="text-lg font-bold text-white">{section.label}</h2>
+                <h2 className="text-lg font-bold text-slate-900">{section.label}</h2>
               </div>
 
               {/* Accordion items */}
-              <div className="bg-slate-800/40 rounded-2xl border border-slate-700/30 px-4 divide-y divide-transparent">
+              <div className="bg-white rounded-2xl border border-slate-200 px-4 divide-y divide-transparent">
                 {section.items.map((item, idx) => {
                   const key = `${section.id}-${idx}`;
                   return (

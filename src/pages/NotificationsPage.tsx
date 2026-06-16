@@ -357,16 +357,11 @@ export default function NotificationsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0f172a]">
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-0 w-[300px] h-[300px] md:w-[500px] md:h-[500px] bg-indigo-500/10 rounded-full blur-[120px]" />
-        <div className="absolute bottom-0 right-0 w-[300px] h-[300px] md:w-[500px] md:h-[500px] bg-purple-500/10 rounded-full blur-[120px]" />
-      </div>
-
+    <div className="min-h-screen bg-[#f1ece3]">
       <div className="relative z-10 pb-24">
         {/* Header */}
         <header className="p-6">
-          <button onClick={() => goBack()} className="flex items-center gap-2 text-slate-400 hover:text-white mb-4 transition">
+          <button onClick={() => goBack()} className="flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-4 transition">
             <ArrowLeft className="w-5 h-5" /> Zpět
           </button>
 
@@ -381,7 +376,7 @@ export default function NotificationsPage() {
                 )}
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-white">Notifikace</h1>
+                <h1 className="text-2xl font-bold text-slate-900">Notifikace</h1>
                 <p className="text-slate-400 text-sm">
                   {loading ? 'Načítám...' : unreadCount > 0 ? `${unreadCount} nepřečtených` : 'Vše přečteno'}
                 </p>
@@ -391,11 +386,11 @@ export default function NotificationsPage() {
             {allNotifications.length > 0 && (
               <div className="flex gap-2">
                 {unreadCount > 0 && (
-                  <button onClick={markAllAsRead} className="flex items-center gap-1 px-3 py-2 bg-white/5 text-slate-400 rounded-xl hover:bg-white/10 text-sm">
+                  <button onClick={markAllAsRead} className="flex items-center gap-1 px-3 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 text-sm">
                     <CheckCheck className="w-4 h-4" /><span className="hidden sm:inline">Přečíst vše</span>
                   </button>
                 )}
-                <button onClick={clearAll} className="flex items-center gap-1 px-3 py-2 bg-red-500/20 text-red-400 rounded-xl hover:bg-red-500/30 text-sm">
+                <button onClick={clearAll} className="flex items-center gap-1 px-3 py-2 bg-red-50 text-red-700 rounded-xl hover:bg-red-100 text-sm">
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
@@ -403,18 +398,18 @@ export default function NotificationsPage() {
           </div>
 
           {/* Tabs */}
-          <div className="flex gap-1 bg-white/5 p-1 rounded-xl">
+          <div className="flex gap-1 bg-slate-100 p-1 rounded-xl">
             {[
               { id: 'all' as const, label: 'Vše', count: allNotifications.length },
               { id: 'unread' as const, label: 'Nepřečtené', count: unreadCount },
             ].map(tab => (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)}
                 className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2 ${
-                  activeTab === tab.id ? 'bg-white text-slate-900' : 'text-slate-400 hover:text-white'
+                  activeTab === tab.id ? 'bg-emerald-600 text-white' : 'text-slate-500 hover:text-slate-700'
                 }`}>
                 {tab.label}
                 {tab.count > 0 && (
-                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${activeTab === tab.id ? 'bg-slate-200' : 'bg-white/10'}`}>{tab.count}</span>
+                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${activeTab === tab.id ? 'bg-white/25 text-white' : 'bg-slate-200 text-slate-600'}`}>{tab.count}</span>
                 )}
               </button>
             ))}
@@ -423,13 +418,13 @@ export default function NotificationsPage() {
             type="button"
             onClick={enablePush}
             disabled={pushSaving}
-            className="mt-3 w-full rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-left text-emerald-100 hover:bg-emerald-500/15 disabled:opacity-60"
+            className="mt-3 w-full rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-left text-emerald-800 hover:bg-emerald-100 disabled:opacity-60"
           >
             <span className="flex items-center gap-3">
               {pushSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Smartphone className="w-5 h-5" />}
               <span>
                 <span className="block text-sm font-bold">Zapnout upozornění v telefonu</span>
-                <span className="block text-xs text-emerald-100/75">Telefon si vyžádá povolení. Potom může aplikace pípnout i mimo otevřenou stránku.</span>
+                <span className="block text-xs text-emerald-700">Telefon si vyžádá povolení. Potom může aplikace pípnout i mimo otevřenou stránku.</span>
               </span>
             </span>
           </button>
@@ -440,12 +435,12 @@ export default function NotificationsPage() {
           <div className="flex gap-2 overflow-x-auto pb-2">
             <button onClick={() => setFilterType('all')}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition ${
-                filterType === 'all' ? 'bg-white text-slate-900' : 'bg-white/5 text-slate-400'
+                filterType === 'all' ? 'bg-emerald-600 text-white' : 'bg-white border border-slate-200 text-slate-600'
               }`}>Vše</button>
             {Object.entries(TYPE_CONFIG).map(([type, cfg]) => (
               <button key={type} onClick={() => setFilterType(type as NotificationType)}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition flex items-center gap-1.5 ${
-                  filterType === type ? 'bg-white text-slate-900' : 'bg-white/5 text-slate-400'
+                  filterType === type ? 'bg-emerald-600 text-white' : 'bg-white border border-slate-200 text-slate-600'
                 }`}>
                 <cfg.icon className="w-3.5 h-3.5" />{cfg.label}
               </button>
@@ -455,7 +450,7 @@ export default function NotificationsPage() {
           {/* Loading */}
           {loading && (
             <div className="text-center py-16">
-              <Loader2 className="w-8 h-8 text-indigo-400 animate-spin mx-auto mb-3" />
+              <Loader2 className="w-8 h-8 text-emerald-700 animate-spin mx-auto mb-3" />
               <p className="text-slate-500 text-sm">Načítám notifikace...</p>
             </div>
           )}
@@ -463,8 +458,8 @@ export default function NotificationsPage() {
           {/* Empty */}
           {!loading && filteredNotifications.length === 0 && (
             <div className="text-center py-16">
-              <BellOff className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-              <h3 className="text-lg font-bold text-white mb-2">Žádné notifikace</h3>
+              <BellOff className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+              <h3 className="text-lg font-bold text-slate-900 mb-2">Žádné notifikace</h3>
               <p className="text-slate-400">{activeTab === 'unread' ? 'Všechny notifikace jsou přečteny' : 'Zatím nemáte žádné notifikace'}</p>
             </div>
           )}
@@ -478,8 +473,8 @@ export default function NotificationsPage() {
                 const Icon = typeCfg.icon;
                 return (
                   <div key={notification.id}
-                    className={`bg-white/5 backdrop-blur-xl rounded-2xl border transition overflow-hidden ${
-                      notification.read ? 'border-white/5 opacity-70' : 'border-white/10'
+                    className={`bg-white rounded-2xl border transition overflow-hidden ${
+                      notification.read ? 'border-slate-200 opacity-70' : 'border-slate-200'
                     }`}>
                     <div className="p-4">
                       <div className="flex gap-3">
@@ -491,20 +486,20 @@ export default function NotificationsPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2">
-                            <h4 className={`font-semibold ${notification.read ? 'text-slate-300' : 'text-white'}`}>{notification.title}</h4>
+                            <h4 className={`font-semibold ${notification.read ? 'text-slate-500' : 'text-slate-900'}`}>{notification.title}</h4>
                             <span className="text-xs text-slate-500 whitespace-nowrap">{formatTime(notification.createdAt)}</span>
                           </div>
                           <p className="text-sm text-slate-400 mt-1">{notification.message}</p>
                           <div className="flex items-center gap-2 mt-3">
                             {notification.actionUrl && (
                               <button onClick={() => { if (!notification.generated) markAsRead(notification.id); navigate(notification.actionUrl!); }}
-                                className="flex items-center gap-1 px-3 py-1.5 bg-white/10 text-white rounded-lg text-sm hover:bg-white/20 transition">
+                                className="flex items-center gap-1 px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-sm hover:bg-slate-200 transition">
                                 {notification.actionLabel || 'Zobrazit'}<ChevronRight className="w-4 h-4" />
                               </button>
                             )}
                             {!notification.read && !notification.generated && (
                               <button onClick={() => markAsRead(notification.id)}
-                                className="flex items-center gap-1 px-3 py-1.5 text-slate-400 rounded-lg text-sm hover:text-white transition">
+                                className="flex items-center gap-1 px-3 py-1.5 text-slate-500 rounded-lg text-sm hover:text-slate-700 transition">
                                 <Check className="w-4 h-4" /> Přečteno
                               </button>
                             )}
