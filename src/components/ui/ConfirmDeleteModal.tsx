@@ -79,28 +79,28 @@ export default function ConfirmDeleteModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-[9999] flex items-center justify-center p-4" onClick={handleClose}>
+    <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4" onClick={handleClose}>
       <div
-        className="bg-[#1e293b] rounded-3xl w-full max-w-md overflow-hidden shadow-2xl border border-white/10"
+        className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl border border-slate-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="bg-red-500/20 p-5 flex items-center justify-between">
+        <div className="bg-red-50 p-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-red-500/30 rounded-xl flex items-center justify-center">
-              {step === 3 ? <Lock className="w-5 h-5 text-red-400" /> : <Trash2 className="w-5 h-5 text-red-400" />}
+            <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center">
+              {step === 3 ? <Lock className="w-5 h-5 text-red-600" /> : <Trash2 className="w-5 h-5 text-red-600" />}
             </div>
             <div>
-              <h3 className="font-bold text-white">
+              <h3 className="font-bold text-slate-900">
                 {step === 1 && 'Smazat ' + itemType}
                 {step === 2 && 'Nelze smazat'}
                 {step === 3 && 'Ověření PIN'}
               </h3>
-              <p className="text-xs text-red-300/70">Krok {step} / {requirePin ? 3 : 2}</p>
+              <p className="text-xs text-red-700">Krok {step} / {requirePin ? 3 : 2}</p>
             </div>
           </div>
-          <button onClick={handleClose} className="p-2 rounded-xl bg-white/10 hover:bg-white/20 transition">
-            <X className="w-4 h-4 text-slate-400" />
+          <button onClick={handleClose} className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 transition">
+            <X className="w-4 h-4 text-slate-500" />
           </button>
         </div>
 
@@ -108,23 +108,23 @@ export default function ConfirmDeleteModal({
           {/* ═══ STEP 1: Confirm intent ═══ */}
           {step === 1 && (
             <>
-              <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-center">
-                <AlertTriangle className="w-10 h-10 text-red-400 mx-auto mb-2" />
-                <p className="text-sm text-slate-300">
-                  Opravdu chcete smazat <strong className="text-white">{itemName}</strong>?
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-center">
+                <AlertTriangle className="w-10 h-10 text-red-600 mx-auto mb-2" />
+                <p className="text-sm text-slate-700">
+                  Opravdu chcete smazat <strong className="text-slate-900">{itemName}</strong>?
                 </p>
                 <p className="text-xs text-slate-500 mt-1">Tato akce je nevratná.</p>
               </div>
               <div className="flex gap-2">
                 <button
                   onClick={handleClose}
-                  className="flex-1 py-3 border border-white/20 text-white rounded-xl font-semibold hover:bg-white/5 transition"
+                  className="flex-1 py-3 border border-slate-200 text-slate-700 rounded-xl font-semibold hover:bg-slate-50 transition"
                 >
                   Zrušit
                 </button>
                 <button
                   onClick={handleStep1}
-                  className="flex-1 py-3 bg-red-500/20 text-red-400 rounded-xl font-bold hover:bg-red-500/30 transition flex items-center justify-center gap-2"
+                  className="flex-1 py-3 bg-red-50 text-red-700 border border-red-200 rounded-xl font-bold hover:bg-red-100 transition flex items-center justify-center gap-2"
                 >
                   <Trash2 className="w-4 h-4" />
                   Pokračovat
@@ -136,21 +136,21 @@ export default function ConfirmDeleteModal({
           {/* ═══ STEP 2: Impact warning ═══ */}
           {step === 2 && (
             <>
-              <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 text-center">
-                <ShieldAlert className="w-10 h-10 text-amber-400 mx-auto mb-2" />
-                <p className="text-sm font-bold text-amber-300 mb-1">
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-center">
+                <ShieldAlert className="w-10 h-10 text-amber-600 mx-auto mb-2" />
+                <p className="text-sm font-bold text-amber-700 mb-1">
                   {allowArchive ? 'Zařízení obsahuje historii' : 'Nelze smazat — aktivní vazby'}
                 </p>
-                <p className="text-sm text-slate-300">{impactWarning}</p>
+                <p className="text-sm text-slate-700">{impactWarning}</p>
                 {allowArchive && (
-                  <p className="text-xs text-amber-400/70 mt-2">Bude archivováno (soft delete).</p>
+                  <p className="text-xs text-amber-700 mt-2">Bude archivováno (soft delete).</p>
                 )}
               </div>
               {allowArchive ? (
                 <>
                   <div>
-                    <label className="block text-sm text-slate-400 mb-1.5">
-                      Pro potvrzení opište název: <strong className="text-white">{itemName}</strong>
+                    <label className="block text-sm text-slate-600 mb-1.5">
+                      Pro potvrzení opište název: <strong className="text-slate-900">{itemName}</strong>
                     </label>
                     <input
                       type="text"
@@ -158,14 +158,14 @@ export default function ConfirmDeleteModal({
                       onChange={(e) => { setNameConfirm(e.target.value); setError(''); }}
                       placeholder={itemName}
                       autoFocus
-                      className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-slate-600 focus:outline-none focus:border-amber-500/50 transition"
+                      className="w-full px-4 py-3 rounded-xl bg-[#fbf9f4] border border-slate-200 text-slate-900 text-sm placeholder-slate-400 focus:outline-none focus:border-emerald-600 transition"
                     />
                   </div>
-                  {error && <div className="text-center text-red-400 text-sm">{error}</div>}
+                  {error && <div className="text-center text-red-600 text-sm">{error}</div>}
                   <div className="flex gap-2">
                     <button
                       onClick={handleClose}
-                      className="flex-1 py-3 border border-white/20 text-white rounded-xl font-semibold hover:bg-white/5 transition"
+                      className="flex-1 py-3 border border-slate-200 text-slate-700 rounded-xl font-semibold hover:bg-slate-50 transition"
                     >
                       Zrušit
                     </button>
@@ -188,7 +188,7 @@ export default function ConfirmDeleteModal({
               ) : (
                 <button
                   onClick={handleClose}
-                  className="w-full py-3 bg-slate-600 text-white rounded-xl font-semibold hover:bg-slate-500 transition"
+                  className="w-full py-3 bg-slate-100 text-slate-700 border border-slate-200 rounded-xl font-semibold hover:bg-slate-200 transition"
                 >
                   Rozumím, zavřít
                 </button>
@@ -201,11 +201,11 @@ export default function ConfirmDeleteModal({
             <>
               <div className="text-center mb-2">
                 <Lock className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-                <p className="text-sm text-slate-300">
+                <p className="text-sm text-slate-700">
                   Zadejte svůj 4místný PIN pro potvrzení smazání
                 </p>
                 <p className="text-xs text-slate-500 mt-1">
-                  <strong className="text-white">{itemName}</strong>
+                  <strong className="text-slate-900">{itemName}</strong>
                 </p>
               </div>
 
@@ -216,8 +216,8 @@ export default function ConfirmDeleteModal({
                     key={i}
                     className={`w-14 h-14 rounded-xl border-2 flex items-center justify-center text-2xl font-bold transition ${
                       pin.length > i
-                        ? 'border-red-500/50 bg-red-500/10 text-white'
-                        : 'border-white/10 bg-white/5 text-slate-600'
+                        ? 'border-red-400 bg-red-50 text-slate-900'
+                        : 'border-slate-200 bg-white text-slate-400'
                     }`}
                   >
                     {pin.length > i ? '•' : ''}
@@ -249,7 +249,7 @@ export default function ConfirmDeleteModal({
                       <button
                         key={idx}
                         onClick={() => setPin((p) => p.slice(0, -1))}
-                        className="py-3 rounded-xl bg-white/5 text-slate-400 font-semibold hover:bg-white/10 transition text-sm"
+                        className="py-3 rounded-xl bg-slate-100 text-slate-600 font-semibold hover:bg-slate-200 transition text-sm"
                       >
                         ←
                       </button>
@@ -259,7 +259,7 @@ export default function ConfirmDeleteModal({
                     <button
                       key={idx}
                       onClick={() => pin.length < 4 && setPin((p) => p + key)}
-                      className="py-3 rounded-xl bg-white/5 text-white font-bold text-lg hover:bg-white/10 transition"
+                      className="py-3 rounded-xl bg-white border border-slate-200 text-slate-900 font-bold text-lg hover:bg-slate-50 transition"
                     >
                       {key}
                     </button>
@@ -268,13 +268,13 @@ export default function ConfirmDeleteModal({
               </div>
 
               {error && (
-                <div className="text-center text-red-400 text-sm mt-2">{error}</div>
+                <div className="text-center text-red-600 text-sm mt-2">{error}</div>
               )}
 
               <div className="flex gap-2 mt-4">
                 <button
                   onClick={handleClose}
-                  className="flex-1 py-3 border border-white/20 text-white rounded-xl font-semibold hover:bg-white/5 transition"
+                  className="flex-1 py-3 border border-slate-200 text-slate-700 rounded-xl font-semibold hover:bg-slate-50 transition"
                 >
                   Zrušit
                 </button>
