@@ -45,9 +45,9 @@ export default function LoginPage() {
   };
 
   return (
-    <div data-testid="login-screen" className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6">
+    <div data-testid="login-screen" className="min-h-screen bg-[#f1ece3] flex flex-col items-center justify-center p-6">
       <div className="flex flex-col items-center gap-2 mb-8">
-        <BrandMark size="lg" tone="light" className="flex-col text-center" />
+        <BrandMark size="lg" tone="dark" className="flex-col text-center" />
       </div>
 
       <div className="mb-8">
@@ -57,10 +57,10 @@ export default function LoginPage() {
               key={i}
               className={`w-11 h-14 rounded-xl border-2 flex items-center justify-center text-2xl font-bold transition-all ${
                 error
-                  ? 'border-red-500 bg-red-500/20 animate-shake'
+                  ? 'border-red-500 bg-red-50 animate-shake text-red-700'
                   : pin.length > i
-                    ? 'border-blue-500 bg-blue-500/20 text-white'
-                    : 'border-slate-600 bg-slate-800'
+                    ? 'border-emerald-600 bg-emerald-50 text-slate-900'
+                    : 'border-slate-200 bg-white'
               }`}
             >
               {pin.length > i ? '●' : ''}
@@ -74,7 +74,7 @@ export default function LoginPage() {
           <p className="text-slate-400 text-center text-xs">PIN má 4 až 6 číslic</p>
         )}
         {isSandboxLoginEnabled && !error && (
-          <p className="text-blue-300 text-center text-xs mt-1">Demo režim: PIN 0000</p>
+          <p className="text-blue-700 text-center text-xs mt-1">Demo režim: PIN 0000</p>
         )}
       </div>
 
@@ -89,7 +89,7 @@ export default function LoginPage() {
                 type="button"
                 onClick={handleDelete}
                 disabled={pin.length === 0 || isLoading}
-                className="w-20 h-16 rounded-xl bg-slate-700 text-white flex items-center justify-center hover:bg-slate-600 active:scale-95 transition disabled:opacity-30"
+                className="w-20 h-16 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 flex items-center justify-center hover:bg-slate-200 active:scale-95 transition disabled:opacity-30"
               >
                 <Delete className="w-6 h-6" />
               </button>
@@ -102,7 +102,7 @@ export default function LoginPage() {
               type="button"
               onClick={() => handleDigit(key)}
               disabled={isLoading}
-              className="w-20 h-16 rounded-xl bg-slate-800 border border-slate-700 text-white text-2xl font-bold hover:bg-slate-700 active:scale-95 active:bg-blue-600 transition disabled:opacity-50"
+              className="w-20 h-16 rounded-xl bg-white border border-slate-200 text-slate-900 text-2xl font-bold hover:bg-slate-50 active:scale-95 active:bg-emerald-600 active:text-white transition disabled:opacity-50"
             >
               {key}
             </button>
@@ -115,14 +115,14 @@ export default function LoginPage() {
         type="button"
         onClick={() => handleLogin(pin)}
         disabled={pin.length < 4 || isLoading}
-        className="mt-5 w-full max-w-xs h-14 rounded-xl bg-blue-600 text-white text-lg font-bold flex items-center justify-center gap-2 hover:bg-blue-500 active:scale-95 transition disabled:opacity-30 disabled:cursor-not-allowed"
+        className="mt-5 w-full max-w-xs h-14 rounded-xl bg-emerald-600 text-white text-lg font-bold flex items-center justify-center gap-2 hover:bg-emerald-700 active:scale-95 transition disabled:opacity-30 disabled:cursor-not-allowed"
       >
         <LogIn className="w-5 h-5" />
         Přihlásit
       </button>
 
       {isLoading && (
-        <div className="mt-6 flex items-center gap-2 text-blue-400">
+        <div className="mt-6 flex items-center gap-2 text-emerald-700">
           <LogIn className="w-5 h-5 animate-pulse" />
           <span>Přihlašuji...</span>
         </div>

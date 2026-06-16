@@ -61,7 +61,7 @@ function SandboxBanner() {
 
 function PageLoading() {
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+    <div className="min-h-screen bg-[#f1ece3] flex items-center justify-center">
       <LoadingSpinner size="lg" text="Načítám modul..." />
     </div>
   );
@@ -69,16 +69,16 @@ function PageLoading() {
 
 function NoAccessPage({ title = 'Sem nemáš přístup', message }: { title?: string; message?: string }) {
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
-      <div className="max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 text-white shadow-xl">
-        <p className="text-sm font-bold uppercase tracking-wider text-blue-300">Oprávnění</p>
+    <div className="min-h-screen bg-[#f1ece3] flex items-center justify-center p-6">
+      <div className="max-w-md rounded-2xl border border-slate-200 bg-white p-6 text-slate-900 shadow-xl">
+        <p className="text-sm font-bold uppercase tracking-wider text-emerald-700">Oprávnění</p>
         <h1 className="mt-2 text-2xl font-black">{title}</h1>
-        <p className="mt-3 text-slate-300">
+        <p className="mt-3 text-slate-600">
           {message || 'Tahle část aplikace není povolená pro tvoji roli. Pokud ji potřebuješ, musí ti správce upravit oprávnění.'}
         </p>
         <a
           href="/"
-          className="mt-5 inline-flex rounded-xl bg-blue-600 px-4 py-3 font-bold text-white hover:bg-blue-500"
+          className="mt-5 inline-flex rounded-xl bg-emerald-600 px-4 py-3 font-bold text-white hover:bg-emerald-700"
         >
           Zpět na dashboard
         </a>
@@ -145,7 +145,7 @@ function ProtectedRoutes() {
   // Loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-[#f1ece3] flex items-center justify-center">
         <LoadingSpinner size="lg" text="Načítám..." />
       </div>
     );
