@@ -273,23 +273,23 @@ export default function EntityModal({ data, breadcrumbs, onClose, onNavigate, on
       )}
 
       <div
-        className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-md flex items-center justify-center p-4"
+        className="fixed inset-0 z-[9999] bg-black/50 flex items-center justify-center p-4"
         onClick={onClose}
       >
         <div
           onClick={(e) => e.stopPropagation()}
-          className="w-full max-w-2xl max-h-[90vh] bg-slate-800 rounded-3xl overflow-hidden shadow-2xl border border-white/10 flex flex-col"
+          className="w-full max-w-2xl max-h-[90vh] bg-white rounded-3xl overflow-hidden shadow-2xl border border-slate-200 flex flex-col"
           style={{ animation: 'nominalSlideUp 0.25s ease-out' }}
         >
           {/* ═══ HEADER ═══ */}
-          <div className="px-5 pt-5 pb-3 border-b border-white/10 flex-shrink-0">
+          <div className="px-5 pt-5 pb-3 border-b border-slate-200 flex-shrink-0">
             {/* Breadcrumbs */}
             <div className="flex items-center text-xs text-slate-500 mb-2 flex-wrap gap-0.5">
               {breadcrumbs.map((bc, i) => (
                 <span key={i} className="flex items-center">
                   {i > 0 && <ChevronRight className="w-3 h-3 mx-0.5 text-slate-600" />}
                   {bc.data ? (
-                    <button onClick={() => onBack()} className="hover:text-blue-400 transition">
+                    <button onClick={() => onBack()} className="hover:text-emerald-700 transition">
                       {bc.label}
                     </button>
                   ) : (
@@ -302,11 +302,11 @@ export default function EntityModal({ data, breadcrumbs, onClose, onNavigate, on
             {/* Title row */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-orange-500/20 flex items-center justify-center flex-shrink-0">
-                  <TypeIcon className="w-5 h-5 text-orange-400" />
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
+                  <TypeIcon className="w-5 h-5 text-emerald-700" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-white">{effectiveData.name}</h2>
+                  <h2 className="text-lg font-bold text-slate-900">{effectiveData.name}</h2>
                   <div className="flex items-center gap-2 text-xs">
                     {effectiveData.code && <span className="text-slate-500 font-mono">{effectiveData.code}</span>}
                     {effectiveData.status && (
@@ -321,14 +321,14 @@ export default function EntityModal({ data, breadcrumbs, onClose, onNavigate, on
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => setShowPdfPreview(true)}
-                  className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 hover:text-white transition"
+                  className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-900 transition"
                   title="PDF pasport"
                 >
                   <Download className="w-4 h-4" />
                 </button>
                 <button
                   onClick={onClose}
-                  className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-slate-400 hover:text-white transition"
+                  className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-900 transition"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -346,8 +346,8 @@ export default function EntityModal({ data, breadcrumbs, onClose, onNavigate, on
                     onClick={() => setActiveTab(tab.id)}
                     className={`px-3 py-2 rounded-t-xl text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap transition ${
                       isActive
-                        ? 'bg-slate-700/60 text-orange-400 border-b-2 border-orange-400'
-                        : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
+                        ? 'bg-slate-50 text-emerald-700 border-b-2 border-emerald-600'
+                        : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
                     }`}
                   >
                     <Icon className="w-3.5 h-3.5" />
@@ -442,12 +442,12 @@ ${activeTasks.length > 0 ? `<h2>Otevřené úkoly (${activeTasks.length})</h2><t
   };
 
   return (
-    <div className="fixed inset-0 z-[10000] bg-slate-900/95 backdrop-blur-lg flex flex-col" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[10000] bg-[#f1ece3] flex flex-col" onClick={(e) => e.stopPropagation()}>
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-slate-800/80 flex-shrink-0">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-white flex-shrink-0">
         <button
           onClick={onClose}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 border border-white/15 text-white text-sm font-semibold hover:bg-white/15 transition"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 text-sm font-semibold hover:bg-slate-50 transition"
         >
           <ArrowLeft className="w-4 h-4" />
           Zpět
@@ -616,7 +616,7 @@ function TabPassport({ data }: { data: EntityModalData }) {
       <div className="space-y-3">
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-xs text-slate-500 uppercase font-bold">Upravit údaje</h3>
-          <button onClick={() => setIsEditing(false)} className="text-xs text-slate-500 hover:text-white transition">Zrušit</button>
+          <button onClick={() => setIsEditing(false)} className="text-xs text-slate-500 hover:text-slate-700 transition">Zrušit</button>
         </div>
 
         {[
@@ -633,7 +633,7 @@ function TabPassport({ data }: { data: EntityModalData }) {
               type={f.type}
               value={f.value}
               onChange={(e) => f.onChange(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-slate-600 focus:outline-none focus:border-orange-500/50 transition min-h-[44px]"
+              className="w-full px-3 py-2.5 rounded-xl bg-[#fbf9f4] border border-slate-200 text-slate-900 text-sm placeholder-slate-400 focus:outline-none focus:border-emerald-600 transition min-h-[44px]"
             />
           </div>
         ))}
@@ -644,10 +644,10 @@ function TabPassport({ data }: { data: EntityModalData }) {
           <select
             value={editBuilding}
             onChange={(e) => setEditBuilding(e.target.value)}
-            className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-orange-500/50 transition min-h-[44px]"
+            className="w-full px-3 py-2.5 rounded-xl bg-[#fbf9f4] border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-emerald-600 transition min-h-[44px]"
           >
             {BUILDING_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value} className="bg-slate-800">{o.label}</option>
+              <option key={o.value} value={o.value} className="bg-white">{o.label}</option>
             ))}
           </select>
         </div>
@@ -658,19 +658,19 @@ function TabPassport({ data }: { data: EntityModalData }) {
           <select
             value={editStatus}
             onChange={(e) => setEditStatus(e.target.value)}
-            className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-orange-500/50 transition min-h-[44px]"
+            className="w-full px-3 py-2.5 rounded-xl bg-[#fbf9f4] border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-emerald-600 transition min-h-[44px]"
           >
             {STATUS_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value} className="bg-slate-800">{o.label}</option>
+              <option key={o.value} value={o.value} className="bg-white">{o.label}</option>
             ))}
           </select>
         </div>
 
         {/* Save / Cancel footer */}
-        <div className="flex items-center gap-3 pt-3 mt-2 border-t border-white/10">
+        <div className="flex items-center gap-3 pt-3 mt-2 border-t border-slate-200">
           <button
             onClick={() => setIsEditing(false)}
-            className="flex-1 py-3 rounded-2xl bg-white/5 border border-white/10 text-slate-400 font-semibold text-sm"
+            className="flex-1 py-3 rounded-2xl bg-slate-100 border border-slate-200 text-slate-600 font-semibold text-sm"
           >
             Zrušit
           </button>
@@ -695,7 +695,7 @@ function TabPassport({ data }: { data: EntityModalData }) {
         {data.type === 'asset' && (
           <button
             onClick={() => setIsEditing(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500/15 text-orange-400 text-xs font-semibold hover:bg-orange-500/25 transition"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-semibold hover:bg-emerald-100 transition"
           >
             <Edit2 className="w-3 h-3" />
             Upravit vše
@@ -705,7 +705,7 @@ function TabPassport({ data }: { data: EntityModalData }) {
 
       {saveMsg && (
         <div className={`p-2.5 rounded-xl text-sm text-center font-semibold ${
-          saveMsg === 'Uloženo' ? 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-400' : 'bg-red-500/20 border border-red-500/30 text-red-400'
+          saveMsg === 'Uloženo' ? 'bg-emerald-50 border border-emerald-200 text-emerald-700' : 'bg-red-50 border border-red-200 text-red-700'
         }`}>
           {saveMsg}
         </div>
@@ -713,9 +713,9 @@ function TabPassport({ data }: { data: EntityModalData }) {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {fields.map((f) => (
-          <div key={f.key} className="bg-slate-700/30 rounded-xl p-3">
+          <div key={f.key} className="bg-slate-50 border border-slate-200 rounded-xl p-3">
             <div className="text-xs text-slate-500 mb-1">{f.label}</div>
-            <div className="text-sm font-medium text-white">{f.value}</div>
+            <div className="text-sm font-medium text-slate-900">{f.value}</div>
           </div>
         ))}
       </div>
@@ -726,7 +726,7 @@ function TabPassport({ data }: { data: EntityModalData }) {
           <h3 className="text-xs text-slate-500 uppercase font-bold mb-2">Kontrolní body</h3>
           <div className="flex flex-wrap gap-1.5">
             {data.asset.controlPoints.map((cp, i) => (
-              <span key={i} className="px-2.5 py-1 rounded-lg bg-white/5 text-[12px] text-slate-300 border border-white/10">
+              <span key={i} className="px-2.5 py-1 rounded-lg bg-slate-50 text-[12px] text-slate-600 border border-slate-200">
                 {cp}
               </span>
             ))}
@@ -772,13 +772,13 @@ function TabRelations({ data, rooms, childAssets, spareParts, loading, onNavigat
                 { type: 'room', id: room.name, name: room.name, buildingId: data.buildingId, roomName: room.name },
                 { label: data.name, data }
               )}
-              className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/[0.08] hover:bg-white/[0.06] transition text-left"
+              className="w-full flex items-center gap-3 p-3 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 transition text-left"
             >
-              <div className="w-9 h-9 rounded-lg bg-slate-700/50 flex items-center justify-center flex-shrink-0">
+              <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
                 <Layers className="w-4 h-4 text-slate-400" />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold text-white">{room.name}</div>
+                <div className="text-sm font-semibold text-slate-900">{room.name}</div>
                 <div className="text-xs text-slate-500">{room.assetCount} strojů</div>
               </div>
               <span className={`w-2.5 h-2.5 rounded-full ${rst.dot}`} />
@@ -810,13 +810,13 @@ function TabRelations({ data, rooms, childAssets, spareParts, loading, onNavigat
                 },
                 { label: data.name, data }
               )}
-              className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/[0.08] hover:bg-white/[0.06] transition text-left"
+              className="w-full flex items-center gap-3 p-3 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 transition text-left"
             >
-              <div className="w-9 h-9 rounded-lg bg-slate-700/50 flex items-center justify-center flex-shrink-0">
+              <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
                 <Wrench className="w-4 h-4 text-slate-400" />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold text-white truncate">{asset.name}</div>
+                <div className="text-sm font-semibold text-slate-900 truncate">{asset.name}</div>
                 {asset.code && <div className="text-xs text-slate-500 font-mono">{asset.code}</div>}
               </div>
               <span className={`w-2.5 h-2.5 rounded-full ${ast.dot}`} />
@@ -835,12 +835,12 @@ function TabRelations({ data, rooms, childAssets, spareParts, loading, onNavigat
       {spareParts.length === 0 ? (
         <div className="text-sm text-slate-500 text-center py-4">Žádné propojené díly ve skladu</div>
       ) : spareParts.map((item: any) => (
-        <div key={item.id} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/[0.08]">
-          <div className="w-9 h-9 rounded-lg bg-slate-700/50 flex items-center justify-center flex-shrink-0">
+        <div key={item.id} className="flex items-center gap-3 p-3 rounded-xl bg-white border border-slate-200">
+          <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
             <Package className="w-4 h-4 text-slate-400" />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-semibold text-white truncate">{item.name}</div>
+            <div className="text-sm font-semibold text-slate-900 truncate">{item.name}</div>
             <div className="text-xs text-slate-500 font-mono">{item.code}</div>
           </div>
           <div className="text-right">
@@ -893,10 +893,10 @@ function TabMaintenance({ activeTasks, revisions, loading }: { activeTasks: any[
               const pc = TASK_PRIORITY_COLORS[task.priority] || '#94a3b8';
               const sb = TASK_STATUS_LABELS[task.status] || TASK_STATUS_LABELS.backlog;
               return (
-                <div key={task.id} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/[0.08]">
+                <div key={task.id} className="flex items-center gap-3 p-3 rounded-xl bg-white border border-slate-200">
                   <span className="text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0" style={{ background: `${pc}20`, color: pc }}>{task.priority || 'P3'}</span>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-white truncate">{task.title}</div>
+                    <div className="text-sm font-medium text-slate-900 truncate">{task.title}</div>
                     {task.assigneeName && <div className="text-xs text-slate-500">{task.assigneeName}</div>}
                   </div>
                   <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-lg ${sb.bg} ${sb.text}`}>{sb.label}</span>
@@ -915,10 +915,10 @@ function TabMaintenance({ activeTasks, revisions, loading }: { activeTasks: any[
               const next = rev.nextRevisionAt?.toDate?.() || new Date(rev.nextRevisionAt);
               const days = Math.round((next.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
               return (
-                <div key={rev.id} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/[0.08]">
+                <div key={rev.id} className="flex items-center gap-3 p-3 rounded-xl bg-white border border-slate-200">
                   <AlertTriangle className={`w-4 h-4 flex-shrink-0 ${days <= 7 ? 'text-red-400' : days <= 30 ? 'text-amber-400' : 'text-blue-400'}`} />
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-white truncate">{rev.name}</div>
+                    <div className="text-sm font-medium text-slate-900 truncate">{rev.name}</div>
                     <div className="text-xs text-slate-500">{rev.provider || '—'}</div>
                   </div>
                   <span className={`text-xs font-bold ${days <= 7 ? 'text-red-400' : days <= 30 ? 'text-amber-400' : 'text-blue-400'}`}>
@@ -958,10 +958,10 @@ function TabHistory({ doneTasks }: { doneTasks: any[] }) {
         const date = task.completedAt?.toDate?.() || task.createdAt?.toDate?.();
         const dateStr = date ? date.toLocaleDateString('cs-CZ') : '—';
         return (
-          <div key={task.id} className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/[0.08]">
+          <div key={task.id} className="flex items-start gap-3 p-3 rounded-xl bg-white border border-slate-200">
             <div className="w-2 h-2 rounded-full bg-emerald-400 mt-1.5 flex-shrink-0" />
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium text-white">{task.title}</div>
+              <div className="text-sm font-medium text-slate-900">{task.title}</div>
               {task.resolution && <div className="text-xs text-slate-400 mt-1">{task.resolution}</div>}
               <div className="text-[11px] text-slate-500 mt-1 flex items-center gap-2">
                 <span>{dateStr}</span>
