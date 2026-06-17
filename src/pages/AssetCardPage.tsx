@@ -239,7 +239,7 @@ export default function AssetCardPage() {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showRevisionModal, setShowRevisionModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<'info' | 'history' | 'tasks' | 'revisions'>('info');
+  const [activeTab, setActiveTab] = useState<'passport' | 'relations' | 'needs' | 'history'>('passport');
   const [stanoviste, setStanoviste] = useState('Expedice');
   const [prefilterSaving, setPrefilterSaving] = useState(false);
   const [historySearch, setHistorySearch] = useState('');
@@ -475,7 +475,7 @@ export default function AssetCardPage() {
         createdById: user?.id || 'unknown',
         createdByName: user?.displayName || 'Neznámý',
       });
-      setActiveTab('tasks');
+      setActiveTab('needs');
     } catch (err) {
       console.error('[Prefilter]', err);
     }
@@ -999,7 +999,7 @@ export default function AssetCardPage() {
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('tasks')}
+            onClick={() => setActiveTab('needs')}
             className="rounded-xl bg-[#fbf9f4] border border-[#eadfce] p-3 text-left transition hover:bg-[#f4ede2]"
           >
             <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">Úkoly</div>
@@ -1007,7 +1007,7 @@ export default function AssetCardPage() {
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('revisions')}
+            onClick={() => setActiveTab('needs')}
             className={`rounded-xl border p-3 text-left transition ${
               expiredRevisions.length > 0
                 ? 'bg-red-50 border-red-200 hover:bg-red-100'
@@ -1025,7 +1025,7 @@ export default function AssetCardPage() {
         <div className="flex flex-wrap gap-2 mb-2 rounded-2xl border border-[#e2d8c9] bg-white p-2 shadow-sm">
           {canEditAsset && (
             <button
-              onClick={() => { setIsEditing(!isEditing); setActiveTab('info'); }}
+              onClick={() => { setIsEditing(!isEditing); setActiveTab('passport'); }}
               className={`min-w-[132px] flex-1 rounded-xl px-3 text-sm font-black flex items-center justify-center gap-2 transition active:scale-[0.97] min-h-11 ${
                 isEditing
                   ? 'bg-blue-50 border border-blue-200 text-blue-700'
@@ -1046,7 +1046,7 @@ export default function AssetCardPage() {
             </button>
           )}
           <button
-            onClick={() => setActiveTab('info')}
+            onClick={() => setActiveTab('passport')}
             className="min-w-[132px] flex-1 bg-blue-50 border border-blue-200 text-blue-700 rounded-xl px-3 text-sm font-black flex items-center justify-center gap-2 hover:bg-blue-100 transition active:scale-[0.97] min-h-11"
           >
             <FileText className="w-5 h-5" />
@@ -1170,17 +1170,17 @@ export default function AssetCardPage() {
         {/* Tabs */}
         <div className="grid grid-cols-2 gap-2 mb-4 rounded-2xl border border-[#e2d8c9] bg-white p-2 shadow-sm sm:grid-cols-4">
           {([
-            { key: 'info' as const, label: 'Detaily' },
+            { key: 'passport' as const, label: 'Rodný list' },
+            { key: 'relations' as const, label: 'Návaznosti' },
+            { key: 'needs' as const, label: `Potřeby (${tasks.length + revisions.length})`, alert: expiredRevisions.length > 0 },
             { key: 'history' as const, label: `Historie (${historyItems.length})` },
-            { key: 'tasks' as const, label: `Úkoly (${tasks.length})` },
-            { key: 'revisions' as const, label: `Revize (${revisions.length})`, alert: expiredRevisions.length > 0 },
           ]).map((tab) => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
               className={`min-h-10 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-[13px] font-black transition-all ${
                 activeTab === tab.key
-                  ? 'bg-[#10263f] text-slate-900'
+                  ? 'bg-emerald-600 text-white'
                   : 'text-slate-500 hover:text-slate-900'
               }`}
             >
@@ -1192,10 +1192,10 @@ export default function AssetCardPage() {
           ))}
         </div>
 
-        {/* ═══ TAB: INFO ═══ */}
-        {activeTab === 'info' && (
+        {/* ═══ TABY: Rodný list / Návaznosti / Potřeby (sekce se zobrazují podle aktivního tabu) ═══ */}
+        {activeTab !== 'history' && (
           <div className="space-y-4">
-            <div className="rounded-2xl border border-[#e2d8c9] bg-white p-3 shadow-sm">
+            <div className="hidden rounded-2xl border border-[#e2d8c9] bg-white p-3 shadow-sm">
               <div className="mb-2 text-[11px] font-black uppercase tracking-[0.08em] text-slate-500">Rychla orientace</div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
                 {[
@@ -1218,7 +1218,7 @@ export default function AssetCardPage() {
               </div>
             </div>
             {/* ═══ SEKCE 1: IDENTITY CARD (Apple-style) ═══ */}
-            <div id="asset-section-basic" style={{ background: '#fff', borderRadius: 24, padding: 24, border: '1px solid #f1f5f9', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+            <div id="asset-section-basic" className={activeTab === 'passport' ? undefined : 'hidden'} style={{ background: '#fff', borderRadius: 24, padding: 24, border: '1px solid #f1f5f9', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
                 <h3 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8', margin: 0 }}>Identifikace</h3>
                 {canEditAsset && !isEditing && (
@@ -1322,7 +1322,7 @@ export default function AssetCardPage() {
               )}
             </div>
 
-            <div id="asset-section-links" style={{ background: '#fff', borderRadius: 24, padding: 24, border: '1px solid #f1f5f9', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+            <div id="asset-section-links" className={activeTab === 'relations' ? undefined : 'hidden'} style={{ background: '#fff', borderRadius: 24, padding: 24, border: '1px solid #f1f5f9', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 16 }}>
                 <div>
                   <h3 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8', margin: 0 }}>Přiřazeno k</h3>
@@ -1426,7 +1426,7 @@ export default function AssetCardPage() {
             </div>
 
             {isGearbox && assetV2 && (
-              <div id="asset-section-gearbox" style={{ background: '#fff', borderRadius: 24, padding: 24, border: '1px solid #bae6fd', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+              <div id="asset-section-gearbox" className={activeTab === 'relations' ? undefined : 'hidden'} style={{ background: '#fff', borderRadius: 24, padding: 24, border: '1px solid #bae6fd', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
                 {(() => {
                   const tempState = getGearboxTemperatureState(assetV2, assetV2.lastTemperatureC);
                   return (
@@ -1533,12 +1533,12 @@ export default function AssetCardPage() {
                 asset={assetV2}
                 user={user}
                 onClose={() => setProblemOpen(false)}
-                onSaved={() => { setProblemOpen(false); setActiveTab('tasks'); }}
+                onSaved={() => { setProblemOpen(false); setActiveTab('needs'); }}
               />
             )}
 
             {/* ═══ SEKCE 2: TECHNICAL SHEET (Apple-style) ═══ */}
-            <div id="asset-section-technical" style={{ background: '#fff', borderRadius: 24, padding: 24, border: '1px solid #f1f5f9', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+            <div id="asset-section-technical" className={activeTab === 'passport' ? undefined : 'hidden'} style={{ background: '#fff', borderRadius: 24, padding: 24, border: '1px solid #f1f5f9', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
               <h3 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8', margin: '0 0 16px 0' }}>Technický list</h3>
               {!isEditing ? (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -1563,7 +1563,7 @@ export default function AssetCardPage() {
             </div>
 
             {/* ═══ SEKCE 3: UDÁLOSTI (Apple-style) ═══ */}
-            <div id="asset-section-events" style={{ background: '#fff', borderRadius: 24, padding: 24, border: '1px solid #f1f5f9', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+            <div id="asset-section-events" className={activeTab === 'needs' ? undefined : 'hidden'} style={{ background: '#fff', borderRadius: 24, padding: 24, border: '1px solid #f1f5f9', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                 <h3 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8', margin: 0 }}>
                   Události
@@ -1720,7 +1720,7 @@ export default function AssetCardPage() {
             </div>
 
             {/* ═══ SEKCE 4: HISTORIE OPRAV (Apple-style) ═══ */}
-            <div id="asset-section-service" style={{ background: '#fff', borderRadius: 24, padding: 24, border: '1px solid #f1f5f9', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+            <div id="asset-section-service" className={activeTab === 'needs' ? undefined : 'hidden'} style={{ background: '#fff', borderRadius: 24, padding: 24, border: '1px solid #f1f5f9', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                 <h3 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8', margin: 0 }}>
                   Historie oprav
@@ -1881,7 +1881,7 @@ export default function AssetCardPage() {
             </div>
 
             {/* ═══ SEKCE 5: DOKUMENTY (Apple-style) ═══ */}
-            <div id="asset-section-documents" style={{ background: '#fff', borderRadius: 24, padding: 24, border: '1px solid #f1f5f9', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+            <div id="asset-section-documents" className={activeTab === 'passport' ? undefined : 'hidden'} style={{ background: '#fff', borderRadius: 24, padding: 24, border: '1px solid #f1f5f9', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                 <h3 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8', margin: 0 }}>
                   Dokumenty
@@ -1991,6 +1991,7 @@ export default function AssetCardPage() {
               </div>
             )}
 
+            {activeTab === 'passport' && (<>
             {/* Legacy info (Budova, Místnost — from old model) */}
             <div className="card-b p-4">
               <h3 className="text-xs text-slate-500 uppercase font-bold mb-3">Umístění (legacy)</h3>
@@ -2117,10 +2118,11 @@ export default function AssetCardPage() {
                 </div>
               </div>
             )}
+            </>)}
           </div>
         )}
 
-        {/* ═══ TAB: TASKS ═══ */}
+        {/* ═══ TAB: Historie ═══ */}
         {activeTab === 'history' && (
           <div className="space-y-3">
             <div className="card-b p-4">
@@ -2199,7 +2201,7 @@ export default function AssetCardPage() {
           </div>
         )}
 
-        {activeTab === 'tasks' && (
+        {activeTab === 'needs' && (
           <>
             {loadingTasks ? (
               <div className="flex justify-center py-12">
@@ -2256,7 +2258,7 @@ export default function AssetCardPage() {
         )}
 
         {/* ═══ TAB: REVISIONS ═══ */}
-        {activeTab === 'revisions' && (
+        {activeTab === 'needs' && (
           <>
             {loadingRevisions ? (
               <div className="flex justify-center py-12">
@@ -2331,7 +2333,7 @@ export default function AssetCardPage() {
           asset={asset}
           user={user}
           onClose={() => setShowFaultModal(false)}
-          onCreated={() => { setShowFaultModal(false); setActiveTab('tasks'); }}
+          onCreated={() => { setShowFaultModal(false); setActiveTab('needs'); }}
         />
       )}
 
@@ -2340,7 +2342,7 @@ export default function AssetCardPage() {
           asset={asset}
           user={user}
           onClose={() => setShowTaskModal(false)}
-          onCreated={() => { setShowTaskModal(false); setActiveTab('tasks'); }}
+          onCreated={() => { setShowTaskModal(false); setActiveTab('needs'); }}
         />
       )}
 
