@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useAuthContext } from '../context/AuthContext';
 import BrandMark from './ui/BrandMark';
+import BottomNav from './BottomNav';
 
 const NAV: { path: string; icon: typeof LayoutDashboard; label: string; permissions: string[] }[] = [
   { path: '/', icon: LayoutDashboard, label: 'Přehled', permissions: [] },
@@ -68,7 +69,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="md:flex min-h-screen bg-[#f1ece3]">
       <Sidebar />
-      <div className="flex-1 min-w-0">{children}</div>
+      <div className="flex-1 min-w-0 pb-16 md:pb-0">{children}</div>
+      {/* Spodní menu jen na mobilu (na PC je boční lišta) */}
+      <BottomNav />
     </div>
   );
 }
