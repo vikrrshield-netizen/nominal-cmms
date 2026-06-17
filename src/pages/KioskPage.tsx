@@ -1938,6 +1938,8 @@ export default function KioskPage() {
 
   // Modul, který nelze vypnout (hlavní účel kiosku)
   const ALWAYS_ON_MODULE = 'breakdown';
+  // Viditelnost dlaždic řízená adminem (pole kioskButtons na uživateli). undefined = vše.
+  const adminAllowsTile = (id: string) => id === ALWAYS_ON_MODULE || !Array.isArray(user?.kioskButtons) || user.kioskButtons.includes(id);
   // Definice dlaždic MENU — sdílí je mřížka i okno „Nastavení modulů".
   const menuDefs = [
     { id: 'breakdown', icon: <AlertTriangle className="w-8 h-8" />, label: 'Nahlásit poruchu', tone: 'red', primary: true, onClick: () => setActiveView('BREAKDOWN'), show: true },
@@ -1965,7 +1967,7 @@ export default function KioskPage() {
           </button>
         </div>
         <div className="flex flex-col gap-2 p-5">
-          {menuDefs.map((t) => {
+          {menuDefs.filter((t) => adminAllowsTile(t.id)).map((t) => {
             const locked = t.id === ALWAYS_ON_MODULE;
             const on = locked || !hiddenModules.includes(t.id);
             return (
@@ -2012,7 +2014,7 @@ export default function KioskPage() {
         <p className="text-slate-400 text-center mb-6 text-xs md:text-sm">Tip: dlaždice můžeš přetáhnout a srovnat si je podle sebe (uloží se na tomto zařízení).</p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           {(() => {
-            const defs = menuDefs.filter((t) => !hiddenModules.includes(t.id));
+            const defs = menuDefs.filter((t) => adminAllowsTile(t.id) && !hiddenModules.includes(t.id));
             const ordered = [...defs].sort((a, b) => {
               const ia = menuOrder.indexOf(a.id); const ib = menuOrder.indexOf(b.id);
               return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib);

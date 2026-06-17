@@ -26,6 +26,7 @@ interface User {
   primaryRoleId: string;
   customPermissions: CustomPermissions;
   scope: UserScope;
+  kioskButtons?: string[]; // které dlaždice kiosku uživatel vidí (undefined = všechny)
 }
 
 interface AuthContextType {
@@ -143,6 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               primaryRoleId: data.primaryRoleId || '',
               customPermissions: data.customPermissions || DEFAULT_CUSTOM,
               scope: data.scope || DEFAULT_SCOPE,
+              kioskButtons: Array.isArray(data.kioskButtons) ? data.kioskButtons : undefined,
             });
           } else {
             setUser({

@@ -18,6 +18,7 @@ import type { ParseResult } from '../utils/importers/excelImporter';
 import { showToast } from '../components/ui/Toast';
 import { exportMigrationData, downloadMigrationJson } from '../utils/vikrr_migration';
 import { MODULE_DEFINITIONS, ROLE_PERMISSIONS } from '../types/user';
+import { KIOSK_TILES, KIOSK_TILE_IDS, KIOSK_ALWAYS_ON } from '../config/kioskTiles';
 import { PERMISSION_GROUPS } from '../types/tenant';
 import { useTenantSettings } from '../hooks/useTenantSettings';
 import { useTenantRoles } from '../hooks/useTenantRoles';
@@ -42,6 +43,7 @@ interface AdminUser {
   positionId?: string;
   customPermissions: AdminCustomPermissions;
   scope: AdminUserScope;
+  kioskButtons: string[];
 }
 
 interface AdminCustomPermissions {
@@ -227,11 +229,12 @@ export default function AdminPage() {
             positionId: data.positionId || '',
             customPermissions: normalizeCustomPermissions(data.customPermissions),
             scope: normalizeUserScope(data.scope),
+            kioskButtons: normalizeStringList(data.kioskButtons),
           };
         }).sort((a, b) => a.displayName.localeCompare(b.displayName, 'cs'));
 
         // Only update state if data actually changed (prevents unnecessary re-renders)
-        const hash = loaded.map(u => `${u.id}:${u.displayName}:${u.role}:${u.active}:${u.building}:${u.positionId}:${JSON.stringify(u.customPermissions)}:${JSON.stringify(u.scope)}`).join('|');
+        const hash = loaded.map(u => `${u.id}:${u.displayName}:${u.role}:${u.active}:${u.building}:${u.positionId}:${JSON.stringify(u.customPermissions)}:${JSON.stringify(u.scope)}:${JSON.stringify(u.kioskButtons)}`).join('|');
         if (hash !== usersHashRef.current) {
           usersHashRef.current = hash;
           setUsers(loaded);
@@ -653,9 +656,21 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
     building: user.building || '',
     customPermissions: normalizeCustomPermissions(user.customPermissions),
     scope: normalizeUserScope(user.scope),
+    // Nenastaveno = výchozí „vidí vše" (předzaškrtnuté všechny dlaždice)
+    kioskButtons: user.kioskButtons.length ? user.kioskButtons : KIOSK_TILE_IDS,
   });
 
   const roleCfg = ROLE_CONFIG[user.role];
+
+  const toggleKioskTile = (id: string) => {
+    if (id === KIOSK_ALWAYS_ON) return; // hlavní dlaždice vždy
+    setFormData((prev) => ({
+      ...prev,
+      kioskButtons: prev.kioskButtons.includes(id)
+        ? prev.kioskButtons.filter((x) => x !== id)
+        : [...prev.kioskButtons, id],
+    }));
+  };
 
   const handleSave = async () => {
     const nextPin = formData.pin.trim();
@@ -678,6 +693,7 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
         buildingId: formData.building || '',
         customPermissions: afterPermissions,
         scope: formData.scope,
+        kioskButtons: Array.from(new Set([KIOSK_ALWAYS_ON, ...formData.kioskButtons])),
         active: user.active,
         isActive: user.active,
         updatedAt: serverTimestamp(),
@@ -906,6 +922,32 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
                 value={formData.scope}
                 onChange={(scope) => setFormData(prev => ({ ...prev, scope }))}
               />
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <div className="text-sm font-bold text-slate-900">Co vidí v kiosku</div>
+                <div className="text-xs text-slate-500 mb-2.5">Které dlaždice se tomuto uživateli ukážou v kiosku. „Nahlásit poruchu" je vždy.</div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {KIOSK_TILES.map((tile) => {
+                    const locked = tile.id === KIOSK_ALWAYS_ON;
+                    const checked = locked || formData.kioskButtons.includes(tile.id);
+                    return (
+                      <label
+                        key={tile.id}
+                        className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 text-sm transition ${checked ? 'border-emerald-300 bg-emerald-50 text-slate-900' : 'border-slate-200 bg-white text-slate-600'} ${locked ? 'opacity-70' : 'cursor-pointer hover:bg-slate-50'}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={locked}
+                          onChange={() => toggleKioskTile(tile.id)}
+                          className="accent-emerald-600 h-4 w-4 flex-shrink-0"
+                        />
+                        <span className="truncate">{tile.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
 
               <div className="flex gap-2 pt-4">
                 <button
