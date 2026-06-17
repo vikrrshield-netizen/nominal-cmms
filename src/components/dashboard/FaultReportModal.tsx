@@ -128,27 +128,27 @@ export default function FaultReportModal({ isOpen, onClose, userId, userName }: 
     <BottomSheet title="🚨 Nahlásit poruchu" isOpen={isOpen} onClose={onClose}>
       {/* 1. Asset autocomplete */}
       <div className="mb-4">
-        <label className="block text-sm font-medium text-slate-300 mb-1.5">Zařízení</label>
+        <label className="block text-sm font-medium text-slate-600 mb-1.5">Zařízení</label>
         <div className="relative">
           <input
             type="text"
             value={assetQuery}
             onChange={(e) => { setAssetQuery(e.target.value); if (selectedAsset) setSelectedAsset(null); }}
             placeholder="Min. 3 znaky pro hledání..."
-            className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-slate-600 focus:outline-none focus:border-orange-500/50 transition"
+            className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm placeholder-slate-400 focus:outline-none focus:border-orange-500/50 transition"
           />
           {selectedAsset && (
-            <button onClick={handleClearAsset} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-white/10">
+            <button onClick={handleClearAsset} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-slate-100">
               <X className="w-4 h-4 text-slate-400" />
             </button>
           )}
           {showSuggestions && (
-            <div className="absolute z-20 left-0 right-0 mt-1 bg-slate-800 border border-white/10 rounded-xl shadow-2xl max-h-48 overflow-y-auto">
+            <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto">
               {suggestions.map((a) => (
                 <button
                   key={a.id}
                   onClick={() => handleSelectAsset(a)}
-                  className="w-full px-3 py-2 text-left text-sm text-white hover:bg-white/10 transition flex items-center gap-2"
+                  className="w-full px-3 py-2 text-left text-sm text-slate-900 hover:bg-slate-100 transition flex items-center gap-2"
                 >
                   <span className="text-slate-500 text-xs">{a.code || '—'}</span>
                   <span className="truncate">{a.name}</span>
@@ -191,18 +191,18 @@ export default function FaultReportModal({ isOpen, onClose, userId, userName }: 
 
       {/* 5. Photo / Attachment */}
       <div className="mb-4">
-        <label className="block text-sm font-medium text-slate-300 mb-1.5">Příloha / Foto</label>
+        <label className="block text-sm font-medium text-slate-600 mb-1.5">Příloha / Foto</label>
         {photoPreview ? (
           <div className="relative inline-block">
-            <img src={photoPreview} alt="Náhled" className="h-24 rounded-xl border border-white/10 object-cover" />
-            <button onClick={clearPhoto} className="absolute -top-1.5 -right-1.5 w-6 h-6 bg-slate-800 border border-white/20 rounded-full flex items-center justify-center hover:bg-red-600 transition">
-              <X className="w-3.5 h-3.5 text-white" />
+            <img src={photoPreview} alt="Náhled" className="h-24 rounded-xl border border-slate-200 object-cover" />
+            <button onClick={clearPhoto} className="absolute -top-1.5 -right-1.5 w-6 h-6 bg-white border border-slate-200 rounded-full flex items-center justify-center hover:bg-red-600 transition">
+              <X className="w-3.5 h-3.5 text-slate-900" />
             </button>
           </div>
         ) : (
           <button
             onClick={() => fileRef.current?.click()}
-            className="w-full py-3 border-2 border-dashed border-white/15 rounded-xl text-slate-400 text-sm font-medium hover:border-orange-500/30 hover:text-orange-400 transition flex items-center justify-center gap-2"
+            className="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 text-sm font-medium hover:border-orange-500/30 hover:text-orange-700 transition flex items-center justify-center gap-2"
           >
             <Camera className="w-4 h-4" />
             Vybrat soubor / Vyfotit

@@ -21,11 +21,11 @@ interface TileProps {
 }
 
 const STATUS_CONFIG: Record<TileStatus, { dot: string; border: string; iconBg: string; iconColor: string }> = {
-  operational: { dot: 'bg-emerald-400', border: 'border-emerald-500/20', iconBg: 'bg-emerald-500/10', iconColor: 'text-emerald-400' },
-  maintenance: { dot: 'bg-amber-400 animate-pulse', border: 'border-amber-500/20', iconBg: 'bg-amber-500/10', iconColor: 'text-amber-400' },
-  breakdown:   { dot: 'bg-red-400 animate-pulse', border: 'border-red-500/30', iconBg: 'bg-red-500/15', iconColor: 'text-red-400' },
-  idle:        { dot: 'bg-slate-400', border: 'border-slate-500/20', iconBg: 'bg-slate-500/10', iconColor: 'text-slate-400' },
-  offline:     { dot: 'bg-slate-600', border: 'border-slate-600/20', iconBg: 'bg-slate-600/10', iconColor: 'text-slate-500' },
+  operational: { dot: 'bg-emerald-500', border: 'border-emerald-200', iconBg: 'bg-emerald-50', iconColor: 'text-emerald-700' },
+  maintenance: { dot: 'bg-amber-500 animate-pulse', border: 'border-amber-200', iconBg: 'bg-amber-50', iconColor: 'text-amber-700' },
+  breakdown:   { dot: 'bg-red-500 animate-pulse', border: 'border-red-200', iconBg: 'bg-red-50', iconColor: 'text-red-600' },
+  idle:        { dot: 'bg-slate-400', border: 'border-slate-200', iconBg: 'bg-slate-100', iconColor: 'text-slate-500' },
+  offline:     { dot: 'bg-slate-400', border: 'border-slate-200', iconBg: 'bg-slate-100', iconColor: 'text-slate-400' },
 };
 
 export default function Tile({
@@ -42,7 +42,7 @@ export default function Tile({
 }: TileProps) {
   const sc = status ? STATUS_CONFIG[status] : null;
   const py = compact ? 'py-2.5 px-3' : 'py-3.5 px-4';
-  const borderClass = sc ? sc.border : 'border-white/8';
+  const borderClass = sc ? sc.border : 'border-slate-200';
 
   return (
     <button
@@ -50,8 +50,8 @@ export default function Tile({
       disabled={!onClick}
       className={`
         w-full flex items-center gap-3 ${py}
-        bg-white/5 backdrop-blur-sm rounded-2xl border ${borderClass}
-        ${onClick ? 'hover:bg-white/10 active:scale-[0.98] cursor-pointer' : 'cursor-default'}
+        bg-white rounded-2xl border ${borderClass} shadow-sm
+        ${onClick ? 'hover:bg-slate-50 active:scale-[0.98] cursor-pointer' : 'cursor-default'}
         transition-all text-left
       `}
       style={gradient ? { background: gradient } : undefined}
@@ -60,8 +60,8 @@ export default function Tile({
       {icon && (
         <div className={`
           ${compact ? 'w-10 h-10' : 'w-11 h-11'} rounded-xl flex items-center justify-center flex-shrink-0
-          ${sc ? sc.iconBg : 'bg-white/8'}
-          ${sc ? sc.iconColor : 'text-slate-400'}
+          ${sc ? sc.iconBg : 'bg-slate-100'}
+          ${sc ? sc.iconColor : 'text-slate-500'}
         `}>
           {icon}
         </div>
@@ -70,7 +70,7 @@ export default function Tile({
       {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <span className={`font-semibold text-white truncate ${compact ? 'text-sm' : 'text-[15px]'}`}>
+          <span className={`font-semibold text-slate-900 truncate ${compact ? 'text-sm' : 'text-[15px]'}`}>
             {title}
           </span>
           {sc && <div className={`w-2 h-2 rounded-full flex-shrink-0 ${sc.dot}`} />}
@@ -86,10 +86,10 @@ export default function Tile({
       {badge && (
         <span className={`
           px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0
-          ${badgeColor === 'red' ? 'bg-red-500/15 text-red-400' :
-            badgeColor === 'green' ? 'bg-emerald-500/15 text-emerald-400' :
-            badgeColor === 'blue' ? 'bg-blue-500/15 text-blue-400' :
-            'bg-amber-500/15 text-amber-400'}
+          ${badgeColor === 'red' ? 'bg-red-50 text-red-600' :
+            badgeColor === 'green' ? 'bg-emerald-50 text-emerald-700' :
+            badgeColor === 'blue' ? 'bg-blue-50 text-blue-700' :
+            'bg-amber-50 text-amber-700'}
         `}>
           {badge}
         </span>
@@ -99,7 +99,7 @@ export default function Tile({
       {rightContent}
 
       {/* Chevron */}
-      {onClick && <ChevronRight className="w-4 h-4 text-slate-600 flex-shrink-0" />}
+      {onClick && <ChevronRight className="w-4 h-4 text-slate-400 flex-shrink-0" />}
     </button>
   );
 }

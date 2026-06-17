@@ -30,7 +30,7 @@ export default function MicButton({ onTranscript, className = '' }: MicButtonPro
       className={`w-10 h-10 rounded-xl flex items-center justify-center transition active:scale-90 flex-shrink-0 ${
         isListening
           ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/30'
-          : 'bg-white/5 border border-white/10 text-slate-500 hover:text-orange-400 hover:border-orange-500/30'
+          : 'bg-slate-50 border border-slate-200 text-slate-500 hover:text-emerald-700 hover:border-emerald-300'
       } ${className}`}
     >
       {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}

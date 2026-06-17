@@ -63,13 +63,13 @@ export default function IdeaModal({ isOpen, onClose, userId, userName }: IdeaMod
       <div className="flex gap-2 mb-4">
         <button
           onClick={() => setIsAnonymous(true)}
-          className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition ${isAnonymous ? 'bg-purple-600 text-white' : 'bg-white/5 text-slate-400 border border-white/10'}`}
+          className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition ${isAnonymous ? 'bg-purple-600 text-white' : 'bg-slate-50 text-slate-400 border border-slate-200'}`}
         >
           🔒 Anonymně
         </button>
         <button
           onClick={() => setIsAnonymous(false)}
-          className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition ${!isAnonymous ? 'bg-blue-600 text-white' : 'bg-white/5 text-slate-400 border border-white/10'}`}
+          className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition ${!isAnonymous ? 'bg-blue-600 text-white' : 'bg-slate-50 text-slate-400 border border-slate-200'}`}
         >
           👤 Se jménem
         </button>

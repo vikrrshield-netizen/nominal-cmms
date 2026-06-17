@@ -44,10 +44,10 @@ export default function ToastContainer() {
       {toasts.map((toast) => (
         <div
           key={toast.id}
-          className={`flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl border backdrop-blur-lg animate-[slideInRight_0.25s_ease-out] ${
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border animate-[slideInRight_0.25s_ease-out] ${
             toast.type === 'success'
-              ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400'
-              : 'bg-red-500/20 border-red-500/30 text-red-400'
+              ? 'bg-white border-emerald-200 text-emerald-700'
+              : 'bg-white border-red-200 text-red-700'
           }`}
         >
           {toast.type === 'success' ? (

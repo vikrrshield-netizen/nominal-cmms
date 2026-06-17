@@ -70,14 +70,14 @@ export default function GearboxProblemModal({ asset, user, onClose, onSaved }: {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/35 p-0 backdrop-blur-sm sm:items-center sm:p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#fbf9f4]/35 p-0 sm:items-center sm:p-4" onClick={onClose}>
       <div
         className="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl border border-[var(--vik-border)] bg-white text-slate-950 shadow-2xl sm:max-w-lg sm:rounded-2xl"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-[var(--vik-border)] bg-white/95 p-4 backdrop-blur">
+        <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-[var(--vik-border)] bg-white p-4">
           <div className="min-w-0">
-            <div className="text-xs font-bold uppercase tracking-widest text-red-300">Nahlásit problém</div>
+            <div className="text-xs font-bold uppercase tracking-widest text-red-700">Nahlásit problém</div>
             <h3 className="mt-1 truncate text-lg font-black text-slate-950">{asset.name}</h3>
             <div className="text-sm text-slate-600">{asset.currentExtruderName || asset.location || 'Sklad ND'}</div>
           </div>
@@ -152,7 +152,7 @@ export default function GearboxProblemModal({ asset, user, onClose, onSaved }: {
           </button>
 
           <div className="flex items-start gap-2 text-xs text-slate-600">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
             Vytvoří se úkol pro údržbu. Oprava se zapisuje zvlášť přes „Oprava / úprava“.
           </div>
         </div>
