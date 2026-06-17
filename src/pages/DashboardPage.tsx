@@ -2295,6 +2295,24 @@ function FullDashboard() {
           </div>
         </div>
 
+        {/* Hlavní akce */}
+        <div className="mb-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setActiveModal('fault')}
+            className="flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-black text-white transition hover:bg-red-700 active:scale-[0.98]"
+          >
+            <AlertTriangle className="h-4 w-4" /> Nahlásit poruchu
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('/tasks?new=1')}
+            className="flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-black text-white transition hover:bg-emerald-600 active:scale-[0.98]"
+          >
+            <PlusCircle className="h-4 w-4" /> Nový úkol
+          </button>
+        </div>
+
         {/* LOADING */}
         {(stats.loading || configLoading) && (
           <div className="flex items-center gap-2 mb-4 text-slate-500 text-sm">
@@ -2303,15 +2321,14 @@ function FullDashboard() {
         )}
 
         <DashboardBuilder
-          storageKey="vikrr-dash-builder-v1"
+          storageKey="vikrr-dash-builder-v2"
           panels={[
             {
               id: 'prehled',
               title: 'Přehled (KPI, fronta, stav)',
               defaultSpan: 3,
               node: (
-                <DashboardZone title="Dnes řešit" description={dashboardProfile.todayDescription}>
-                  <OverviewDaylight
+                <OverviewDaylight
                     alarmCount={stats.criticalTasks || 0}
                     alarmDetail={alarmDetail}
                     kpi={{
@@ -2333,13 +2350,13 @@ function FullDashboard() {
                     onNavigate={navigate}
                     onResolveAlarm={() => navigate('/tasks')}
                   />
-                </DashboardZone>
               ),
             },
             {
               id: 'rychle-akce',
               title: 'Rychlé akce',
               defaultSpan: 1,
+              defaultHidden: true,
               node: (
                 <QuickActions onNavigate={(path) => {
                   if (path === 'fault') { setActiveModal('fault'); return; }
@@ -2351,6 +2368,7 @@ function FullDashboard() {
               id: 'moduly',
               title: 'Moduly',
               defaultSpan: 1,
+              defaultHidden: true,
               node: (
                 <DashboardZone title="Moduly" description="Kompaktni menu podle opravneni a role.">
                   <ModuleShortcuts onNavigate={navigate} showHeader={false} />
@@ -2361,6 +2379,7 @@ function FullDashboard() {
               id: 'moje-sledovani',
               title: 'Moje sledování (převodovky, výroba)',
               defaultSpan: 2,
+              defaultHidden: true,
               node: (
                 <DashboardZone title="Moje sledování" description={dashboardProfile.watchDescription}>
                   <WatchWidgets
@@ -2377,6 +2396,7 @@ function FullDashboard() {
               id: 'dalsi-prehledy',
               title: 'Další přehledy',
               defaultSpan: 1,
+              defaultHidden: true,
               node: (
                 <section className="rounded-2xl border border-stone-200 bg-white p-3 shadow-sm shadow-stone-200/70">
                   <button
