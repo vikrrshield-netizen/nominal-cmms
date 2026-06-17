@@ -117,6 +117,14 @@ body,
   color: #1b2620;
 }
 
+/* Pojistka proti vodorovnému přetečení na mobilu (nic se nesmí ořezávat doprava).
+   `clip` nerozbíjí position:sticky (na rozdíl od overflow:hidden). */
+html,
+body {
+  overflow-x: clip;
+  max-width: 100%;
+}
+
 html {
   -webkit-text-size-adjust: 100%;
 }
