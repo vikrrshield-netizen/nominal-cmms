@@ -43,6 +43,7 @@ import SemaphoreWidget from '../components/dashboard/SemaphoreWidget';
 import Top5TasksWidget from '../components/dashboard/Top5TasksWidget';
 import LemonListWidget from '../components/dashboard/LemonListWidget';
 import OverviewDaylight, { type OverviewTask } from '../components/dashboard/OverviewDaylight';
+import DashboardBuilder from '../components/dashboard/DashboardBuilder';
 import MiniChart from '../components/ui/MiniChart';
 import { useEmployeeDirectory } from '../hooks/useEmployeeDirectory';
 import { TYPE_CONFIG as REVISION_TYPE_CONFIG } from '../hooks/useRevisions';
@@ -2073,25 +2074,6 @@ function FullDashboard() {
 
   // Quick action modals
   const [activeModal, setActiveModal] = useState<'idea' | 'request' | 'ai' | 'fault' | null>(null);
-  const watchStorageKey = useMemo(() => `nominal-dashboard-watch-collapsed:${user?.id || role}`, [role, user?.id]);
-  const [watchCollapsed, setWatchCollapsed] = useState(false);
-  useEffect(() => {
-    try {
-      setWatchCollapsed(localStorage.getItem(watchStorageKey) === '1');
-    } catch {
-      setWatchCollapsed(false);
-    }
-  }, [watchStorageKey]);
-
-  const toggleWatchCollapsed = () => {
-    setWatchCollapsed((current) => {
-      const next = !current;
-      try {
-        localStorage.setItem(watchStorageKey, next ? '1' : '0');
-      } catch { /* ignore */ }
-      return next;
-    });
-  };
 
   // Tile data (defensive — all hook data accessed safely)
   const invStats = inventory?.stats ?? { low: 0, critical: 0, out: 0 };
@@ -2320,131 +2302,143 @@ function FullDashboard() {
           </div>
         )}
 
-        <DashboardZone title="Dnes řešit" description={dashboardProfile.todayDescription}>
-          <OverviewDaylight
-            alarmCount={stats.criticalTasks || 0}
-            alarmDetail={alarmDetail}
-            kpi={{
-              openTasks: stats.openTasks || 0,
-              p1: stats.criticalTasks || 0,
-              p2: (stats as any).urgentTasks || 0,
-              operational: stats.operationalAssets || 0,
-              total: stats.totalAssets || 0,
-              breakdown: stats.breakdownAssets || 0,
-              revisionsSoon: stats.upcomingRevisions || 0,
-              lowStock: lowStockCount,
-            }}
-            priorityTasks={topTasks}
-            machineStatus={{ operational: stats.operationalAssets || 0, maintenance: stats.maintenanceAssets || 0, breakdown: stats.breakdownAssets || 0 }}
-            team={overviewTeam}
-            revisions={revisionsTop}
-            lowStockItems={lowStockTop}
-            gearbox={{ installed: gearboxDashboard.installed || 0, stock: gearboxDashboard.stock || 0, service: gearboxDashboard.service || 0 }}
-            onNavigate={navigate}
-            onResolveAlarm={() => navigate('/tasks')}
-            quickActions={(
-              <QuickActions onNavigate={(path) => {
-                if (path === 'fault') { setActiveModal('fault'); return; }
-                navigate(path);
-              }} />
-            )}
-          />
-        </DashboardZone>
+        <DashboardBuilder
+          storageKey="vikrr-dash-builder-v1"
+          panels={[
+            {
+              id: 'prehled',
+              title: 'Přehled (KPI, fronta, stav)',
+              defaultSpan: 3,
+              node: (
+                <DashboardZone title="Dnes řešit" description={dashboardProfile.todayDescription}>
+                  <OverviewDaylight
+                    alarmCount={stats.criticalTasks || 0}
+                    alarmDetail={alarmDetail}
+                    kpi={{
+                      openTasks: stats.openTasks || 0,
+                      p1: stats.criticalTasks || 0,
+                      p2: (stats as any).urgentTasks || 0,
+                      operational: stats.operationalAssets || 0,
+                      total: stats.totalAssets || 0,
+                      breakdown: stats.breakdownAssets || 0,
+                      revisionsSoon: stats.upcomingRevisions || 0,
+                      lowStock: lowStockCount,
+                    }}
+                    priorityTasks={topTasks}
+                    machineStatus={{ operational: stats.operationalAssets || 0, maintenance: stats.maintenanceAssets || 0, breakdown: stats.breakdownAssets || 0 }}
+                    team={overviewTeam}
+                    revisions={revisionsTop}
+                    lowStockItems={lowStockTop}
+                    gearbox={{ installed: gearboxDashboard.installed || 0, stock: gearboxDashboard.stock || 0, service: gearboxDashboard.service || 0 }}
+                    onNavigate={navigate}
+                    onResolveAlarm={() => navigate('/tasks')}
+                  />
+                </DashboardZone>
+              ),
+            },
+            {
+              id: 'rychle-akce',
+              title: 'Rychlé akce',
+              defaultSpan: 1,
+              node: (
+                <QuickActions onNavigate={(path) => {
+                  if (path === 'fault') { setActiveModal('fault'); return; }
+                  navigate(path);
+                }} />
+              ),
+            },
+            {
+              id: 'moduly',
+              title: 'Moduly',
+              defaultSpan: 1,
+              node: (
+                <DashboardZone title="Moduly" description="Kompaktni menu podle opravneni a role.">
+                  <ModuleShortcuts onNavigate={navigate} showHeader={false} />
+                </DashboardZone>
+              ),
+            },
+            {
+              id: 'moje-sledovani',
+              title: 'Moje sledování (převodovky, výroba)',
+              defaultSpan: 2,
+              node: (
+                <DashboardZone title="Moje sledování" description={dashboardProfile.watchDescription}>
+                  <WatchWidgets
+                    blocks={watchBlocks}
+                    order={watchOrder}
+                    hidden={watchHidden}
+                    onReorder={persistWatchOrder}
+                    onSetHidden={persistWatchHidden}
+                  />
+                </DashboardZone>
+              ),
+            },
+            {
+              id: 'dalsi-prehledy',
+              title: 'Další přehledy',
+              defaultSpan: 1,
+              node: (
+                <section className="rounded-2xl border border-stone-200 bg-white p-3 shadow-sm shadow-stone-200/70">
+                  <button
+                    type="button"
+                    onClick={() => setShowMorePanels((value) => !value)}
+                    className="flex w-full items-center justify-between gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-stone-50 active:scale-[0.99]"
+                  >
+                    <div>
+                      <div className="text-sm font-black text-slate-950">Další přehledy</div>
+                      <div className="mt-0.5 text-xs font-semibold text-slate-500">
+                        {dashboardProfile.moreDescription}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-full border border-stone-200 bg-stone-50 px-2.5 py-1 text-xs font-black text-slate-600">
+                        {showMorePanels ? 'Skrýt' : 'Zobrazit'}
+                      </span>
+                      {showMorePanels ? <ChevronUp className="h-4 w-4 text-slate-500" /> : <ChevronDown className="h-4 w-4 text-slate-500" />}
+                    </div>
+                  </button>
 
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_390px] xl:items-start">
-          <main className="order-2 space-y-5 xl:order-1">
-        <DashboardZone title="Moje sledování" description={dashboardProfile.watchDescription}>
-          <div className="mb-3 flex justify-end">
-            <button
-              type="button"
-              onClick={toggleWatchCollapsed}
-              className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 text-xs font-black text-slate-600 transition hover:bg-stone-50 active:scale-[0.99]"
-            >
-              {watchCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-              {watchCollapsed ? 'Rozbalit sledování' : 'Minimalizovat sledování'}
-            </button>
-          </div>
+                  {showMorePanels && (
+                    <div className="mt-3 space-y-4">
+                      <VacationNotice
+                        todayVacations={vacationAlerts.todayVacations}
+                        upcomingVacations={vacationAlerts.upcomingVacations}
+                        onNavigate={navigate}
+                      />
 
-          {watchCollapsed ? (
-            <div className="rounded-2xl border border-stone-200 bg-white/80 p-4 text-sm font-semibold text-slate-500">
-              Sledované widgety jsou skryté na tomto zařízení.
-            </div>
-          ) : (
-            <WatchWidgets
-              blocks={watchBlocks}
-              order={watchOrder}
-              hidden={watchHidden}
-              onReorder={persistWatchOrder}
-              onSetHidden={persistWatchHidden}
-            />
-          )}
-        </DashboardZone>
-          </main>
+                      <OptionalActivityPanel
+                        todayItems={activity.todayItems}
+                        weekItems={activity.weekItems}
+                        onNavigate={navigate}
+                      />
 
-          <aside className="order-1 space-y-5 xl:order-2 xl:sticky xl:top-4">
-        <DashboardZone title="Moduly" description="Kompaktni menu podle opravneni a role.">
-          <ModuleShortcuts onNavigate={navigate} showHeader={false} />
-        </DashboardZone>
+                      <AuditReadiness
+                        todayLogs={todayOps.todayLogs}
+                        openTasks={stats.openTasks || 0}
+                        todayDefects={todayOps.todayDefects}
+                        onNavigate={navigate}
+                      />
 
-        <section className="rounded-2xl border border-stone-200 bg-white p-3 shadow-sm shadow-stone-200/70">
-          <button
-            type="button"
-            onClick={() => setShowMorePanels((value) => !value)}
-            className="flex w-full items-center justify-between gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-stone-50 active:scale-[0.99]"
-          >
-            <div>
-              <div className="text-sm font-black text-slate-950">Další přehledy</div>
-              <div className="mt-0.5 text-xs font-semibold text-slate-500">
-                {dashboardProfile.moreDescription}
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="rounded-full border border-stone-200 bg-stone-50 px-2.5 py-1 text-xs font-black text-slate-600">
-                {showMorePanels ? 'Skrýt' : 'Zobrazit'}
-              </span>
-              {showMorePanels ? <ChevronUp className="h-4 w-4 text-slate-500" /> : <ChevronDown className="h-4 w-4 text-slate-500" />}
-            </div>
-          </button>
+                      <AiTipCard stats={stats} />
+                      <ReminderStrip tasks={recurringToday} onNavigate={() => navigate('/schedules')} />
 
-          {showMorePanels && (
-            <div className="mt-3 space-y-4">
-              <VacationNotice
-                todayVacations={vacationAlerts.todayVacations}
-                upcomingVacations={vacationAlerts.upcomingVacations}
-                onNavigate={navigate}
-              />
-
-              <OptionalActivityPanel
-                todayItems={activity.todayItems}
-                weekItems={activity.weekItems}
-                onNavigate={navigate}
-              />
-
-              <AuditReadiness
-                todayLogs={todayOps.todayLogs}
-                openTasks={stats.openTasks || 0}
-                todayDefects={todayOps.todayDefects}
-                onNavigate={navigate}
-              />
-
-              <AiTipCard stats={stats} />
-              <ReminderStrip tasks={recurringToday} onNavigate={() => navigate('/schedules')} />
-
-              {!configLoading && filteredWidgets.length > 0 && (
-                <SecondaryModules
-                  widgets={filteredWidgets}
-                  getTileData={getTileData}
-                  onTileClick={handleTileClick}
-                  onReorder={handleModuleReorder}
-                  onSetVisible={handleModuleSetVisible}
-                  onReset={resetToDefaults}
-                />
-              )}
-            </div>
-          )}
-        </section>
-          </aside>
-        </div>
+                      {!configLoading && filteredWidgets.length > 0 && (
+                        <SecondaryModules
+                          widgets={filteredWidgets}
+                          getTileData={getTileData}
+                          onTileClick={handleTileClick}
+                          onReorder={handleModuleReorder}
+                          onSetVisible={handleModuleSetVisible}
+                          onReset={resetToDefaults}
+                        />
+                      )}
+                    </div>
+                  )}
+                </section>
+              ),
+            },
+          ]}
+        />
       </div>
 
       {/* ACTION MODALS */}
