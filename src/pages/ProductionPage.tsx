@@ -143,9 +143,9 @@ interface SimpleAsset {
 // ═══════════════════════════════════════════════════════════════════
 
 const STATUS_CFG: Record<string, { label: string; dot: string; bg: string; text: string }> = {
-  planned: { label: 'Plánováno', dot: 'bg-blue-400',    bg: 'bg-blue-500/15',    text: 'text-blue-400' },
-  running: { label: 'Probíhá',  dot: 'bg-amber-400 animate-pulse', bg: 'bg-amber-500/15', text: 'text-amber-400' },
-  done:    { label: 'Hotovo',   dot: 'bg-emerald-400',  bg: 'bg-emerald-500/15', text: 'text-emerald-400' },
+  planned: { label: 'Plánováno', dot: 'bg-blue-400',    bg: 'bg-blue-500/15',    text: 'text-blue-700' },
+  running: { label: 'Probíhá',  dot: 'bg-amber-400 animate-pulse', bg: 'bg-amber-500/15', text: 'text-amber-700' },
+  done:    { label: 'Hotovo',   dot: 'bg-emerald-400',  bg: 'bg-emerald-500/15', text: 'text-emerald-700' },
 };
 
 const RAW_MATERIALS = [
@@ -927,16 +927,16 @@ export default function ProductionPage() {
   const stats = activeTab === 'extrusion' ? extrusionStats : packagingStats;
 
   return (
-    <div className="min-h-screen bg-slate-900 pb-24">
+    <div className="min-h-screen bg-[#f1ece3] pb-24">
       {/* Header */}
-      <div className="bg-slate-800/80 backdrop-blur-sm border-b border-slate-700/50 px-4 py-4 sticky top-0 z-20">
+      <div className="bg-white border-b border-slate-700/50 px-4 py-4 sticky top-0 z-20">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
-            <button onClick={() => goBack()} className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition">
+            <button onClick={() => goBack()} className="p-2 rounded-xl bg-slate-50 border border-slate-200 hover:bg-slate-100 transition">
               <ArrowLeft className="w-5 h-5 text-slate-400" />
             </button>
             <div>
-              <h1 className="text-lg font-bold text-white">Výroba</h1>
+              <h1 className="text-lg font-bold text-slate-900">Výroba</h1>
               <p className="text-xs text-slate-500">Plánování extruze & balení</p>
             </div>
           </div>
@@ -952,7 +952,7 @@ export default function ProductionPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 bg-white/5 p-1 rounded-xl">
+        <div className="flex gap-1 bg-slate-50 p-1 rounded-xl">
           {[
             { id: 'extrusion' as const, label: 'Extrudovna', icon: Cog, count: extrusionStats.running },
             { id: 'packaging' as const, label: 'Balení', icon: Package, count: packagingStats.running },
@@ -961,14 +961,14 @@ export default function ProductionPage() {
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition ${
-                activeTab === tab.id ? 'bg-white text-slate-900' : 'text-slate-400 hover:text-white'
+                activeTab === tab.id ? 'bg-white text-slate-900' : 'text-slate-400 hover:text-slate-900'
               }`}
             >
               <tab.icon className="w-4 h-4" />
               {tab.label}
               {tab.count > 0 && (
                 <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                  activeTab === tab.id ? 'bg-amber-200 text-amber-800' : 'bg-amber-500/20 text-amber-400'
+                  activeTab === tab.id ? 'bg-amber-200 text-amber-800' : 'bg-amber-500/20 text-amber-700'
                 }`}>
                   {tab.count} ▶
                 </span>
@@ -997,20 +997,20 @@ export default function ProductionPage() {
 
       {activeTab === 'extrusion' && (
         <div className="max-w-2xl mx-auto px-4 pb-3">
-          <div className="rounded-2xl border border-slate-700/60 bg-slate-800/60 p-3">
+          <div className="rounded-2xl border border-slate-700/60 bg-white p-3">
             <div className="mb-3 flex items-center justify-between gap-2">
               <div>
                 <div className="text-xs font-black uppercase tracking-wide text-slate-400">Dnešní provoz</div>
-                <div className="text-sm font-bold text-white">Co běží a co čeká</div>
+                <div className="text-sm font-bold text-slate-900">Co běží a co čeká</div>
               </div>
-              <div className="rounded-full bg-slate-950/45 px-3 py-1 text-xs font-black text-slate-300">
+              <div className="rounded-full bg-[#fbf9f4]/45 px-3 py-1 text-xs font-black text-slate-600">
                 {new Date().toLocaleDateString('cs-CZ', { day: '2-digit', month: '2-digit' })}
               </div>
             </div>
 
             <div className="grid gap-2 sm:grid-cols-2">
               <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3">
-                <div className="mb-2 text-[10px] font-black uppercase tracking-wide text-amber-300">Právě běží</div>
+                <div className="mb-2 text-[10px] font-black uppercase tracking-wide text-amber-700">Právě běží</div>
                 {runningExtrusionBatches.length === 0 ? (
                   <div className="text-sm font-semibold text-slate-400">Nic neběží</div>
                 ) : (
@@ -1024,10 +1024,10 @@ export default function ProductionPage() {
                           const filterId = getBatchMachineFilterIds(batch)[0];
                           if (filterId) setMachineFilter(filterId);
                         }}
-                        className="block w-full rounded-lg bg-slate-950/35 px-2.5 py-2 text-left transition hover:bg-slate-950/55"
+                        className="block w-full rounded-lg bg-[#fbf9f4]/35 px-2.5 py-2 text-left transition hover:bg-white"
                       >
-                        <div className="truncate text-sm font-black text-white">{batch.productName || batch.materialName || batch.rawMaterial || 'Dávka'}</div>
-                        <div className="mt-0.5 truncate text-xs font-semibold text-amber-200">{getBatchMachineLabel(batch)}</div>
+                        <div className="truncate text-sm font-black text-slate-900">{batch.productName || batch.materialName || batch.rawMaterial || 'Dávka'}</div>
+                        <div className="mt-0.5 truncate text-xs font-semibold text-amber-700">{getBatchMachineLabel(batch)}</div>
                       </button>
                     ))}
                   </div>
@@ -1035,7 +1035,7 @@ export default function ProductionPage() {
               </div>
 
               <div className="rounded-xl border border-blue-500/20 bg-blue-500/10 p-3">
-                <div className="mb-2 text-[10px] font-black uppercase tracking-wide text-blue-300">Dnes čeká</div>
+                <div className="mb-2 text-[10px] font-black uppercase tracking-wide text-blue-700">Dnes čeká</div>
                 {todayPlannedBatches.length === 0 ? (
                   <div className="text-sm font-semibold text-slate-400">Dnes není otevřená dávka</div>
                 ) : (
@@ -1049,9 +1049,9 @@ export default function ProductionPage() {
                           const filterId = getBatchMachineFilterIds(batch)[0];
                           if (filterId) setMachineFilter(filterId);
                         }}
-                        className="block w-full rounded-lg bg-slate-950/35 px-2.5 py-2 text-left transition hover:bg-slate-950/55"
+                        className="block w-full rounded-lg bg-[#fbf9f4]/35 px-2.5 py-2 text-left transition hover:bg-white"
                       >
-                        <div className="truncate text-sm font-black text-white">{batch.productName || batch.materialName || batch.rawMaterial || 'Dávka'}</div>
+                        <div className="truncate text-sm font-black text-slate-900">{batch.productName || batch.materialName || batch.rawMaterial || 'Dávka'}</div>
                         <div className="mt-0.5 truncate text-xs font-semibold text-blue-200">{getBatchMachineLabel(batch)}</div>
                       </button>
                     ))}
@@ -1070,15 +1070,15 @@ export default function ProductionPage() {
                     setMachineFilter(firstLine?.id || 'ALL');
                     setPlanDateFilter('ALL');
                   }}
-                  className="rounded-xl border border-white/10 bg-slate-950/30 px-3 py-2 text-left transition hover:bg-slate-950/50"
+                  className="rounded-xl border border-slate-200 bg-[#fbf9f4]/30 px-3 py-2 text-left transition hover:bg-[#fbf9f4]/50"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <div className="truncate text-sm font-black text-white">{area.name}</div>
-                    <div className="text-xs font-black text-slate-300">{today} dnes</div>
+                    <div className="truncate text-sm font-black text-slate-900">{area.name}</div>
+                    <div className="text-xs font-black text-slate-600">{today} dnes</div>
                   </div>
                   <div className="mt-1 flex gap-2 text-[11px] font-bold text-slate-400">
-                    <span className="text-amber-300">{running} běží</span>
-                    <span className="text-blue-300">{planned} plán</span>
+                    <span className="text-amber-700">{running} běží</span>
+                    <span className="text-blue-700">{planned} plán</span>
                   </div>
                 </button>
               ))}
@@ -1094,7 +1094,7 @@ export default function ProductionPage() {
             <button
               onClick={() => setMachineFilter('ALL')}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition ${
-                machineFilter === 'ALL' ? 'bg-white text-slate-900' : 'bg-white/5 text-slate-400'
+                machineFilter === 'ALL' ? 'bg-white text-slate-900' : 'bg-slate-50 text-slate-400'
               }`}
             >
               Všechny stroje
@@ -1104,7 +1104,7 @@ export default function ProductionPage() {
                 key={a.id}
                 onClick={() => setMachineFilter(a.id)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition ${
-                  machineFilter === a.id ? 'bg-white text-slate-900' : 'bg-white/5 text-slate-400'
+                  machineFilter === a.id ? 'bg-white text-slate-900' : 'bg-slate-50 text-slate-400'
                 }`}
               >
                 {a.name}
@@ -1128,11 +1128,11 @@ export default function ProductionPage() {
           const filtered = planDateFilter === 'ALL' ? byMachine : byMachine.filter((batch) => batch.planDate === planDateFilter);
           return (
           <>
-            <div className="rounded-2xl border border-slate-700/60 bg-slate-800/60 p-3">
+            <div className="rounded-2xl border border-slate-700/60 bg-white p-3">
               <div className="mb-3 flex items-center justify-between gap-2">
                 <div>
                   <div className="text-xs font-black uppercase tracking-wide text-slate-400">Týdenní plán</div>
-                  <div className="text-sm font-bold text-white">Extruze po dnech</div>
+                  <div className="text-sm font-bold text-slate-900">Extruze po dnech</div>
                 </div>
                 <button
                   type="button"
@@ -1140,7 +1140,7 @@ export default function ProductionPage() {
                   className={`rounded-full px-3 py-1.5 text-xs font-black transition ${
                     planDateFilter === 'ALL'
                       ? 'bg-white text-slate-950'
-                      : 'bg-slate-950/45 text-slate-300 hover:bg-slate-900'
+                      : 'bg-[#fbf9f4]/45 text-slate-600 hover:bg-white'
                   }`}
                 >
                   Všechny dny
@@ -1157,21 +1157,21 @@ export default function ProductionPage() {
                       key={day.key}
                       className={`min-h-[74px] rounded-xl border p-2 text-left transition active:scale-[0.98] ${
                         isSelected ? 'border-white bg-white text-slate-950' :
-                        isToday ? 'border-emerald-400/50 bg-emerald-500/15' : 'border-white/10 bg-slate-950/35 hover:bg-slate-950/55'
+                        isToday ? 'border-emerald-400/50 bg-emerald-500/15' : 'border-slate-200 bg-[#fbf9f4]/35 hover:bg-white'
                       }`}
                     >
                       <div className={`text-[10px] font-bold uppercase ${isSelected ? 'text-slate-500' : 'text-slate-400'}`}>
                         {day.date.toLocaleDateString('cs-CZ', { weekday: 'short' })}
                       </div>
-                      <div className={`text-sm font-black ${isSelected ? 'text-slate-950' : isToday ? 'text-emerald-200' : 'text-white'}`}>
+                      <div className={`text-sm font-black ${isSelected ? 'text-slate-950' : isToday ? 'text-emerald-700' : 'text-slate-900'}`}>
                         {day.date.getDate()}. {day.date.getMonth() + 1}.
                       </div>
-                      <div className={`mt-2 text-lg font-black ${isSelected ? 'text-slate-950' : 'text-white'}`}>{day.total}</div>
+                      <div className={`mt-2 text-lg font-black ${isSelected ? 'text-slate-950' : 'text-slate-900'}`}>{day.total}</div>
                       <div className="mt-1 flex gap-1">
                         {day.running > 0 && <span className="h-1.5 flex-1 rounded-full bg-amber-400" />}
                         {day.planned > 0 && <span className="h-1.5 flex-1 rounded-full bg-blue-400" />}
                         {day.done > 0 && <span className="h-1.5 flex-1 rounded-full bg-emerald-400" />}
-                        {day.total === 0 && <span className={`h-1.5 flex-1 rounded-full ${isSelected ? 'bg-slate-300' : 'bg-slate-700'}`} />}
+                        {day.total === 0 && <span className={`h-1.5 flex-1 rounded-full ${isSelected ? 'bg-slate-300' : 'bg-slate-100'}`} />}
                       </div>
                     </button>
                   );
@@ -1185,7 +1185,7 @@ export default function ProductionPage() {
               const st = STATUS_CFG[batch.status];
               const machineLabel = getBatchMachineLabel(batch);
               return (
-                <div key={batch.id} className={`bg-slate-800/60 rounded-2xl border ${
+                <div key={batch.id} className={`bg-white rounded-2xl border ${
                   batch.status === 'running' ? 'border-amber-500/30 ring-1 ring-amber-500/20' :
                   batch.status === 'done' ? 'border-emerald-500/20 opacity-70' : 'border-slate-700/40'
                 } overflow-hidden`}>
@@ -1197,13 +1197,13 @@ export default function ProductionPage() {
                       <span className="text-xs text-slate-500 font-mono">{batch.batchId}</span>
                     </div>
                     {batch.status === 'running' && (
-                      <span className="flex items-center gap-1 text-xs text-amber-400 font-semibold">
+                      <span className="flex items-center gap-1 text-xs text-amber-700 font-semibold">
                         <Clock className="w-3 h-3" />
                         {formatDuration(batch.startedAt, null)}
                       </span>
                     )}
                     {batch.status === 'done' && batch.startedAt && (
-                      <span className="flex items-center gap-1 text-xs text-emerald-400">
+                      <span className="flex items-center gap-1 text-xs text-emerald-700">
                         <CheckCircle2 className="w-3 h-3" />
                         {formatDuration(batch.startedAt, batch.completedAt)}
                       </span>
@@ -1214,57 +1214,57 @@ export default function ProductionPage() {
                   <button
                     type="button"
                     onClick={() => setSelectedBatch(batch)}
-                    className="block w-full px-4 py-3 text-left transition hover:bg-slate-950/20"
+                    className="block w-full px-4 py-3 text-left transition hover:bg-[#fbf9f4]/20"
                   >
                     <div className="mb-3 flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="truncate text-base font-black text-white">{batch.productName || batch.materialName || batch.rawMaterial || 'Bez výrobku'}</div>
-                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-bold text-slate-300">
-                          <span className="rounded-full bg-white/5 px-2.5 py-1">{batch.productionAreaLabel}</span>
-                          <span className="rounded-full bg-white/5 px-2.5 py-1">{machineLabel}</span>
+                        <div className="truncate text-base font-black text-slate-900">{batch.productName || batch.materialName || batch.rawMaterial || 'Bez výrobku'}</div>
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-bold text-slate-600">
+                          <span className="rounded-full bg-slate-50 px-2.5 py-1">{batch.productionAreaLabel}</span>
+                          <span className="rounded-full bg-slate-50 px-2.5 py-1">{machineLabel}</span>
                         </div>
                       </div>
-                      <div className="shrink-0 rounded-xl border border-white/10 bg-slate-950/35 px-3 py-2 text-right">
+                      <div className="shrink-0 rounded-xl border border-slate-200 bg-[#fbf9f4]/35 px-3 py-2 text-right">
                         <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">Plán</div>
-                        <div className="text-sm font-black text-white">{batch.planDate || 'Bez data'}</div>
+                        <div className="text-sm font-black text-slate-900">{batch.planDate || 'Bez data'}</div>
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-2 mb-3 lg:grid-cols-4">
-                      <div className="rounded-xl border border-white/10 bg-slate-950/35 p-2.5">
+                      <div className="rounded-xl border border-slate-200 bg-[#fbf9f4]/35 p-2.5">
                         <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">Výrobek</div>
-                        <div className="text-sm font-medium text-white">{batch.productName || 'nezadáno'}</div>
-                        {batch.productBatch && <div className="mt-1 font-mono text-[11px] text-emerald-300">{batch.productBatch}</div>}
+                        <div className="text-sm font-medium text-slate-900">{batch.productName || 'nezadáno'}</div>
+                        {batch.productBatch && <div className="mt-1 font-mono text-[11px] text-emerald-700">{batch.productBatch}</div>}
                       </div>
-                      <div className="rounded-xl border border-white/10 bg-slate-950/35 p-2.5">
+                      <div className="rounded-xl border border-slate-200 bg-[#fbf9f4]/35 p-2.5">
                         <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">Surovina</div>
-                        <div className="text-sm font-medium text-white">{batch.materialName || batch.rawMaterial}</div>
-                        {batch.materialBatch && <div className="mt-1 font-mono text-[11px] text-emerald-300">{batch.materialBatch}</div>}
+                        <div className="text-sm font-medium text-slate-900">{batch.materialName || batch.rawMaterial}</div>
+                        {batch.materialBatch && <div className="mt-1 font-mono text-[11px] text-emerald-700">{batch.materialBatch}</div>}
                       </div>
-                      <div className="rounded-xl border border-white/10 bg-slate-950/35 p-2.5">
+                      <div className="rounded-xl border border-slate-200 bg-[#fbf9f4]/35 p-2.5">
                         <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">Hmotnost</div>
-                        <div className="text-sm font-medium text-white">{batch.targetWeight} kg</div>
+                        <div className="text-sm font-medium text-slate-900">{batch.targetWeight} kg</div>
                       </div>
-                      <div className="rounded-xl border border-white/10 bg-slate-950/35 p-2.5">
+                      <div className="rounded-xl border border-slate-200 bg-[#fbf9f4]/35 p-2.5">
                         <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">Stroj</div>
-                        <div className="text-sm font-medium text-white">{machineLabel}</div>
+                        <div className="text-sm font-medium text-slate-900">{machineLabel}</div>
                       </div>
                     </div>
 
                     {(batch.mixingRecipeSnapshot?.length || batch.mixingNote || typeof batch.targetMotorLoadAmps === 'number') && (
                       <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-2.5 mb-3">
                         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                          <div className="text-[10px] font-black uppercase tracking-wide text-emerald-300">Míchání podle receptury</div>
+                          <div className="text-[10px] font-black uppercase tracking-wide text-emerald-700">Míchání podle receptury</div>
                           {typeof batch.targetMotorLoadAmps === 'number' && (
-                            <div className="rounded-full bg-emerald-400/10 px-2 py-1 text-[11px] font-black text-emerald-200">cíl {batch.targetMotorLoadAmps} A</div>
+                            <div className="rounded-full bg-emerald-400/10 px-2 py-1 text-[11px] font-black text-emerald-700">cíl {batch.targetMotorLoadAmps} A</div>
                           )}
                         </div>
                         {!!batch.mixingRecipeSnapshot?.length && (
                           <div className="space-y-1">
                             {batch.mixingRecipeSnapshot.map((row, index) => (
-                              <div key={`${row.materialId}-${index}`} className="grid grid-cols-[1fr_auto_auto] gap-2 rounded-lg bg-slate-950/40 px-2 py-1.5 text-xs">
-                                <span className="font-semibold text-white">{row.materialName}</span>
-                                <span className="text-slate-300">{row.ratio} dílů</span>
-                                <span className="font-bold text-emerald-200">{row.plannedAmountKg || '—'} kg</span>
+                              <div key={`${row.materialId}-${index}`} className="grid grid-cols-[1fr_auto_auto] gap-2 rounded-lg bg-slate-50 px-2 py-1.5 text-xs">
+                                <span className="font-semibold text-slate-900">{row.materialName}</span>
+                                <span className="text-slate-600">{row.ratio} dílů</span>
+                                <span className="font-bold text-emerald-700">{row.plannedAmountKg || '—'} kg</span>
                               </div>
                             ))}
                           </div>
@@ -1274,17 +1274,17 @@ export default function ProductionPage() {
                     )}
 
                     {batch.note && (
-                      <div className="bg-slate-700/30 rounded-xl p-2.5 mb-3">
+                      <div className="bg-slate-50 rounded-xl p-2.5 mb-3">
                         <div className="text-[10px] text-slate-500 uppercase mb-1">Poznámka k plánu</div>
-                        <p className="text-xs text-slate-300 whitespace-pre-wrap">{batch.note}</p>
+                        <p className="text-xs text-slate-600 whitespace-pre-wrap">{batch.note}</p>
                       </div>
                     )}
 
                     {/* Shift log */}
                     {batch.shiftLog && (
-                      <div className="bg-slate-700/30 rounded-xl p-2.5 mb-3">
+                      <div className="bg-slate-50 rounded-xl p-2.5 mb-3">
                         <div className="text-[10px] text-slate-500 uppercase mb-1">Směnový záznam</div>
-                        <p className="text-xs text-slate-300 whitespace-pre-wrap">{batch.shiftLog}</p>
+                        <p className="text-xs text-slate-600 whitespace-pre-wrap">{batch.shiftLog}</p>
                       </div>
                     )}
                   </button>
@@ -1294,19 +1294,19 @@ export default function ProductionPage() {
                       <div className="flex gap-2 px-4 pb-3">
                         {batch.status === 'planned' && (
                           <button onClick={(event) => { event.stopPropagation(); startBatch(batch.id); }}
-                            className="flex-1 py-2.5 bg-amber-500/15 border border-amber-500/30 text-amber-400 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-amber-500/25 transition active:scale-[0.97]">
+                            className="flex-1 py-2.5 bg-amber-500/15 border border-amber-500/30 text-amber-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-amber-500/25 transition active:scale-[0.97]">
                             <Play className="w-3.5 h-3.5" /> Start
                           </button>
                         )}
                         {batch.status === 'running' && (
                           <button onClick={(event) => { event.stopPropagation(); stopBatch(batch.id); }}
-                            className="flex-1 py-2.5 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-emerald-500/25 transition active:scale-[0.97]">
+                            className="flex-1 py-2.5 bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-emerald-500/25 transition active:scale-[0.97]">
                             <Square className="w-3.5 h-3.5" /> Dokončit
                           </button>
                         )}
                         {batch.status !== 'done' && (
                           <button onClick={(event) => { event.stopPropagation(); setShiftLogId(batch.id); setShiftLogText(batch.shiftLog || ''); }}
-                            className="py-2.5 px-3 bg-white/5 border border-white/10 text-slate-400 rounded-xl text-xs font-semibold hover:text-white transition">
+                            className="py-2.5 px-3 bg-slate-50 border border-slate-200 text-slate-400 rounded-xl text-xs font-semibold hover:text-slate-900 transition">
                             Záznam
                           </button>
                         )}
@@ -1336,7 +1336,7 @@ export default function ProductionPage() {
               const st = STATUS_CFG[order.status];
               const isOverdue = order.deadline && new Date(order.deadline) < new Date() && order.status !== 'done';
               return (
-                <div key={order.id} className={`bg-slate-800/60 rounded-2xl border ${
+                <div key={order.id} className={`bg-white rounded-2xl border ${
                   isOverdue ? 'border-red-500/30 ring-1 ring-red-500/20' :
                   order.status === 'running' ? 'border-amber-500/30 ring-1 ring-amber-500/20' :
                   order.status === 'done' ? 'border-emerald-500/20 opacity-70' : 'border-slate-700/40'
@@ -1345,19 +1345,19 @@ export default function ProductionPage() {
                   <div className={`px-4 py-2.5 ${isOverdue ? 'bg-red-500/15' : st.bg} flex items-center justify-between`}>
                     <div className="flex items-center gap-2">
                       <div className={`w-2.5 h-2.5 rounded-full ${isOverdue ? 'bg-red-400 animate-pulse' : st.dot}`} />
-                      <span className={`text-xs font-bold ${isOverdue ? 'text-red-400' : st.text}`}>
+                      <span className={`text-xs font-bold ${isOverdue ? 'text-red-700' : st.text}`}>
                         {isOverdue ? 'Po termínu!' : st.label}
                       </span>
                       <span className="text-xs text-slate-500 font-mono">{order.productId}</span>
                     </div>
                     {order.status === 'running' && (
-                      <span className="flex items-center gap-1 text-xs text-amber-400 font-semibold">
+                      <span className="flex items-center gap-1 text-xs text-amber-700 font-semibold">
                         <Clock className="w-3 h-3" />
                         {formatDuration(order.startedAt, null)}
                       </span>
                     )}
                     {order.status === 'done' && order.startedAt && (
-                      <span className="flex items-center gap-1 text-xs text-emerald-400">
+                      <span className="flex items-center gap-1 text-xs text-emerald-700">
                         <CheckCircle2 className="w-3 h-3" />
                         {formatDuration(order.startedAt, order.completedAt)}
                       </span>
@@ -1369,20 +1369,20 @@ export default function ProductionPage() {
                     <div className="grid grid-cols-3 gap-3 mb-3">
                       <div>
                         <div className="text-[10px] text-slate-500 uppercase">Balení</div>
-                        <div className="text-sm font-medium text-white">{order.packagingType}</div>
+                        <div className="text-sm font-medium text-slate-900">{order.packagingType}</div>
                       </div>
                       <div>
                         <div className="text-[10px] text-slate-500 uppercase">Palet</div>
-                        <div className="text-sm font-medium text-white">{order.palletCount}</div>
+                        <div className="text-sm font-medium text-slate-900">{order.palletCount}</div>
                       </div>
                       <div>
                         <div className="text-[10px] text-slate-500 uppercase">Linka</div>
-                        <div className="text-sm font-medium text-white">{order.lineName || '—'}</div>
+                        <div className="text-sm font-medium text-slate-900">{order.lineName || '—'}</div>
                       </div>
                     </div>
 
                     {order.deadline && (
-                      <div className={`flex items-center gap-1.5 mb-3 text-xs font-medium ${isOverdue ? 'text-red-400' : 'text-slate-400'}`}>
+                      <div className={`flex items-center gap-1.5 mb-3 text-xs font-medium ${isOverdue ? 'text-red-700' : 'text-slate-400'}`}>
                         {isOverdue && <AlertTriangle className="w-3.5 h-3.5" />}
                         <Clock className="w-3.5 h-3.5" />
                         Deadline: {new Date(order.deadline).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'short', year: 'numeric' })}
@@ -1394,13 +1394,13 @@ export default function ProductionPage() {
                       <div className="flex gap-2">
                         {order.status === 'planned' && (
                           <button onClick={() => startOrder(order.id)}
-                            className="flex-1 py-2.5 bg-amber-500/15 border border-amber-500/30 text-amber-400 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-amber-500/25 transition active:scale-[0.97]">
+                            className="flex-1 py-2.5 bg-amber-500/15 border border-amber-500/30 text-amber-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-amber-500/25 transition active:scale-[0.97]">
                             <Play className="w-3.5 h-3.5" /> Start
                           </button>
                         )}
                         {order.status === 'running' && (
                           <button onClick={() => stopOrder(order.id)}
-                            className="flex-1 py-2.5 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-emerald-500/25 transition active:scale-[0.97]">
+                            className="flex-1 py-2.5 bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-emerald-500/25 transition active:scale-[0.97]">
                             <Square className="w-3.5 h-3.5" /> Dokončit
                           </button>
                         )}
@@ -1423,7 +1423,7 @@ export default function ProductionPage() {
 
       {/* ═══ NEW EXTRUSION BATCH MODAL ═══ */}
       {showNewBatch && (
-        <ModalShell title="Nová extruzní dávka" icon={<Cog className="w-5 h-5 text-orange-400" />} onClose={() => setShowNewBatch(false)}>
+        <ModalShell title="Nová extruzní dávka" icon={<Cog className="w-5 h-5 text-orange-700" />} onClose={() => setShowNewBatch(false)}>
           <div className="space-y-4">
             <Field label="Datum plánu">
               <input type="date" value={batchForm.planDate}
@@ -1439,8 +1439,8 @@ export default function ProductionPage() {
                     onClick={() => setBatchForm(p => ({ ...p, productionArea: area.id }))}
                     className={`rounded-xl border p-3 text-left transition active:scale-[0.98] ${
                       batchForm.productionArea === area.id
-                        ? 'border-orange-400 bg-orange-500/20 text-white'
-                        : 'border-white/10 bg-white/5 text-slate-300'
+                        ? 'border-orange-400 bg-orange-500/20 text-slate-900'
+                        : 'border-slate-200 bg-slate-50 text-slate-600'
                     }`}
                   >
                     <span className="block text-sm font-bold">{area.name}</span>
@@ -1463,7 +1463,7 @@ export default function ProductionPage() {
                       const ids = visibleExtrusionLines.map((line) => line.id);
                       setBatchForm((prev) => ({ ...prev, extruderIds: ids, extruderId: ids[0] || '' }));
                     }}
-                    className="shrink-0 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1.5 text-xs font-bold text-emerald-200"
+                    className="shrink-0 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1.5 text-xs font-bold text-emerald-700"
                   >
                     Vybrat vše
                   </button>
@@ -1484,14 +1484,14 @@ export default function ProductionPage() {
                     })}
                     className={`rounded-xl border p-3 text-left transition active:scale-[0.98] ${
                       batchForm.extruderIds.includes(line.id)
-                        ? 'border-emerald-400 bg-emerald-500/20 text-white'
-                        : 'border-white/10 bg-white/5 text-slate-300'
+                        ? 'border-emerald-400 bg-emerald-500/20 text-slate-900'
+                        : 'border-slate-200 bg-slate-50 text-slate-600'
                     }`}
                   >
                     <span className="flex items-center justify-between gap-2 text-sm font-bold">
                       {line.name}
                       {batchForm.extruderIds.includes(line.id) && (
-                        <CheckCircle2 className="h-4 w-4 text-emerald-300" />
+                        <CheckCircle2 className="h-4 w-4 text-emerald-700" />
                       )}
                     </span>
                     <span className="mt-1 block text-xs opacity-75">{line.areaName}</span>
@@ -1506,9 +1506,9 @@ export default function ProductionPage() {
                 className={SEL_CLS}
                 style={{ appearance: 'auto' }}
               >
-                <option value="" className="bg-slate-800">— vybrat výrobek —</option>
+                <option value="" className="bg-white">— vybrat výrobek —</option>
                 {masterProducts.map(product => (
-                  <option key={product.id} value={product.id} className="bg-slate-800">
+                  <option key={product.id} value={product.id} className="bg-white">
                     {product.nkCode} — {product.name}
                   </option>
                 ))}
@@ -1524,8 +1524,8 @@ export default function ProductionPage() {
                 />
               </Field>
               <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3">
-                <div className="text-[10px] font-black uppercase text-emerald-300">Auto šarže výrobku</div>
-                <div className="mt-1 font-mono text-sm font-black text-white">{selectedProductBatch || 'vyber výrobek'}</div>
+                <div className="text-[10px] font-black uppercase text-emerald-700">Auto šarže výrobku</div>
+                <div className="mt-1 font-mono text-sm font-black text-slate-900">{selectedProductBatch || 'vyber výrobek'}</div>
               </div>
             </div>
             <Field label="Surovina">
@@ -1535,9 +1535,9 @@ export default function ProductionPage() {
                 className={SEL_CLS}
                 style={{ appearance: 'auto' }}
               >
-                <option value="" className="bg-slate-800">— vybrat surovinu —</option>
+                <option value="" className="bg-white">— vybrat surovinu —</option>
                 {masterMaterials.map(material => (
-                  <option key={material.id} value={material.id} className="bg-slate-800">
+                  <option key={material.id} value={material.id} className="bg-white">
                     {material.nkCode} — {material.name}
                   </option>
                 ))}
@@ -1547,8 +1547,8 @@ export default function ProductionPage() {
               <Field label="Surovina (dočasný číselník)">
                 <select value={batchForm.rawMaterial} onChange={e => setBatchForm(p => ({ ...p, rawMaterial: e.target.value }))}
                   className={SEL_CLS} style={{ appearance: 'auto' }}>
-                  <option value="" className="bg-slate-800">— vybrat —</option>
-                  {materialOptions.map(m => <option key={m.id} value={m.name} className="bg-slate-800">{m.name}</option>)}
+                  <option value="" className="bg-white">— vybrat —</option>
+                  {materialOptions.map(m => <option key={m.id} value={m.name} className="bg-white">{m.name}</option>)}
                 </select>
               </Field>
             )}
@@ -1579,19 +1579,19 @@ export default function ProductionPage() {
               />
             </Field>
             {canManage && (
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
                 <button
                   type="button"
                   onClick={() => setShowCatalogSettings((value) => !value)}
                   className="flex w-full items-center justify-between gap-3 text-left"
                 >
                   <span>
-                    <span className="block text-xs font-bold uppercase tracking-wide text-slate-300">Nastavení seznamů</span>
+                    <span className="block text-xs font-bold uppercase tracking-wide text-slate-600">Nastavení seznamů</span>
                     <span className="mt-1 block text-xs font-semibold text-slate-400">
                       Volitelné: suroviny, úseky a stroje pro plánování. Sem později přidáme i mlýny.
                     </span>
                   </span>
-                  <span className="rounded-full border border-white/10 px-3 py-1 text-xs font-bold text-white">
+                  <span className="rounded-full border border-slate-200 px-3 py-1 text-xs font-bold text-slate-900">
                     {showCatalogSettings ? 'Sbalit' : 'Rozbalit'}
                   </span>
                 </button>
@@ -1643,7 +1643,7 @@ export default function ProductionPage() {
                       style={{ appearance: 'auto' }}
                     >
                       {areaOptions.map((area) => (
-                        <option key={area.id} value={area.id} className="bg-slate-800">{area.name}</option>
+                        <option key={area.id} value={area.id} className="bg-white">{area.name}</option>
                       ))}
                     </select>
                     <button
@@ -1666,7 +1666,7 @@ export default function ProductionPage() {
             </Field>
             <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-3">
               <div className="mb-2 flex items-center justify-between gap-2">
-                <div className="text-xs font-black uppercase tracking-wide text-emerald-300">Míchání / receptura</div>
+                <div className="text-xs font-black uppercase tracking-wide text-emerald-700">Míchání / receptura</div>
                 {typeof selectedProduct?.targetMotorLoadAmps === 'number' && (
                   <div className="rounded-full bg-emerald-400/10 px-2 py-1 text-[11px] font-black text-emerald-100">
                     zátěž {selectedProduct.targetMotorLoadAmps} A
@@ -1676,15 +1676,15 @@ export default function ProductionPage() {
               {selectedProduct?.recipe?.length ? (
                 <div className="space-y-1">
                   {mixingRecipeSnapshot.map((row, index) => (
-                    <div key={`${row.materialId}-${index}`} className="grid grid-cols-[1fr_auto_auto] gap-2 rounded-lg bg-slate-950/40 px-2 py-1.5 text-xs">
-                      <span className="font-semibold text-white">{row.materialName}</span>
-                      <span className="text-slate-300">{row.ratio} dílů</span>
-                      <span className="font-bold text-emerald-200">{row.plannedAmountKg || '—'} kg</span>
+                    <div key={`${row.materialId}-${index}`} className="grid grid-cols-[1fr_auto_auto] gap-2 rounded-lg bg-slate-50 px-2 py-1.5 text-xs">
+                      <span className="font-semibold text-slate-900">{row.materialName}</span>
+                      <span className="text-slate-600">{row.ratio} dílů</span>
+                      <span className="font-bold text-emerald-700">{row.plannedAmountKg || '—'} kg</span>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-xs font-semibold text-amber-200">Receptura není vyplněná v rodném listu výrobku.</p>
+                <p className="text-xs font-semibold text-amber-700">Receptura není vyplněná v rodném listu výrobku.</p>
               )}
             </div>
             <Field label="Poznámka k míchání">
@@ -1715,13 +1715,13 @@ export default function ProductionPage() {
 
       {/* ═══ NEW PACKAGING ORDER MODAL ═══ */}
       {showNewOrder && (
-        <ModalShell title="Nová balicí zakázka" icon={<Package className="w-5 h-5 text-blue-400" />} onClose={() => setShowNewOrder(false)}>
+        <ModalShell title="Nová balicí zakázka" icon={<Package className="w-5 h-5 text-blue-700" />} onClose={() => setShowNewOrder(false)}>
           <div className="space-y-4">
             <Field label="Typ balení">
               <select value={orderForm.packagingType} onChange={e => setOrderForm(p => ({ ...p, packagingType: e.target.value }))}
                 className={SEL_CLS} style={{ appearance: 'auto' }}>
-                <option value="" className="bg-slate-800">— vybrat —</option>
-                {PACKAGING_TYPES.map(t => <option key={t} value={t} className="bg-slate-800">{t}</option>)}
+                <option value="" className="bg-white">— vybrat —</option>
+                {PACKAGING_TYPES.map(t => <option key={t} value={t} className="bg-white">{t}</option>)}
               </select>
             </Field>
             <Field label="Počet palet">
@@ -1734,8 +1734,8 @@ export default function ProductionPage() {
                 const asset = packagingOptions.find(a => a.id === e.target.value);
                 setOrderForm(p => ({ ...p, lineId: e.target.value, lineName: asset?.name || '' }));
               }} className={SEL_CLS} style={{ appearance: 'auto' }}>
-                <option value="" className="bg-slate-800">— vybrat linku —</option>
-                {packagingOptions.map(a => <option key={a.id} value={a.id} className="bg-slate-800">{a.name}{a.code ? ` (${a.code})` : ''}</option>)}
+                <option value="" className="bg-white">— vybrat linku —</option>
+                {packagingOptions.map(a => <option key={a.id} value={a.id} className="bg-white">{a.name}{a.code ? ` (${a.code})` : ''}</option>)}
               </select>
             </Field>
             <Field label="Deadline">
@@ -1755,39 +1755,39 @@ export default function ProductionPage() {
       {selectedBatch && (
         <ModalShell
           title="Detail dávky"
-          icon={<Cog className="w-5 h-5 text-amber-400" />}
+          icon={<Cog className="w-5 h-5 text-amber-700" />}
           onClose={() => setSelectedBatch(null)}
         >
           <div className="space-y-4">
-            <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+            <div className="rounded-2xl border border-slate-200 bg-[#fbf9f4]/35 p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="text-xs font-black uppercase tracking-wide text-slate-500">{selectedBatch.batchId}</div>
-                  <h3 className="mt-1 text-xl font-black text-white">{selectedBatch.productName || selectedBatch.materialName || selectedBatch.rawMaterial || 'Bez výrobku'}</h3>
-                  <p className="mt-1 text-sm font-semibold text-slate-300">{getBatchMachineLabel(selectedBatch)}</p>
+                  <h3 className="mt-1 text-xl font-black text-slate-900">{selectedBatch.productName || selectedBatch.materialName || selectedBatch.rawMaterial || 'Bez výrobku'}</h3>
+                  <p className="mt-1 text-sm font-semibold text-slate-600">{getBatchMachineLabel(selectedBatch)}</p>
                 </div>
-                <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-black ${STATUS_CFG[selectedBatch.status]?.bg || 'bg-white/10'} ${STATUS_CFG[selectedBatch.status]?.text || 'text-white'}`}>
+                <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-black ${STATUS_CFG[selectedBatch.status]?.bg || 'bg-slate-100'} ${STATUS_CFG[selectedBatch.status]?.text || 'text-slate-900'}`}>
                   {STATUS_CFG[selectedBatch.status]?.label || selectedBatch.status}
                 </span>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-2">
-              <div className="rounded-xl border border-white/10 bg-slate-950/35 p-3">
+              <div className="rounded-xl border border-slate-200 bg-[#fbf9f4]/35 p-3">
                 <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">Extrudovna</div>
-                <div className="mt-1 text-sm font-black text-white">{selectedBatch.productionAreaLabel}</div>
+                <div className="mt-1 text-sm font-black text-slate-900">{selectedBatch.productionAreaLabel}</div>
               </div>
-              <div className="rounded-xl border border-white/10 bg-slate-950/35 p-3">
+              <div className="rounded-xl border border-slate-200 bg-[#fbf9f4]/35 p-3">
                 <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">Plán</div>
-                <div className="mt-1 text-sm font-black text-white">{selectedBatch.planDate || 'Bez data'}</div>
+                <div className="mt-1 text-sm font-black text-slate-900">{selectedBatch.planDate || 'Bez data'}</div>
               </div>
-              <div className="rounded-xl border border-white/10 bg-slate-950/35 p-3">
+              <div className="rounded-xl border border-slate-200 bg-[#fbf9f4]/35 p-3">
                 <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">Hmotnost</div>
-                <div className="mt-1 text-sm font-black text-white">{selectedBatch.targetWeight} kg</div>
+                <div className="mt-1 text-sm font-black text-slate-900">{selectedBatch.targetWeight} kg</div>
               </div>
-              <div className="rounded-xl border border-white/10 bg-slate-950/35 p-3">
+              <div className="rounded-xl border border-slate-200 bg-[#fbf9f4]/35 p-3">
                 <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">Cílová zátěž</div>
-                <div className="mt-1 text-sm font-black text-white">
+                <div className="mt-1 text-sm font-black text-slate-900">
                   {typeof selectedBatch.targetMotorLoadAmps === 'number' ? `${selectedBatch.targetMotorLoadAmps} A` : 'Nezadáno'}
                 </div>
               </div>
@@ -1795,26 +1795,26 @@ export default function ProductionPage() {
 
             <div className="grid gap-2 sm:grid-cols-2">
               <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3">
-                <div className="text-[10px] font-black uppercase tracking-wide text-emerald-300">Výrobek / šarže</div>
-                <div className="mt-1 text-sm font-black text-white">{selectedBatch.productName || 'Nezadáno'}</div>
-                <div className="mt-1 font-mono text-xs font-bold text-emerald-200">{selectedBatch.productBatch || 'bez šarže'}</div>
+                <div className="text-[10px] font-black uppercase tracking-wide text-emerald-700">Výrobek / šarže</div>
+                <div className="mt-1 text-sm font-black text-slate-900">{selectedBatch.productName || 'Nezadáno'}</div>
+                <div className="mt-1 font-mono text-xs font-bold text-emerald-700">{selectedBatch.productBatch || 'bez šarže'}</div>
               </div>
               <div className="rounded-xl border border-blue-500/20 bg-blue-500/10 p-3">
-                <div className="text-[10px] font-black uppercase tracking-wide text-blue-300">Surovina / šarže</div>
-                <div className="mt-1 text-sm font-black text-white">{selectedBatch.materialName || selectedBatch.rawMaterial || 'Nezadáno'}</div>
+                <div className="text-[10px] font-black uppercase tracking-wide text-blue-700">Surovina / šarže</div>
+                <div className="mt-1 text-sm font-black text-slate-900">{selectedBatch.materialName || selectedBatch.rawMaterial || 'Nezadáno'}</div>
                 <div className="mt-1 font-mono text-xs font-bold text-blue-200">{selectedBatch.materialBatch || 'bez šarže'}</div>
               </div>
             </div>
 
             <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-3">
-              <div className="mb-2 text-[10px] font-black uppercase tracking-wide text-emerald-300">Receptura / míchání</div>
+              <div className="mb-2 text-[10px] font-black uppercase tracking-wide text-emerald-700">Receptura / míchání</div>
               {selectedBatch.mixingRecipeSnapshot?.length ? (
                 <div className="space-y-1.5">
                   {selectedBatch.mixingRecipeSnapshot.map((row, index) => (
-                    <div key={`${row.materialId}-${index}`} className="grid grid-cols-[1fr_auto_auto] gap-2 rounded-lg bg-slate-950/40 px-2.5 py-2 text-xs">
-                      <span className="font-black text-white">{row.materialName}</span>
-                      <span className="font-semibold text-slate-300">{row.ratio} dílů</span>
-                      <span className="font-black text-emerald-200">{row.plannedAmountKg || '—'} kg</span>
+                    <div key={`${row.materialId}-${index}`} className="grid grid-cols-[1fr_auto_auto] gap-2 rounded-lg bg-slate-50 px-2.5 py-2 text-xs">
+                      <span className="font-black text-slate-900">{row.materialName}</span>
+                      <span className="font-semibold text-slate-600">{row.ratio} dílů</span>
+                      <span className="font-black text-emerald-700">{row.plannedAmountKg || '—'} kg</span>
                     </div>
                   ))}
                 </div>
@@ -1827,15 +1827,15 @@ export default function ProductionPage() {
             {(selectedBatch.note || selectedBatch.shiftLog) && (
               <div className="space-y-2">
                 {selectedBatch.note && (
-                  <div className="rounded-xl border border-white/10 bg-slate-950/35 p-3">
+                  <div className="rounded-xl border border-slate-200 bg-[#fbf9f4]/35 p-3">
                     <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">Poznámka k plánu</div>
-                    <p className="mt-1 text-sm text-slate-200 whitespace-pre-wrap">{selectedBatch.note}</p>
+                    <p className="mt-1 text-sm text-slate-700 whitespace-pre-wrap">{selectedBatch.note}</p>
                   </div>
                 )}
                 {selectedBatch.shiftLog && (
-                  <div className="rounded-xl border border-white/10 bg-slate-950/35 p-3">
+                  <div className="rounded-xl border border-slate-200 bg-[#fbf9f4]/35 p-3">
                     <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">Směnový záznam</div>
-                    <p className="mt-1 text-sm text-slate-200 whitespace-pre-wrap">{selectedBatch.shiftLog}</p>
+                    <p className="mt-1 text-sm text-slate-700 whitespace-pre-wrap">{selectedBatch.shiftLog}</p>
                   </div>
                 )}
               </div>
@@ -1846,7 +1846,7 @@ export default function ProductionPage() {
                 {selectedBatch.status === 'planned' && (
                   <button
                     onClick={() => { startBatch(selectedBatch.id); setSelectedBatch(null); }}
-                    className="py-3 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-300 font-black flex items-center justify-center gap-2"
+                    className="py-3 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-700 font-black flex items-center justify-center gap-2"
                   >
                     <Play className="w-4 h-4" /> Start
                   </button>
@@ -1854,7 +1854,7 @@ export default function ProductionPage() {
                 {selectedBatch.status === 'running' && (
                   <button
                     onClick={() => { stopBatch(selectedBatch.id); setSelectedBatch(null); }}
-                    className="py-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-black flex items-center justify-center gap-2"
+                    className="py-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 font-black flex items-center justify-center gap-2"
                   >
                     <Square className="w-4 h-4" /> Dokončit
                   </button>
@@ -1865,7 +1865,7 @@ export default function ProductionPage() {
                     setShiftLogText(selectedBatch.shiftLog || '');
                     setSelectedBatch(null);
                   }}
-                  className="py-3 rounded-2xl bg-white/5 border border-white/10 text-slate-200 font-black flex items-center justify-center gap-2"
+                  className="py-3 rounded-2xl bg-slate-50 border border-slate-200 text-slate-700 font-black flex items-center justify-center gap-2"
                 >
                   <Clock className="w-4 h-4" /> Záznam směny
                 </button>
@@ -1893,7 +1893,7 @@ export default function ProductionPage() {
               </div>
             </div>
             <button onClick={saveShiftLog} disabled={!shiftLogText.trim()}
-              className="w-full py-3.5 bg-gradient-to-r from-slate-500 to-slate-600 text-white rounded-2xl font-bold disabled:opacity-50 flex items-center justify-center gap-2 transition active:scale-[0.98]">
+              className="w-full py-3.5 bg-gradient-to-r from-slate-500 to-slate-600 text-slate-900 rounded-2xl font-bold disabled:opacity-50 flex items-center justify-center gap-2 transition active:scale-[0.98]">
               Uložit záznam
             </button>
           </div>
@@ -1907,7 +1907,7 @@ export default function ProductionPage() {
 // SHARED UI HELPERS
 // ═══════════════════════════════════════════════════════════════════
 
-const INP_CLS = 'w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-slate-600 focus:outline-none focus:border-orange-500/50 transition';
+const INP_CLS = 'w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm placeholder-slate-400 focus:outline-none focus:border-orange-500/50 transition';
 const SEL_CLS = INP_CLS;
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -1923,7 +1923,7 @@ function EmptyBlock({ icon, text, sub }: { icon: React.ReactNode; text: string; 
   return (
     <div className="text-center py-16">
       {icon}
-      <h3 className="text-lg font-bold text-white mt-3 mb-1">{text}</h3>
+      <h3 className="text-lg font-bold text-slate-900 mt-3 mb-1">{text}</h3>
       <p className="text-slate-500 text-sm">{sub}</p>
     </div>
   );
@@ -1933,15 +1933,15 @@ function ModalShell({ title, icon, onClose, children }: {
   title: string; icon: React.ReactNode; onClose: () => void; children: React.ReactNode;
 }) {
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-[9999] flex items-end sm:items-center justify-center" onClick={onClose}>
-      <div className="bg-slate-800 rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-white/10"
+    <div className="fixed inset-0 bg-black/50 z-[9999] flex items-end sm:items-center justify-center" onClick={onClose}>
+      <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-slate-200"
         onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-white/10">
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-200">
           <div className="flex items-center gap-2">
             {icon}
-            <h2 className="text-xl font-bold text-white">{title}</h2>
+            <h2 className="text-xl font-bold text-slate-900">{title}</h2>
           </div>
-          <button onClick={onClose} className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-slate-400 hover:text-white transition">
+          <button onClick={onClose} className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-900 transition">
             <X className="w-5 h-5" />
           </button>
         </div>

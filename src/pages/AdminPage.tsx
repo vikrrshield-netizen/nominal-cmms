@@ -355,7 +355,7 @@ export default function AdminPage() {
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 bg-gradient-to-br from-emerald-600 to-teal-600 rounded-2xl flex items-center justify-center shadow-sm">
-                <Shield className="w-7 h-7 text-white" />
+                <Shield className="w-7 h-7 text-slate-900" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
@@ -399,7 +399,7 @@ export default function AdminPage() {
                 onClick={() => setActiveTab(tab.id as typeof activeTab)}
                 className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-sm font-bold whitespace-nowrap transition ${
                   activeTab === tab.id
-                    ? 'bg-[#1a6b4f] text-white'
+                    ? 'bg-[#1a6b4f] text-slate-900'
                     : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
                 }`}
               >
@@ -601,7 +601,7 @@ function AdminUserCard({ adminUser, onSelect }: { adminUser: AdminUser; onSelect
         adminUser.active ? 'border-slate-200' : 'border-red-200 bg-red-50/50'
       }`}
     >
-      <div className={`w-12 h-12 ${roleCfg.color} rounded-xl flex items-center justify-center text-white text-xl shrink-0`}>
+      <div className={`w-12 h-12 ${roleCfg.color} rounded-xl flex items-center justify-center text-slate-900 text-xl shrink-0`}>
         {roleCfg.icon}
       </div>
       <div className="flex-1 min-w-0">
@@ -722,7 +722,7 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-3xl w-full max-w-lg max-h-[85vh] overflow-hidden shadow-2xl border border-slate-200" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className={`${roleCfg.color} p-6`}>
@@ -731,11 +731,11 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
               <span className="text-4xl">{roleCfg.icon}</span>
               <div>
                 <h2 className="text-xl font-bold text-slate-900">{user.displayName}</h2>
-                <p className="text-white/80">{roleCfg.label}</p>
+                <p className="text-slate-900/80">{roleCfg.label}</p>
               </div>
             </div>
-            <button onClick={onClose} className="p-2 rounded-xl bg-white/20 hover:bg-white/30">
-              <X className="w-5 h-5 text-white" />
+            <button onClick={onClose} className="p-2 rounded-xl bg-slate-100 hover:bg-white/30">
+              <X className="w-5 h-5 text-slate-900" />
             </button>
           </div>
         </div>
@@ -813,8 +813,8 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
                       onClick={onToggleActive}
                       className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl ${
                         user.active
-                          ? 'bg-amber-500/20 text-amber-400'
-                          : 'bg-emerald-500/20 text-emerald-400'
+                          ? 'bg-amber-500/20 text-amber-700'
+                          : 'bg-emerald-500/20 text-emerald-700'
                       }`}
                     >
                       {user.active ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
@@ -824,7 +824,7 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
 
                   <button
                     onClick={onDelete}
-                    className="w-full flex items-center justify-center gap-2 p-3 bg-red-500/20 text-red-400 rounded-xl"
+                    className="w-full flex items-center justify-center gap-2 p-3 bg-red-500/20 text-red-700 rounded-xl"
                   >
                     <Trash2 className="w-4 h-4" />
                     Deaktivovat uživatele
@@ -1336,7 +1336,7 @@ function NewUserModal({ onClose, onCreated }: {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-3xl w-full max-w-lg max-h-[85vh] overflow-hidden shadow-2xl border border-slate-200 flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="p-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
           <h2 className="text-xl font-bold text-slate-900">Nový uživatel</h2>
@@ -1530,7 +1530,7 @@ function RoleManagerTab({ users, canEdit }: { users: AdminUser[]; canEdit: boole
                   } ${!canEdit ? 'opacity-60 cursor-not-allowed' : ''}`}
                 >
                   <div className={`w-5 h-5 rounded-md flex items-center justify-center ${isOn ? 'bg-emerald-500' : 'bg-slate-300'}`}>
-                    {isOn && <Check className="w-3.5 h-3.5 text-white" />}
+                    {isOn && <Check className="w-3.5 h-3.5 text-slate-900" />}
                   </div>
                   <div>
                     <div className={`font-medium ${isOn ? 'text-emerald-700' : 'text-slate-400'}`}>{feat.label}</div>
@@ -1617,7 +1617,7 @@ function LoginSecurityPanel({ canEdit }: { canEdit: boolean }) {
     <div className="vik-card p-4 space-y-4 mb-4">
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center">
-          <Lock className="w-5 h-5 text-white" />
+          <Lock className="w-5 h-5 text-slate-900" />
         </div>
         <div>
           <h3 className="font-bold text-slate-900">Zabezpečení přihlášení</h3>
@@ -1732,7 +1732,7 @@ function BrandSettingsPanel({ canEdit }: { canEdit: boolean }) {
   return (
     <div className="vik-card p-4 space-y-4">
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center font-black">
+        <div className="w-10 h-10 rounded-xl bg-white text-slate-900 flex items-center justify-center font-black">
           {(logoLetter || companyName || appConfig.LOGO_LETTER).slice(0, 1).toUpperCase()}
         </div>
         <div>
@@ -1863,14 +1863,14 @@ function DynamicConfigTab({ canEdit }: { canEdit: boolean }) {
                 <h3 className="font-bold text-slate-900">{section.label}</h3>
                 <p className="text-xs text-slate-500">{section.items.length} položek</p>
               </div>
-              <Edit2 className={`w-4 h-4 transition ${isOpen ? 'text-orange-400' : 'text-slate-500'}`} />
+              <Edit2 className={`w-4 h-4 transition ${isOpen ? 'text-orange-700' : 'text-slate-500'}`} />
             </button>
 
             {isOpen && (
               <div className="px-4 pb-4 border-t border-slate-100 pt-3">
                 {/* Contextual help */}
                 <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-3 flex items-start gap-2">
-                  <span className="text-blue-400 text-xs mt-0.5">ℹ️</span>
+                  <span className="text-blue-700 text-xs mt-0.5">ℹ️</span>
                   <p className="text-xs text-blue-700">{section.help}</p>
                 </div>
                 <div className="space-y-1.5 mb-3">
@@ -1880,7 +1880,7 @@ function DynamicConfigTab({ canEdit }: { canEdit: boolean }) {
                       {canEdit && (
                         <button
                           onClick={() => removeItem(section.id, idx)}
-                          className="p-1 rounded hover:bg-red-500/20 text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition"
+                          className="p-1 rounded hover:bg-red-500/20 text-slate-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition"
                         >
                           <X className="w-3.5 h-3.5" />
                         </button>
@@ -1900,7 +1900,7 @@ function DynamicConfigTab({ canEdit }: { canEdit: boolean }) {
                     />
                     <button
                       onClick={() => addItem(section.id)}
-                      className="px-3 py-2 bg-emerald-500/20 text-emerald-400 rounded-lg hover:bg-emerald-500/30 transition"
+                      className="px-3 py-2 bg-emerald-500/20 text-emerald-700 rounded-lg hover:bg-emerald-500/30 transition"
                     >
                       <Plus className="w-4 h-4" />
                     </button>
@@ -1998,7 +1998,7 @@ function ErrorMonitorTab() {
 
       {logs.length === 0 ? (
         <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
-          <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto mb-3" />
+          <CheckCircle2 className="w-10 h-10 text-emerald-700 mx-auto mb-3" />
           <div className="text-slate-900 font-semibold">Zatím žádné chyby</div>
           <div className="text-slate-400 text-sm mt-1">Až aplikace zachytí pád nebo technickou chybu, zobrazí se tady.</div>
         </div>
@@ -2056,7 +2056,7 @@ function ErrorMonitorTab() {
                     </div>
 
                     {(log.stack || log.componentStack) && (
-                      <pre className="max-h-72 overflow-auto rounded-xl bg-slate-900 border border-slate-700 p-3 text-xs text-slate-100 whitespace-pre-wrap">
+                      <pre className="max-h-72 overflow-auto rounded-xl bg-white border border-slate-700 p-3 text-xs text-slate-900 whitespace-pre-wrap">
                         {log.stack || log.componentStack}
                       </pre>
                     )}
@@ -2120,7 +2120,7 @@ function AuditTrailTab() {
           <div key={i} className="flex items-start gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
             <div className={`w-2 h-2 mt-1.5 rounded-full flex-shrink-0 ${AUDIT_TYPE_COLORS[log.type] || 'bg-slate-400'}`} />
             <div className="flex-1 min-w-0">
-              <div className="text-sm text-white">
+              <div className="text-sm text-slate-900">
                 <span className="font-semibold">{log.user}</span>
                 <span className="text-slate-500"> — </span>
                 <span>{log.action}</span>
@@ -2242,7 +2242,7 @@ function ImportExportTab({ canEdit }: { canEdit: boolean }) {
       {/* IMPORT SECTION */}
       <div className="bg-white rounded-2xl border border-slate-200 p-5">
         <h3 className="text-slate-900 font-bold text-lg mb-4 flex items-center gap-2">
-          <Upload className="w-5 h-5 text-blue-400" />
+          <Upload className="w-5 h-5 text-blue-700" />
           Hromadný import (CSV / Excel)
         </h3>
 
@@ -2295,7 +2295,7 @@ function ImportExportTab({ canEdit }: { canEdit: boolean }) {
                 {' '}(list: {parseResult.sheetName})
               </div>
               {importedCount > 0 && (
-                <span className="flex items-center gap-1 text-emerald-400 text-sm">
+                <span className="flex items-center gap-1 text-emerald-700 text-sm">
                   <CheckCircle2 className="w-4 h-4" /> {importedCount} importováno
                 </span>
               )}
@@ -2308,7 +2308,7 @@ function ImportExportTab({ canEdit }: { canEdit: boolean }) {
                 <div key={i} className="flex items-center gap-2 py-1 text-sm">
                   <span className="text-slate-500 truncate flex-1">{m.excelColumn}</span>
                   <span className="text-slate-600">→</span>
-                  <span className={`truncate flex-1 ${m.confidence > 0.6 ? 'text-emerald-400' : m.confidence > 0.3 ? 'text-amber-400' : 'text-slate-500'}`}>
+                  <span className={`truncate flex-1 ${m.confidence > 0.6 ? 'text-emerald-700' : m.confidence > 0.3 ? 'text-amber-700' : 'text-slate-500'}`}>
                     {m.mappedTo}
                   </span>
                   <span className="text-[10px] text-slate-600 w-8 text-right">{Math.round(m.confidence * 100)}%</span>
@@ -2345,7 +2345,7 @@ function ImportExportTab({ canEdit }: { canEdit: boolean }) {
             <button
               onClick={handleImport}
               disabled={importing || importedCount > 0 || !canEdit}
-              className="w-full py-3 bg-emerald-600 text-slate-900 font-semibold rounded-xl hover:bg-emerald-500 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full py-3 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-500 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {importing ? (
                 <><Loader2 className="w-4 h-4 animate-spin" /> Importuji...</>
@@ -2362,7 +2362,7 @@ function ImportExportTab({ canEdit }: { canEdit: boolean }) {
       {/* EXPORT SECTION */}
       <div className="bg-white rounded-2xl border border-slate-200 p-5">
         <h3 className="text-slate-900 font-bold text-lg mb-4 flex items-center gap-2">
-          <Download className="w-5 h-5 text-emerald-400" />
+          <Download className="w-5 h-5 text-emerald-700" />
           Export dat (migrace)
         </h3>
         <p className="text-slate-400 text-sm mb-4">
@@ -2371,7 +2371,7 @@ function ImportExportTab({ canEdit }: { canEdit: boolean }) {
         <button
           onClick={handleExportMigration}
           disabled={exporting}
-          className="w-full py-3 bg-blue-600 text-slate-900 font-semibold rounded-xl hover:bg-blue-500 transition disabled:opacity-50 flex items-center justify-center gap-2"
+          className="w-full py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-500 transition disabled:opacity-50 flex items-center justify-center gap-2"
         >
           {exporting ? (
             <><Loader2 className="w-4 h-4 animate-spin" /> Exportuji kolekce...</>
@@ -2447,10 +2447,10 @@ function ModuleManagerTab({ canEdit }: { canEdit: boolean }) {
               </div>
               {canEdit && (
                 <div className="flex gap-1">
-                  <button onClick={() => handleEnableAll(tenant.id)} className="px-2 py-1 text-[10px] font-semibold rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition">
+                  <button onClick={() => handleEnableAll(tenant.id)} className="px-2 py-1 text-[10px] font-semibold rounded-lg bg-emerald-500/20 text-emerald-700 hover:bg-emerald-500/30 transition">
                     Vše ON
                   </button>
-                  <button onClick={() => handleDisableAll(tenant.id)} className="px-2 py-1 text-[10px] font-semibold rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition">
+                  <button onClick={() => handleDisableAll(tenant.id)} className="px-2 py-1 text-[10px] font-semibold rounded-lg bg-red-500/20 text-red-700 hover:bg-red-500/30 transition">
                     Vše OFF
                   </button>
                 </div>
@@ -2473,7 +2473,7 @@ function ModuleManagerTab({ canEdit }: { canEdit: boolean }) {
                         } ${!canEdit ? 'opacity-60 cursor-not-allowed' : ''}`}
                       >
                         <div className={`w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 ${isOn ? 'bg-emerald-500' : 'bg-slate-300'}`}>
-                          {isOn && <Check className="w-3.5 h-3.5 text-white" />}
+                          {isOn && <Check className="w-3.5 h-3.5 text-slate-900" />}
                         </div>
                         <div className="min-w-0">
                           <div className={`text-xs font-medium truncate ${isOn ? 'text-emerald-700' : 'text-slate-500'}`}>
@@ -2571,7 +2571,7 @@ function PositionManagerTab({ canEdit }: { canEdit: boolean }) {
             return (
               <div key={role.id} className="bg-white rounded-2xl p-4 border border-slate-200 flex items-center gap-3">
                 <div className="w-10 h-10 bg-violet-500/20 rounded-xl flex items-center justify-center">
-                  <Briefcase className="w-5 h-5 text-violet-400" />
+                  <Briefcase className="w-5 h-5 text-violet-700" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold text-slate-900 text-sm">{role.roleName}</div>
@@ -2583,7 +2583,7 @@ function PositionManagerTab({ canEdit }: { canEdit: boolean }) {
                       <Edit2 className="w-4 h-4 text-slate-400" />
                     </button>
                     <button onClick={() => handleDelete(role.id)} className="p-2 rounded-lg hover:bg-red-500/20 transition">
-                      <Trash2 className="w-4 h-4 text-slate-500 hover:text-red-400" />
+                      <Trash2 className="w-4 h-4 text-slate-500 hover:text-red-700" />
                     </button>
                   </div>
                 )}
@@ -2605,7 +2605,7 @@ function PositionManagerTab({ canEdit }: { canEdit: boolean }) {
       {canEdit && !showForm && (
         <button
           onClick={() => setShowForm(true)}
-          className="w-full py-3 border-2 border-dashed border-violet-500/30 rounded-2xl text-violet-400 text-sm font-semibold hover:border-violet-500/50 hover:bg-violet-500/5 transition flex items-center justify-center gap-2"
+          className="w-full py-3 border-2 border-dashed border-violet-500/30 rounded-2xl text-violet-700 text-sm font-semibold hover:border-violet-500/50 hover:bg-violet-500/5 transition flex items-center justify-center gap-2"
         >
           <Plus className="w-4 h-4" /> Nová pozice
         </button>
@@ -2656,7 +2656,7 @@ function PositionManagerTab({ canEdit }: { canEdit: boolean }) {
                           }`}
                         >
                           <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 ${isOn ? 'bg-violet-500' : 'bg-slate-300'}`}>
-                            {isOn && <Check className="w-3 h-3 text-white" />}
+                            {isOn && <Check className="w-3 h-3 text-slate-900" />}
                           </div>
                           <span className={`${isOn ? 'text-violet-700' : 'text-slate-500'}`}>{perm.label}</span>
                         </button>

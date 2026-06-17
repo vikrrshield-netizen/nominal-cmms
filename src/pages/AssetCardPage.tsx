@@ -100,9 +100,9 @@ const STATUS_MAP: Record<string, { label: string; dot: string; color: string }> 
 };
 
 const PRIORITY_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
-  P1: { label: 'P1 Havárie', bg: 'bg-red-500/20', text: 'text-red-400' },
-  P2: { label: 'P2 Týden', bg: 'bg-orange-500/20', text: 'text-orange-400' },
-  P3: { label: 'P3 Běžná', bg: 'bg-blue-500/20', text: 'text-blue-400' },
+  P1: { label: 'P1 Havárie', bg: 'bg-red-500/20', text: 'text-red-700' },
+  P2: { label: 'P2 Týden', bg: 'bg-orange-500/20', text: 'text-orange-700' },
+  P3: { label: 'P3 Běžná', bg: 'bg-blue-500/20', text: 'text-blue-700' },
   P4: { label: 'P4 Nápad', bg: 'bg-slate-500/20', text: 'text-slate-400' },
 };
 
@@ -879,7 +879,7 @@ export default function AssetCardPage() {
       <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center gap-4">
         <Settings className="w-16 h-16 text-slate-600" />
         <h2 className="text-xl font-bold text-slate-400">Zařízení nenalezeno</h2>
-        <button onClick={goBackOneStep} className="text-blue-400 font-medium">
+        <button onClick={goBackOneStep} className="text-blue-700 font-medium">
           ← Zpět
         </button>
       </div>
@@ -898,11 +898,11 @@ export default function AssetCardPage() {
       {expiredRevisions.length > 0 && (
         <div className="bg-red-500/20 border-b border-red-500/30 px-4 py-3">
           <div className="max-w-4xl mx-auto flex items-center gap-2">
-            <Shield className="w-5 h-5 text-red-400 flex-shrink-0" />
+            <Shield className="w-5 h-5 text-red-700 flex-shrink-0" />
             <div>
-              <div className="font-bold text-red-400 text-sm">Prošlé revize!</div>
+              <div className="font-bold text-red-700 text-sm">Prošlé revize!</div>
               {expiredRevisions.map((r) => (
-                <div key={r.id} className="text-xs text-red-300/80">{r.title}</div>
+                <div key={r.id} className="text-xs text-red-700/80">{r.title}</div>
               ))}
             </div>
           </div>
@@ -944,7 +944,7 @@ export default function AssetCardPage() {
         <div className="rounded-2xl border border-[#e2d8c9] bg-white p-3 shadow-sm mb-3 flex items-center gap-3">
           <button
             onClick={goBackOneStep}
-            className="w-11 h-11 rounded-xl bg-[#10263f] border border-[#10263f] flex items-center justify-center text-white transition flex-shrink-0"
+            className="w-11 h-11 rounded-xl bg-[#10263f] border border-[#10263f] flex items-center justify-center text-slate-900 transition flex-shrink-0"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
@@ -970,7 +970,7 @@ export default function AssetCardPage() {
                 {st.label}
               </span>
               {expiringRevisions.length > 0 && (
-                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400">
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700">
                   {expiringRevisions.length} revize končí
                 </span>
               )}
@@ -1180,7 +1180,7 @@ export default function AssetCardPage() {
               onClick={() => setActiveTab(tab.key)}
               className={`min-h-10 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-[13px] font-black transition-all ${
                 activeTab === tab.key
-                  ? 'bg-[#10263f] text-white'
+                  ? 'bg-[#10263f] text-slate-900'
                   : 'text-slate-500 hover:text-slate-900'
               }`}
             >
@@ -2018,7 +2018,7 @@ export default function AssetCardPage() {
                       className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition border min-h-[44px] ${
                         stanoviste === loc
                           ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
-                          : 'bg-white/5 text-slate-500 border-white/10 hover:text-slate-300'
+                          : 'bg-slate-50 text-slate-500 border-slate-200 hover:text-slate-600'
                       }`}
                       onClick={() => setStanoviste(loc)}
                     >
@@ -2045,10 +2045,10 @@ export default function AssetCardPage() {
                     { name: 'Školení operátora VZV', date: '05.01.2026' },
                     { name: 'Technický list', date: '01.03.2024' },
                   ].map((d, i) => (
-                    <div key={i} className="flex items-center gap-3 bg-slate-700/30 rounded-xl p-3 hover:bg-slate-700/40 transition cursor-pointer">
-                      <FileText className="w-5 h-5 text-blue-400 flex-shrink-0" />
+                    <div key={i} className="flex items-center gap-3 bg-slate-50 rounded-xl p-3 hover:bg-slate-100/40 transition cursor-pointer">
+                      <FileText className="w-5 h-5 text-blue-700 flex-shrink-0" />
                       <div className="flex-1">
-                        <div className="text-sm font-medium text-white">{d.name}</div>
+                        <div className="text-sm font-medium text-slate-900">{d.name}</div>
                         <div className="text-xs text-slate-500">{d.date}</div>
                       </div>
                       <ChevronRight className="w-4 h-4 text-slate-600" />
@@ -2065,8 +2065,8 @@ export default function AssetCardPage() {
                 <div className="space-y-2">
                   {asset.controlPoints.map((cp, i) => (
                     <div key={i} className="flex items-center gap-2.5 text-sm">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                      <span className="text-slate-300">{cp}</span>
+                      <CheckCircle2 className="w-4 h-4 text-emerald-700 flex-shrink-0" />
+                      <span className="text-slate-600">{cp}</span>
                     </div>
                   ))}
                 </div>
@@ -2076,8 +2076,8 @@ export default function AssetCardPage() {
             {/* Notes */}
             {asset.notes && (
               <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4">
-                <div className="text-xs text-amber-400 font-bold mb-1">Poznámky</div>
-                <div className="text-sm text-amber-300/80">{asset.notes}</div>
+                <div className="text-xs text-amber-700 font-bold mb-1">Poznámky</div>
+                <div className="text-sm text-amber-700/80">{asset.notes}</div>
               </div>
             )}
 
@@ -2094,16 +2094,16 @@ export default function AssetCardPage() {
                     const isExpired = rev.status === 'expired';
                     const isExpiring = rev.status === 'expiring';
                     const dotColor = isExpired ? 'bg-red-400' : isExpiring ? 'bg-amber-400' : 'bg-emerald-400';
-                    const textColor = isExpired ? 'text-red-400' : isExpiring ? 'text-amber-400' : 'text-emerald-400';
+                    const textColor = isExpired ? 'text-red-700' : isExpiring ? 'text-amber-700' : 'text-emerald-700';
 
                     return (
                       <div
                         key={rev.id}
-                        className="bg-slate-700/30 rounded-xl p-3 flex items-center gap-3"
+                        className="bg-slate-50 rounded-xl p-3 flex items-center gap-3"
                       >
                         <div className={`w-3 h-3 rounded-full flex-shrink-0 ${dotColor}`} />
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-white truncate">{rev.title}</div>
+                          <div className="text-sm font-medium text-slate-900 truncate">{rev.title}</div>
                           <div className="text-xs text-slate-500">
                             {formatRevisionDate(rev.nextRevisionDate)}
                           </div>
@@ -2212,7 +2212,7 @@ export default function AssetCardPage() {
                 {canCreateTask && (
                   <button
                     onClick={() => setShowTaskModal(true)}
-                    className="mt-4 px-4 py-2 bg-blue-500/15 border border-blue-500/30 text-blue-400 rounded-xl text-sm font-semibold hover:bg-blue-500/25 transition"
+                    className="mt-4 px-4 py-2 bg-blue-500/15 border border-blue-500/30 text-blue-700 rounded-xl text-sm font-semibold hover:bg-blue-500/25 transition"
                   >
                     + Vytvořit úkol
                   </button>
@@ -2233,7 +2233,7 @@ export default function AssetCardPage() {
                           {pCfg.label}
                         </span>
                         {isDone && (
-                          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                          <CheckCircle2 className="w-4 h-4 text-emerald-700" />
                         )}
                         <span className="text-[10px] text-slate-600 ml-auto flex items-center gap-1">
                           <Clock className="w-3 h-3" />
@@ -2245,7 +2245,7 @@ export default function AssetCardPage() {
                       </div>
                       <h4 className="font-medium text-sm text-slate-950">{task.title}</h4>
                       {task.assignedToName && (
-                        <div className="text-xs text-blue-400 mt-1">→ {task.assignedToName}</div>
+                        <div className="text-xs text-blue-700 mt-1">→ {task.assignedToName}</div>
                       )}
                     </div>
                   );
@@ -2276,7 +2276,7 @@ export default function AssetCardPage() {
                   const isExpiring = rev.status === 'expiring';
                   const borderColor = isExpired ? 'border-red-500/40' : isExpiring ? 'border-amber-500/30' : 'border-slate-700/30';
                   const dotColor = isExpired ? 'bg-red-400' : isExpiring ? 'bg-amber-400' : 'bg-emerald-400';
-                  const textColor = isExpired ? 'text-red-400' : isExpiring ? 'text-amber-400' : 'text-emerald-400';
+                  const textColor = isExpired ? 'text-red-700' : isExpiring ? 'text-amber-700' : 'text-emerald-700';
                   const statusLabel = isExpired ? 'Prošlá' : isExpiring ? 'Končí brzy' : 'Platná';
 
                   return (
@@ -2284,9 +2284,9 @@ export default function AssetCardPage() {
                       <div className="flex items-center gap-2 mb-3">
                         <span className="text-xl">{typeCfg.icon}</span>
                         <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                          isExpired ? 'bg-red-500/20 text-red-400' :
-                          isExpiring ? 'bg-amber-500/20 text-amber-400' :
-                          'bg-emerald-500/20 text-emerald-400'
+                          isExpired ? 'bg-red-500/20 text-red-700' :
+                          isExpiring ? 'bg-amber-500/20 text-amber-700' :
+                          'bg-emerald-500/20 text-emerald-700'
                         }`}>
                           {statusLabel}
                         </span>
@@ -2407,9 +2407,9 @@ export default function AssetCardPage() {
 function InfoBox({ label, value, icon, highlight }: {
   label: string; value: string; icon?: React.ReactNode; highlight?: 'amber' | 'red';
 }) {
-  const textClass = highlight === 'red' ? 'text-red-400' : highlight === 'amber' ? 'text-amber-400' : 'text-white';
+  const textClass = highlight === 'red' ? 'text-red-700' : highlight === 'amber' ? 'text-amber-700' : 'text-slate-900';
   return (
-    <div className="bg-slate-700/30 rounded-xl p-3">
+    <div className="bg-slate-50 rounded-xl p-3">
       <div className="flex items-center gap-1.5 mb-1">
         {icon}
         <span className="text-xs text-slate-500">{label}</span>
@@ -2463,10 +2463,10 @@ function FaultModal({ asset, user, onClose, onCreated }: {
   };
 
   return (
-    <ModalShell title="Nahlásit poruchu" icon={<AlertTriangle className="w-5 h-5 text-red-400" />} onClose={onClose}>
-      <div className="bg-slate-700/30 p-3 rounded-xl text-sm mb-4">
+    <ModalShell title="Nahlásit poruchu" icon={<AlertTriangle className="w-5 h-5 text-red-700" />} onClose={onClose}>
+      <div className="bg-slate-50 p-3 rounded-xl text-sm mb-4">
         <span className="text-slate-500">Zařízení:</span>{' '}
-        <span className="font-medium text-white">{asset.name}</span>
+        <span className="font-medium text-slate-900">{asset.name}</span>
         {asset.code && <span className="text-slate-500 ml-2 font-mono text-xs">{asset.code}</span>}
       </div>
 
@@ -2475,7 +2475,7 @@ function FaultModal({ asset, user, onClose, onCreated }: {
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder="Popis poruchy..."
-        className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-red-500/50 transition mb-3"
+        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-red-500/50 transition mb-3"
         autoFocus
       />
 
@@ -2485,7 +2485,7 @@ function FaultModal({ asset, user, onClose, onCreated }: {
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Detailní popis závady — co se stalo, kde přesně, okolnosti..."
           rows={4}
-          className="flex-1 p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-red-500/50 transition resize-none"
+          className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-red-500/50 transition resize-none"
         />
         <div className="pt-2">
           <MicButton onTranscript={(t) => setDescription((prev) => prev ? prev + ' ' + t : t)} />
@@ -2496,9 +2496,9 @@ function FaultModal({ asset, user, onClose, onCreated }: {
         <div className="text-sm font-medium text-slate-400 mb-2">Priorita</div>
         <div className="flex gap-2">
           {([
-            { key: 'P3', label: 'Nízká', bg: 'bg-blue-500/20', text: 'text-blue-400' },
-            { key: 'P2', label: 'Střední', bg: 'bg-orange-500/20', text: 'text-orange-400' },
-            { key: 'P1', label: 'Havárie', bg: 'bg-red-500/20', text: 'text-red-400' },
+            { key: 'P3', label: 'Nízká', bg: 'bg-blue-500/20', text: 'text-blue-700' },
+            { key: 'P2', label: 'Střední', bg: 'bg-orange-500/20', text: 'text-orange-700' },
+            { key: 'P1', label: 'Havárie', bg: 'bg-red-500/20', text: 'text-red-700' },
           ]).map((opt) => (
             <button
               key={opt.key}
@@ -2506,7 +2506,7 @@ function FaultModal({ asset, user, onClose, onCreated }: {
               className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition ${
                 priority === opt.key
                   ? `${opt.bg} ${opt.text} border border-current`
-                  : 'bg-white/5 text-slate-500 border border-white/10'
+                  : 'bg-slate-50 text-slate-500 border border-slate-200'
               }`}
             >
               {opt.label}
@@ -2518,7 +2518,7 @@ function FaultModal({ asset, user, onClose, onCreated }: {
       <div className="mb-4">
         <div className="text-sm font-medium text-slate-400 mb-2">Přiřadit řešitele</div>
         {assignees.length === 0 ? (
-          <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-400">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-400">
             V administraci zatím není aktivní pracovník údržby.
           </div>
         ) : (
@@ -2529,12 +2529,12 @@ function FaultModal({ asset, user, onClose, onCreated }: {
               onClick={() => setAssignee(assignee === a.id ? '' : a.id)}
               className={`py-2 px-3 rounded-xl text-sm font-semibold transition flex items-center gap-2 ${
                 assignee === a.id
-                  ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                  : 'bg-white/5 text-slate-500 border border-white/10 hover:text-slate-300'
+                  ? 'bg-blue-500/20 text-blue-700 border border-blue-500/30'
+                  : 'bg-slate-50 text-slate-500 border border-slate-200 hover:text-slate-600'
               }`}
             >
               <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
-                assignee === a.id ? 'bg-blue-500/30 text-blue-300' : 'bg-slate-600 text-slate-400'
+                assignee === a.id ? 'bg-blue-500/30 text-blue-700' : 'bg-slate-600 text-slate-400'
               }`}>
                 {a.displayName.split(' ').map(w => w[0]).join('')}
               </div>
@@ -2594,16 +2594,16 @@ function TaskModal({ asset, user, onClose, onCreated }: {
   };
 
   const typeOptions = [
-    { key: 'preventive' as const, label: 'Preventivní', color: 'text-emerald-400', bg: 'bg-emerald-500/20' },
-    { key: 'corrective' as const, label: 'Nápravný', color: 'text-red-400', bg: 'bg-red-500/20' },
-    { key: 'improvement' as const, label: 'Zlepšení', color: 'text-blue-400', bg: 'bg-blue-500/20' },
+    { key: 'preventive' as const, label: 'Preventivní', color: 'text-emerald-700', bg: 'bg-emerald-500/20' },
+    { key: 'corrective' as const, label: 'Nápravný', color: 'text-red-700', bg: 'bg-red-500/20' },
+    { key: 'improvement' as const, label: 'Zlepšení', color: 'text-blue-700', bg: 'bg-blue-500/20' },
   ];
 
   return (
-    <ModalShell title="Nový úkol" icon={<PlusCircle className="w-5 h-5 text-blue-400" />} onClose={onClose}>
-      <div className="bg-slate-700/30 p-3 rounded-xl text-sm mb-4">
+    <ModalShell title="Nový úkol" icon={<PlusCircle className="w-5 h-5 text-blue-700" />} onClose={onClose}>
+      <div className="bg-slate-50 p-3 rounded-xl text-sm mb-4">
         <span className="text-slate-500">Zařízení:</span>{' '}
-        <span className="font-medium text-white">{asset.name}</span>
+        <span className="font-medium text-slate-900">{asset.name}</span>
         {asset.code && <span className="text-slate-500 ml-2 font-mono text-xs">{asset.code}</span>}
       </div>
 
@@ -2618,7 +2618,7 @@ function TaskModal({ asset, user, onClose, onCreated }: {
               className={`flex-1 py-2 rounded-xl text-xs font-semibold transition ${
                 taskType === opt.key
                   ? `${opt.bg} ${opt.color} border border-current`
-                  : 'bg-white/5 text-slate-500 border border-white/10'
+                  : 'bg-slate-50 text-slate-500 border border-slate-200'
               }`}
             >
               {opt.label}
@@ -2632,7 +2632,7 @@ function TaskModal({ asset, user, onClose, onCreated }: {
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder="Název úkolu..."
-        className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/50 transition mb-3"
+        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500/50 transition mb-3"
         autoFocus
       />
 
@@ -2642,7 +2642,7 @@ function TaskModal({ asset, user, onClose, onCreated }: {
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Podrobnosti (volitelné)..."
           rows={3}
-          className="flex-1 p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/50 transition resize-none"
+          className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500/50 transition resize-none"
         />
         <div className="pt-2">
           <MicButton onTranscript={(t) => setDescription((prev) => prev ? prev + ' ' + t : t)} />
@@ -2659,7 +2659,7 @@ function TaskModal({ asset, user, onClose, onCreated }: {
               className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition ${
                 priority === key
                   ? `${cfg.bg} ${cfg.text} border border-current`
-                  : 'bg-white/5 text-slate-500 border border-white/10'
+                  : 'bg-slate-50 text-slate-500 border border-slate-200'
               }`}
             >
               {key}
@@ -2710,17 +2710,17 @@ function RevisionLogModal({ revisions, onClose, onLog }: {
   };
 
   return (
-    <ModalShell title="Zapsat revizi" icon={<Shield className="w-5 h-5 text-emerald-400" />} onClose={onClose}>
+    <ModalShell title="Zapsat revizi" icon={<Shield className="w-5 h-5 text-emerald-700" />} onClose={onClose}>
       <div className="mb-3">
         <div className="text-sm font-medium text-slate-400 mb-2">Revize</div>
         <select
           value={selectedId}
           onChange={(e) => setSelectedId(e.target.value)}
-          className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-emerald-500/50 transition"
+          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-emerald-500/50 transition"
           style={{ appearance: 'auto' }}
         >
           {revisions.map((r: any) => (
-            <option key={r.id} value={r.id} className="bg-slate-800">{r.title}</option>
+            <option key={r.id} value={r.id} className="bg-white">{r.title}</option>
           ))}
         </select>
       </div>
@@ -2731,7 +2731,7 @@ function RevisionLogModal({ revisions, onClose, onLog }: {
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-emerald-500/50 transition"
+          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-emerald-500/50 transition"
         />
       </div>
 
@@ -2742,7 +2742,7 @@ function RevisionLogModal({ revisions, onClose, onLog }: {
           value={certNumber}
           onChange={(e) => setCertNumber(e.target.value)}
           placeholder="EL-2026-XXXX"
-          className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500/50 transition"
+          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500/50 transition"
         />
       </div>
 
@@ -2774,11 +2774,11 @@ function GearboxAssignModal({ gearbox, extruders, saving, onClose, onAssign }: {
   const selected = extruders.find((item) => item.id === extruderId);
 
   return (
-    <ModalShell title="Přiřadit převodovku" icon={<Cog className="w-5 h-5 text-violet-300" />} onClose={onClose}>
+    <ModalShell title="Přiřadit převodovku" icon={<Cog className="w-5 h-5 text-violet-700" />} onClose={onClose}>
       <div className="space-y-3">
-        <div className="rounded-xl bg-white/5 border border-white/10 p-3">
+        <div className="rounded-xl bg-slate-50 border border-slate-200 p-3">
           <div className="text-xs text-slate-500">Převodovka</div>
-          <div className="font-bold text-white">{gearbox.name}</div>
+          <div className="font-bold text-slate-900">{gearbox.name}</div>
           <div className="text-xs text-slate-400 mt-1">Nyní: {gearbox.currentExtruderName || 'Sklad ND'}</div>
         </div>
         <label className="block">
@@ -2786,12 +2786,12 @@ function GearboxAssignModal({ gearbox, extruders, saving, onClose, onAssign }: {
           <select
             value={extruderId}
             onChange={(e) => setExtruderId(e.target.value)}
-            className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-violet-400"
+            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-violet-400"
             style={{ appearance: 'auto' }}
           >
-            {extruders.length === 0 && <option value="" className="bg-slate-800">Žádný extruder v kartotéce</option>}
+            {extruders.length === 0 && <option value="" className="bg-white">Žádný extruder v kartotéce</option>}
             {extruders.map((item) => (
-              <option key={item.id} value={item.id} className="bg-slate-800">
+              <option key={item.id} value={item.id} className="bg-white">
                 {item.name}{item.code ? ` (${item.code})` : ''}
               </option>
             ))}
@@ -2804,7 +2804,7 @@ function GearboxAssignModal({ gearbox, extruders, saving, onClose, onAssign }: {
             onChange={(e) => setNote(e.target.value)}
             rows={3}
             placeholder="např. výměna po servisu, preventivní přesun..."
-            className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-violet-400"
+            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-violet-400"
           />
         </label>
         <button
@@ -2984,18 +2984,18 @@ function GearboxTemperatureModal({ gearbox, user, saving, onClose, onSave }: {
   const setMotorLoadValue = (value: number) => setMotorLoad(String(Math.max(0, Math.round(value * 10) / 10)));
 
   return (
-    <ModalShell title="Záznam teploty" icon={<Thermometer className="w-5 h-5 text-cyan-300" />} onClose={onClose}>
+    <ModalShell title="Záznam teploty" icon={<Thermometer className="w-5 h-5 text-cyan-700" />} onClose={onClose}>
       <div className="space-y-3">
-        <div className="rounded-xl bg-white/5 border border-white/10 p-3">
+        <div className="rounded-xl bg-slate-50 border border-slate-200 p-3">
           <div className="text-xs text-slate-500">Převodovka</div>
-          <div className="font-bold text-white">{gearbox.name}</div>
+          <div className="font-bold text-slate-900">{gearbox.name}</div>
           <div className="text-xs text-slate-400 mt-1">{gearbox.currentExtruderName || 'Sklad ND'} · {user?.displayName || 'Neznámý'}</div>
         </div>
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="text-sm font-medium text-slate-400">Teplota převodovky</div>
-              <div className="mt-1 text-4xl font-black text-white">{temperatureNumber} °C</div>
+              <div className="mt-1 text-4xl font-black text-slate-900">{temperatureNumber} °C</div>
               <div className="mt-1 text-xs text-slate-400">
                 Limity: varování {gearbox.gearboxWarningTemperatureC ?? 70} °C, kritická {gearbox.gearboxCriticalTemperatureC ?? 85} °C
               </div>
@@ -3022,7 +3022,7 @@ function GearboxTemperatureModal({ gearbox, user, saving, onClose, onSave }: {
                 key={delta}
                 type="button"
                 onClick={() => setTemperatureValue(temperatureNumber + delta)}
-                className="rounded-xl border border-white/10 bg-slate-900 px-3 py-3 text-sm font-black text-white"
+                className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-black text-slate-900"
               >
                 {delta > 0 ? `+${delta}` : delta}
               </button>
@@ -3041,11 +3041,11 @@ function GearboxTemperatureModal({ gearbox, user, saving, onClose, onSave }: {
             ))}
           </div>
         </div>
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
               <div className="text-sm font-medium text-slate-400">Zátěž motoru</div>
-              <div className="mt-1 text-3xl font-black text-white">{motorLoad.trim() ? motorLoadNumber : '—'} A</div>
+              <div className="mt-1 text-3xl font-black text-slate-900">{motorLoad.trim() ? motorLoadNumber : '—'} A</div>
             </div>
             <input
               type="text"
@@ -3053,7 +3053,7 @@ function GearboxTemperatureModal({ gearbox, user, saving, onClose, onSave }: {
               value={motorLoad}
               onChange={(e) => setMotorLoad(e.target.value)}
               placeholder="např. 12,5"
-              className="w-28 rounded-xl border border-white/10 bg-slate-900 p-3 text-right font-black text-white placeholder-slate-600 focus:outline-none focus:border-cyan-400"
+              className="w-28 rounded-xl border border-slate-200 bg-white p-3 text-right font-black text-slate-900 placeholder-slate-400 focus:outline-none focus:border-cyan-400"
             />
           </div>
           <input
@@ -3071,7 +3071,7 @@ function GearboxTemperatureModal({ gearbox, user, saving, onClose, onSave }: {
                 key={delta}
                 type="button"
                 onClick={() => setMotorLoadValue(motorLoadNumber + delta)}
-                className="rounded-xl border border-white/10 bg-slate-900 px-3 py-3 text-sm font-black text-white"
+                className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-black text-slate-900"
               >
                 {delta > 0 ? `+${delta}` : delta}
               </button>
@@ -3084,7 +3084,7 @@ function GearboxTemperatureModal({ gearbox, user, saving, onClose, onSave }: {
             type="datetime-local"
             value={measuredAt}
             onChange={(e) => setMeasuredAt(e.target.value)}
-            className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-cyan-400"
+            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-cyan-400"
           />
         </label>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -3095,7 +3095,7 @@ function GearboxTemperatureModal({ gearbox, user, saving, onClose, onSave }: {
               value={materialSearch}
               onChange={(e) => setMaterialSearch(e.target.value)}
               placeholder="hledat název, č.sur nebo NK kód"
-              className="mb-2 w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-cyan-400"
+              className="mb-2 w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-cyan-400"
             />
             <select
               value={materialId}
@@ -3103,7 +3103,7 @@ function GearboxTemperatureModal({ gearbox, user, saving, onClose, onSave }: {
                 setMaterialId(e.target.value);
                 setRawMaterial('');
               }}
-              className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-cyan-400"
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-cyan-400"
             >
               <option value="">Nezadáno</option>
               {filteredMaterials.map((material) => (
@@ -3118,12 +3118,12 @@ function GearboxTemperatureModal({ gearbox, user, saving, onClose, onSave }: {
               value={productSearch}
               onChange={(e) => setProductSearch(e.target.value)}
               placeholder="hledat název, č.výr nebo NK kód"
-              className="mb-2 w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-cyan-400"
+              className="mb-2 w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-cyan-400"
             />
             {selectedMaterial && (
               <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-xs font-bold text-cyan-100">
                 <span>{showAllProducts ? 'Zobrazeny všechny výrobky' : `Dle receptury: ${relatedProducts.length} výrobků`}</span>
-                <button type="button" onClick={() => setShowAllProducts((current) => !current)} className="rounded-lg bg-white/10 px-2 py-1 font-black text-white">
+                <button type="button" onClick={() => setShowAllProducts((current) => !current)} className="rounded-lg bg-slate-100 px-2 py-1 font-black text-slate-900">
                   {showAllProducts ? 'Dle receptury' : 'Zobrazit vše'}
                 </button>
               </div>
@@ -3131,7 +3131,7 @@ function GearboxTemperatureModal({ gearbox, user, saving, onClose, onSave }: {
             <select
               value={productId}
               onChange={(e) => setProductId(e.target.value)}
-              className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-cyan-400"
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-cyan-400"
             >
               <option value="">Nezadáno</option>
               {filteredProducts.map((product) => (
@@ -3146,13 +3146,13 @@ function GearboxTemperatureModal({ gearbox, user, saving, onClose, onSave }: {
                 type="date"
                 value={materialBatchDate}
                 onChange={(e) => setMaterialBatchDate(e.target.value)}
-                className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-cyan-400"
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-cyan-400"
               />
               <input
                 value={materialBatchSuffix}
                 onChange={(e) => setMaterialBatchSuffix(e.target.value.toUpperCase().slice(0, 2))}
                 placeholder="A"
-                className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-center font-black text-white focus:outline-none focus:border-cyan-400"
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-center font-black text-slate-900 focus:outline-none focus:border-cyan-400"
               />
             </div>
             <input
@@ -3160,7 +3160,7 @@ function GearboxTemperatureModal({ gearbox, user, saving, onClose, onSave }: {
               value={materialBatchValue}
               onChange={(e) => setMaterialBatchValue(e.target.value)}
               placeholder="sarze se predvyplni po vyberu suroviny"
-              className="mt-2 w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-cyan-400"
+              className="mt-2 w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-cyan-400"
             />
           </label>
           <label className="block">
@@ -3169,7 +3169,7 @@ function GearboxTemperatureModal({ gearbox, user, saving, onClose, onSave }: {
               type="date"
               value={productBatchDate}
               onChange={(e) => setProductBatchDate(e.target.value)}
-              className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-cyan-400"
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-cyan-400"
             />
             <div className="mt-2 rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-sm font-black text-cyan-100">
               Šarže výrobku: {productBatchValue || 'vyber výrobek'}
@@ -3183,7 +3183,7 @@ function GearboxTemperatureModal({ gearbox, user, saving, onClose, onSave }: {
             value={rawMaterial}
             onChange={(e) => setRawMaterial(e.target.value)}
             placeholder="napr. kukurice, ryze, smes..."
-            className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-cyan-400"
+            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-cyan-400"
           />
         </label>
         <label className="block">
@@ -3193,7 +3193,7 @@ function GearboxTemperatureModal({ gearbox, user, saving, onClose, onSave }: {
             onChange={(e) => setNote(e.target.value)}
             rows={3}
             placeholder="např. opsáno z papíru u extruderu, kontrola bez závad..."
-            className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-cyan-400"
+            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-cyan-400"
           />
         </label>
         <label className="block">
@@ -3207,9 +3207,9 @@ function GearboxTemperatureModal({ gearbox, user, saving, onClose, onSave }: {
               setPhotoFile(file);
               setPhotoPreview(file ? URL.createObjectURL(file) : '');
             }}
-            className="w-full text-sm text-slate-300 file:mr-3 file:rounded-lg file:border-0 file:bg-cyan-500 file:px-3 file:py-2 file:text-white"
+            className="w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-cyan-500 file:px-3 file:py-2 file:text-white"
           />
-          {photoPreview && <img src={photoPreview} alt="Náhled" className="mt-3 h-28 rounded-xl object-cover border border-white/10" />}
+          {photoPreview && <img src={photoPreview} alt="Náhled" className="mt-3 h-28 rounded-xl object-cover border border-slate-200" />}
         </label>
         <button
           onClick={() => onSave({
@@ -3241,9 +3241,9 @@ function ModalShell({ title, icon, onClose, children }: {
   title: string; icon: React.ReactNode; onClose: () => void; children: React.ReactNode;
 }) {
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[9999] flex items-end md:items-center justify-center" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/50 z-[9999] flex items-end md:items-center justify-center" onClick={onClose}>
       <div
-        className="bg-slate-800 rounded-t-3xl md:rounded-3xl w-full max-w-lg max-h-[85vh] overflow-y-auto border border-slate-700/50"
+        className="bg-white rounded-t-3xl md:rounded-3xl w-full max-w-lg max-h-[85vh] overflow-y-auto border border-slate-700/50"
         onClick={(e) => e.stopPropagation()}
         style={{ animation: 'nominalSlideUp 0.25s ease-out' }}
       >
@@ -3263,11 +3263,11 @@ function ModalShell({ title, icon, onClose, children }: {
         <div className="flex items-center justify-between px-6 pb-4 pt-2">
           <div className="flex items-center gap-2">
             {icon}
-            <h2 className="text-lg font-bold text-white">{title}</h2>
+            <h2 className="text-lg font-bold text-slate-900">{title}</h2>
           </div>
           <button
             onClick={onClose}
-            className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-slate-400 hover:text-white transition"
+            className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-900 transition"
           >
             <X className="w-5 h-5" />
           </button>

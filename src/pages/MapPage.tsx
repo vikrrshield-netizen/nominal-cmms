@@ -287,11 +287,11 @@ function MachineCard({ asset, onClick }: { asset: Asset; onClick: () => void }) 
   return (
     <button
       onClick={onClick}
-      className="flex flex-col items-center justify-center p-3 rounded-xl border bg-white/[0.03] border-white/[0.08] hover:bg-white/[0.06] transition-all active:scale-[0.96] cursor-pointer text-center min-h-[80px]"
+      className="flex flex-col items-center justify-center p-3 rounded-xl border bg-white border-slate-200 hover:bg-slate-100 transition-all active:scale-[0.96] cursor-pointer text-center min-h-[80px]"
     >
       <div className="flex items-center gap-2 mb-1">
         <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${st.dot}`} />
-        <span className="text-[13px] font-semibold text-white leading-tight">{asset.name}</span>
+        <span className="text-[13px] font-semibold text-slate-900 leading-tight">{asset.name}</span>
       </div>
       {asset.code && <span className="text-[10px] text-slate-500 mt-0.5">{asset.code}</span>}
       <span className="text-[11px] mt-1.5 font-medium" style={{ color: st.color }}>
@@ -310,11 +310,11 @@ function FolderTile({ folder, onClick }: { folder: FolderGroup; onClick: () => v
   return (
     <button
       onClick={onClick}
-      className="flex flex-col items-center justify-center p-4 rounded-2xl border bg-white/[0.03] border-white/[0.08] hover:bg-white/[0.06] transition-all active:scale-[0.96] cursor-pointer text-center min-h-[100px] relative"
+      className="flex flex-col items-center justify-center p-4 rounded-2xl border bg-white border-slate-200 hover:bg-slate-100 transition-all active:scale-[0.96] cursor-pointer text-center min-h-[100px] relative"
     >
       <div className={`absolute top-2.5 right-2.5 w-2.5 h-2.5 rounded-full ${st.dot}`} />
       <span className="text-3xl mb-1.5">{folder.icon}</span>
-      <span className="text-[13px] font-semibold text-white leading-tight">{folder.name}</span>
+      <span className="text-[13px] font-semibold text-slate-900 leading-tight">{folder.name}</span>
       <span className="text-[11px] text-slate-500 mt-1">{folder.assets.length} strojů</span>
     </button>
   );
@@ -334,7 +334,7 @@ function RoomTile({ room, color, onClick, code, canUpdate, canDelete, onEdit, on
     <div className="relative group">
       <button
         onClick={onClick}
-        className="w-full flex flex-col items-center justify-center p-3 rounded-2xl border transition-all active:scale-[0.96] cursor-pointer text-center min-h-[110px] relative bg-slate-800/40 border-slate-700/30 hover:bg-slate-700/40"
+        className="w-full flex flex-col items-center justify-center p-3 rounded-2xl border transition-all active:scale-[0.96] cursor-pointer text-center min-h-[110px] relative bg-slate-50 border-slate-700/30 hover:bg-slate-100/40"
       >
         <div className={`absolute top-2 right-2 w-2.5 h-2.5 rounded-full ${roomSt.dot}`} />
         <div
@@ -343,11 +343,11 @@ function RoomTile({ room, color, onClick, code, canUpdate, canDelete, onEdit, on
         >
           <Layers className="w-6 h-6" style={{ color }} />
         </div>
-        <span className="text-[13px] font-semibold text-white leading-tight">{room.name}</span>
+        <span className="text-[13px] font-semibold text-slate-900 leading-tight">{room.name}</span>
         <span className="text-[10px] font-mono text-slate-500 mt-0.5">{code}</span>
         <span className="text-[11px] text-slate-500 mt-0.5">{room.assets.length} strojů</span>
         {room.issueCount > 0 && (
-          <span className="text-[11px] text-red-400 mt-0.5">{room.issueCount} problémů</span>
+          <span className="text-[11px] text-red-700 mt-0.5">{room.issueCount} problémů</span>
         )}
       </button>
       {/* Edit/delete overlay follows the same split as Firestore asset rules. */}
@@ -356,7 +356,7 @@ function RoomTile({ room, color, onClick, code, canUpdate, canDelete, onEdit, on
           {canUpdate && onEdit && (
             <button
               onClick={(e) => { e.stopPropagation(); onEdit(); }}
-              className="w-7 h-7 rounded-lg bg-amber-500/80 text-white flex items-center justify-center hover:bg-amber-500 transition"
+              className="w-7 h-7 rounded-lg bg-amber-500/80 text-slate-900 flex items-center justify-center hover:bg-amber-500 transition"
               title="Přejmenovat místnost"
             >
               <Edit2 className="w-3.5 h-3.5" />
@@ -365,7 +365,7 @@ function RoomTile({ room, color, onClick, code, canUpdate, canDelete, onEdit, on
           {canDelete && onDelete && (
             <button
               onClick={(e) => { e.stopPropagation(); onDelete(); }}
-              className="w-7 h-7 rounded-lg bg-red-500/80 text-white flex items-center justify-center hover:bg-red-500 transition"
+              className="w-7 h-7 rounded-lg bg-red-500/80 text-slate-900 flex items-center justify-center hover:bg-red-500 transition"
               title="Smazat místnost"
             >
               <Trash2 className="w-3.5 h-3.5" />
@@ -422,7 +422,7 @@ function WastePanel({ wasteStatus, setWasteStatus }: { wasteStatus: Record<strin
   };
 
   return (
-    <div className="bg-slate-800/40 rounded-2xl p-4 border border-slate-700/30 mb-4">
+    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-700/30 mb-4">
       <h3 className="text-xs text-slate-500 uppercase font-bold mb-3 flex items-center gap-2">
         <Truck className="w-4 h-4" />
         Správa odpadů — Loupárna
@@ -442,15 +442,15 @@ function WastePanel({ wasteStatus, setWasteStatus }: { wasteStatus: Record<strin
             >
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-lg">{w.icon}</span>
-                <span className="text-sm font-medium text-white">{w.label}</span>
+                <span className="text-sm font-medium text-slate-900">{w.label}</span>
                 <div className={`w-3 h-3 rounded-full ml-auto ${isFull ? 'bg-red-500' : 'bg-emerald-500'}`} />
               </div>
               <button
                 onClick={() => toggleFull(w.id)}
                 className={`w-full py-1.5 rounded-lg text-xs font-bold transition ${
                   isFull
-                    ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'
-                    : 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                    ? 'bg-emerald-500/20 text-emerald-700 hover:bg-emerald-500/30'
+                    : 'bg-red-500/20 text-red-700 hover:bg-red-500/30'
                 }`}
               >
                 {isFull ? 'Označit prázdný' : 'Plný stav'}
@@ -465,7 +465,7 @@ function WastePanel({ wasteStatus, setWasteStatus }: { wasteStatus: Record<strin
         disabled={saving || plevyStatus === 'pending'}
         className={`w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition active:scale-[0.97] ${
           plevyStatus === 'pending'
-            ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+            ? 'bg-amber-500/20 text-amber-700 border border-amber-500/30'
             : 'bg-yellow-600 text-white hover:bg-yellow-500'
         }`}
       >
@@ -758,7 +758,7 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onDelete, on
             <button
               onClick={handleInlineSave}
               disabled={editSaving || !editName.trim()}
-              className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-400 hover:bg-emerald-500/30 transition disabled:opacity-50"
+              className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-700 hover:bg-emerald-500/30 transition disabled:opacity-50"
               title="Uložit"
             >
               {editSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
@@ -766,7 +766,7 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onDelete, on
           ) : canUpdate ? (
             <button
               onClick={() => setIsEditing(true)}
-              className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center text-amber-400 hover:bg-amber-500/30 transition"
+              className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center text-amber-700 hover:bg-amber-500/30 transition"
               title="Upravit"
             >
               <Edit2 className="w-4 h-4" />
@@ -775,7 +775,7 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onDelete, on
           {!isEditing && canDelete && onDelete && (
             <button
               onClick={() => onDelete(asset)}
-              className="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center text-red-400 hover:bg-red-500/30 transition"
+              className="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center text-red-700 hover:bg-red-500/30 transition"
               title="Smazat"
             >
               <Trash2 className="w-4 h-4" />
@@ -794,22 +794,22 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onDelete, on
               value={editName}
               onChange={(e) => setEditName(e.target.value)}
               autoFocus
-              className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-amber-500/50 transition"
+              className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-amber-500/50 transition"
             />
           </div>
           <div>
             <label className="text-xs text-slate-400 mb-1 block">Stav</label>
             <div className="flex gap-1.5">
               {([
-                { value: 'operational', label: 'V provozu', active: 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400' },
-                { value: 'maintenance', label: 'Údržba', active: 'bg-amber-500/20 border-amber-500/40 text-amber-400' },
-                { value: 'breakdown', label: 'Porucha', active: 'bg-red-500/20 border-red-500/40 text-red-400' },
+                { value: 'operational', label: 'V provozu', active: 'bg-emerald-500/20 border-emerald-500/40 text-emerald-700' },
+                { value: 'maintenance', label: 'Údržba', active: 'bg-amber-500/20 border-amber-500/40 text-amber-700' },
+                { value: 'breakdown', label: 'Porucha', active: 'bg-red-500/20 border-red-500/40 text-red-700' },
               ] as const).map((s) => (
                 <button
                   key={s.value}
                   onClick={() => setEditStatus(s.value)}
                   className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition ${
-                    editStatus === s.value ? s.active : 'bg-white/5 border-white/10 text-slate-400'
+                    editStatus === s.value ? s.active : 'bg-slate-50 border-slate-200 text-slate-400'
                   }`}
                 >
                   {s.label}
@@ -823,11 +823,11 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onDelete, on
               <select
                 value={editRoom}
                 onChange={(e) => setEditRoom(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-amber-500/50 transition"
+                className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-amber-500/50 transition"
                 style={{ appearance: 'auto' }}
               >
                 {roomOptions.map((r) => (
-                  <option key={r} value={r} className="bg-slate-800">{r}</option>
+                  <option key={r} value={r} className="bg-white">{r}</option>
                 ))}
               </select>
             </div>
@@ -849,7 +849,7 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onDelete, on
           </div>
           <div className="flex flex-wrap gap-1.5">
             {asset.controlPoints.map((cp, i) => (
-              <span key={i} className="px-2.5 py-1 rounded-lg bg-white/5 text-[12px] text-slate-300 border border-white/10">
+              <span key={i} className="px-2.5 py-1 rounded-lg bg-slate-50 text-[12px] text-slate-600 border border-slate-200">
                 {cp}
               </span>
             ))}
@@ -861,25 +861,25 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onDelete, on
       {isPestTrap && (
         <div className="mt-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4">
           <div className="flex items-center gap-2 mb-3">
-            <Bug className="w-5 h-5 text-amber-400" />
-            <span className="font-bold text-amber-300">Hmyzolapač</span>
+            <Bug className="w-5 h-5 text-amber-700" />
+            <span className="font-bold text-amber-700">Hmyzolapač</span>
             {pestControl.isCritical && (
-              <span className="px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 text-xs font-bold animate-pulse">KRITICKÝ</span>
+              <span className="px-2 py-0.5 rounded-full bg-red-500/20 text-red-700 text-xs font-bold animate-pulse">KRITICKÝ</span>
             )}
           </div>
 
           {/* Latest count */}
           {pestControl.latestLog && (
-            <div className="flex items-center gap-3 mb-3 bg-white/5 rounded-xl p-3">
+            <div className="flex items-center gap-3 mb-3 bg-slate-50 rounded-xl p-3">
               <div className="text-center">
-                <div className={`text-2xl font-bold ${pestControl.isCritical ? 'text-red-400' : 'text-amber-300'}`}>
+                <div className={`text-2xl font-bold ${pestControl.isCritical ? 'text-red-700' : 'text-amber-700'}`}>
                   {pestControl.latestLog.count}
                 </div>
                 <div className="text-[10px] text-slate-500">kusů</div>
               </div>
               <div className="flex-1 min-w-0">
                 <div className="text-xs text-slate-400">Poslední kontrola</div>
-                <div className="text-sm text-white">
+                <div className="text-sm text-slate-900">
                   {pestControl.latestLog.loggedAt?.toDate?.()?.toLocaleDateString('cs-CZ') || '—'}
                 </div>
                 {pestControl.latestLog.note && (
@@ -904,7 +904,7 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onDelete, on
                   onChange={(e) => setPestCount(e.target.value)}
                   placeholder="0"
                   autoFocus
-                  className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-amber-500/50"
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-amber-500/50"
                 />
               </div>
               <div>
@@ -914,7 +914,7 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onDelete, on
                   type="file"
                   accept="image/*"
                   capture="environment"
-                  className="w-full text-sm text-slate-400 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-amber-500/20 file:text-amber-400 hover:file:bg-amber-500/30"
+                  className="w-full text-sm text-slate-400 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-amber-500/20 file:text-amber-700 hover:file:bg-amber-500/30"
                 />
               </div>
               <div>
@@ -924,13 +924,13 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onDelete, on
                   value={pestNote}
                   onChange={(e) => setPestNote(e.target.value)}
                   placeholder="Stav lapáku, komentář..."
-                  className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-amber-500/50"
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-amber-500/50"
                 />
               </div>
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowPestForm(false)}
-                  className="flex-1 py-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 text-sm font-semibold"
+                  className="flex-1 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-400 text-sm font-semibold"
                 >
                   Zrušit
                 </button>
@@ -963,9 +963,9 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onDelete, on
                   <div key={log.id} className="flex items-center gap-2 text-xs">
                     <div className={`w-2 h-2 rounded-full ${log.isCritical ? 'bg-red-500' : 'bg-emerald-500'}`} />
                     <span className="text-slate-400">{log.loggedAt?.toDate?.()?.toLocaleDateString('cs-CZ') || '—'}</span>
-                    <span className={`font-bold ${log.isCritical ? 'text-red-400' : 'text-white'}`}>{log.count} ks</span>
+                    <span className={`font-bold ${log.isCritical ? 'text-red-700' : 'text-slate-900'}`}>{log.count} ks</span>
                     {log.note && <span className="text-slate-500 truncate">{log.note}</span>}
-                    {log.photoUrl && <span className="text-blue-400">📷</span>}
+                    {log.photoUrl && <span className="text-blue-700">📷</span>}
                   </div>
                 ))}
               </div>
@@ -978,8 +978,8 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onDelete, on
       {isWasteBin && (
         <div className="mt-4 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4">
           <div className="flex items-center gap-2 mb-3">
-            <Trash2 className="w-5 h-5 text-emerald-400" />
-            <span className="font-bold text-emerald-300">Popelnice / Kontejner</span>
+            <Trash2 className="w-5 h-5 text-emerald-700" />
+            <span className="font-bold text-emerald-700">Popelnice / Kontejner</span>
           </div>
           <button
             onClick={handleQuickEmpty}
@@ -998,10 +998,10 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onDelete, on
           <div className="text-[11px] text-slate-500 uppercase tracking-wider mb-1.5 font-bold">Nadřazené zařízení</div>
           <button
             onClick={() => onSelectAsset(parentAsset)}
-            className="w-full flex items-center gap-3 p-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] transition text-left"
+            className="w-full flex items-center gap-3 p-2.5 rounded-xl bg-slate-50 border border-slate-200 hover:bg-slate-100 transition text-left"
           >
             <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${(STATUS_CONFIG[parentAsset.status] || STATUS_CONFIG.idle).dot}`} />
-            <span className="text-sm text-white font-medium truncate">{parentAsset.name}</span>
+            <span className="text-sm text-slate-900 font-medium truncate">{parentAsset.name}</span>
             {parentAsset.code && <span className="text-[10px] text-slate-500 font-mono ml-auto">{parentAsset.code}</span>}
           </button>
         </div>
@@ -1017,7 +1017,7 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onDelete, on
             {canCreate && !showSubForm && (
               <button
                 onClick={() => setShowSubForm(true)}
-                className="text-[11px] text-orange-400 font-semibold hover:text-orange-300 transition flex items-center gap-1"
+                className="text-[11px] text-orange-700 font-semibold hover:text-orange-700 transition flex items-center gap-1"
               >
                 <Plus className="w-3.5 h-3.5" /> Přidat
               </button>
@@ -1033,19 +1033,19 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onDelete, on
                 onChange={(e) => setSubName(e.target.value)}
                 placeholder="Název podzařízení"
                 autoFocus
-                className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-orange-500/50 transition"
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-orange-500/50 transition"
               />
               <input
                 type="text"
                 value={subCode}
                 onChange={(e) => setSubCode(e.target.value)}
                 placeholder="Kód (volitelně)"
-                className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-orange-500/50 transition"
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-orange-500/50 transition"
               />
               <div className="flex gap-2">
                 <button
                   onClick={() => { setShowSubForm(false); setSubName(''); setSubCode(''); }}
-                  className="flex-1 py-2 rounded-lg bg-white/5 border border-white/10 text-slate-400 text-xs font-semibold"
+                  className="flex-1 py-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-400 text-xs font-semibold"
                 >
                   Zrušit
                 </button>
@@ -1070,10 +1070,10 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onDelete, on
                   <button
                     key={child.id}
                     onClick={() => onSelectAsset?.(child)}
-                    className="w-full flex items-center gap-3 p-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] transition text-left"
+                    className="w-full flex items-center gap-3 p-2.5 rounded-xl bg-slate-50 border border-slate-200 hover:bg-slate-100 transition text-left"
                   >
                     <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${cst.dot}`} />
-                    <span className="text-sm text-white font-medium truncate">{child.name}</span>
+                    <span className="text-sm text-slate-900 font-medium truncate">{child.name}</span>
                     {child.code && <span className="text-[10px] text-slate-500 font-mono ml-auto">{child.code}</span>}
                   </button>
                 );
@@ -1087,8 +1087,8 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onDelete, on
       {actionResult && (
         <div className={`mt-3 p-3 rounded-xl text-sm font-semibold text-center ${
           actionResult.type === 'success'
-            ? 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-400'
-            : 'bg-red-500/20 border border-red-500/30 text-red-400'
+            ? 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-700'
+            : 'bg-red-500/20 border border-red-500/30 text-red-700'
         }`}>
           {actionResult.type === 'success' ? '✅ ' : '❌ '}{actionResult.text}
         </div>
@@ -1099,7 +1099,7 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onDelete, on
         <button
           onClick={(e) => { e.stopPropagation(); handleAction('report'); }}
           disabled={actionLoading !== null}
-          className="py-3 rounded-xl bg-red-500/15 border border-red-500/30 text-red-400 text-sm font-semibold active:scale-95 transition flex items-center justify-center gap-2 min-h-[48px] disabled:opacity-50"
+          className="py-3 rounded-xl bg-red-500/15 border border-red-500/30 text-red-700 text-sm font-semibold active:scale-95 transition flex items-center justify-center gap-2 min-h-[48px] disabled:opacity-50"
         >
           {actionLoading === 'report' ? <Loader2 className="w-4 h-4 animate-spin" /> : <AlertTriangle className="w-4 h-4" />}
           Nahlásit
@@ -1107,7 +1107,7 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onDelete, on
         <button
           onClick={(e) => { e.stopPropagation(); handleAction('task'); }}
           disabled={actionLoading !== null}
-          className="py-3 rounded-xl bg-blue-500/15 border border-blue-500/30 text-blue-400 text-sm font-semibold active:scale-95 transition flex items-center justify-center gap-2 min-h-[48px] disabled:opacity-50"
+          className="py-3 rounded-xl bg-blue-500/15 border border-blue-500/30 text-blue-700 text-sm font-semibold active:scale-95 transition flex items-center justify-center gap-2 min-h-[48px] disabled:opacity-50"
         >
           {actionLoading === 'task' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wrench className="w-4 h-4" />}
           Úkol
@@ -1115,7 +1115,7 @@ function AssetDetailSheet({ asset, onClose, onCreateTask, onReport, onDelete, on
         {onOpenPassport && (
           <button
             onClick={(e) => { e.stopPropagation(); onOpenPassport(asset); }}
-            className="col-span-2 py-3 rounded-xl bg-orange-500/15 border border-orange-500/30 text-orange-400 text-sm font-semibold active:scale-95 transition flex items-center justify-center gap-2 min-h-[48px]"
+            className="col-span-2 py-3 rounded-xl bg-orange-500/15 border border-orange-500/30 text-orange-700 text-sm font-semibold active:scale-95 transition flex items-center justify-center gap-2 min-h-[48px]"
           >
             <FileText className="w-4 h-4" />
             Pasport
@@ -1199,14 +1199,14 @@ function GlobalSearchResults({ assets, buildings, search, onSelectAsset, onSelec
 
   if (total === 0) {
     return (
-      <div className="bg-slate-800/60 rounded-2xl border border-slate-700/50 p-6 text-center mb-4">
+      <div className="bg-white rounded-2xl border border-slate-700/50 p-6 text-center mb-4">
         <div className="text-slate-500 text-sm">Nic nenalezeno pro "{search}"</div>
       </div>
     );
   }
 
   return (
-    <div className="bg-slate-800/60 rounded-2xl border border-slate-700/50 p-4 mb-4 space-y-3 max-h-[60vh] overflow-y-auto">
+    <div className="bg-white rounded-2xl border border-slate-700/50 p-4 mb-4 space-y-3 max-h-[60vh] overflow-y-auto">
       <div className="text-xs text-slate-500 font-bold uppercase">Výsledky ({total})</div>
 
       {matchedBuildings.length > 0 && (
@@ -1216,11 +1216,11 @@ function GlobalSearchResults({ assets, buildings, search, onSelectAsset, onSelec
           </div>
           {matchedBuildings.map(b => (
             <button key={b.id} onClick={() => onSelectBuilding(b.id)}
-              className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-white/[0.06] transition text-left mb-1"
+              className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-100 transition text-left mb-1"
             >
               <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold" style={{ background: `${b.color}20`, color: b.color }}>{b.id}</div>
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-white">{b.name}</div>
+                <div className="text-sm font-medium text-slate-900">{b.name}</div>
                 <div className="text-[11px] text-slate-500">{b.totalAssets} zařízení</div>
               </div>
               <ChevronRight className="w-4 h-4 text-slate-600" />
@@ -1236,11 +1236,11 @@ function GlobalSearchResults({ assets, buildings, search, onSelectAsset, onSelec
           </div>
           {matchedRooms.slice(0, 10).map(r => (
             <button key={`${r.buildingId}-${r.roomName}`} onClick={() => onSelectRoom(r.buildingId, r.roomName)}
-              className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-white/[0.06] transition text-left mb-1"
+              className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-100 transition text-left mb-1"
             >
-              <div className="w-8 h-8 rounded-lg bg-slate-700/50 flex items-center justify-center"><Layers className="w-4 h-4 text-slate-400" /></div>
+              <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center"><Layers className="w-4 h-4 text-slate-400" /></div>
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-white">{r.roomName}</div>
+                <div className="text-sm font-medium text-slate-900">{r.roomName}</div>
                 <div className="text-[11px] text-slate-500">{r.buildingName}</div>
               </div>
               <ChevronRight className="w-4 h-4 text-slate-600" />
@@ -1259,9 +1259,9 @@ function GlobalSearchResults({ assets, buildings, search, onSelectAsset, onSelec
             const catCfg = a.category ? FOLDER_CONFIG[a.category] : null;
             return (
               <button key={a.id} onClick={() => onSelectAsset(a)}
-                className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-white/[0.06] transition text-left mb-1"
+                className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-100 transition text-left mb-1"
               >
-                <div className="w-8 h-8 rounded-lg bg-slate-700/50 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
                   {catCfg ? (
                     <span className="text-base">{catCfg.icon}</span>
                   ) : (
@@ -1269,7 +1269,7 @@ function GlobalSearchResults({ assets, buildings, search, onSelectAsset, onSelec
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-white truncate">{a.name}</div>
+                  <div className="text-sm font-medium text-slate-900 truncate">{a.name}</div>
                   <div className="text-[11px] text-slate-500">
                     {BUILDING_META[a.buildingId]?.name || a.buildingId}{a.areaName ? ` · ${a.areaName}` : ''}
                     {catCfg ? ` · ${catCfg.label}` : ''}
@@ -1636,18 +1636,18 @@ export default function MapPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900">
+    <div className="min-h-screen bg-[#f1ece3]">
       <div className="max-w-6xl mx-auto px-3 pt-4 pb-24">
         {/* Header */}
         <div className="flex items-center gap-3 mb-3">
           <button
             onClick={() => goBack()}
-            className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 hover:text-white transition"
+            className="w-9 h-9 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-900 transition"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="flex-1">
-            <h1 className="text-xl font-bold text-white">Mapa areálu</h1>
+            <h1 className="text-xl font-bold text-slate-900">Mapa areálu</h1>
             <p className="text-xs text-slate-500">
               {assets.length} zařízení · {buildings.length} budov
             </p>
@@ -1658,37 +1658,37 @@ export default function MapPage() {
         {/* Breadcrumb */}
         {activeLevel !== 'buildings' && (
           <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-3 flex-wrap">
-            <button onClick={handleBackToBuildings} className="hover:text-orange-400 transition font-medium">
+            <button onClick={handleBackToBuildings} className="hover:text-orange-700 transition font-medium">
               Budovy
             </button>
             {activeLevel === 'rooms' && currentBuilding && (
               <>
                 <ChevronRight className="w-3 h-3" />
-                <span className="text-white font-semibold">{currentBuilding.name}</span>
+                <span className="text-slate-900 font-semibold">{currentBuilding.name}</span>
               </>
             )}
             {activeLevel === 'machines' && currentBuilding && (
               <>
                 <ChevronRight className="w-3 h-3" />
-                <button onClick={handleBackToRooms} className="hover:text-orange-400 transition font-medium">
+                <button onClick={handleBackToRooms} className="hover:text-orange-700 transition font-medium">
                   {currentBuilding.name}
                 </button>
                 <ChevronRight className="w-3 h-3" />
-                <span className="text-white font-semibold">{selectedRoomName}</span>
+                <span className="text-slate-900 font-semibold">{selectedRoomName}</span>
               </>
             )}
             {activeLevel === 'folder' && currentBuilding && currentFolder && (
               <>
                 <ChevronRight className="w-3 h-3" />
-                <button onClick={handleBackToRooms} className="hover:text-orange-400 transition font-medium">
+                <button onClick={handleBackToRooms} className="hover:text-orange-700 transition font-medium">
                   {currentBuilding.name}
                 </button>
                 <ChevronRight className="w-3 h-3" />
-                <button onClick={handleBackToFolders} className="hover:text-orange-400 transition font-medium">
+                <button onClick={handleBackToFolders} className="hover:text-orange-700 transition font-medium">
                   {selectedRoomName}
                 </button>
                 <ChevronRight className="w-3 h-3" />
-                <span className="text-white font-semibold">{currentFolder.icon} {currentFolder.name}</span>
+                <span className="text-slate-900 font-semibold">{currentFolder.icon} {currentFolder.name}</span>
               </>
             )}
           </div>
@@ -1702,7 +1702,7 @@ export default function MapPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Hledat budovu, místnost nebo stroj..."
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-slate-600 focus:outline-none focus:border-orange-500/50 transition"
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm placeholder-slate-400 focus:outline-none focus:border-orange-500/50 transition"
           />
         </div>
 
@@ -1760,12 +1760,12 @@ export default function MapPage() {
                         >
                           {b.id}
                         </div>
-                        <span className="text-[13px] font-semibold text-white leading-tight">{b.name}</span>
+                        <span className="text-[13px] font-semibold text-slate-900 leading-tight">{b.name}</span>
                         <span className="text-[11px] text-slate-500 mt-0.5">
                           {b.totalAssets} zařízení · {b.rooms.length} míst.
                         </span>
                         {b.issueCount > 0 && (
-                          <span className="text-[11px] text-red-400 mt-0.5">{b.issueCount} problémů</span>
+                          <span className="text-[11px] text-red-700 mt-0.5">{b.issueCount} problémů</span>
                         )}
                       </button>
                     );
@@ -1775,7 +1775,7 @@ export default function MapPage() {
                   {canCreateAssets && (
                     <button
                       onClick={() => setShowAddModal('building')}
-                      className="flex flex-col items-center justify-center p-3 rounded-2xl border-2 border-dashed border-slate-700/50 text-slate-500 hover:text-orange-400 hover:border-orange-500/30 transition cursor-pointer text-center min-h-[120px]"
+                      className="flex flex-col items-center justify-center p-3 rounded-2xl border-2 border-dashed border-slate-700/50 text-slate-500 hover:text-orange-700 hover:border-orange-500/30 transition cursor-pointer text-center min-h-[120px]"
                     >
                       <Plus className="w-8 h-8 mb-1" />
                       <span className="text-[12px] font-medium">Přidat</span>
@@ -1792,7 +1792,7 @@ export default function MapPage() {
           <>
             <button
               onClick={handleBackToBuildings}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-400 text-xs font-semibold mb-3 hover:text-white transition"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-400 text-xs font-semibold mb-3 hover:text-slate-900 transition"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               Zpět na budovy
@@ -1806,7 +1806,7 @@ export default function MapPage() {
                 {selectedBuildingId}
               </div>
               <div className="flex-1">
-                <div className="text-lg font-bold text-white">{currentBuilding.name}</div>
+                <div className="text-lg font-bold text-slate-900">{currentBuilding.name}</div>
                 <div className="text-xs text-slate-500">
                   {currentBuilding.totalAssets} zařízení · {currentBuilding.rooms.length} místností
                 </div>
@@ -1843,7 +1843,7 @@ export default function MapPage() {
                 {canCreateAssets && (
                   <button
                     onClick={() => setShowAddModal('room')}
-                    className="flex flex-col items-center justify-center p-3 rounded-2xl border-2 border-dashed border-slate-700/50 text-slate-500 hover:text-orange-400 hover:border-orange-500/30 transition cursor-pointer text-center min-h-[110px]"
+                    className="flex flex-col items-center justify-center p-3 rounded-2xl border-2 border-dashed border-slate-700/50 text-slate-500 hover:text-orange-700 hover:border-orange-500/30 transition cursor-pointer text-center min-h-[110px]"
                   >
                     <Plus className="w-7 h-7 mb-1" />
                     <span className="text-[12px] font-medium">Přidat</span>
@@ -1859,7 +1859,7 @@ export default function MapPage() {
           <>
             <button
               onClick={handleBackToRooms}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-400 text-xs font-semibold mb-3 hover:text-white transition"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-400 text-xs font-semibold mb-3 hover:text-slate-900 transition"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               Zpět na místnosti
@@ -1873,7 +1873,7 @@ export default function MapPage() {
                 <Layers className="w-6 h-6" style={{ color: currentColor }} />
               </div>
               <div className="flex-1">
-                <div className="text-lg font-bold text-white">{currentRoom.name}</div>
+                <div className="text-lg font-bold text-slate-900">{currentRoom.name}</div>
                 <div className="text-xs text-slate-500">
                   {currentRoom.assets.length} strojů · {currentRoom.floor}
                 </div>
@@ -1901,7 +1901,7 @@ export default function MapPage() {
                   {canCreateAssets && (
                     <button
                       onClick={() => setShowAddModal('asset')}
-                      className="flex flex-col items-center justify-center p-3 rounded-2xl border-2 border-dashed border-slate-700/50 text-slate-500 hover:text-orange-400 hover:border-orange-500/30 transition cursor-pointer text-center min-h-[100px]"
+                      className="flex flex-col items-center justify-center p-3 rounded-2xl border-2 border-dashed border-slate-700/50 text-slate-500 hover:text-orange-700 hover:border-orange-500/30 transition cursor-pointer text-center min-h-[100px]"
                     >
                       <Plus className="w-7 h-7 mb-1" />
                       <span className="text-[12px] font-medium">Přidat</span>
@@ -1918,18 +1918,18 @@ export default function MapPage() {
           <>
             <button
               onClick={handleBackToFolders}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-400 text-xs font-semibold mb-3 hover:text-white transition"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-400 text-xs font-semibold mb-3 hover:text-slate-900 transition"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               Zpět na místnost
             </button>
 
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 rounded-xl bg-white/[0.05] flex items-center justify-center text-2xl">
+              <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center text-2xl">
                 {currentFolder.icon}
               </div>
               <div className="flex-1">
-                <div className="text-lg font-bold text-white">{currentFolder.name}</div>
+                <div className="text-lg font-bold text-slate-900">{currentFolder.name}</div>
                 <div className="text-xs text-slate-500">
                   {currentFolder.assets.length} strojů
                 </div>
@@ -2104,7 +2104,7 @@ export default function MapPage() {
           </>
         )}
         {addError && (
-          <div className="p-2.5 bg-red-500/20 border border-red-500/30 rounded-xl text-red-300 text-sm text-center">
+          <div className="p-2.5 bg-red-500/20 border border-red-500/30 rounded-xl text-red-700 text-sm text-center">
             {addError}
           </div>
         )}
