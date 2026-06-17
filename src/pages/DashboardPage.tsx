@@ -2274,8 +2274,8 @@ function FullDashboard() {
   const alarmDetail = topTasks.filter((t) => t.priority === 'P1').map((t) => t.asset || t.title).filter(Boolean).slice(0, 2).join(' · ');
 
   return (
-    <div className="dashboard-daylight min-h-screen bg-[#f1ece3] text-slate-950">
-      <div className="mx-auto max-w-[1360px] px-3 pt-4 pb-24 sm:px-4 xl:px-5">
+    <div className="dashboard-daylight min-h-screen w-full overflow-x-hidden bg-[#f1ece3] text-slate-950">
+      <div className="mx-auto w-full max-w-[1360px] min-w-0 px-3 pt-4 pb-24 sm:px-4 xl:px-5">
 
         {/* HEADER */}
         <div className="flex items-center justify-between gap-3 mb-5 overflow-hidden rounded-3xl border border-stone-200 bg-gradient-to-br from-emerald-50 via-white to-white px-4 py-4 sm:px-5 shadow-sm shadow-stone-200/70">

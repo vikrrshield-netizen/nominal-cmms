@@ -78,7 +78,7 @@ function Donut({ operational, maintenance, breakdown }: { operational: number; m
 }
 
 const CARD = 'rounded-2xl border border-stone-200 bg-white p-4 shadow-sm shadow-stone-200/70';
-const EYEBROW = 'text-[10px] font-bold uppercase tracking-widest text-slate-400';
+const EYEBROW = 'text-[11px] font-bold uppercase tracking-wide text-slate-400';
 
 export default function OverviewDaylight({
   alarmCount, alarmDetail, kpi, priorityTasks, machineStatus, team, revisions, lowStockItems, gearbox,
@@ -114,7 +114,7 @@ export default function OverviewDaylight({
               <span className={`flex h-7 w-7 items-center justify-center rounded-lg ${c.box}`}><c.icon className="h-4 w-4" /></span>
             </div>
             <div className="mt-2 text-3xl font-black text-slate-950 leading-none">{c.value}</div>
-            <div className="mt-1 text-xs font-semibold text-slate-400">{c.sub}</div>
+            <div className="mt-1 text-[13px] font-semibold text-slate-400">{c.sub}</div>
           </button>
         ))}
       </div>
