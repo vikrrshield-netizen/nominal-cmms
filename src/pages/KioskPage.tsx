@@ -24,10 +24,12 @@ import {
   Package,
   Search,
   Send,
+  Settings,
   Shield,
   ShieldCheck,
   Thermometer,
   Trash2,
+  User,
   X,
 } from 'lucide-react';
 import { db } from '../lib/firebase';
@@ -42,7 +44,7 @@ import type { DataloggerTemperatureLog } from '../types/datalogger';
 import type { GearboxTemperatureLog } from '../types/gearbox';
 import { materialBatch, productBatch } from '../data/productionMasterSeed';
 
-type ViewState = 'MENU' | 'BREAKDOWN' | 'ORDER' | 'IDEA' | 'MESSAGE' | 'PREFILTER' | 'GEARBOX_TEMP' | 'DATALOGGER_TEMP' | 'ASSISTANT' | 'HANDOVER';
+type ViewState = 'MENU' | 'BREAKDOWN' | 'ORDER' | 'IDEA' | 'MESSAGE' | 'PREFILTER' | 'GEARBOX_TEMP' | 'DATALOGGER_TEMP' | 'ASSISTANT' | 'HANDOVER' | 'PROFILE';
 
 interface QuickOption {
   id: string;
@@ -378,6 +380,19 @@ export default function KioskPage() {
     next.splice(idx < 0 ? next.length : idx, 0, from);
     setMenuOrder(next);
     try { window.localStorage.setItem('kiosk:menuOrder', JSON.stringify(next)); } catch { /* ignore */ }
+  };
+
+  // Vypínání modulů (dlaždic) — uloženo na zařízení. Oprávnění platí dál: schováváme jen to, co terminál smí.
+  const [hiddenModules, setHiddenModules] = useState<string[]>(() => {
+    try { const v = JSON.parse(window.localStorage.getItem('kiosk:hiddenModules') || 'null'); return Array.isArray(v) ? (v as string[]) : []; } catch { return []; }
+  });
+  const [showModuleSettings, setShowModuleSettings] = useState(false);
+  const toggleModule = (id: string) => {
+    setHiddenModules((prev) => {
+      const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
+      try { window.localStorage.setItem('kiosk:hiddenModules', JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
   };
 
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -1576,7 +1591,7 @@ export default function KioskPage() {
     <div className="space-y-4">
       <div>
         <h3 className="text-xl text-slate-700 font-bold">1. Kde je porucha?</h3>
-        <div className="mt-2 inline-flex rounded-xl border border-blue-400/30 bg-blue-500/15 px-4 py-3 text-base font-bold text-blue-100">
+        <div className="mt-2 inline-flex rounded-xl border border-blue-400/30 bg-blue-500/15 px-4 py-3 text-base font-bold text-blue-700">
           Budova D
         </div>
       </div>
@@ -1734,7 +1749,7 @@ export default function KioskPage() {
                     <div className="text-lg font-black leading-tight text-slate-900">Extruder {group.number}</div>
                     <div className="mt-1 text-sm font-bold text-slate-700">{group.prefilters.length} předfiltrů</div>
                   </div>
-                  <span className={`shrink-0 rounded-xl px-2.5 py-1 text-xs font-black ${isOverdue ? 'bg-red-500/25 text-red-100' : isWarning ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                  <span className={`shrink-0 rounded-xl px-2.5 py-1 text-xs font-black ${isOverdue ? 'bg-red-500/25 text-red-700' : isWarning ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>
                     {statusText}
                   </span>
                 </div>
@@ -1745,7 +1760,7 @@ export default function KioskPage() {
                     return (
                       <div key={asset.id} className="flex min-h-10 items-center justify-between gap-2 rounded-xl bg-[#fbf9f4]/55 px-3">
                         <span className="min-w-0 truncate text-sm font-black text-slate-900">{asset.name.replace(/^Předfiltr\s*/i, '')}</span>
-                        <span className={`shrink-0 text-xs font-black ${status.state === 'overdue' ? 'text-red-100' : status.state === 'warning' ? 'text-amber-700' : 'text-emerald-700'}`}>
+                        <span className={`shrink-0 text-xs font-black ${status.state === 'overdue' ? 'text-red-700' : status.state === 'warning' ? 'text-amber-700' : 'text-emerald-700'}`}>
                           {status.label}
                         </span>
                       </div>
@@ -1776,10 +1791,10 @@ export default function KioskPage() {
       {gearboxTemperatureAlerts.missing.length > 0 && (
         <div className="rounded-2xl border border-violet-300/40 bg-violet-600/20 p-4">
           <div className="flex items-center gap-3">
-            <Thermometer className="h-6 w-6 text-violet-100" />
+            <Thermometer className="h-6 w-6 text-violet-700" />
             <div>
               <div className="text-lg font-black text-slate-900">Dnešní teploty ještě nejsou kompletní</div>
-              <div className="text-sm font-bold text-violet-100">{gearboxTemperatureAlerts.missing.length} převodovek čeká na zápis.</div>
+              <div className="text-sm font-bold text-violet-700">{gearboxTemperatureAlerts.missing.length} převodovek čeká na zápis.</div>
             </div>
           </div>
         </div>
@@ -1821,11 +1836,11 @@ export default function KioskPage() {
                     className="min-w-0 flex-1 text-left active:scale-[0.99]"
                   >
                     <div className="flex min-w-0 items-start gap-2">
-                      {missing && <AlertTriangle className="mt-1 h-5 w-5 shrink-0 text-violet-100" />}
+                      {missing && <AlertTriangle className="mt-1 h-5 w-5 shrink-0 text-violet-700" />}
                       <div className="min-w-0">
                         <div className="text-slate-900 text-lg font-black leading-snug break-words">{asset.name}</div>
                         <div className="text-sm text-slate-600 mt-1 leading-snug break-words">{asset.currentExtruderName || assetLabel(asset, assets)}</div>
-                        <div className={`mt-2 text-sm font-black ${missing ? 'text-violet-100' : 'text-emerald-700'}`}>
+                        <div className={`mt-2 text-sm font-black ${missing ? 'text-violet-700' : 'text-emerald-700'}`}>
                           {dailyStatus.label}
                         </div>
                       </div>
@@ -1842,7 +1857,7 @@ export default function KioskPage() {
                       setGearboxProblemNote('');
                       setSubmitError('');
                     }}
-                    className="shrink-0 rounded-xl border border-red-400/60 bg-red-50 px-3 py-2 text-xs font-black text-red-100 active:scale-[0.98]"
+                    className="shrink-0 rounded-xl border border-red-400/60 bg-red-50 px-3 py-2 text-xs font-black text-red-700 active:scale-[0.98]"
                   >
                     Problém
                   </button>
@@ -1921,8 +1936,75 @@ export default function KioskPage() {
     </div>
   );
 
+  // Modul, který nelze vypnout (hlavní účel kiosku)
+  const ALWAYS_ON_MODULE = 'breakdown';
+  // Definice dlaždic MENU — sdílí je mřížka i okno „Nastavení modulů".
+  const menuDefs = [
+    { id: 'breakdown', icon: <AlertTriangle className="w-8 h-8" />, label: 'Nahlásit poruchu', tone: 'red', primary: true, onClick: () => setActiveView('BREAKDOWN'), show: true },
+    { id: 'order', icon: <Package className="w-8 h-8" />, label: 'Požadavek na díl', tone: 'blue', onClick: () => setActiveView('ORDER'), show: true },
+    { id: 'handover', icon: <ClipboardList className="w-8 h-8" />, label: 'Předání směny', tone: 'indigo', onClick: () => setActiveView('HANDOVER'), show: true },
+    { id: 'datalogger', icon: <Thermometer className="w-8 h-8" />, label: 'Datalogery', tone: 'teal', onClick: () => setActiveView('DATALOGGER_TEMP'), badge: dataloggerAlerts.missing.length, show: canUseDataloggerKiosk },
+    { id: 'prefilter', icon: <Filter className="w-8 h-8" />, label: 'Výměna předfiltru', tone: 'cyan', onClick: () => setActiveView('PREFILTER'), badge: prefilterAlerts.overdue.length + prefilterAlerts.warning.length, show: canUsePrefilterKiosk },
+    { id: 'gearbox', icon: <Thermometer className="w-8 h-8" />, label: 'Teplota převodovky', tone: 'violet', onClick: () => setActiveView('GEARBOX_TEMP'), badge: gearboxTemperatureAlerts.missing.length, show: canUseGearboxKiosk },
+    { id: 'idea', icon: <Lightbulb className="w-8 h-8" />, label: 'Nápad', tone: 'emerald', onClick: () => setActiveView('IDEA'), show: true },
+    { id: 'assistant', icon: <HelpCircle className="w-8 h-8" />, label: 'Jak postupovat', tone: 'amber', onClick: () => setActiveView('ASSISTANT'), show: true },
+    { id: 'message', icon: <ShieldCheck className="w-8 h-8" />, label: 'Schránka důvěry', tone: 'purple', onClick: () => setActiveView('MESSAGE'), show: true },
+    { id: 'profile', icon: <User className="w-8 h-8" />, label: 'Profil', tone: 'slate', onClick: () => setActiveView('PROFILE'), show: true },
+  ].filter((t) => t.show);
+
+  const renderModuleSettings = () => (
+    <div className="fixed inset-0 z-[120] flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" onClick={() => setShowModuleSettings(false)}>
+      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl">
+        <div className="sticky top-0 flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4">
+          <div>
+            <h2 className="text-lg font-black text-slate-900">Které dlaždice zobrazit</h2>
+            <p className="text-xs text-slate-400">Platí jen pro toto zařízení.</p>
+          </div>
+          <button onClick={() => setShowModuleSettings(false)} className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-900 transition" aria-label="Zavřít">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="flex flex-col gap-2 p-5">
+          {menuDefs.map((t) => {
+            const locked = t.id === ALWAYS_ON_MODULE;
+            const on = locked || !hiddenModules.includes(t.id);
+            return (
+              <button
+                key={t.id}
+                type="button"
+                disabled={locked}
+                onClick={() => !locked && toggleModule(t.id)}
+                className={`flex items-center justify-between gap-3 rounded-xl bg-[#fbf9f4] px-3 py-3 text-left transition ${locked ? 'opacity-60 cursor-default' : 'hover:bg-slate-100'}`}
+              >
+                <span className="flex items-center gap-3 text-[15px] font-semibold text-slate-900">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-600">
+                    {t.icon ? <span className="[&_svg]:h-5 [&_svg]:w-5">{t.icon}</span> : null}
+                  </span>
+                  {t.label}{locked && <span className="text-xs font-medium text-slate-400">(vždy)</span>}
+                </span>
+                <span className={`relative h-6 w-11 flex-shrink-0 rounded-full transition ${on ? 'bg-emerald-600' : 'bg-slate-300'}`}>
+                  <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${on ? 'right-0.5' : 'left-0.5'}`} />
+                </span>
+              </button>
+            );
+          })}
+          <p className="mt-1 text-xs text-slate-400">Vypnuté dlaždice z menu zmizí. Oprávnění platí dál — nabízí se jen to, co terminál smí.</p>
+        </div>
+      </div>
+    </div>
+  );
+
   const renderMenu = () => (
     <div className="w-full max-w-6xl space-y-5">
+      {showModuleSettings && renderModuleSettings()}
+      <button
+        onClick={() => setShowModuleSettings(true)}
+        className="absolute right-3 top-3 z-10 flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50 hover:text-slate-900 transition md:right-6 md:top-6"
+        aria-label="Nastavení modulů"
+        title="Nastavení modulů"
+      >
+        <Settings className="h-5 w-5" />
+      </button>
       {renderClock()}
       <div>
         <h1 className="text-2xl md:text-3xl font-black text-slate-900 text-center mb-2 leading-tight">Kiosk výroby</h1>
@@ -1930,17 +2012,7 @@ export default function KioskPage() {
         <p className="text-slate-400 text-center mb-6 text-xs md:text-sm">Tip: dlaždice můžeš přetáhnout a srovnat si je podle sebe (uloží se na tomto zařízení).</p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           {(() => {
-            const defs = [
-              { id: 'breakdown', icon: <AlertTriangle className="w-8 h-8" />, label: 'Nahlásit poruchu', tone: 'red', primary: true, onClick: () => setActiveView('BREAKDOWN'), show: true },
-              { id: 'order', icon: <Package className="w-8 h-8" />, label: 'Požadavek na díl', tone: 'blue', onClick: () => setActiveView('ORDER'), show: true },
-              { id: 'handover', icon: <ClipboardList className="w-8 h-8" />, label: 'Předání směny', tone: 'indigo', onClick: () => setActiveView('HANDOVER'), show: true },
-              { id: 'datalogger', icon: <Thermometer className="w-8 h-8" />, label: 'Datalogery', tone: 'teal', onClick: () => setActiveView('DATALOGGER_TEMP'), badge: dataloggerAlerts.missing.length, show: canUseDataloggerKiosk },
-              { id: 'prefilter', icon: <Filter className="w-8 h-8" />, label: 'Výměna předfiltru', tone: 'cyan', onClick: () => setActiveView('PREFILTER'), badge: prefilterAlerts.overdue.length + prefilterAlerts.warning.length, show: canUsePrefilterKiosk },
-              { id: 'gearbox', icon: <Thermometer className="w-8 h-8" />, label: 'Teplota převodovky', tone: 'violet', onClick: () => setActiveView('GEARBOX_TEMP'), badge: gearboxTemperatureAlerts.missing.length, show: canUseGearboxKiosk },
-              { id: 'idea', icon: <Lightbulb className="w-8 h-8" />, label: 'Nápad', tone: 'emerald', onClick: () => setActiveView('IDEA'), show: true },
-              { id: 'assistant', icon: <HelpCircle className="w-8 h-8" />, label: 'Jak postupovat', tone: 'amber', onClick: () => setActiveView('ASSISTANT'), show: true },
-              { id: 'message', icon: <ShieldCheck className="w-8 h-8" />, label: 'Schránka důvěry', tone: 'purple', onClick: () => setActiveView('MESSAGE'), show: true },
-            ].filter((t) => t.show);
+            const defs = menuDefs.filter((t) => !hiddenModules.includes(t.id));
             const ordered = [...defs].sort((a, b) => {
               const ia = menuOrder.indexOf(a.id); const ib = menuOrder.indexOf(b.id);
               return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib);
@@ -2189,12 +2261,12 @@ export default function KioskPage() {
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0">
                 <div className="truncate text-base font-black leading-tight text-slate-900">{selectedAsset.name}</div>
-                <div className="mt-0.5 truncate text-xs font-bold text-violet-100/80">{selectedAsset.currentExtruderName || assetLabel(selectedAsset, assets)}</div>
+                <div className="mt-0.5 truncate text-xs font-bold text-violet-700/80">{selectedAsset.currentExtruderName || assetLabel(selectedAsset, assets)}</div>
               </div>
               <button
                 type="button"
                 onClick={() => setGearboxProblemOpen(true)}
-                className="min-h-9 shrink-0 rounded-lg border border-red-400/50 bg-red-500/15 px-3 text-xs font-black text-red-100 active:scale-[0.98]"
+                className="min-h-9 shrink-0 rounded-lg border border-red-400/50 bg-red-500/15 px-3 text-xs font-black text-red-700 active:scale-[0.98]"
               >
                 Problém
               </button>
@@ -2328,7 +2400,7 @@ export default function KioskPage() {
                 className="mb-2 w-full rounded-xl border border-slate-200 bg-[#fbf9f4] p-2.5 text-base text-slate-900 outline-none placeholder:text-slate-400 focus:border-violet-400"
               />
               {selectedMaterial && (
-                <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-violet-400/20 bg-violet-500/10 px-3 py-2 text-xs font-bold text-violet-100">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-violet-400/20 bg-violet-500/10 px-3 py-2 text-xs font-bold text-violet-700">
                   <span>
                     {gearboxShowAllProducts ? 'Zobrazeny všechny výrobky' : `Dle receptury: ${relatedProducts.length} výrobků`}
                   </span>
@@ -2385,7 +2457,7 @@ export default function KioskPage() {
                 onChange={(event) => setGearboxProductBatchDate(event.target.value)}
                 className="w-full rounded-xl border border-slate-200 bg-[#fbf9f4] p-2.5 text-base text-slate-900 outline-none placeholder:text-slate-400 focus:border-violet-400"
               />
-              <div className="mt-1 rounded-lg border border-violet-400/20 bg-violet-500/10 px-3 py-2 text-sm font-black text-violet-100">
+              <div className="mt-1 rounded-lg border border-violet-400/20 bg-violet-500/10 px-3 py-2 text-sm font-black text-violet-700">
                 Šarže výrobku: {gearboxProductBatch || 'vyber výrobek'}
               </div>
             </label>
@@ -2441,7 +2513,7 @@ export default function KioskPage() {
               <button
                 type="button"
                 onClick={() => setGearboxProblemOpen(true)}
-                className="flex w-full items-center justify-center gap-3 rounded-xl border border-red-200 bg-red-500/10 py-3 font-bold text-red-100 active:scale-[0.98]"
+                className="flex w-full items-center justify-center gap-3 rounded-xl border border-red-200 bg-red-500/10 py-3 font-bold text-red-700 active:scale-[0.98]"
               >
                 <AlertTriangle className="w-5 h-5" />
                 Nahlásit problém
@@ -2689,7 +2761,7 @@ export default function KioskPage() {
                     : 'border-slate-200 bg-white text-slate-700 hover:border-purple-300/60'
                 }`}
               >
-                <Icon className={`mb-3 h-6 w-6 ${selected ? 'text-purple-100' : 'text-slate-400'}`} />
+                <Icon className={`mb-3 h-6 w-6 ${selected ? 'text-purple-700' : 'text-slate-400'}`} />
                 <div className="text-lg font-black">{category.label}</div>
                 <div className="mt-1 text-sm font-semibold text-slate-400">{category.description}</div>
               </button>
@@ -2742,6 +2814,30 @@ export default function KioskPage() {
     </FormWrapper>
   );
 
+  const renderProfile = () => (
+    <FormWrapper title="Profil terminálu" onCancel={handleCancel}>
+      <div className="flex flex-col items-center text-center py-4">
+        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 text-3xl font-black">
+          {(user?.displayName || 'T').charAt(0).toUpperCase()}
+        </div>
+        <div className="mt-4 text-2xl font-black text-slate-900">{user?.displayName || 'Terminál'}</div>
+      </div>
+      <div className="rounded-2xl border border-slate-200 bg-white divide-y divide-slate-100">
+        <div className="flex items-center justify-between gap-3 px-4 py-3">
+          <span className="text-sm text-slate-500">Přihlášený terminál</span>
+          <span className="text-sm font-bold text-slate-900">{user?.displayName || '—'}</span>
+        </div>
+        <div className="flex items-center justify-between gap-3 px-4 py-3">
+          <span className="text-sm text-slate-500">Role</span>
+          <span className="text-sm font-bold text-slate-900">{user?.role || '—'}</span>
+        </div>
+      </div>
+      <button onClick={handleLogout} className="mt-5 flex w-full min-h-12 items-center justify-center gap-2 rounded-xl bg-red-600 px-4 text-base font-black text-white active:scale-[0.99]">
+        <LogOut className="h-5 w-5" /> Odhlásit terminál
+      </button>
+    </FormWrapper>
+  );
+
   const renderHandover = () => (
     <FormWrapper title="Předání směny" onCancel={handleCancel}>
       {renderError()}
@@ -2761,10 +2857,10 @@ export default function KioskPage() {
                 <span className="text-sm text-slate-600">{note.time}</span>
               </div>
               <div className="mt-1 flex flex-wrap gap-1.5">
-                <span className="rounded-full bg-indigo-500/15 px-2 py-1 text-xs font-bold text-indigo-100">
+                <span className="rounded-full bg-indigo-500/15 px-2 py-1 text-xs font-bold text-indigo-700">
                   Pro: {note.recipient || 'Všichni'}
                 </span>
-                <span className="rounded-full bg-sky-500/15 px-2 py-1 text-xs font-bold text-sky-100">
+                <span className="rounded-full bg-sky-500/15 px-2 py-1 text-xs font-bold text-sky-700">
                   {note.shift === 'afternoon' ? 'Odpolední směna' : 'Ranní směna'}
                 </span>
                 {note.priority === 'important' && <span className="rounded-full bg-red-50 px-2 py-1 text-xs font-bold text-red-700">Důležité</span>}
@@ -2790,7 +2886,7 @@ export default function KioskPage() {
                   <button
                     type="button"
                     onClick={() => void handleHandoverDelete(note)}
-                    className="min-h-10 rounded-xl border border-red-400/30 bg-red-500/10 px-2 text-sm font-black text-red-100"
+                    className="min-h-10 rounded-xl border border-red-400/30 bg-red-500/10 px-2 text-sm font-black text-red-700"
                   >
                     <Trash2 className="mr-2 inline h-4 w-4" />
                     Smazat
@@ -2818,7 +2914,7 @@ export default function KioskPage() {
         <div className="mb-3 rounded-2xl border border-slate-200 bg-[#fbf9f4]/50 p-3">
           <div className="mb-2 flex items-center justify-between gap-3">
             <span className="text-sm font-black uppercase text-slate-600">Komu</span>
-            <span className="truncate rounded-full bg-indigo-500/15 px-3 py-1 text-sm font-black text-indigo-100">
+            <span className="truncate rounded-full bg-indigo-500/15 px-3 py-1 text-sm font-black text-indigo-700">
               {handoverRecipient}
             </span>
           </div>
@@ -2886,6 +2982,7 @@ export default function KioskPage() {
       {activeView === 'MESSAGE' && renderMessage()}
       {activeView === 'ASSISTANT' && renderAssistant()}
       {activeView === 'HANDOVER' && renderHandover()}
+      {activeView === 'PROFILE' && renderProfile()}
     </div>
   );
 }
