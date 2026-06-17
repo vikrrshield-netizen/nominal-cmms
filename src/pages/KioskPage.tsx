@@ -297,9 +297,9 @@ const parseAssetDate = (value: unknown) => {
 const temperatureStatus = (asset: Asset | null, temperature: number) => {
   const warning = asset?.gearboxWarningTemperatureC ?? 70;
   const critical = asset?.gearboxCriticalTemperatureC ?? 85;
-  if (temperature >= critical) return { label: 'Kritická teplota', color: 'text-red-200', bg: 'bg-red-500/20', border: 'border-red-400/40' };
-  if (temperature >= warning) return { label: 'Varování', color: 'text-amber-100', bg: 'bg-amber-500/20', border: 'border-amber-400/40' };
-  return { label: 'V pořádku', color: 'text-emerald-100', bg: 'bg-emerald-500/20', border: 'border-emerald-400/40' };
+  if (temperature >= critical) return { label: 'Kritická teplota', color: 'text-red-700', bg: 'bg-red-50', border: 'border-red-200' };
+  if (temperature >= warning) return { label: 'Varování', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200' };
+  return { label: 'V pořádku', color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200' };
 };
 
 // VIKRSHIELD — lokální skóre provozní důležitosti zařízení pro výběr v "Nahlásit poruchu".
@@ -1491,27 +1491,27 @@ export default function KioskPage() {
   );
 
   const renderError = () => submitError ? (
-    <div className="bg-red-950/70 border border-red-500/50 text-red-200 px-4 py-3 rounded-xl mb-4 text-center text-base md:text-lg">
+    <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-4 text-center text-base md:text-lg">
       {submitError}
     </div>
   ) : null;
 
   const renderSubmitting = () => isSubmitting ? (
     <div className="fixed inset-0 bg-black/65 z-50 flex items-center justify-center">
-      <div className="bg-slate-800 px-8 py-6 rounded-2xl flex items-center gap-4 border border-white/10">
+      <div className="bg-white px-8 py-6 rounded-2xl flex items-center gap-4 border border-slate-200">
         <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
-        <span className="text-xl text-white">Odesílám...</span>
+        <span className="text-xl text-slate-900">Odesílám...</span>
       </div>
     </div>
   ) : null;
 
   const renderAssetPicker = (title = 'Vyberte zařízení') => (
     <div className="space-y-4">
-      <h3 className="text-xl text-slate-200 font-bold">{title}</h3>
+      <h3 className="text-xl text-slate-700 font-bold">{title}</h3>
       <div className="flex gap-2 overflow-x-auto pb-1">
         <button
           onClick={() => setSelectedBuilding('')}
-          className={`px-4 py-3 rounded-xl text-base font-bold whitespace-nowrap border ${!selectedBuilding ? 'bg-blue-600 text-white border-blue-400' : 'bg-slate-900 text-slate-300 border-white/10'}`}
+          className={`px-4 py-3 rounded-xl text-base font-bold whitespace-nowrap border ${!selectedBuilding ? 'bg-blue-600 text-white border-blue-400' : 'bg-white text-slate-600 border-slate-200'}`}
         >
               Vše
         </button>
@@ -1519,7 +1519,7 @@ export default function KioskPage() {
           <button
             key={building}
             onClick={() => setSelectedBuilding(building)}
-            className={`px-4 py-3 rounded-xl text-base font-bold whitespace-nowrap border ${selectedBuilding === building ? 'bg-blue-600 text-white border-blue-400' : 'bg-slate-900 text-slate-300 border-white/10'}`}
+            className={`px-4 py-3 rounded-xl text-base font-bold whitespace-nowrap border ${selectedBuilding === building ? 'bg-blue-600 text-white border-blue-400' : 'bg-white text-slate-600 border-slate-200'}`}
           >
             Budova {building}
           </button>
@@ -1534,16 +1534,16 @@ export default function KioskPage() {
             setSelectedAssetId('');
           }}
           placeholder="Hledat stroj, místnost nebo kód..."
-          className="w-full bg-slate-950 border border-white/10 text-white text-lg rounded-2xl py-4 pl-12 pr-4 outline-none focus:border-blue-400"
+          className="w-full bg-[#fbf9f4] border border-slate-200 text-slate-900 text-lg rounded-2xl py-4 pl-12 pr-4 outline-none focus:border-blue-400"
         />
       </label>
       {selectedAsset && (
         <div className="flex items-center justify-between gap-3 bg-emerald-500/10 border border-emerald-400/30 rounded-2xl p-4">
           <div>
-            <div className="text-white font-bold text-lg">{selectedAsset.name}</div>
-            <div className="text-sm text-emerald-100/80">{assetLabel(selectedAsset, assets)}</div>
+            <div className="text-slate-900 font-bold text-lg">{selectedAsset.name}</div>
+            <div className="text-sm text-emerald-700/80">{assetLabel(selectedAsset, assets)}</div>
           </div>
-          <button onClick={() => setSelectedAssetId('')} className="min-h-12 min-w-12 flex items-center justify-center p-2 rounded-xl bg-white/10 text-white">
+          <button onClick={() => setSelectedAssetId('')} className="min-h-12 min-w-12 flex items-center justify-center p-2 rounded-xl bg-slate-100 text-slate-900">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -1560,10 +1560,10 @@ export default function KioskPage() {
                   setSelectedAssetId(asset.id);
                   setAssetSearch('');
                 }}
-                className="text-left bg-slate-900 hover:bg-slate-700 active:scale-[0.99] border border-white/10 rounded-2xl p-4 transition min-h-[88px]"
+                className="text-left bg-white hover:bg-slate-100 active:scale-[0.99] border border-slate-200 rounded-2xl p-4 transition min-h-[88px]"
               >
-                <div className="text-white text-lg font-black leading-snug break-words">{asset.name}</div>
-                <div className="text-sm text-slate-300 mt-1 leading-snug break-words">{assetLabel(asset, assets)}</div>
+                <div className="text-slate-900 text-lg font-black leading-snug break-words">{asset.name}</div>
+                <div className="text-sm text-slate-600 mt-1 leading-snug break-words">{assetLabel(asset, assets)}</div>
               </button>
             ))
           )}
@@ -1575,7 +1575,7 @@ export default function KioskPage() {
   const renderBreakdownPicker = () => (
     <div className="space-y-4">
       <div>
-        <h3 className="text-xl text-slate-200 font-bold">1. Kde je porucha?</h3>
+        <h3 className="text-xl text-slate-700 font-bold">1. Kde je porucha?</h3>
         <div className="mt-2 inline-flex rounded-xl border border-blue-400/30 bg-blue-500/15 px-4 py-3 text-base font-bold text-blue-100">
           Budova D
         </div>
@@ -1583,7 +1583,7 @@ export default function KioskPage() {
 
       {breakdownFloors.length > 0 && (
         <div>
-          <div className="text-base font-black text-slate-200 mb-2">Patro</div>
+          <div className="text-base font-black text-slate-700 mb-2">Patro</div>
           <div className="flex gap-2 overflow-x-auto pb-1">
             <button
               type="button"
@@ -1592,7 +1592,7 @@ export default function KioskPage() {
                 setBreakdownRoom('');
                 setSelectedAssetId('');
               }}
-              className={`px-4 py-3 rounded-xl text-base font-bold whitespace-nowrap border ${!breakdownFloor ? 'bg-blue-600 text-white border-blue-400' : 'bg-slate-900 text-slate-300 border-white/10'}`}
+              className={`px-4 py-3 rounded-xl text-base font-bold whitespace-nowrap border ${!breakdownFloor ? 'bg-blue-600 text-white border-blue-400' : 'bg-white text-slate-600 border-slate-200'}`}
             >
               Všechna
             </button>
@@ -1605,7 +1605,7 @@ export default function KioskPage() {
                   setBreakdownRoom('');
                   setSelectedAssetId('');
                 }}
-                className={`px-4 py-3 rounded-xl text-base font-bold whitespace-nowrap border ${breakdownFloor === floor ? 'bg-blue-600 text-white border-blue-400' : 'bg-slate-900 text-slate-300 border-white/10'}`}
+                className={`px-4 py-3 rounded-xl text-base font-bold whitespace-nowrap border ${breakdownFloor === floor ? 'bg-blue-600 text-white border-blue-400' : 'bg-white text-slate-600 border-slate-200'}`}
               >
                 {floor}
               </button>
@@ -1616,7 +1616,7 @@ export default function KioskPage() {
 
       {breakdownRooms.length > 0 && (
         <div>
-          <div className="text-base font-black text-slate-200 mb-2">Extrudovna</div>
+          <div className="text-base font-black text-slate-700 mb-2">Extrudovna</div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             {breakdownRooms.map((room) => (
               <button
@@ -1626,7 +1626,7 @@ export default function KioskPage() {
                   setBreakdownRoom(room);
                   setSelectedAssetId('');
                 }}
-                className={`min-h-14 rounded-xl border px-4 text-left text-base font-bold ${breakdownRoom === room ? 'bg-cyan-700 border-cyan-300 text-white' : 'bg-slate-900 border-white/10 text-slate-200'}`}
+                className={`min-h-14 rounded-xl border px-4 text-left text-base font-bold ${breakdownRoom === room ? 'bg-cyan-700 border-cyan-300 text-white' : 'bg-white border-slate-200 text-slate-700'}`}
               >
                 {room}
               </button>
@@ -1644,17 +1644,17 @@ export default function KioskPage() {
             setSelectedAssetId('');
           }}
           placeholder="Hledat zařízení v budově D..."
-          className="w-full bg-slate-950 border border-white/10 text-white text-lg rounded-2xl py-4 pl-12 pr-4 outline-none focus:border-red-400"
+          className="w-full bg-[#fbf9f4] border border-slate-200 text-slate-900 text-lg rounded-2xl py-4 pl-12 pr-4 outline-none focus:border-red-400"
         />
       </label>
 
       {selectedAsset ? (
         <div className="flex items-center justify-between gap-3 bg-emerald-500/10 border border-emerald-400/30 rounded-2xl p-4">
           <div>
-            <div className="text-white font-bold text-lg">{selectedAsset.name}</div>
-            <div className="text-sm text-emerald-100/80">{assetLabel(selectedAsset, assets)}</div>
+            <div className="text-slate-900 font-bold text-lg">{selectedAsset.name}</div>
+            <div className="text-sm text-emerald-700/80">{assetLabel(selectedAsset, assets)}</div>
           </div>
-          <button onClick={() => setSelectedAssetId('')} className="min-h-12 min-w-12 flex items-center justify-center p-2 rounded-xl bg-white/10 text-white">
+          <button onClick={() => setSelectedAssetId('')} className="min-h-12 min-w-12 flex items-center justify-center p-2 rounded-xl bg-slate-100 text-slate-900">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -1670,10 +1670,10 @@ export default function KioskPage() {
                   setSelectedAssetId(asset.id);
                   setAssetSearch('');
                 }}
-                className="text-left bg-slate-900 hover:bg-slate-700 active:scale-[0.99] border border-white/10 rounded-2xl p-4 transition min-h-[88px]"
+                className="text-left bg-white hover:bg-slate-100 active:scale-[0.99] border border-slate-200 rounded-2xl p-4 transition min-h-[88px]"
               >
-                <div className="text-white text-lg font-black leading-snug break-words">{asset.name}</div>
-                <div className="text-sm text-slate-300 mt-1 leading-snug break-words">{assetLabel(asset, assets)}</div>
+                <div className="text-slate-900 text-lg font-black leading-snug break-words">{asset.name}</div>
+                <div className="text-sm text-slate-600 mt-1 leading-snug break-words">{assetLabel(asset, assets)}</div>
               </button>
             ))
           )}
@@ -1686,8 +1686,8 @@ export default function KioskPage() {
     <div className="space-y-3">
       <div className="flex items-end justify-between gap-3">
         <div>
-          <h3 className="text-xl text-slate-100 font-black leading-tight">Předfiltry nad extrudery</h3>
-          <p className="mt-1 text-sm font-bold text-slate-300">Vyber extruder a potvrď výměnu jeho předfiltrů.</p>
+          <h3 className="text-xl text-slate-900 font-black leading-tight">Předfiltry nad extrudery</h3>
+          <p className="mt-1 text-sm font-bold text-slate-600">Vyber extruder a potvrď výměnu jeho předfiltrů.</p>
         </div>
         <span className="shrink-0 rounded-xl bg-cyan-500/15 px-3 py-2 text-sm font-black text-cyan-100">
           {prefilterAlerts.overdue.length + prefilterAlerts.warning.length} čeká
@@ -1700,13 +1700,13 @@ export default function KioskPage() {
           value={assetSearch}
           onChange={(event) => setAssetSearch(event.target.value)}
           placeholder="Hledat extruder..."
-          className="min-h-12 w-full rounded-2xl border border-white/10 bg-slate-950 py-3 pl-11 pr-3 text-base font-semibold text-white outline-none focus:border-cyan-400"
+          className="min-h-12 w-full rounded-2xl border border-slate-200 bg-[#fbf9f4] py-3 pl-11 pr-3 text-base font-semibold text-slate-900 outline-none focus:border-cyan-400"
         />
       </label>
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {filteredPrefilterGroups.length === 0 ? (
-          <div className="rounded-2xl border border-white/10 bg-slate-900 p-5 text-center text-base font-bold text-slate-400">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 text-center text-base font-bold text-slate-400">
             V kartotéce se nenašel žádný předfiltr extruderu.
           </div>
         ) : (
@@ -1731,10 +1731,10 @@ export default function KioskPage() {
               <div key={group.number} className={`rounded-2xl border p-3 ${tone}`}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="text-lg font-black leading-tight text-white">Extruder {group.number}</div>
-                    <div className="mt-1 text-sm font-bold text-slate-200">{group.prefilters.length} předfiltrů</div>
+                    <div className="text-lg font-black leading-tight text-slate-900">Extruder {group.number}</div>
+                    <div className="mt-1 text-sm font-bold text-slate-700">{group.prefilters.length} předfiltrů</div>
                   </div>
-                  <span className={`shrink-0 rounded-xl px-2.5 py-1 text-xs font-black ${isOverdue ? 'bg-red-500/25 text-red-100' : isWarning ? 'bg-amber-500/20 text-amber-100' : 'bg-emerald-500/20 text-emerald-100'}`}>
+                  <span className={`shrink-0 rounded-xl px-2.5 py-1 text-xs font-black ${isOverdue ? 'bg-red-500/25 text-red-100' : isWarning ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>
                     {statusText}
                   </span>
                 </div>
@@ -1743,9 +1743,9 @@ export default function KioskPage() {
                   {group.prefilters.map((asset) => {
                     const status = getPrefilterStatus(asset);
                     return (
-                      <div key={asset.id} className="flex min-h-10 items-center justify-between gap-2 rounded-xl bg-slate-950/55 px-3">
-                        <span className="min-w-0 truncate text-sm font-black text-white">{asset.name.replace(/^Předfiltr\s*/i, '')}</span>
-                        <span className={`shrink-0 text-xs font-black ${status.state === 'overdue' ? 'text-red-100' : status.state === 'warning' ? 'text-amber-100' : 'text-emerald-100'}`}>
+                      <div key={asset.id} className="flex min-h-10 items-center justify-between gap-2 rounded-xl bg-[#fbf9f4]/55 px-3">
+                        <span className="min-w-0 truncate text-sm font-black text-slate-900">{asset.name.replace(/^Předfiltr\s*/i, '')}</span>
+                        <span className={`shrink-0 text-xs font-black ${status.state === 'overdue' ? 'text-red-100' : status.state === 'warning' ? 'text-amber-700' : 'text-emerald-700'}`}>
                           {status.label}
                         </span>
                       </div>
@@ -1772,13 +1772,13 @@ export default function KioskPage() {
 
   const renderGearboxPicker = () => (
     <div className="space-y-4">
-      <h3 className="text-xl text-slate-100 font-black leading-tight">1. Vyberte převodovku</h3>
+      <h3 className="text-xl text-slate-900 font-black leading-tight">1. Vyberte převodovku</h3>
       {gearboxTemperatureAlerts.missing.length > 0 && (
         <div className="rounded-2xl border border-violet-300/40 bg-violet-600/20 p-4">
           <div className="flex items-center gap-3">
             <Thermometer className="h-6 w-6 text-violet-100" />
             <div>
-              <div className="text-lg font-black text-white">Dnešní teploty ještě nejsou kompletní</div>
+              <div className="text-lg font-black text-slate-900">Dnešní teploty ještě nejsou kompletní</div>
               <div className="text-sm font-bold text-violet-100">{gearboxTemperatureAlerts.missing.length} převodovek čeká na zápis.</div>
             </div>
           </div>
@@ -1793,7 +1793,7 @@ export default function KioskPage() {
             setSelectedAssetId('');
           }}
           placeholder="Hledat převodovku, extruder nebo kód..."
-          className="w-full bg-slate-950 border border-white/10 text-white text-lg rounded-2xl py-4 pl-12 pr-4 outline-none focus:border-violet-400"
+          className="w-full bg-[#fbf9f4] border border-slate-200 text-slate-900 text-lg rounded-2xl py-4 pl-12 pr-4 outline-none focus:border-violet-400"
         />
       </label>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1808,7 +1808,7 @@ export default function KioskPage() {
                 className={`border rounded-2xl p-4 transition min-h-[98px] ${
                   missing
                     ? 'bg-violet-600/20 border-violet-300/50'
-                    : 'bg-slate-900 border-white/10'
+                    : 'bg-white border-slate-200'
                 }`}
               >
                 <div className="flex items-start justify-between gap-3">
@@ -1823,9 +1823,9 @@ export default function KioskPage() {
                     <div className="flex min-w-0 items-start gap-2">
                       {missing && <AlertTriangle className="mt-1 h-5 w-5 shrink-0 text-violet-100" />}
                       <div className="min-w-0">
-                        <div className="text-white text-lg font-black leading-snug break-words">{asset.name}</div>
-                        <div className="text-sm text-slate-300 mt-1 leading-snug break-words">{asset.currentExtruderName || assetLabel(asset, assets)}</div>
-                        <div className={`mt-2 text-sm font-black ${missing ? 'text-violet-100' : 'text-emerald-100'}`}>
+                        <div className="text-slate-900 text-lg font-black leading-snug break-words">{asset.name}</div>
+                        <div className="text-sm text-slate-600 mt-1 leading-snug break-words">{asset.currentExtruderName || assetLabel(asset, assets)}</div>
+                        <div className={`mt-2 text-sm font-black ${missing ? 'text-violet-100' : 'text-emerald-700'}`}>
                           {dailyStatus.label}
                         </div>
                       </div>
@@ -1842,7 +1842,7 @@ export default function KioskPage() {
                       setGearboxProblemNote('');
                       setSubmitError('');
                     }}
-                    className="shrink-0 rounded-xl border border-red-400/60 bg-red-500/20 px-3 py-2 text-xs font-black text-red-100 active:scale-[0.98]"
+                    className="shrink-0 rounded-xl border border-red-400/60 bg-red-50 px-3 py-2 text-xs font-black text-red-100 active:scale-[0.98]"
                   >
                     Problém
                   </button>
@@ -1859,13 +1859,13 @@ export default function KioskPage() {
 
   const renderDataloggerPicker = () => (
     <div className="space-y-4">
-      <h3 className="text-xl text-slate-100 font-black leading-tight">1. Vyberte datalogger</h3>
+      <h3 className="text-xl text-slate-900 font-black leading-tight">1. Vyberte datalogger</h3>
       {dataloggerAlerts.missing.length > 0 && (
         <div className="rounded-2xl border border-teal-300/40 bg-teal-600/20 p-4">
           <div className="flex items-center gap-3">
             <Thermometer className="h-6 w-6 text-teal-100" />
             <div>
-              <div className="text-lg font-black text-white">Dnešní teploty skladů nejsou kompletní</div>
+              <div className="text-lg font-black text-slate-900">Dnešní teploty skladů nejsou kompletní</div>
               <div className="text-sm font-bold text-teal-100">{dataloggerAlerts.missing.length} dataloggerů čeká na zápis.</div>
             </div>
           </div>
@@ -1880,7 +1880,7 @@ export default function KioskPage() {
             setSelectedAssetId('');
           }}
           placeholder="Hledat datalogger, sklad, místnost nebo kód..."
-          className="w-full bg-slate-950 border border-white/10 text-white text-lg rounded-2xl py-4 pl-12 pr-4 outline-none focus:border-teal-400"
+          className="w-full bg-[#fbf9f4] border border-slate-200 text-slate-900 text-lg rounded-2xl py-4 pl-12 pr-4 outline-none focus:border-teal-400"
         />
       </label>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[45vh] overflow-y-auto pr-1">
@@ -1898,15 +1898,15 @@ export default function KioskPage() {
               className={`text-left border rounded-2xl p-4 transition min-h-[98px] active:scale-[0.99] ${
                 missing
                   ? 'bg-teal-600/20 border-teal-300/50'
-                  : 'bg-slate-900 border-white/10'
+                  : 'bg-white border-slate-200'
               }`}
             >
               <div className="flex min-w-0 items-start gap-2">
                 {missing && <AlertTriangle className="mt-1 h-5 w-5 shrink-0 text-teal-100" />}
                 <div className="min-w-0">
-                  <div className="text-white text-lg font-black leading-snug break-words">{asset.name}</div>
-                  <div className="text-sm text-slate-300 mt-1 leading-snug break-words">{getAssetRoom(asset, assets) || assetLabel(asset, assets)}</div>
-                  <div className={`mt-2 text-sm font-black ${missing ? 'text-teal-100' : 'text-emerald-100'}`}>
+                  <div className="text-slate-900 text-lg font-black leading-snug break-words">{asset.name}</div>
+                  <div className="text-sm text-slate-600 mt-1 leading-snug break-words">{getAssetRoom(asset, assets) || assetLabel(asset, assets)}</div>
+                  <div className={`mt-2 text-sm font-black ${missing ? 'text-teal-100' : 'text-emerald-700'}`}>
                     {dailyStatus.label}
                   </div>
                 </div>
@@ -1962,46 +1962,46 @@ export default function KioskPage() {
         </div>
       </div>
       {canViewProductionPlan && (
-        <section className="rounded-2xl border border-white/10 bg-slate-900/55 p-3">
+        <section className="rounded-2xl border border-slate-200 bg-white p-3">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <Factory className="h-5 w-5 text-emerald-200" />
+              <Factory className="h-5 w-5 text-emerald-700" />
               <div>
-                <div className="text-base font-black text-white">Plán výroby dnes</div>
-                <div className="text-sm font-bold text-slate-300">Extrudovna I: 1, 2 · Extrudovna II: 3, 4</div>
+                <div className="text-base font-black text-slate-900">Plán výroby dnes</div>
+                <div className="text-sm font-bold text-slate-600">Extrudovna I: 1, 2 · Extrudovna II: 3, 4</div>
               </div>
             </div>
-            <span className="rounded-xl bg-emerald-500/15 px-3 py-1 text-sm font-black text-emerald-100">
+            <span className="rounded-xl bg-emerald-500/15 px-3 py-1 text-sm font-black text-emerald-700">
               {todayProductionPlans.length}
             </span>
           </div>
 
           {todayProductionPlans.length === 0 ? (
-            <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-sm font-bold text-slate-300">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm font-bold text-slate-600">
               Na dnes není zadaný plán extruze.
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
               {productionPlansByArea.map((group) => (
                 <div key={group.label} className="rounded-xl border border-emerald-300/25 bg-emerald-500/10 p-3">
-                  <div className="mb-2 text-sm font-black text-emerald-100">{group.label}</div>
+                  <div className="mb-2 text-sm font-black text-emerald-700">{group.label}</div>
                   <div className="space-y-2">
                     {group.plans.map((plan) => (
-                      <div key={plan.id} className="rounded-lg bg-slate-950/60 p-3">
+                      <div key={plan.id} className="rounded-lg bg-slate-50 p-3">
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
-                            <div className="truncate text-sm font-black text-white">{plan.machineName}</div>
-                            <div className="mt-0.5 text-sm font-bold text-slate-200">{plan.rawMaterial || 'Bez suroviny'}</div>
+                            <div className="truncate text-sm font-black text-slate-900">{plan.machineName}</div>
+                            <div className="mt-0.5 text-sm font-bold text-slate-700">{plan.rawMaterial || 'Bez suroviny'}</div>
                           </div>
-                          <span className="shrink-0 rounded-lg bg-white/10 px-2 py-1 text-xs font-black text-slate-100">
+                          <span className="shrink-0 rounded-lg bg-slate-100 px-2 py-1 text-xs font-black text-slate-900">
                             {plan.status === 'running' ? 'Probíhá' : 'Plán'}
                           </span>
                         </div>
                         {plan.targetWeight > 0 && (
-                          <div className="mt-1 text-sm font-bold text-slate-300">{plan.targetWeight} kg</div>
+                          <div className="mt-1 text-sm font-bold text-slate-600">{plan.targetWeight} kg</div>
                         )}
                         {plan.note && (
-                          <div className="mt-2 rounded-lg border border-white/10 bg-white/5 p-2 text-sm font-bold text-slate-200">
+                          <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-2 text-sm font-bold text-slate-700">
                             {plan.note}
                           </div>
                         )}
@@ -2014,27 +2014,27 @@ export default function KioskPage() {
           )}
         </section>
       )}
-      <section className="rounded-2xl border border-white/10 bg-slate-900/55 p-2">
+      <section className="rounded-2xl border border-slate-200 bg-white p-2">
         <button
           type="button"
           onClick={() => setShowTodayActions((value) => !value)}
           className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl px-3 text-left active:scale-[0.99]"
         >
-          <span className="min-w-0 text-base font-black text-white">Úkoly na dnešek</span>
+          <span className="min-w-0 text-base font-black text-slate-900">Úkoly na dnešek</span>
           <span className="flex items-center gap-2">
             <span className={`flex h-8 min-w-8 items-center justify-center rounded-xl px-2 text-sm font-black ${
-              todayActions.length ? 'bg-red-500 text-white' : 'bg-emerald-500/20 text-emerald-100'
+              todayActions.length ? 'bg-red-500 text-white' : 'bg-emerald-50 text-emerald-700'
             }`}>
               {todayActions.length}
             </span>
-            <ChevronRight className={`h-5 w-5 shrink-0 text-slate-300 transition ${showTodayActions ? 'rotate-90' : ''}`} />
+            <ChevronRight className={`h-5 w-5 shrink-0 text-slate-600 transition ${showTodayActions ? 'rotate-90' : ''}`} />
           </span>
         </button>
 
         {showTodayActions && (
           <div className="mt-2 space-y-2">
             {todayActions.length === 0 ? (
-              <div className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-3 text-sm font-bold text-emerald-100">
+              <div className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-3 text-sm font-bold text-emerald-700">
                 Pro tvoji roli tu dnes není žádná položka k vyřízení.
               </div>
             ) : (
@@ -2065,7 +2065,7 @@ export default function KioskPage() {
                   );
                 })}
                 {todayActions.length > 6 && (
-                  <div className="px-2 pt-1 text-sm font-bold text-slate-300">
+                  <div className="px-2 pt-1 text-sm font-bold text-slate-600">
                     Dalších {todayActions.length - 6} položek je v příslušném modulu.
                   </div>
                 )}
@@ -2074,7 +2074,7 @@ export default function KioskPage() {
           </div>
         )}
       </section>
-      <button onClick={handleLogout} className="mx-auto text-slate-300 hover:text-white flex items-center gap-2 text-base transition py-3 px-4 rounded-xl">
+      <button onClick={handleLogout} className="mx-auto text-slate-600 hover:text-slate-900 flex items-center gap-2 text-base transition py-3 px-4 rounded-xl">
         <LogOut className="w-5 h-5" />
         Odhlásit terminál
       </button>
@@ -2088,7 +2088,7 @@ export default function KioskPage() {
       {selectedAsset && !selectedQuickOption && (
         <div className="space-y-4">
           {renderAssetPicker('1. Vybrané zařízení')}
-          <h3 className="text-xl text-slate-100 font-black leading-tight">2. Co se děje?</h3>
+          <h3 className="text-xl text-slate-900 font-black leading-tight">2. Co se děje?</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {QUICK_BREAKDOWNS.map((option) => (
               <QuickButton
@@ -2106,13 +2106,13 @@ export default function KioskPage() {
       )}
       {selectedAsset && selectedQuickOption === 'other' && (
         <div>
-          <h3 className="text-xl text-slate-100 mb-4 font-black leading-tight">3. Popište problém</h3>
+          <h3 className="text-xl text-slate-900 mb-4 font-black leading-tight">3. Popište problém</h3>
           <textarea
             value={customText}
             onChange={(event) => setCustomText(event.target.value)}
             placeholder="Co se děje?"
             autoFocus
-            className="w-full h-40 bg-slate-950 text-white text-xl p-4 rounded-2xl border-2 border-white/10 focus:border-red-400 outline-none resize-none mb-4"
+            className="w-full h-40 bg-[#fbf9f4] text-slate-900 text-xl p-4 rounded-2xl border-2 border-slate-200 focus:border-red-400 outline-none resize-none mb-4"
           />
           <button
             onClick={() => void handleBreakdownSubmit(customText)}
@@ -2132,7 +2132,7 @@ export default function KioskPage() {
       {renderError()}
       {!selectedQuickOption && (
         <div>
-          <h3 className="text-xl text-slate-100 mb-4 font-black leading-tight">Co potřebujete?</h3>
+          <h3 className="text-xl text-slate-900 mb-4 font-black leading-tight">Co potřebujete?</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {QUICK_PARTS.map((option) => (
               <QuickButton
@@ -2150,13 +2150,13 @@ export default function KioskPage() {
       )}
       {selectedQuickOption === 'other' && (
         <div>
-          <h3 className="text-xl text-slate-100 mb-4 font-black leading-tight">Upřesněte požadavek</h3>
+          <h3 className="text-xl text-slate-900 mb-4 font-black leading-tight">Upřesněte požadavek</h3>
           <textarea
             value={customText}
             onChange={(event) => setCustomText(event.target.value)}
             placeholder="Jaký díl nebo materiál potřebujete?"
             autoFocus
-            className="w-full h-40 bg-slate-950 text-white text-xl p-4 rounded-2xl border-2 border-white/10 focus:border-blue-400 outline-none resize-none mb-4"
+            className="w-full h-40 bg-[#fbf9f4] text-slate-900 text-xl p-4 rounded-2xl border-2 border-slate-200 focus:border-blue-400 outline-none resize-none mb-4"
           />
           <button onClick={() => void handleOrderSubmit(customText)} disabled={!customText.trim() || isSubmitting} className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white py-5 rounded-2xl text-xl font-bold flex items-center justify-center gap-3">
             <Send className="w-6 h-6" />
@@ -2188,7 +2188,7 @@ export default function KioskPage() {
           <div className="rounded-xl border border-violet-400/30 bg-violet-500/10 p-2.5">
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0">
-                <div className="truncate text-base font-black leading-tight text-white">{selectedAsset.name}</div>
+                <div className="truncate text-base font-black leading-tight text-slate-900">{selectedAsset.name}</div>
                 <div className="mt-0.5 truncate text-xs font-bold text-violet-100/80">{selectedAsset.currentExtruderName || assetLabel(selectedAsset, assets)}</div>
               </div>
               <button
@@ -2205,8 +2205,8 @@ export default function KioskPage() {
           <div className={`rounded-xl border ${status.border} ${status.bg} p-2.5`}>
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="text-xs font-bold text-slate-300">Teplota</div>
-                <div className="text-4xl font-black leading-none text-white">{temperature}<span className="text-xl"> °C</span></div>
+                <div className="text-xs font-bold text-slate-600">Teplota</div>
+                <div className="text-4xl font-black leading-none text-slate-900">{temperature}<span className="text-xl"> °C</span></div>
               </div>
               <div className={`rounded-xl border ${status.border} px-3 py-1.5 text-xs font-black ${status.color}`}>{status.label}</div>
             </div>
@@ -2225,7 +2225,7 @@ export default function KioskPage() {
                   key={delta}
                   type="button"
                   onClick={() => setTemperatureValue(temperature + delta)}
-                  className="min-h-10 rounded-lg border border-white/10 bg-slate-950/60 text-lg font-black text-white active:scale-[0.98]"
+                  className="min-h-10 rounded-lg border border-slate-200 bg-slate-50 text-lg font-black text-slate-900 active:scale-[0.98]"
                 >
                   {delta > 0 ? `+${delta}` : delta}
                 </button>
@@ -2237,7 +2237,7 @@ export default function KioskPage() {
                   key={preset}
                   type="button"
                   onClick={() => setTemperatureValue(preset)}
-                  className="min-h-10 rounded-lg border border-white/10 bg-white/5 text-sm font-bold text-slate-200 active:scale-[0.98]"
+                  className="min-h-10 rounded-lg border border-slate-200 bg-slate-50 text-sm font-bold text-slate-700 active:scale-[0.98]"
                 >
                   {preset} °C
                 </button>
@@ -2248,8 +2248,8 @@ export default function KioskPage() {
           <div className="rounded-xl border border-cyan-400/20 bg-cyan-500/10 p-2.5">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="text-xs font-bold text-slate-300">Zátěž motoru</div>
-                <div className="text-3xl font-black leading-none text-white">
+                <div className="text-xs font-bold text-slate-600">Zátěž motoru</div>
+                <div className="text-3xl font-black leading-none text-slate-900">
                   {gearboxMotorLoad.trim() ? motorLoad : '—'}<span className="text-lg"> A</span>
                 </div>
               </div>
@@ -2259,7 +2259,7 @@ export default function KioskPage() {
                 value={gearboxMotorLoad}
                 onChange={(event) => setGearboxMotorLoad(event.target.value)}
                 placeholder="např. 12,5"
-                className="w-28 rounded-xl border border-white/10 bg-slate-950 p-2.5 text-right text-base font-black text-white outline-none placeholder:text-slate-500 focus:border-cyan-300"
+                className="w-28 rounded-xl border border-slate-200 bg-[#fbf9f4] p-2.5 text-right text-base font-black text-slate-900 outline-none placeholder:text-slate-400 focus:border-cyan-300"
               />
             </div>
             <input
@@ -2277,7 +2277,7 @@ export default function KioskPage() {
                   key={delta}
                   type="button"
                   onClick={() => setGearboxMotorLoadValue(motorLoad + delta)}
-                  className="min-h-10 rounded-lg border border-white/10 bg-slate-950/60 text-base font-black text-white active:scale-[0.98]"
+                  className="min-h-10 rounded-lg border border-slate-200 bg-slate-50 text-base font-black text-slate-900 active:scale-[0.98]"
                 >
                   {delta > 0 ? `+${delta}` : delta}
                 </button>
@@ -2286,23 +2286,23 @@ export default function KioskPage() {
           </div>
 
           <label className="block">
-            <span className="mb-1 block text-xs font-black text-slate-200">Datum a čas měření</span>
+            <span className="mb-1 block text-xs font-black text-slate-700">Datum a čas měření</span>
             <input
               type="datetime-local"
               value={gearboxMeasuredAt}
               onChange={(event) => setGearboxMeasuredAt(event.target.value)}
-              className="w-full rounded-xl border border-white/10 bg-slate-950 p-2.5 text-base text-white"
+              className="w-full rounded-xl border border-slate-200 bg-[#fbf9f4] p-2.5 text-base text-slate-900"
             />
           </label>
           <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
             <label className="block">
-              <span className="mb-1 block text-xs font-black text-slate-200">Surovina</span>
+              <span className="mb-1 block text-xs font-black text-slate-700">Surovina</span>
               <input
                 type="search"
                 value={gearboxMaterialSearch}
                 onChange={(event) => setGearboxMaterialSearch(event.target.value)}
                 placeholder="hledat název, č.sur nebo NK kód"
-                className="mb-2 w-full rounded-xl border border-white/10 bg-slate-950 p-2.5 text-base text-white outline-none placeholder:text-slate-500 focus:border-violet-400"
+                className="mb-2 w-full rounded-xl border border-slate-200 bg-[#fbf9f4] p-2.5 text-base text-slate-900 outline-none placeholder:text-slate-400 focus:border-violet-400"
               />
               <select
                 value={gearboxMaterialId}
@@ -2310,7 +2310,7 @@ export default function KioskPage() {
                   setGearboxMaterialId(event.target.value);
                   setGearboxRawMaterial('');
                 }}
-                className="w-full rounded-xl border border-white/10 bg-slate-950 p-2.5 text-base text-white outline-none focus:border-violet-400"
+                className="w-full rounded-xl border border-slate-200 bg-[#fbf9f4] p-2.5 text-base text-slate-900 outline-none focus:border-violet-400"
               >
                 <option value="">Nezadáno</option>
                 {filteredMaterials.map((material) => (
@@ -2319,13 +2319,13 @@ export default function KioskPage() {
               </select>
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-black text-slate-200">Výrobek</span>
+              <span className="mb-1 block text-xs font-black text-slate-700">Výrobek</span>
               <input
                 type="search"
                 value={gearboxProductSearch}
                 onChange={(event) => setGearboxProductSearch(event.target.value)}
                 placeholder="hledat název, č.výr nebo NK kód"
-                className="mb-2 w-full rounded-xl border border-white/10 bg-slate-950 p-2.5 text-base text-white outline-none placeholder:text-slate-500 focus:border-violet-400"
+                className="mb-2 w-full rounded-xl border border-slate-200 bg-[#fbf9f4] p-2.5 text-base text-slate-900 outline-none placeholder:text-slate-400 focus:border-violet-400"
               />
               {selectedMaterial && (
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-violet-400/20 bg-violet-500/10 px-3 py-2 text-xs font-bold text-violet-100">
@@ -2335,7 +2335,7 @@ export default function KioskPage() {
                   <button
                     type="button"
                     onClick={() => setGearboxShowAllProducts((current) => !current)}
-                    className="rounded-lg bg-white/10 px-2 py-1 font-black text-white"
+                    className="rounded-lg bg-slate-100 px-2 py-1 font-black text-slate-900"
                   >
                     {gearboxShowAllProducts ? 'Dle receptury' : 'Zobrazit všechny'}
                   </button>
@@ -2344,7 +2344,7 @@ export default function KioskPage() {
               <select
                 value={gearboxProductId}
                 onChange={(event) => setGearboxProductId(event.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-slate-950 p-2.5 text-base text-white outline-none focus:border-violet-400"
+                className="w-full rounded-xl border border-slate-200 bg-[#fbf9f4] p-2.5 text-base text-slate-900 outline-none focus:border-violet-400"
               >
                 <option value="">Nezadáno</option>
                 {filteredProducts.map((product) => (
@@ -2353,20 +2353,20 @@ export default function KioskPage() {
               </select>
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-black text-slate-200">Datum naskladnění suroviny</span>
+              <span className="mb-1 block text-xs font-black text-slate-700">Datum naskladnění suroviny</span>
               <div className="grid grid-cols-[minmax(0,1fr)_80px] gap-2">
                 <input
                   type="date"
                   value={gearboxMaterialBatchDate}
                   onChange={(event) => setGearboxMaterialBatchDate(event.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-slate-950 p-2.5 text-base text-white outline-none placeholder:text-slate-500 focus:border-violet-400"
+                  className="w-full rounded-xl border border-slate-200 bg-[#fbf9f4] p-2.5 text-base text-slate-900 outline-none placeholder:text-slate-400 focus:border-violet-400"
                 />
                 <input
                   type="text"
                   value={gearboxMaterialBatchSuffix}
                   onChange={(event) => setGearboxMaterialBatchSuffix(event.target.value.toUpperCase().slice(0, 2))}
                   placeholder="A"
-                  className="w-full rounded-xl border border-white/10 bg-slate-950 p-2.5 text-center text-base font-black text-white outline-none placeholder:text-slate-500 focus:border-violet-400"
+                  className="w-full rounded-xl border border-slate-200 bg-[#fbf9f4] p-2.5 text-center text-base font-black text-slate-900 outline-none placeholder:text-slate-400 focus:border-violet-400"
                 />
               </div>
               <input
@@ -2374,16 +2374,16 @@ export default function KioskPage() {
                 value={gearboxMaterialBatch}
                 onChange={(event) => setGearboxMaterialBatch(event.target.value)}
                 placeholder="šarže se předvyplní po výběru suroviny"
-                className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 p-2.5 text-base text-white outline-none placeholder:text-slate-500 focus:border-violet-400"
+                className="mt-2 w-full rounded-xl border border-slate-200 bg-[#fbf9f4] p-2.5 text-base text-slate-900 outline-none placeholder:text-slate-400 focus:border-violet-400"
               />
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-black text-slate-200">Datum zahájení výroby</span>
+              <span className="mb-1 block text-xs font-black text-slate-700">Datum zahájení výroby</span>
               <input
                 type="date"
                 value={gearboxProductBatchDate}
                 onChange={(event) => setGearboxProductBatchDate(event.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-slate-950 p-2.5 text-base text-white outline-none placeholder:text-slate-500 focus:border-violet-400"
+                className="w-full rounded-xl border border-slate-200 bg-[#fbf9f4] p-2.5 text-base text-slate-900 outline-none placeholder:text-slate-400 focus:border-violet-400"
               />
               <div className="mt-1 rounded-lg border border-violet-400/20 bg-violet-500/10 px-3 py-2 text-sm font-black text-violet-100">
                 Šarže výrobku: {gearboxProductBatch || 'vyber výrobek'}
@@ -2391,22 +2391,22 @@ export default function KioskPage() {
             </label>
           </div>
           <label className="block">
-            <span className="mb-1 block text-xs font-black text-slate-200">Surovina mimo seznam</span>
+            <span className="mb-1 block text-xs font-black text-slate-700">Surovina mimo seznam</span>
             <input
               type="text"
               value={gearboxRawMaterial}
               onChange={(event) => setGearboxRawMaterial(event.target.value)}
               placeholder="jen když není v číselníku"
-              className="w-full rounded-xl border border-white/10 bg-slate-950 p-2.5 text-base text-white outline-none placeholder:text-slate-500 focus:border-violet-400"
+              className="w-full rounded-xl border border-slate-200 bg-[#fbf9f4] p-2.5 text-base text-slate-900 outline-none placeholder:text-slate-400 focus:border-violet-400"
             />
           </label>
           <label className="block">
-            <span className="mb-1 block text-xs font-black text-slate-200">Poznámka</span>
+            <span className="mb-1 block text-xs font-black text-slate-700">Poznámka</span>
             <textarea
               value={gearboxNote}
               onChange={(event) => setGearboxNote(event.target.value)}
               placeholder="Volitelně: zvuk, únik oleje, vibrace..."
-              className="h-16 w-full resize-none rounded-xl border border-white/10 bg-slate-950 p-2.5 text-base text-white outline-none focus:border-violet-400"
+              className="h-16 w-full resize-none rounded-xl border border-slate-200 bg-[#fbf9f4] p-2.5 text-base text-slate-900 outline-none focus:border-violet-400"
             />
           </label>
           <div>
@@ -2421,7 +2421,7 @@ export default function KioskPage() {
             <button
               type="button"
               onClick={() => gearboxPhotoInputRef.current?.click()}
-              className="flex w-full items-center justify-center gap-3 rounded-xl border border-dashed border-white/20 py-2.5 font-bold text-slate-200"
+              className="flex w-full items-center justify-center gap-3 rounded-xl border border-dashed border-white/20 py-2.5 font-bold text-slate-700"
             >
               <Camera className="w-5 h-5" />
               {gearboxPhotoFile ? gearboxPhotoFile.name : 'Přidat fotku'}
@@ -2436,12 +2436,12 @@ export default function KioskPage() {
             Zapsat teplotu
           </button>
 
-          <div className="border-t border-white/10 pt-2">
+          <div className="border-t border-slate-200 pt-2">
             {!gearboxProblemOpen ? (
               <button
                 type="button"
                 onClick={() => setGearboxProblemOpen(true)}
-                className="flex w-full items-center justify-center gap-3 rounded-xl border border-red-400/40 bg-red-500/10 py-3 font-bold text-red-100 active:scale-[0.98]"
+                className="flex w-full items-center justify-center gap-3 rounded-xl border border-red-200 bg-red-500/10 py-3 font-bold text-red-100 active:scale-[0.98]"
               >
                 <AlertTriangle className="w-5 h-5" />
                 Nahlásit problém
@@ -2449,7 +2449,7 @@ export default function KioskPage() {
             ) : (
               <div className="space-y-4">
                 <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-xl text-slate-100 font-black leading-tight">Nahlásit problém s převodovkou</h3>
+                  <h3 className="text-xl text-slate-900 font-black leading-tight">Nahlásit problém s převodovkou</h3>
                   <button
                     type="button"
                     onClick={() => {
@@ -2459,7 +2459,7 @@ export default function KioskPage() {
                       setGearboxProblemNote('');
                       setSubmitError('');
                     }}
-                    className="min-h-12 min-w-12 flex items-center justify-center p-2 rounded-xl bg-white/10 text-white"
+                    className="min-h-12 min-w-12 flex items-center justify-center p-2 rounded-xl bg-slate-100 text-slate-900"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -2469,14 +2469,14 @@ export default function KioskPage() {
                   <button
                     type="button"
                     onClick={() => setGearboxProblemPriority('P2')}
-                    className={`min-h-14 rounded-xl border px-4 text-base font-black ${gearboxProblemPriority === 'P2' ? 'bg-amber-600 border-amber-300 text-white' : 'bg-slate-900 border-white/10 text-slate-200'}`}
+                    className={`min-h-14 rounded-xl border px-4 text-base font-black ${gearboxProblemPriority === 'P2' ? 'bg-amber-600 border-amber-300 text-white' : 'bg-white border-slate-200 text-slate-700'}`}
                   >
                     Závada (P2)
                   </button>
                   <button
                     type="button"
                     onClick={() => setGearboxProblemPriority('P1')}
-                    className={`min-h-14 rounded-xl border px-4 text-base font-black ${gearboxProblemPriority === 'P1' ? 'bg-red-600 border-red-300 text-white' : 'bg-slate-900 border-white/10 text-slate-200'}`}
+                    className={`min-h-14 rounded-xl border px-4 text-base font-black ${gearboxProblemPriority === 'P1' ? 'bg-red-600 border-red-300 text-white' : 'bg-white border-slate-200 text-slate-700'}`}
                   >
                     Havárie (P1)
                   </button>
@@ -2494,14 +2494,14 @@ export default function KioskPage() {
                 </div>
 
                 <label className="block">
-                  <span className="block text-slate-200 text-base font-black mb-2">
+                  <span className="block text-slate-700 text-base font-black mb-2">
                     {gearboxProblemOption === 'Jiný problém' ? 'Popište problém' : 'Poznámka (volitelně)'}
                   </span>
                   <textarea
                     value={gearboxProblemNote}
                     onChange={(event) => setGearboxProblemNote(event.target.value)}
                     placeholder="Co se děje s převodovkou?"
-                    className="w-full h-28 bg-slate-950 text-white text-lg p-4 rounded-2xl border border-white/10 outline-none focus:border-red-400 resize-none"
+                    className="w-full h-28 bg-[#fbf9f4] text-slate-900 text-lg p-4 rounded-2xl border border-slate-200 outline-none focus:border-red-400 resize-none"
                   />
                 </label>
 
@@ -2535,7 +2535,7 @@ export default function KioskPage() {
             <div className="rounded-xl border border-teal-400/30 bg-teal-500/10 p-2.5">
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="truncate text-base font-black leading-tight text-white">{selectedAsset.name}</div>
+                  <div className="truncate text-base font-black leading-tight text-slate-900">{selectedAsset.name}</div>
                   <div className="mt-0.5 truncate text-xs font-bold text-teal-100/80">{getAssetRoom(selectedAsset, assets) || assetLabel(selectedAsset, assets)}</div>
                 </div>
               </div>
@@ -2545,8 +2545,8 @@ export default function KioskPage() {
             <div className="rounded-xl border border-teal-400/40 bg-teal-500/15 p-2.5">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-xs font-bold text-slate-300">Teplota</div>
-                  <div className="text-4xl font-black leading-none text-white">{temperature}<span className="text-xl"> °C</span></div>
+                  <div className="text-xs font-bold text-slate-600">Teplota</div>
+                  <div className="text-4xl font-black leading-none text-slate-900">{temperature}<span className="text-xl"> °C</span></div>
                 </div>
               </div>
               <input
@@ -2564,7 +2564,7 @@ export default function KioskPage() {
                     key={preset}
                     type="button"
                     onClick={() => setDataloggerTemperatureValue(preset)}
-                    className="min-h-10 rounded-lg border border-white/10 bg-slate-950/60 text-sm font-black text-white active:scale-[0.98]"
+                    className="min-h-10 rounded-lg border border-slate-200 bg-slate-50 text-sm font-black text-slate-900 active:scale-[0.98]"
                   >
                     {preset} °C
                   </button>
@@ -2577,8 +2577,8 @@ export default function KioskPage() {
                 <div className="flex items-center gap-2">
                   <Droplets className="h-5 w-5 text-cyan-100" />
                   <div>
-                    <div className="text-xs font-bold text-slate-300">Vlhkost</div>
-                    <div className="text-3xl font-black leading-none text-white">{dataloggerHumidity.trim() ? humidity : '--'}<span className="text-lg"> %</span></div>
+                    <div className="text-xs font-bold text-slate-600">Vlhkost</div>
+                    <div className="text-3xl font-black leading-none text-slate-900">{dataloggerHumidity.trim() ? humidity : '--'}<span className="text-lg"> %</span></div>
                   </div>
                 </div>
               </div>
@@ -2597,7 +2597,7 @@ export default function KioskPage() {
                     key={preset}
                     type="button"
                     onClick={() => setDataloggerHumidityValue(preset)}
-                    className="min-h-10 rounded-lg border border-white/10 bg-white/5 text-sm font-bold text-slate-200 active:scale-[0.98]"
+                    className="min-h-10 rounded-lg border border-slate-200 bg-slate-50 text-sm font-bold text-slate-700 active:scale-[0.98]"
                   >
                     {preset} %
                   </button>
@@ -2606,31 +2606,31 @@ export default function KioskPage() {
             </div>
 
             <label className="block">
-              <span className="mb-1 block text-xs font-black text-slate-200">Surovina / produkt</span>
+              <span className="mb-1 block text-xs font-black text-slate-700">Surovina / produkt</span>
               <input
                 value={dataloggerRawMaterial}
                 onChange={(event) => setDataloggerRawMaterial(event.target.value)}
                 placeholder="Volitelně: mouka, směs, šarže..."
-                className="w-full rounded-xl border border-white/10 bg-slate-950 p-2.5 text-base text-white outline-none focus:border-teal-400"
+                className="w-full rounded-xl border border-slate-200 bg-[#fbf9f4] p-2.5 text-base text-slate-900 outline-none focus:border-teal-400"
               />
             </label>
 
             <label className="block">
-              <span className="mb-1 block text-xs font-black text-slate-200">Datum a čas měření</span>
+              <span className="mb-1 block text-xs font-black text-slate-700">Datum a čas měření</span>
               <input
                 type="datetime-local"
                 value={dataloggerMeasuredAt}
                 onChange={(event) => setDataloggerMeasuredAt(event.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-slate-950 p-2.5 text-base text-white"
+                className="w-full rounded-xl border border-slate-200 bg-[#fbf9f4] p-2.5 text-base text-slate-900"
               />
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-black text-slate-200">Poznámka</span>
+              <span className="mb-1 block text-xs font-black text-slate-700">Poznámka</span>
               <textarea
                 value={dataloggerNote}
                 onChange={(event) => setDataloggerNote(event.target.value)}
                 placeholder="Volitelně: námraza, otevřené dveře, kontrola OK..."
-                className="h-16 w-full resize-none rounded-xl border border-white/10 bg-slate-950 p-2.5 text-base text-white outline-none focus:border-teal-400"
+                className="h-16 w-full resize-none rounded-xl border border-slate-200 bg-[#fbf9f4] p-2.5 text-base text-slate-900 outline-none focus:border-teal-400"
               />
             </label>
             <button
@@ -2650,7 +2650,7 @@ export default function KioskPage() {
   const renderIdea = () => (
     <FormWrapper title="Nápad na zlepšení" onCancel={handleCancel}>
       {renderError()}
-      <textarea value={customText} onChange={(event) => setCustomText(event.target.value)} placeholder="Váš nápad..." autoFocus className="w-full h-48 bg-slate-950 text-white text-xl p-4 rounded-2xl border-2 border-white/10 focus:border-emerald-400 outline-none resize-none mb-4" />
+      <textarea value={customText} onChange={(event) => setCustomText(event.target.value)} placeholder="Váš nápad..." autoFocus className="w-full h-48 bg-[#fbf9f4] text-slate-900 text-xl p-4 rounded-2xl border-2 border-slate-200 focus:border-emerald-400 outline-none resize-none mb-4" />
       <button onClick={() => void handleIdeaSubmit(customText)} disabled={!customText.trim() || isSubmitting} className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white py-5 rounded-2xl text-xl font-bold flex items-center justify-center gap-3">
         <Send className="w-6 h-6" />
         Odeslat nápad
@@ -2662,18 +2662,18 @@ export default function KioskPage() {
     <FormWrapper title="Schránka důvěry" onCancel={handleCancel}>
       {renderError()}
       <div className="mb-5 text-center">
-        <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-500/20 text-purple-200">
+        <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-100 text-purple-200">
           <ShieldCheck className="h-8 w-8" />
         </div>
-        <p className="text-base font-semibold text-slate-200">Anonymní prostor pro obavy, problémy nebo nápady.</p>
-        <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-bold text-emerald-200">
+        <p className="text-base font-semibold text-slate-700">Anonymní prostor pro obavy, problémy nebo nápady.</p>
+        <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-bold text-emerald-700">
           <Lock className="h-4 w-4" />
           100% anonymní
         </div>
       </div>
 
       <div className="mb-5">
-        <div className="mb-3 text-sm font-black uppercase tracking-wide text-slate-300">O čem chcete napsat?</div>
+        <div className="mb-3 text-sm font-black uppercase tracking-wide text-slate-600">O čem chcete napsat?</div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {TRUSTBOX_CATEGORIES.map((category) => {
             const Icon = category.icon;
@@ -2685,8 +2685,8 @@ export default function KioskPage() {
                 onClick={() => setTrustboxCategory(category.id)}
                 className={`min-h-24 rounded-2xl border-2 p-4 text-left transition ${
                   selected
-                    ? 'border-purple-300 bg-purple-500/20 text-white'
-                    : 'border-white/10 bg-slate-900 text-slate-200 hover:border-purple-300/60'
+                    ? 'border-purple-300 bg-purple-100 text-slate-900'
+                    : 'border-slate-200 bg-white text-slate-700 hover:border-purple-300/60'
                 }`}
               >
                 <Icon className={`mb-3 h-6 w-6 ${selected ? 'text-purple-100' : 'text-slate-400'}`} />
@@ -2702,10 +2702,10 @@ export default function KioskPage() {
         value={customText}
         onChange={(event) => setCustomText(event.target.value)}
         placeholder="Napište zprávu..."
-        className="mb-3 h-40 w-full resize-none rounded-2xl border-2 border-white/10 bg-slate-950 p-4 text-lg text-white outline-none placeholder:text-slate-500 focus:border-purple-400"
+        className="mb-3 h-40 w-full resize-none rounded-2xl border-2 border-slate-200 bg-[#fbf9f4] p-4 text-lg text-slate-900 outline-none placeholder:text-slate-400 focus:border-purple-400"
       />
-      <div className="mb-5 rounded-2xl border border-white/10 bg-slate-900/80 p-4 text-sm font-semibold text-slate-300">
-        <div className="mb-1 flex items-center gap-2 font-black text-slate-100">
+      <div className="mb-5 rounded-2xl border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-600">
+        <div className="mb-1 flex items-center gap-2 font-black text-slate-900">
           <Heart className="h-4 w-4 text-pink-300" />
           Vaše bezpečí je prioritou.
         </div>
@@ -2726,11 +2726,11 @@ export default function KioskPage() {
     <FormWrapper title="Jak postupovat při poruše" onCancel={handleCancel}>
       <div className="space-y-4 overflow-y-auto max-h-[60vh]">
         {ASSISTANT_TIPS.map((tip) => (
-          <div key={tip.title} className="bg-slate-900 border border-white/10 rounded-2xl p-4">
-            <h3 className="text-xl font-bold text-white mb-3">{tip.title}</h3>
+          <div key={tip.title} className="bg-white border border-slate-200 rounded-2xl p-4">
+            <h3 className="text-xl font-bold text-slate-900 mb-3">{tip.title}</h3>
             <ul className="space-y-2">
               {tip.steps.map((step) => (
-                <li key={step} className="text-lg text-slate-300 flex items-start gap-2">
+                <li key={step} className="text-lg text-slate-600 flex items-start gap-2">
                   <ChevronRight className="w-5 h-5 text-slate-500 flex-shrink-0 mt-1" />
                   {step}
                 </li>
@@ -2755,10 +2755,10 @@ export default function KioskPage() {
             const canDeleteNote = Boolean(currentUserId);
             const acknowledgedNames = Object.values(note.acknowledgedByName || {}).filter(Boolean);
             return (
-            <div key={note.id} className={`rounded-xl p-3 border ${note.priority === 'important' ? 'bg-red-950/40 border-red-500/30' : 'bg-slate-900 border-white/10'}`}>
+            <div key={note.id} className={`rounded-xl p-3 border ${note.priority === 'important' ? 'bg-red-50 border-red-200' : 'bg-white border-slate-200'}`}>
               <div className="flex items-center justify-between gap-3">
-                <span className="text-sm font-bold text-white">{note.author}</span>
-                <span className="text-sm text-slate-300">{note.time}</span>
+                <span className="text-sm font-bold text-slate-900">{note.author}</span>
+                <span className="text-sm text-slate-600">{note.time}</span>
               </div>
               <div className="mt-1 flex flex-wrap gap-1.5">
                 <span className="rounded-full bg-indigo-500/15 px-2 py-1 text-xs font-bold text-indigo-100">
@@ -2767,12 +2767,12 @@ export default function KioskPage() {
                 <span className="rounded-full bg-sky-500/15 px-2 py-1 text-xs font-bold text-sky-100">
                   {note.shift === 'afternoon' ? 'Odpolední směna' : 'Ranní směna'}
                 </span>
-                {note.priority === 'important' && <span className="rounded-full bg-red-500/20 px-2 py-1 text-xs font-bold text-red-200">Důležité</span>}
-                {acknowledged && <span className="rounded-full bg-emerald-500/20 px-2 py-1 text-xs font-bold text-emerald-100">Přečteno</span>}
+                {note.priority === 'important' && <span className="rounded-full bg-red-50 px-2 py-1 text-xs font-bold text-red-700">Důležité</span>}
+                {acknowledged && <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-700">Přečteno</span>}
               </div>
-              <p className="mt-2 text-base text-slate-200">{note.text}</p>
+              <p className="mt-2 text-base text-slate-700">{note.text}</p>
               {acknowledgedNames.length > 0 && (
-                <div className="mt-2 rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-xs font-bold text-emerald-100">
+                <div className="mt-2 rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-xs font-bold text-emerald-700">
                   Přečetli: {acknowledgedNames.join(', ')}
                 </div>
               )}
@@ -2781,7 +2781,7 @@ export default function KioskPage() {
                   type="button"
                   onClick={() => void handleHandoverAcknowledge(note)}
                   disabled={acknowledged}
-                  className="min-h-10 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-2 text-sm font-black text-emerald-100 disabled:opacity-60"
+                  className="min-h-10 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-2 text-sm font-black text-emerald-700 disabled:opacity-60"
                 >
                   <CheckCircle2 className="mr-2 inline h-4 w-4" />
                   {acknowledged ? 'Přečteno' : 'Potvrdit přečtení'}
@@ -2796,7 +2796,7 @@ export default function KioskPage() {
                     Smazat
                   </button>
                 ) : (
-                  <div className="min-h-10 rounded-xl border border-white/10 bg-slate-950/40 px-2 py-2.5 text-center text-sm font-bold text-slate-400">
+                  <div className="min-h-10 rounded-xl border border-slate-200 bg-[#fbf9f4]/40 px-2 py-2.5 text-center text-sm font-bold text-slate-400">
                     {Object.keys(note.acknowledgedBy || {}).length} přečtení
                   </div>
                 )}
@@ -2806,18 +2806,18 @@ export default function KioskPage() {
           })
         )}
       </div>
-      <div className="border-t border-white/10 pt-4">
+      <div className="border-t border-slate-200 pt-4">
         <div className="mb-2 grid grid-cols-2 gap-2">
-          <button onClick={() => setHandoverShift('morning')} className={`py-3 rounded-xl text-base font-bold transition ${handoverShift === 'morning' ? 'bg-sky-600 text-white' : 'bg-slate-900 text-slate-300'}`}>Ranní směna</button>
-          <button onClick={() => setHandoverShift('afternoon')} className={`py-3 rounded-xl text-base font-bold transition ${handoverShift === 'afternoon' ? 'bg-sky-600 text-white' : 'bg-slate-900 text-slate-300'}`}>Odpolední směna</button>
+          <button onClick={() => setHandoverShift('morning')} className={`py-3 rounded-xl text-base font-bold transition ${handoverShift === 'morning' ? 'bg-sky-600 text-white' : 'bg-white text-slate-600'}`}>Ranní směna</button>
+          <button onClick={() => setHandoverShift('afternoon')} className={`py-3 rounded-xl text-base font-bold transition ${handoverShift === 'afternoon' ? 'bg-sky-600 text-white' : 'bg-white text-slate-600'}`}>Odpolední směna</button>
         </div>
         <div className="grid grid-cols-2 gap-2 mb-3">
-          <button onClick={() => setHandoverPriority('normal')} className={`py-3 rounded-xl text-lg font-bold transition ${handoverPriority === 'normal' ? 'bg-slate-600 text-white' : 'bg-slate-900 text-slate-300'}`}>Běžný zápis</button>
-          <button onClick={() => setHandoverPriority('important')} className={`py-3 rounded-xl text-lg font-bold transition ${handoverPriority === 'important' ? 'bg-red-600 text-white' : 'bg-slate-900 text-slate-300'}`}>Důležité</button>
+          <button onClick={() => setHandoverPriority('normal')} className={`py-3 rounded-xl text-lg font-bold transition ${handoverPriority === 'normal' ? 'bg-slate-600 text-white' : 'bg-white text-slate-600'}`}>Běžný zápis</button>
+          <button onClick={() => setHandoverPriority('important')} className={`py-3 rounded-xl text-lg font-bold transition ${handoverPriority === 'important' ? 'bg-red-600 text-white' : 'bg-white text-slate-600'}`}>Důležité</button>
         </div>
-        <div className="mb-3 rounded-2xl border border-white/10 bg-slate-950/50 p-3">
+        <div className="mb-3 rounded-2xl border border-slate-200 bg-[#fbf9f4]/50 p-3">
           <div className="mb-2 flex items-center justify-between gap-3">
-            <span className="text-sm font-black uppercase text-slate-300">Komu</span>
+            <span className="text-sm font-black uppercase text-slate-600">Komu</span>
             <span className="truncate rounded-full bg-indigo-500/15 px-3 py-1 text-sm font-black text-indigo-100">
               {handoverRecipient}
             </span>
@@ -2828,7 +2828,7 @@ export default function KioskPage() {
                 key={recipient}
                 type="button"
                 onClick={() => selectHandoverRecipient(recipient)}
-                className={`min-h-10 rounded-xl border px-2 text-sm font-black ${handoverRecipient === recipient ? 'border-indigo-300 bg-indigo-600 text-white' : 'border-white/10 bg-slate-900 text-slate-300'}`}
+                className={`min-h-10 rounded-xl border px-2 text-sm font-black ${handoverRecipient === recipient ? 'border-indigo-300 bg-indigo-600 text-white' : 'border-slate-200 bg-white text-slate-600'}`}
               >
                 <span className="block truncate">{recipient}</span>
               </button>
@@ -2840,7 +2840,7 @@ export default function KioskPage() {
               value={handoverRecipientSearch}
               onChange={(event) => setHandoverRecipientSearch(event.target.value)}
               placeholder="Hledat osobu..."
-              className="min-h-11 w-full rounded-xl border border-white/10 bg-slate-900 py-2 pl-10 pr-3 text-base font-semibold text-white outline-none focus:border-indigo-400"
+              className="min-h-11 w-full rounded-xl border border-slate-200 bg-white py-2 pl-10 pr-3 text-base font-semibold text-slate-900 outline-none focus:border-indigo-400"
             />
           </label>
           {(handoverRecipientSearch || !quickHandoverRecipients.includes(handoverRecipient)) && (
@@ -2850,20 +2850,20 @@ export default function KioskPage() {
                   key={recipient}
                   type="button"
                   onClick={() => selectHandoverRecipient(recipient)}
-                  className={`min-h-10 rounded-xl border px-2 text-sm font-black ${handoverRecipient === recipient ? 'border-indigo-300 bg-indigo-600 text-white' : 'border-white/10 bg-slate-900 text-slate-300'}`}
+                  className={`min-h-10 rounded-xl border px-2 text-sm font-black ${handoverRecipient === recipient ? 'border-indigo-300 bg-indigo-600 text-white' : 'border-slate-200 bg-white text-slate-600'}`}
                 >
                   <span className="block truncate">{recipient}</span>
                 </button>
               ))}
               {filteredHandoverRecipients.length === 0 && (
-                <div className="col-span-2 rounded-xl border border-white/10 bg-slate-900 px-3 py-3 text-center text-sm font-bold text-slate-400 sm:col-span-3">
+                <div className="col-span-2 rounded-xl border border-slate-200 bg-white px-3 py-3 text-center text-sm font-bold text-slate-400 sm:col-span-3">
                   Nikdo nenalezen
                 </div>
               )}
             </div>
           )}
         </div>
-        <textarea value={handoverText} onChange={(event) => setHandoverText(event.target.value)} placeholder="Zpráva pro další směnu..." className="w-full h-24 bg-slate-950 text-white text-lg p-3 rounded-2xl border-2 border-white/10 focus:border-indigo-400 outline-none resize-none mb-3" />
+        <textarea value={handoverText} onChange={(event) => setHandoverText(event.target.value)} placeholder="Zpráva pro další směnu..." className="w-full h-24 bg-[#fbf9f4] text-slate-900 text-lg p-3 rounded-2xl border-2 border-slate-200 focus:border-indigo-400 outline-none resize-none mb-3" />
         <button onClick={() => void handleHandoverSubmit()} disabled={!handoverText.trim() || isSubmitting} className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white py-4 rounded-2xl text-lg font-bold flex items-center justify-center gap-3">
           <Send className="w-6 h-6" />
           Přidat poznámku
@@ -2892,7 +2892,7 @@ export default function KioskPage() {
 
 function MenuButton({ icon, label, color, badge, onClick }: { icon: React.ReactNode; label: string; color: string; badge?: number; onClick: () => void }) {
   return (
-    <button onClick={onClick} className={`${color} relative text-white rounded-2xl p-4 md:p-5 flex flex-col items-center justify-center transition-all shadow-xl active:scale-95 min-h-[118px] md:min-h-[148px] border border-white/10 overflow-hidden`}>
+    <button onClick={onClick} className={`${color} relative text-white rounded-2xl p-4 md:p-5 flex flex-col items-center justify-center transition-all shadow-xl active:scale-95 min-h-[118px] md:min-h-[148px] border border-slate-200 overflow-hidden`}>
       {Boolean(badge) && (
         <span className="absolute right-3 top-3 flex min-h-7 min-w-7 items-center justify-center rounded-full bg-red-500 px-2 text-sm font-black text-white shadow-lg">
           {badge && badge > 9 ? '9+' : badge}
@@ -2906,7 +2906,7 @@ function MenuButton({ icon, label, color, badge, onClick }: { icon: React.ReactN
 
 function QuickButton({ label, selected, onClick }: { label: string; selected: boolean; onClick: () => void }) {
   return (
-    <button onClick={onClick} className={`min-h-16 px-4 py-4 rounded-xl text-base md:text-lg font-black leading-snug transition active:scale-95 border break-words ${selected ? 'bg-blue-600 text-white border-blue-400' : 'bg-slate-900 text-white hover:bg-slate-700 border-white/10'}`}>
+    <button onClick={onClick} className={`min-h-16 px-4 py-4 rounded-xl text-base md:text-lg font-black leading-snug transition active:scale-95 border break-words ${selected ? 'bg-blue-600 text-white border-blue-400' : 'bg-white text-slate-900 hover:bg-slate-100 border-slate-200'}`}>
       {label}
     </button>
   );
@@ -2914,12 +2914,12 @@ function QuickButton({ label, selected, onClick }: { label: string; selected: bo
 
 function FormWrapper({ title, onCancel, children }: { title: string; onCancel: () => void; children: React.ReactNode }) {
   return (
-    <div className="h-[100dvh] w-full overflow-y-auto bg-slate-800 p-3 shadow-2xl border border-white/10 sm:h-auto sm:max-h-[calc(100dvh-12px)] sm:max-w-6xl sm:rounded-3xl md:p-6">
+    <div className="h-[100dvh] w-full overflow-y-auto bg-white p-3 shadow-2xl border border-slate-200 sm:h-auto sm:max-h-[calc(100dvh-12px)] sm:max-w-6xl sm:rounded-3xl md:p-6">
       <div className="flex items-center gap-3 mb-5">
-        <button onClick={onCancel} className="min-h-12 min-w-12 flex items-center justify-center p-3 rounded-xl bg-slate-900 text-slate-300 hover:bg-slate-700 hover:text-white transition">
+        <button onClick={onCancel} className="min-h-12 min-w-12 flex items-center justify-center p-3 rounded-xl bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition">
           <ArrowLeft className="w-6 h-6" />
         </button>
-        <h2 className="text-xl md:text-3xl font-black text-white leading-tight break-words">{title}</h2>
+        <h2 className="text-xl md:text-3xl font-black text-slate-900 leading-tight break-words">{title}</h2>
       </div>
       {children}
     </div>
