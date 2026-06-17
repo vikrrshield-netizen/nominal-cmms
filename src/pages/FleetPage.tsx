@@ -417,7 +417,7 @@ function VehicleDetailModal({ entity, blueprint, onClose, toast }: {
     <div className="fixed inset-0 bg-black/70 z-50 flex items-end md:items-center justify-center" onClick={onClose}>
       <div className="bg-white text-slate-950 rounded-t-3xl md:rounded-3xl w-full max-w-3xl max-h-[90vh] overflow-y-auto border border-slate-200 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
-        <div className="sticky top-0 bg-white/95 backdrop-blur-sm border-b border-slate-200 p-4 flex items-center justify-between z-10">
+        <div className="sticky top-0 bg-white/95 border-b border-slate-200 p-4 flex items-center justify-between z-10">
           <div className="flex items-center gap-2">
             <Car className="w-5 h-5 text-blue-400" />
             <span className="font-bold text-slate-950">{entity.name}</span>

@@ -1704,7 +1704,7 @@ export default function KioskPage() {
           <h3 className="text-xl text-slate-900 font-black leading-tight">Předfiltry nad extrudery</h3>
           <p className="mt-1 text-sm font-bold text-slate-600">Vyber extruder a potvrď výměnu jeho předfiltrů.</p>
         </div>
-        <span className="shrink-0 rounded-xl bg-cyan-500/15 px-3 py-2 text-sm font-black text-cyan-100">
+        <span className="shrink-0 rounded-xl bg-cyan-500/15 px-3 py-2 text-sm font-black text-cyan-700">
           {prefilterAlerts.overdue.length + prefilterAlerts.warning.length} čeká
         </span>
       </div>
@@ -1878,10 +1878,10 @@ export default function KioskPage() {
       {dataloggerAlerts.missing.length > 0 && (
         <div className="rounded-2xl border border-teal-300/40 bg-teal-600/20 p-4">
           <div className="flex items-center gap-3">
-            <Thermometer className="h-6 w-6 text-teal-100" />
+            <Thermometer className="h-6 w-6 text-teal-700" />
             <div>
               <div className="text-lg font-black text-slate-900">Dnešní teploty skladů nejsou kompletní</div>
-              <div className="text-sm font-bold text-teal-100">{dataloggerAlerts.missing.length} dataloggerů čeká na zápis.</div>
+              <div className="text-sm font-bold text-teal-700">{dataloggerAlerts.missing.length} dataloggerů čeká na zápis.</div>
             </div>
           </div>
         </div>
@@ -1917,11 +1917,11 @@ export default function KioskPage() {
               }`}
             >
               <div className="flex min-w-0 items-start gap-2">
-                {missing && <AlertTriangle className="mt-1 h-5 w-5 shrink-0 text-teal-100" />}
+                {missing && <AlertTriangle className="mt-1 h-5 w-5 shrink-0 text-teal-700" />}
                 <div className="min-w-0">
                   <div className="text-slate-900 text-lg font-black leading-snug break-words">{asset.name}</div>
                   <div className="text-sm text-slate-600 mt-1 leading-snug break-words">{getAssetRoom(asset, assets) || assetLabel(asset, assets)}</div>
-                  <div className={`mt-2 text-sm font-black ${missing ? 'text-teal-100' : 'text-emerald-700'}`}>
+                  <div className={`mt-2 text-sm font-black ${missing ? 'text-teal-700' : 'text-emerald-700'}`}>
                     {dailyStatus.label}
                   </div>
                 </div>
@@ -2271,7 +2271,7 @@ export default function KioskPage() {
                 Problém
               </button>
             </div>
-            <button onClick={() => setSelectedAssetId('')} className="mt-1 text-xs font-bold text-violet-200 underline">Vybrat jinou převodovku</button>
+            <button onClick={() => setSelectedAssetId('')} className="mt-1 text-xs font-bold text-violet-700 underline">Vybrat jinou převodovku</button>
           </div>
 
           <div className={`rounded-xl border ${status.border} ${status.bg} p-2.5`}>
@@ -2608,10 +2608,10 @@ export default function KioskPage() {
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <div className="truncate text-base font-black leading-tight text-slate-900">{selectedAsset.name}</div>
-                  <div className="mt-0.5 truncate text-xs font-bold text-teal-100/80">{getAssetRoom(selectedAsset, assets) || assetLabel(selectedAsset, assets)}</div>
+                  <div className="mt-0.5 truncate text-xs font-bold text-teal-700/80">{getAssetRoom(selectedAsset, assets) || assetLabel(selectedAsset, assets)}</div>
                 </div>
               </div>
-              <button onClick={() => setSelectedAssetId('')} className="mt-1 text-xs font-bold text-teal-200 underline">Vybrat jiný datalogger</button>
+              <button onClick={() => setSelectedAssetId('')} className="mt-1 text-xs font-bold text-teal-700 underline">Vybrat jiný datalogger</button>
             </div>
 
             <div className="rounded-xl border border-teal-400/40 bg-teal-500/15 p-2.5">
@@ -2647,7 +2647,7 @@ export default function KioskPage() {
             <div className="rounded-xl border border-cyan-400/35 bg-cyan-500/10 p-2.5">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
-                  <Droplets className="h-5 w-5 text-cyan-100" />
+                  <Droplets className="h-5 w-5 text-cyan-700" />
                   <div>
                     <div className="text-xs font-bold text-slate-600">Vlhkost</div>
                     <div className="text-3xl font-black leading-none text-slate-900">{dataloggerHumidity.trim() ? humidity : '--'}<span className="text-lg"> %</span></div>
@@ -2734,7 +2734,7 @@ export default function KioskPage() {
     <FormWrapper title="Schránka důvěry" onCancel={handleCancel}>
       {renderError()}
       <div className="mb-5 text-center">
-        <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-100 text-purple-200">
+        <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-100 text-purple-700">
           <ShieldCheck className="h-8 w-8" />
         </div>
         <p className="text-base font-semibold text-slate-700">Anonymní prostor pro obavy, problémy nebo nápady.</p>

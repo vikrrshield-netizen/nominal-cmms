@@ -3034,7 +3034,7 @@ function GearboxTemperatureModal({ gearbox, user, saving, onClose, onSave }: {
                 key={value}
                 type="button"
                 onClick={() => setTemperatureValue(value)}
-                className="rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-3 text-sm font-black text-cyan-100"
+                className="rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-3 text-sm font-black text-cyan-700"
               >
                 {value} °C
               </button>
@@ -3121,7 +3121,7 @@ function GearboxTemperatureModal({ gearbox, user, saving, onClose, onSave }: {
               className="mb-2 w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-cyan-400"
             />
             {selectedMaterial && (
-              <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-xs font-bold text-cyan-100">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-xs font-bold text-cyan-700">
                 <span>{showAllProducts ? 'Zobrazeny všechny výrobky' : `Dle receptury: ${relatedProducts.length} výrobků`}</span>
                 <button type="button" onClick={() => setShowAllProducts((current) => !current)} className="rounded-lg bg-slate-100 px-2 py-1 font-black text-slate-900">
                   {showAllProducts ? 'Dle receptury' : 'Zobrazit vše'}
@@ -3171,7 +3171,7 @@ function GearboxTemperatureModal({ gearbox, user, saving, onClose, onSave }: {
               onChange={(e) => setProductBatchDate(e.target.value)}
               className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-cyan-400"
             />
-            <div className="mt-2 rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-sm font-black text-cyan-100">
+            <div className="mt-2 rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-sm font-black text-cyan-700">
               Šarže výrobku: {productBatchValue || 'vyber výrobek'}
             </div>
           </label>

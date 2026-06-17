@@ -31,8 +31,8 @@ const STATUS = {
 };
 
 const TASK_PRIORITY_OPTIONS: Array<{ value: TaskPriority; label: string; hint: string; className: string }> = [
-  { value: 'P1', label: 'P1', hint: 'hned / havárie', className: 'border-red-500/40 bg-red-500/10 text-red-200' },
-  { value: 'P2', label: 'P2', hint: 'důležité', className: 'border-amber-500/40 bg-amber-500/10 text-amber-100' },
+  { value: 'P1', label: 'P1', hint: 'hned / havárie', className: 'border-red-500/40 bg-red-500/10 text-red-700' },
+  { value: 'P2', label: 'P2', hint: 'důležité', className: 'border-amber-500/40 bg-amber-500/10 text-amber-700' },
   { value: 'P3', label: 'P3', hint: 'běžný úkol', className: 'border-blue-200 bg-blue-50 text-blue-900' },
   { value: 'P4', label: 'P4', hint: 'až bude čas', className: 'border-slate-500/40 bg-slate-700/50 text-slate-200' },
 ];
@@ -1292,7 +1292,7 @@ export default function InspectionsPage() {
                     }`}
                   >
                     <div className="text-sm font-bold">{asset.name}</div>
-                    <div className={`text-xs ${selectedAssetIds.includes(asset.id) ? 'text-violet-100' : 'text-slate-500'}`}>
+                    <div className={`text-xs ${selectedAssetIds.includes(asset.id) ? 'text-violet-700' : 'text-slate-500'}`}>
                       {asset.buildingId || '-'} {asset.floor ? `· ${asset.floor}` : ''} {assetRoom(asset) ? `· ${assetRoom(asset)}` : ''}
                     </div>
                   </button>

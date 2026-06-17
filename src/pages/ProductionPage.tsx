@@ -1052,7 +1052,7 @@ export default function ProductionPage() {
                         className="block w-full rounded-lg bg-[#fbf9f4]/35 px-2.5 py-2 text-left transition hover:bg-white"
                       >
                         <div className="truncate text-sm font-black text-slate-900">{batch.productName || batch.materialName || batch.rawMaterial || 'Dávka'}</div>
-                        <div className="mt-0.5 truncate text-xs font-semibold text-blue-200">{getBatchMachineLabel(batch)}</div>
+                        <div className="mt-0.5 truncate text-xs font-semibold text-blue-700">{getBatchMachineLabel(batch)}</div>
                       </button>
                     ))}
                   </div>
@@ -1269,7 +1269,7 @@ export default function ProductionPage() {
                             ))}
                           </div>
                         )}
-                        {batch.mixingNote && <p className="mt-2 text-xs text-emerald-100 whitespace-pre-wrap">{batch.mixingNote}</p>}
+                        {batch.mixingNote && <p className="mt-2 text-xs text-emerald-700 whitespace-pre-wrap">{batch.mixingNote}</p>}
                       </div>
                     )}
 
@@ -1668,7 +1668,7 @@ export default function ProductionPage() {
               <div className="mb-2 flex items-center justify-between gap-2">
                 <div className="text-xs font-black uppercase tracking-wide text-emerald-700">Míchání / receptura</div>
                 {typeof selectedProduct?.targetMotorLoadAmps === 'number' && (
-                  <div className="rounded-full bg-emerald-400/10 px-2 py-1 text-[11px] font-black text-emerald-100">
+                  <div className="rounded-full bg-emerald-400/10 px-2 py-1 text-[11px] font-black text-emerald-700">
                     zátěž {selectedProduct.targetMotorLoadAmps} A
                   </div>
                 )}
@@ -1802,7 +1802,7 @@ export default function ProductionPage() {
               <div className="rounded-xl border border-blue-500/20 bg-blue-500/10 p-3">
                 <div className="text-[10px] font-black uppercase tracking-wide text-blue-700">Surovina / šarže</div>
                 <div className="mt-1 text-sm font-black text-slate-900">{selectedBatch.materialName || selectedBatch.rawMaterial || 'Nezadáno'}</div>
-                <div className="mt-1 font-mono text-xs font-bold text-blue-200">{selectedBatch.materialBatch || 'bez šarže'}</div>
+                <div className="mt-1 font-mono text-xs font-bold text-blue-700">{selectedBatch.materialBatch || 'bez šarže'}</div>
               </div>
             </div>
 
@@ -1821,7 +1821,7 @@ export default function ProductionPage() {
               ) : (
                 <div className="text-sm font-semibold text-slate-400">Receptura není uložená u dávky.</div>
               )}
-              {selectedBatch.mixingNote && <p className="mt-2 text-sm text-emerald-100 whitespace-pre-wrap">{selectedBatch.mixingNote}</p>}
+              {selectedBatch.mixingNote && <p className="mt-2 text-sm text-emerald-700 whitespace-pre-wrap">{selectedBatch.mixingNote}</p>}
             </div>
 
             {(selectedBatch.note || selectedBatch.shiftLog) && (

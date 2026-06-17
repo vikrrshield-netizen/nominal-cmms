@@ -23,7 +23,7 @@ export default function WidgetLibrary({ widgets, onRestore }: WidgetLibraryProps
         Knihovna ({hiddenWidgets.length})
       </div>
       {hiddenWidgets.length === 0 ? (
-        <div className="text-sm text-slate-600 text-center py-4 bg-white/[0.02] rounded-xl border border-dashed border-slate-700/50">
+        <div className="text-sm text-slate-600 text-center py-4 bg-slate-50 rounded-xl border border-dashed border-slate-700/50">
           Všechny dlaždice jsou zobrazeny
         </div>
       ) : (

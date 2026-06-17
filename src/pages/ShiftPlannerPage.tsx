@@ -330,15 +330,15 @@ export default function ShiftPlannerPage() {
           <div className="flex items-start justify-between gap-3 mb-3">
             <div className="flex items-start gap-3">
               <div className="w-11 h-11 rounded-xl bg-indigo-500/15 border border-indigo-400/30 flex items-center justify-center flex-shrink-0">
-                <ClipboardList className="w-5 h-5 text-indigo-200" />
+                <ClipboardList className="w-5 h-5 text-indigo-700" />
               </div>
               <div>
                 <h2 className="text-base font-bold text-slate-900">Předání směny</h2>
-                <p className="text-sm text-indigo-100/80">Poslední zprávy z kiosku pro další směnu.</p>
+                <p className="text-sm text-indigo-700/80">Poslední zprávy z kiosku pro další směnu.</p>
               </div>
             </div>
             {importantShiftNotes.length > 0 && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-red-500/20 border border-red-400/30 px-2 py-1 text-xs font-bold text-red-100">
+              <span className="inline-flex items-center gap-1 rounded-full bg-red-500/20 border border-red-400/30 px-2 py-1 text-xs font-bold text-red-700">
                 <AlertTriangle className="w-3.5 h-3.5" />
                 {importantShiftNotes.length}
               </span>
@@ -364,7 +364,7 @@ export default function ShiftPlannerPage() {
                   </div>
                   <p className="text-base text-slate-900 leading-snug">{latestShiftNote.text}</p>
                   {latestShiftNote.priority === 'important' && (
-                    <span className="mt-2 inline-block rounded-full bg-red-500/20 px-2 py-1 text-xs font-bold text-red-100">Důležité</span>
+                    <span className="mt-2 inline-block rounded-full bg-red-500/20 px-2 py-1 text-xs font-bold text-red-700">Důležité</span>
                   )}
                 </div>
               )}

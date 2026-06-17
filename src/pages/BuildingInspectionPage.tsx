@@ -756,7 +756,7 @@ export default function BuildingInspectionPage() {
                   }}
                   className={`min-h-[54px] rounded-xl border px-2 py-2 text-left transition active:scale-[0.98] ${
                     active
-                      ? 'bg-orange-500/20 border-orange-400/60 text-orange-200'
+                      ? 'bg-orange-500/20 border-orange-400/60 text-orange-700'
                       : 'bg-slate-50 border-slate-200 text-slate-600'
                   }`}
                 >
@@ -780,7 +780,7 @@ export default function BuildingInspectionPage() {
           />
         </div>
         {searchScope.buildingId && !filterBuilding && (
-          <div className="mb-3 rounded-xl bg-orange-500/10 border border-orange-500/25 px-3 py-2 text-xs text-orange-200">
+          <div className="mb-3 rounded-xl bg-orange-500/10 border border-orange-500/25 px-3 py-2 text-xs text-orange-700">
             Zobrazuji {buildingLabel(searchScope.buildingId)}
             {searchScope.roomQuery ? `, hledám "${searchScope.roomQuery}"` : ''}
           </div>

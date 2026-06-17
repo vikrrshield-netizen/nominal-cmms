@@ -1074,11 +1074,11 @@ export default function WorkDiaryPage() {
         </div>
 
         {lastSavedLogId && (
-          <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100 flex items-start gap-3">
+          <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 flex items-start gap-3">
             <CheckCircle2 className="w-5 h-5 text-emerald-300 flex-shrink-0 mt-0.5" />
             <div>
               <div className="font-bold">Zápis je uložený.</div>
-              <div className="text-emerald-200/80">Níže je zobrazený poslední uložený záznam. Můžeš se vrátit na zadání další práce.</div>
+              <div className="text-emerald-700/80">Níže je zobrazený poslední uložený záznam. Můžeš se vrátit na zadání další práce.</div>
             </div>
           </div>
         )}

@@ -1569,7 +1569,7 @@ function ActivityDetailCard({ item, onClose, onContinue, onEdit }: {
         className="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl border border-stone-200 bg-white text-slate-950 shadow-2xl sm:max-w-2xl sm:rounded-2xl"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-stone-200 bg-white/95 p-4 backdrop-blur">
+        <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-stone-200 bg-white/95 p-4">
           <div>
             <div className="text-[10px] font-black uppercase tracking-widest text-sky-700">Detail záznamu</div>
             <h3 className="mt-1 text-lg font-black text-slate-950">{item.title}</h3>
@@ -1639,7 +1639,7 @@ function ActivityDetailCard({ item, onClose, onContinue, onEdit }: {
           </div>
         </div>
 
-        <div className="sticky bottom-0 grid grid-cols-2 gap-2 border-t border-stone-200 bg-white/95 p-4 backdrop-blur">
+        <div className="sticky bottom-0 grid grid-cols-2 gap-2 border-t border-stone-200 bg-white/95 p-4">
           <button type="button" onClick={onContinue} className="min-h-11 rounded-xl bg-emerald-700 px-4 text-sm font-bold text-white active:scale-[0.99] hover:bg-emerald-600">
             Pokračovat
           </button>
