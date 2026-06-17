@@ -42,6 +42,9 @@ import BrandMark from '../components/ui/BrandMark';
 import SemaphoreWidget from '../components/dashboard/SemaphoreWidget';
 import Top5TasksWidget from '../components/dashboard/Top5TasksWidget';
 import LemonListWidget from '../components/dashboard/LemonListWidget';
+import OverviewDaylight, { type OverviewTask } from '../components/dashboard/OverviewDaylight';
+import { useEmployeeDirectory } from '../hooks/useEmployeeDirectory';
+import { TYPE_CONFIG as REVISION_TYPE_CONFIG } from '../hooks/useRevisions';
 
 function asDate(value: any): Date | null {
   if (!value) return null;
@@ -189,49 +192,6 @@ function AiTipCard({ stats }: { stats: { criticalTasks: number; breakdownAssets:
 // ═══════════════════════════════════════════════════════
 // FIREBASE HOOKS (LIVE DATA)
 // ═══════════════════════════════════════════════════════
-
-interface DailyOperationsProps {
-  openTasks: number;
-  criticalTasks: number;
-  overdueTasks: number;
-  todayLogs: number;
-  todayMinutes: number;
-  todayDefects: number;
-  onNavigate: (path: string) => void;
-}
-
-function DailyOperations({ openTasks, criticalTasks, overdueTasks, todayLogs, todayMinutes, todayDefects, onNavigate }: DailyOperationsProps) {
-  const cards = [
-    { label: 'Otevřené úkoly', value: openTasks, detail: criticalTasks ? `${criticalTasks} P1` : 'bez havárie', path: '/tasks', icon: Wrench, tone: 'text-amber-600' },
-    { label: 'Po termínu', value: overdueTasks, detail: overdueTasks ? 'řešit jako první' : 'nic po termínu', path: '/tasks', icon: Clock, tone: 'text-red-600' },
-    { label: 'Deník prací', value: todayLogs, detail: todayMinutes ? `${Math.round(todayMinutes / 60 * 10) / 10} h práce` : 'zatím bez zápisu', path: '/work-diary', icon: FileText, tone: 'text-emerald-700' },
-    { label: 'Závady dnes', value: todayDefects, detail: todayDefects ? 'z kontrol' : 'bez závad', path: '/inspections', icon: AlertTriangle, tone: 'text-orange-600' },
-  ];
-
-  return (
-    <section className="rounded-2xl border border-stone-200 bg-[#fbf9f4] p-3 shadow-sm shadow-stone-200/70 sm:p-4">
-      <div className="mb-3">
-        <div className="text-[10px] text-emerald-700 uppercase tracking-widest font-bold">Dnešní provoz</div>
-        <h2 className="text-lg font-black text-slate-950 mt-0.5">Co je potřeba hlídat dnes</h2>
-      </div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {cards.map(({ label, value, detail, path, icon: Icon, tone }) => (
-          <button key={label} type="button" onClick={() => onNavigate(path)}
-            className={`${DASH_PANEL} ${DASH_PANEL_HOVER} p-4 text-left min-h-[116px]`}>
-            <div className="flex items-center justify-between gap-2">
-              <div className={DASH_ICON_BOX}>
-                <Icon className={`w-5 h-5 ${tone}`} />
-              </div>
-              <div className={`text-2xl font-bold ${tone}`}>{value}</div>
-            </div>
-            <div className="text-sm font-black text-slate-950 mt-3">{label}</div>
-            <div className="text-xs font-semibold text-slate-500 mt-1">{detail}</div>
-          </button>
-        ))}
-      </div>
-    </section>
-  );
-}
 
 function QuickActions({ onNavigate }: { onNavigate: (path: string) => void }) {
   const actions = [
@@ -1322,6 +1282,30 @@ function WatchWidgets({
   );
 }
 
+function useTopTasks(): OverviewTask[] {
+  const [tasks, setTasks] = useState<OverviewTask[]>([]);
+  useEffect(() => {
+    const q = query(collection(db, 'tasks'), where('status', 'in', ['backlog', 'planned', 'in_progress', 'paused']));
+    const unsub = onSnapshot(q, (snap) => {
+      const order: Record<string, number> = { P1: 0, P2: 1, P3: 2, P4: 3 };
+      const rows = snap.docs.map((d) => {
+        const data = d.data();
+        const assignee = String(data.assignee || data.assigneeName || '');
+        return {
+          id: d.id,
+          title: String(data.title || 'Úkol'),
+          priority: String(data.priority || 'P4'),
+          asset: String(data.asset || data.assetName || ''),
+          assigneeInitial: assignee ? assignee.charAt(0).toUpperCase() : null,
+        } as OverviewTask;
+      }).sort((a, b) => (order[a.priority] ?? 9) - (order[b.priority] ?? 9)).slice(0, 6);
+      setTasks(rows);
+    }, () => setTasks([]));
+    return () => unsub();
+  }, []);
+  return tasks;
+}
+
 function useDashboardStats() {
   const [stats, setStats] = useState({
     openTasks: 0, criticalTasks: 0, urgentTasks: 0, newReports: 0,
@@ -1478,86 +1462,6 @@ function VacationNotice({ todayVacations, upcomingVacations, onNavigate }: {
         >
           Kalendář
         </button>
-      </div>
-    </section>
-  );
-}
-
-function OperationalAlerts({
-  newKioskTasks,
-  criticalTasks,
-  overdueTasks,
-  expiredRevisions,
-  expiringRevisions,
-  lowStockCount,
-  todayDefects,
-  todayAbsences,
-  onNavigate,
-}: {
-  newKioskTasks: number;
-  criticalTasks: number;
-  overdueTasks: number;
-  expiredRevisions: number;
-  expiringRevisions: number;
-  lowStockCount: number;
-  todayDefects: number;
-  todayAbsences: number;
-  onNavigate: (path: string) => void;
-}) {
-  const alerts = [
-    newKioskTasks > 0 ? { label: 'Nové z kiosku', value: newKioskTasks, detail: 'hlášení od obsluhy', path: '/tasks?source=kiosk', icon: Bell, tone: 'text-red-700', border: 'border-red-200 bg-red-50' } : null,
-    criticalTasks > 0 ? { label: 'P1 úkoly', value: criticalTasks, detail: 'řešit hned', path: '/tasks', icon: AlertTriangle, tone: 'text-red-700', border: 'border-red-200 bg-red-50' } : null,
-    overdueTasks > 0 ? { label: 'Po termínu', value: overdueTasks, detail: 'otevřené práce', path: '/tasks', icon: Clock, tone: 'text-orange-700', border: 'border-orange-200 bg-orange-50' } : null,
-    expiredRevisions > 0 ? { label: 'Prošlé revize', value: expiredRevisions, detail: 'auditní riziko', path: '/revisions', icon: ShieldCheck, tone: 'text-red-700', border: 'border-red-200 bg-red-50' } : null,
-    expiredRevisions === 0 && expiringRevisions > 0 ? { label: 'Blížící revize', value: expiringRevisions, detail: 'naplánovat', path: '/revisions', icon: ShieldCheck, tone: 'text-amber-700', border: 'border-amber-200 bg-amber-50' } : null,
-    lowStockCount > 0 ? { label: 'Sklad pod limitem', value: lowStockCount, detail: 'zkontrolovat ND', path: '/inventory', icon: Package, tone: 'text-amber-700', border: 'border-amber-200 bg-amber-50' } : null,
-    todayDefects > 0 ? { label: 'Závady dnes', value: todayDefects, detail: 'z kontrol', path: '/inspections', icon: ClipboardCheck, tone: 'text-sky-700', border: 'border-sky-200 bg-sky-50' } : null,
-    todayAbsences > 0 ? { label: 'Dnes mimo práci', value: todayAbsences, detail: 'dovolená/nemoc', path: '/calendar', icon: Calendar, tone: 'text-emerald-700', border: 'border-emerald-200 bg-emerald-50' } : null,
-  ].filter(Boolean) as Array<{
-    label: string;
-    value: number;
-    detail: string;
-    path: string;
-    icon: typeof AlertTriangle;
-    tone: string;
-    border: string;
-  }>;
-
-  if (alerts.length === 0) return null;
-
-  return (
-    <section className="mb-5">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div>
-          <div className="text-[10px] text-red-600 uppercase tracking-widest font-bold">Upozornění</div>
-          <h2 className="text-lg font-black text-slate-950 mt-0.5">Co nečeká</h2>
-        </div>
-        <button
-          type="button"
-          onClick={() => onNavigate('/notifications')}
-          className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-stone-50"
-        >
-          Vše
-        </button>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-        {alerts.slice(0, 6).map(({ label, value, detail, path, icon: Icon, tone, border }) => (
-          <button
-            key={label}
-            type="button"
-            onClick={() => onNavigate(path)}
-            className={`min-h-[72px] rounded-xl border p-3 text-left flex items-center gap-3 active:scale-[0.98] transition ${border}`}
-          >
-            <span className={DASH_ICON_BOX}>
-              <Icon className={`w-5 h-5 ${tone}`} />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-black text-slate-950 truncate">{label}</span>
-              <span className="block text-xs font-semibold text-slate-600 truncate">{detail}</span>
-            </span>
-            <span className={`text-xl font-black ${tone}`}>{value}</span>
-          </button>
-        ))}
       </div>
     </section>
   );
@@ -2231,6 +2135,8 @@ function FullDashboard() {
   const fleet = useFleet();
   const inventory = useInventory();
   const revisions = useRevisions();
+  const topTasks = useTopTasks();
+  const directory = useEmployeeDirectory({ tenantId });
   const inspections = useInspections();
 
   // Clock
@@ -2418,6 +2324,27 @@ function FullDashboard() {
     { id: 'lemon', label: 'Doutnající úkoly', available: true, node: (<LemonListWidget />) },
   ];
 
+  // Data pro nový přehled (směr B) — z dat, co appka už má
+  const revisionsTop = ([...((revisions?.revisions ?? []) as any[])])
+    .filter((r) => !r.isDeleted)
+    .sort((a, b) => (a.nextRevisionDate?.toMillis?.() ?? 0) - (b.nextRevisionDate?.toMillis?.() ?? 0))
+    .slice(0, 3)
+    .map((r) => ({
+      label: r.title || REVISION_TYPE_CONFIG[r.type as keyof typeof REVISION_TYPE_CONFIG]?.label || 'Revize',
+      due: r.nextRevisionDate?.toDate ? r.nextRevisionDate.toDate().toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' }) : '—',
+      status: (r.status || 'valid') as 'valid' | 'expiring' | 'expired',
+    }));
+  const lowStockTop = ((inventory?.items ?? []) as any[])
+    .filter((i) => typeof i.quantity === 'number' && typeof i.minQuantity === 'number' && i.quantity <= i.minQuantity)
+    .sort((a, b) => (a.quantity / Math.max(1, a.minQuantity)) - (b.quantity / Math.max(1, b.minQuantity)))
+    .slice(0, 3)
+    .map((i) => ({ name: String(i.name || 'Díl'), qty: i.quantity as number, min: i.minQuantity as number }));
+  const overviewTeam = ((directory ?? []) as any[]).slice(0, 8).map((u) => ({
+    name: String(u.displayName || '?').split(' ')[0],
+    initial: String(u.displayName || '?').charAt(0).toUpperCase(),
+  }));
+  const alarmDetail = topTasks.filter((t) => t.priority === 'P1').map((t) => t.asset || t.title).filter(Boolean).slice(0, 2).join(' · ');
+
   return (
     <div className="dashboard-daylight min-h-screen bg-[#f1ece3] text-slate-950">
       <div className="mx-auto max-w-[1360px] px-3 pt-4 pb-24 sm:px-4 xl:px-5">
@@ -2477,30 +2404,32 @@ function FullDashboard() {
               }} />
             </div>
 
-            <div className="space-y-4 xl:order-1">
-              <OperationalAlerts
-            newKioskTasks={(stats as any).newKioskTasks || 0}
-            criticalTasks={stats.criticalTasks || 0}
-            overdueTasks={(stats as any).overdueTasks || 0}
-            expiredRevisions={revStats.expired ?? 0}
-            expiringRevisions={revStats.expiring ?? 0}
-            lowStockCount={lowStockCount}
-            todayDefects={todayOps.todayDefects}
-            todayAbsences={vacationAlerts.todayVacations.length}
-            onNavigate={navigate}
-          />
-
-              <DailyOperations
-            openTasks={stats.openTasks || 0}
-            criticalTasks={stats.criticalTasks || 0}
-            overdueTasks={(stats as any).overdueTasks || 0}
-            todayLogs={todayOps.todayLogs}
-            todayMinutes={todayOps.todayMinutes}
-            todayDefects={todayOps.todayDefects}
-            onNavigate={navigate}
+            <div className="xl:order-1">
+              <OverviewDaylight
+                alarmCount={stats.criticalTasks || 0}
+                alarmDetail={alarmDetail}
+                kpi={{
+                  openTasks: stats.openTasks || 0,
+                  p1: stats.criticalTasks || 0,
+                  p2: (stats as any).urgentTasks || 0,
+                  operational: stats.operationalAssets || 0,
+                  total: stats.totalAssets || 0,
+                  breakdown: stats.breakdownAssets || 0,
+                  revisionsSoon: stats.upcomingRevisions || 0,
+                  lowStock: lowStockCount,
+                }}
+                priorityTasks={topTasks}
+                machineStatus={{ operational: stats.operationalAssets || 0, maintenance: stats.maintenanceAssets || 0, breakdown: stats.breakdownAssets || 0 }}
+                team={overviewTeam}
+                revisions={revisionsTop}
+                lowStockItems={lowStockTop}
+                gearbox={{ installed: gearboxDashboard.installed || 0, stock: gearboxDashboard.stock || 0, service: gearboxDashboard.service || 0 }}
+                onNavigate={navigate}
+                onResolveAlarm={() => navigate('/tasks')}
               />
-
-              <FavoriteModules onNavigate={navigate} />
+              <div className="mt-4">
+                <FavoriteModules onNavigate={navigate} />
+              </div>
             </div>
           </div>
         </DashboardZone>
