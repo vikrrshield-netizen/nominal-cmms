@@ -39,6 +39,9 @@ import AiModal from '../components/dashboard/AiModal';
 import GearboxProblemModal from '../components/gearbox/GearboxProblemModal';
 import GearboxRepairModal from '../components/gearbox/GearboxRepairModal';
 import BrandMark from '../components/ui/BrandMark';
+import SemaphoreWidget from '../components/dashboard/SemaphoreWidget';
+import Top5TasksWidget from '../components/dashboard/Top5TasksWidget';
+import LemonListWidget from '../components/dashboard/LemonListWidget';
 
 function asDate(value: any): Date | null {
   if (!value) return null;
@@ -1217,6 +1220,108 @@ function SecondaryModules({
   );
 }
 
+function WatchWidgets({
+  blocks,
+  order,
+  hidden,
+  onReorder,
+  onSetHidden,
+}: {
+  blocks: { id: string; label: string; available: boolean; node: ReactNode }[];
+  order: string[];
+  hidden: string[];
+  onReorder: (visibleIds: string[]) => void;
+  onSetHidden: (hidden: string[]) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const dragIndex = useRef<number | null>(null);
+
+  const available = blocks.filter((b) => b.available);
+  const defIdx = (id: string) => available.findIndex((b) => b.id === id);
+  const orderIdx = (id: string) => {
+    const i = order.indexOf(id);
+    return i < 0 ? 1000 + defIdx(id) : i;
+  };
+  const visible = available.filter((b) => !hidden.includes(b.id)).sort((a, b) => orderIdx(a.id) - orderIdx(b.id));
+  const hiddenBlocks = available.filter((b) => hidden.includes(b.id));
+
+  if (available.length === 0) {
+    return (
+      <div className="rounded-2xl border border-dashed border-stone-300 bg-stone-50 p-3 text-sm font-semibold text-slate-500">
+        Pro tuto roli zatím není co sledovat.
+      </div>
+    );
+  }
+
+  const visibleIds = visible.map((b) => b.id);
+  const move = (from: number, to: number) => {
+    if (to < 0 || to >= visibleIds.length || from === to) return;
+    const next = [...visibleIds];
+    const [m] = next.splice(from, 1);
+    next.splice(to, 0, m);
+    onReorder(next);
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={() => setEditing((v) => !v)}
+          className={`rounded-full px-2.5 py-1 text-xs font-bold transition ${editing ? 'bg-emerald-600 text-white' : 'border border-stone-200 bg-white text-slate-600 hover:bg-stone-50'}`}
+        >
+          {editing ? 'Hotovo' : 'Upravit widgety'}
+        </button>
+      </div>
+
+      {!editing && visible.map((b) => <div key={b.id}>{b.node}</div>)}
+      {!editing && visible.length === 0 && (
+        <div className="rounded-2xl border border-dashed border-stone-300 bg-stone-50 p-3 text-sm font-semibold text-slate-500">
+          Nic připnutého. Klepni na „Upravit widgety" a přidej.
+        </div>
+      )}
+
+      {editing && (
+        <>
+          {visible.map((b, idx) => (
+            <div
+              key={b.id}
+              draggable
+              onDragStart={() => { dragIndex.current = idx; }}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={() => { const f = dragIndex.current; dragIndex.current = null; if (f != null) move(f, idx); }}
+              className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-white p-3 cursor-grab active:cursor-grabbing"
+            >
+              <span className="text-slate-300 text-lg leading-none select-none" aria-hidden="true">⠿</span>
+              <span className="flex-1 text-sm font-black text-slate-900">{b.label}</span>
+              <button type="button" onClick={() => move(idx, idx - 1)} disabled={idx === 0} className="w-7 h-7 rounded-lg bg-stone-50 border border-stone-200 text-slate-600 disabled:opacity-30 hover:bg-white transition" aria-label="Nahoru">↑</button>
+              <button type="button" onClick={() => move(idx, idx + 1)} disabled={idx === visible.length - 1} className="w-7 h-7 rounded-lg bg-stone-50 border border-stone-200 text-slate-600 disabled:opacity-30 hover:bg-white transition" aria-label="Dolů">↓</button>
+              <button type="button" onClick={() => onSetHidden([...hidden, b.id])} className="w-7 h-7 rounded-lg bg-red-50 border border-red-200 text-red-600 flex items-center justify-center hover:bg-red-100 transition" aria-label="Skrýt"><X className="w-4 h-4" /></button>
+            </div>
+          ))}
+          {hiddenBlocks.length > 0 && (
+            <div>
+              <div className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-2">Přidat widget</div>
+              <div className="flex flex-wrap gap-2">
+                {hiddenBlocks.map((b) => (
+                  <button
+                    key={b.id}
+                    type="button"
+                    onClick={() => onSetHidden(hidden.filter((x) => x !== b.id))}
+                    className="flex items-center gap-2 rounded-full border border-stone-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:border-emerald-300 hover:bg-emerald-50 transition"
+                  >
+                    {b.label} <PlusCircle className="w-4 h-4 text-emerald-700" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 function useDashboardStats() {
   const [stats, setStats] = useState({
     openTasks: 0, criticalTasks: 0, urgentTasks: 0, newReports: 0,
@@ -2276,6 +2381,43 @@ function FullDashboard() {
     });
   }, [widgets, enabledModules, FULL_WIDTH_IDS, RETIRED_MODULE_IDS]);
 
+  // „Moje sledování" — přetahování + skrýt/přidat velké widgety (uloženo na zařízení)
+  const [watchOrder, setWatchOrder] = useState<string[]>(() => {
+    try { const v = JSON.parse(localStorage.getItem('dash:watchOrder') || 'null'); return Array.isArray(v) ? v : []; } catch { return []; }
+  });
+  const [watchHidden, setWatchHidden] = useState<string[]>(() => {
+    try { const v = JSON.parse(localStorage.getItem('dash:watchHidden') || 'null'); return Array.isArray(v) ? v : ['semaphore', 'top5', 'lemon']; } catch { return ['semaphore', 'top5', 'lemon']; }
+  });
+  const persistWatchOrder = (o: string[]) => { setWatchOrder(o); try { localStorage.setItem('dash:watchOrder', JSON.stringify(o)); } catch { /* ignore */ } };
+  const persistWatchHidden = (h: string[]) => { setWatchHidden(h); try { localStorage.setItem('dash:watchHidden', JSON.stringify(h)); } catch { /* ignore */ } };
+
+  const watchBlocks = [
+    {
+      id: 'gearbox', label: 'Převodovky', available: dashboardProfile.showGearbox,
+      node: (
+        <GearboxDashboardWidget
+          data={gearboxDashboard}
+          onNavigate={navigate}
+          user={user as any}
+          tenantId={tenantId}
+          canWriteTemp={hasPermission('gearbox.temperature.write') || hasPermission('asset.update')}
+          canReportProblem={hasPermission('wo.create')}
+          canLogRepair={hasPermission('asset.update')}
+        />
+      ),
+    },
+    {
+      id: 'production', label: 'Výroba', available: dashboardProfile.showProductionMaster && canReadProductionMaster,
+      node: (<ProductionMasterDashboardWidget data={productionMasterDashboard} onNavigate={navigate} />),
+    },
+    {
+      id: 'semaphore', label: 'Semafor', available: true,
+      node: (<SemaphoreWidget stats={{ breakdownAssets: stats.breakdownAssets || 0, criticalTasks: stats.criticalTasks || 0, maintenanceAssets: stats.maintenanceAssets || 0 }} wasteRed={0} />),
+    },
+    { id: 'top5', label: 'Top 5 úkolů', available: true, node: (<Top5TasksWidget />) },
+    { id: 'lemon', label: 'Doutnající úkoly', available: true, node: (<LemonListWidget />) },
+  ];
+
   return (
     <div className="dashboard-daylight min-h-screen bg-[#f1ece3] text-slate-950">
       <div className="mx-auto max-w-[1360px] px-3 pt-4 pb-24 sm:px-4 xl:px-5">
@@ -2382,32 +2524,13 @@ function FullDashboard() {
               Sledované widgety jsou skryté na tomto zařízení.
             </div>
           ) : (
-            <>
-              {dashboardProfile.showGearbox && (
-                <GearboxDashboardWidget
-                  data={gearboxDashboard}
-                  onNavigate={navigate}
-                  user={user as any}
-                  tenantId={tenantId}
-                  canWriteTemp={hasPermission('gearbox.temperature.write') || hasPermission('asset.update')}
-                  canReportProblem={hasPermission('wo.create')}
-                  canLogRepair={hasPermission('asset.update')}
-                />
-              )}
-
-              {dashboardProfile.showProductionMaster && canReadProductionMaster && (
-                <ProductionMasterDashboardWidget
-                  data={productionMasterDashboard}
-                  onNavigate={navigate}
-                />
-              )}
-
-                  {!dashboardProfile.showGearbox && !(dashboardProfile.showProductionMaster && canReadProductionMaster) && (
-                    <div className="rounded-2xl border border-dashed border-stone-300 bg-stone-50 p-3 text-sm font-semibold text-slate-500">
-                      Přidat widget: zatím tu není nic připnutého pro tuto roli.
-                    </div>
-                  )}
-            </>
+            <WatchWidgets
+              blocks={watchBlocks}
+              order={watchOrder}
+              hidden={watchHidden}
+              onReorder={persistWatchOrder}
+              onSetHidden={persistWatchHidden}
+            />
           )}
         </DashboardZone>
           </main>

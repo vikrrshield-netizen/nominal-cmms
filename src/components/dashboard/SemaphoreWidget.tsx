@@ -14,14 +14,14 @@ export default function SemaphoreWidget({ stats, wasteRed }: SemaphoreWidgetProp
       label: 'Kritické',
       value: criticalTotal,
       color: criticalTotal > 0 ? 'bg-red-500' : 'bg-emerald-500',
-      textColor: criticalTotal > 0 ? 'text-red-400' : 'text-emerald-400',
+      textColor: criticalTotal > 0 ? 'text-red-700' : 'text-emerald-700',
       bgColor: criticalTotal > 0 ? 'bg-red-500/10 border-red-500/30' : 'bg-emerald-500/10 border-emerald-500/30',
     },
     {
       label: 'Údržba',
       value: stats.maintenanceAssets,
       color: stats.maintenanceAssets > 0 ? 'bg-amber-500' : 'bg-emerald-500',
-      textColor: stats.maintenanceAssets > 0 ? 'text-amber-400' : 'text-emerald-400',
+      textColor: stats.maintenanceAssets > 0 ? 'text-amber-700' : 'text-emerald-700',
       bgColor: stats.maintenanceAssets > 0 ? 'bg-amber-500/10 border-amber-500/30' : 'bg-emerald-500/10 border-emerald-500/30',
     },
   ];
