@@ -215,30 +215,30 @@ function QuickActions({ onNavigate }: { onNavigate: (path: string) => void }) {
         <div className="text-[10px] text-sky-700 uppercase tracking-widest font-bold">Rychlé akce</div>
         <h2 className="text-lg font-black text-slate-950 mt-0.5">Nejčastější práce na telefonu</h2>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-2.5">
         {primaryActions.map(({ label, detail, path, icon: Icon, tone, primaryClass, iconClass }) => (
           <button key={label} type="button" onClick={() => onNavigate(path)}
-            className={`min-h-[92px] rounded-2xl border shadow-sm shadow-stone-200/70 p-4 text-left flex items-center gap-4 active:scale-[0.98] transition ${primaryClass}`}>
-            <span className={`w-12 h-12 rounded-xl border flex items-center justify-center flex-shrink-0 ${iconClass}`}>
-              <Icon className={`w-6 h-6 ${tone}`} />
+            className={`min-h-[80px] rounded-2xl border shadow-sm shadow-stone-200/70 p-3 text-left flex flex-col justify-between gap-2 active:scale-[0.98] transition ${primaryClass}`}>
+            <span className={`w-10 h-10 rounded-xl border flex items-center justify-center flex-shrink-0 ${iconClass}`}>
+              <Icon className={`w-5 h-5 ${tone}`} />
             </span>
             <span className="min-w-0">
-              <span className="block text-base font-black leading-tight">{label}</span>
-              <span className="block text-sm font-semibold opacity-80 mt-1">{detail}</span>
+              <span className="block text-sm font-black leading-tight">{label}</span>
+              <span className="block text-xs font-semibold opacity-80 mt-0.5 leading-snug">{detail}</span>
             </span>
           </button>
         ))}
       </div>
-      <div className="mt-2.5 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+      <div className="mt-2.5 grid grid-cols-2 gap-2.5">
         {secondaryActions.map(({ label, detail, path, icon: Icon, tone }) => (
           <button key={label} type="button" onClick={() => onNavigate(path)}
-            className={`min-h-[68px] ${DASH_PANEL} ${DASH_PANEL_HOVER} p-3 text-left flex items-center gap-2.5`}>
+            className={`min-h-[64px] ${DASH_PANEL} ${DASH_PANEL_HOVER} p-2.5 text-left flex items-center gap-2`}>
             <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border border-stone-200 bg-stone-50">
               <Icon className={`h-4 w-4 ${tone}`} />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-sm font-black leading-tight text-slate-950">{label}</span>
-              <span className="mt-0.5 block text-xs font-semibold leading-snug text-slate-500">{detail}</span>
+              <span className="block text-sm font-black leading-tight text-slate-950 truncate">{label}</span>
+              <span className="mt-0.5 block text-[11px] font-semibold leading-snug text-slate-500 truncate">{detail}</span>
             </span>
           </button>
         ))}
