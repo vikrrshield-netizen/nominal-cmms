@@ -944,7 +944,7 @@ export default function AssetCardPage() {
         <div className="rounded-2xl border border-[#e2d8c9] bg-white p-3 shadow-sm mb-3 flex items-center gap-3">
           <button
             onClick={goBackOneStep}
-            className="w-11 h-11 rounded-xl bg-[#10263f] border border-[#10263f] flex items-center justify-center text-slate-900 transition flex-shrink-0"
+            className="w-11 h-11 rounded-xl bg-stone-50 border border-stone-200 flex items-center justify-center text-slate-600 hover:bg-stone-100 transition flex-shrink-0"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
@@ -978,7 +978,7 @@ export default function AssetCardPage() {
           </div>
         </div>
 
-        <div className="mb-3 grid grid-cols-2 gap-2 rounded-2xl border border-[#e2d8c9] bg-white p-2 shadow-sm lg:grid-cols-5">
+        <div className="mb-3 grid grid-cols-2 gap-2 lg:grid-cols-5">
           <div className="rounded-xl bg-[#fbf9f4] border border-[#eadfce] p-3">
             <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">Typ</div>
             <div className="mt-1 truncate text-sm font-black text-slate-950">{assetV2?.entityType || asset.entityType || asset.category || 'Karta'}</div>
@@ -1021,42 +1021,110 @@ export default function AssetCardPage() {
           </button>
         </div>
 
-        {/* Primary Action Buttons */}
-        <div className="flex flex-wrap gap-2 mb-2 rounded-2xl border border-[#e2d8c9] bg-white p-2 shadow-sm">
-          {canEditAsset && (
+        {/* Akce — jedna čistá lišta (jeden červený akcent „Nahlásit", ostatní neutrální + barevná ikona) */}
+        <div className="flex flex-wrap items-center gap-2 mb-4 rounded-2xl border border-[#e2d8c9] bg-white p-2 shadow-sm">
+          {canCreateTask && (
             <button
-              onClick={() => { setIsEditing(!isEditing); setActiveTab('passport'); }}
-              className={`min-w-[132px] flex-1 rounded-xl px-3 text-sm font-black flex items-center justify-center gap-2 transition active:scale-[0.97] min-h-11 ${
-                isEditing
-                  ? 'bg-blue-50 border border-blue-200 text-blue-700'
-                  : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
-              }`}
+              onClick={() => setShowFaultModal(true)}
+              className="min-w-[140px] flex-1 bg-red-600 border border-red-600 text-white rounded-xl px-3 text-sm font-black flex items-center justify-center gap-2 hover:bg-red-700 transition active:scale-[0.97] min-h-11"
             >
-              <Edit3 className="w-5 h-5" />
-              {isEditing ? 'Edituji…' : 'Upravit'}
+              <AlertTriangle className="w-5 h-5" />
+              Nahlásit poruchu
             </button>
           )}
           {canCreateTask && (
             <button
-              onClick={() => setShowFaultModal(true)}
-              className="min-w-[132px] flex-1 bg-red-50 border border-red-200 text-red-700 rounded-xl px-3 text-sm font-black flex items-center justify-center gap-2 hover:bg-red-100 transition active:scale-[0.97] min-h-11"
+              onClick={() => setShowTaskModal(true)}
+              className="min-w-[120px] flex-1 bg-white border border-stone-200 text-slate-700 rounded-xl px-3 text-sm font-bold flex items-center justify-center gap-2 hover:bg-stone-50 transition active:scale-[0.97] min-h-11"
             >
-              <AlertTriangle className="w-5 h-5" />
-              Nahlásit
+              <PlusCircle className="w-5 h-5 text-emerald-700" />
+              Nový úkol
+            </button>
+          )}
+          {canEditAsset && (
+            <button
+              onClick={() => { setIsEditing(!isEditing); setActiveTab('passport'); }}
+              className={`min-w-[120px] flex-1 rounded-xl px-3 text-sm font-bold flex items-center justify-center gap-2 transition active:scale-[0.97] min-h-11 border ${
+                isEditing
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                  : 'bg-white border-stone-200 text-slate-700 hover:bg-stone-50'
+              }`}
+            >
+              <Edit3 className="w-5 h-5 text-slate-500" />
+              {isEditing ? 'Edituji…' : 'Upravit'}
+            </button>
+          )}
+          {canEditAsset && revisions.length > 0 && (
+            <button
+              onClick={() => setShowRevisionModal(true)}
+              className="min-w-[120px] flex-1 bg-white border border-stone-200 text-slate-700 rounded-xl px-3 text-sm font-bold flex items-center justify-center gap-2 hover:bg-stone-50 transition active:scale-[0.97] min-h-11"
+            >
+              <Shield className="w-5 h-5 text-emerald-700" />
+              Zapsat revizi
+            </button>
+          )}
+          {isGearbox && canEditAsset && (
+            <button
+              onClick={() => setShowGearboxTemperature(true)}
+              className="min-w-[120px] flex-1 bg-white border border-stone-200 text-slate-700 rounded-xl px-3 text-sm font-bold flex items-center justify-center gap-2 hover:bg-stone-50 transition active:scale-[0.97] min-h-11"
+            >
+              <Thermometer className="w-5 h-5 text-cyan-600" />
+              Teplota
+            </button>
+          )}
+          {isGearbox && canAssignGearbox && (
+            <button
+              onClick={() => setShowGearboxAssign(true)}
+              disabled={gearboxActionSaving}
+              className="min-w-[120px] flex-1 bg-white border border-stone-200 text-slate-700 rounded-xl px-3 text-sm font-bold flex items-center justify-center gap-2 hover:bg-stone-50 transition active:scale-[0.97] min-h-11 disabled:opacity-50"
+            >
+              <Cog className="w-5 h-5 text-violet-600" />
+              Přiřadit
+            </button>
+          )}
+          {isGearbox && canAssignGearbox && getGearboxStatus(assetV2) !== 'in_stock' && (
+            <button
+              onClick={handleReturnGearboxToStock}
+              disabled={gearboxActionSaving}
+              className="min-w-[120px] flex-1 bg-white border border-stone-200 text-slate-700 rounded-xl px-3 text-sm font-bold flex items-center justify-center gap-2 hover:bg-stone-50 transition active:scale-[0.97] min-h-11 disabled:opacity-50"
+            >
+              <PackageCheck className="w-5 h-5 text-emerald-600" />
+              Sklad
+            </button>
+          )}
+          {isGearbox && canAssignGearbox && (
+            <button
+              onClick={handleMoveGearboxToService}
+              disabled={gearboxActionSaving || getGearboxStatus(assetV2) === 'service'}
+              className="min-w-[120px] flex-1 bg-white border border-stone-200 text-slate-700 rounded-xl px-3 text-sm font-bold flex items-center justify-center gap-2 hover:bg-stone-50 transition active:scale-[0.97] min-h-11 disabled:opacity-50"
+            >
+              <Wrench className="w-5 h-5 text-amber-600" />
+              Servis
+            </button>
+          )}
+          {asset.category === 'extruder' && canCreateTask && (
+            <button
+              onClick={handlePrefilterChange}
+              disabled={prefilterSaving}
+              className="min-w-[120px] flex-1 bg-white border border-stone-200 text-slate-700 rounded-xl px-3 text-sm font-bold flex items-center justify-center gap-2 hover:bg-stone-50 transition active:scale-[0.97] min-h-11 disabled:opacity-50"
+            >
+              {prefilterSaving ? <Loader2 className="w-5 h-5 animate-spin text-purple-600" /> : <Filter className="w-5 h-5 text-purple-600" />}
+              Předfiltr
             </button>
           )}
           <button
-            onClick={() => setActiveTab('passport')}
-            className="min-w-[132px] flex-1 bg-blue-50 border border-blue-200 text-blue-700 rounded-xl px-3 text-sm font-black flex items-center justify-center gap-2 hover:bg-blue-100 transition active:scale-[0.97] min-h-11"
+            onClick={printAssetPassport}
+            className="min-w-[120px] flex-1 bg-white border border-stone-200 text-slate-700 rounded-xl px-3 text-sm font-bold flex items-center justify-center gap-2 hover:bg-stone-50 transition active:scale-[0.97] min-h-11"
           >
-            <FileText className="w-5 h-5" />
-            Detaily
+            <Printer className="w-5 h-5 text-slate-500" />
+            Tisk historie
           </button>
-          {/* Export dropdown */}
+          {/* Export */}
           <div className="relative" style={{ flex: '0 0 auto' }}>
             <button
               onClick={() => setShowExportMenu(!showExportMenu)}
               className="min-h-11 px-4 bg-emerald-700 border border-emerald-700 text-white rounded-xl font-black flex items-center justify-center gap-2 hover:bg-emerald-600 transition active:scale-[0.97]"
+              title="Export PDF / Excel"
             >
               <Download className="w-5 h-5" />
             </button>
@@ -1088,83 +1156,6 @@ export default function AssetCardPage() {
               </>
             )}
           </div>
-        </div>
-        {/* Secondary Action Buttons */}
-        <div className="flex flex-wrap gap-2 mb-4 rounded-2xl border border-[#e2d8c9] bg-white p-2 shadow-sm">
-          {canCreateTask && (
-            <button
-              onClick={() => setShowTaskModal(true)}
-              className="min-w-[132px] flex-1 bg-blue-50 border border-blue-200 text-blue-700 rounded-xl px-3 text-sm font-black flex items-center justify-center gap-2 hover:bg-blue-100 transition active:scale-[0.97] min-h-11"
-            >
-              <PlusCircle className="w-5 h-5" />
-              Nový úkol
-            </button>
-          )}
-          {canEditAsset && revisions.length > 0 && (
-            <button
-              onClick={() => setShowRevisionModal(true)}
-              className="min-w-[132px] flex-1 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl px-3 text-sm font-black flex items-center justify-center gap-2 hover:bg-emerald-100 transition active:scale-[0.97] min-h-11"
-            >
-              <Shield className="w-5 h-5" />
-              Zapsat revizi
-            </button>
-          )}
-          {isGearbox && canEditAsset && (
-            <button
-              onClick={() => setShowGearboxTemperature(true)}
-              className="min-w-[132px] flex-1 bg-cyan-50 border border-cyan-200 text-cyan-700 rounded-xl px-3 text-sm font-black flex items-center justify-center gap-2 hover:bg-cyan-100 transition active:scale-[0.97] min-h-11"
-            >
-              <Thermometer className="w-5 h-5" />
-              Teplota
-            </button>
-          )}
-          {isGearbox && canAssignGearbox && (
-            <button
-              onClick={() => setShowGearboxAssign(true)}
-              disabled={gearboxActionSaving}
-              className="min-w-[132px] flex-1 bg-violet-50 border border-violet-200 text-violet-700 rounded-xl px-3 text-sm font-black flex items-center justify-center gap-2 hover:bg-violet-100 transition active:scale-[0.97] min-h-11 disabled:opacity-50"
-            >
-              <Cog className="w-5 h-5" />
-              Přiřadit
-            </button>
-          )}
-          {isGearbox && canAssignGearbox && getGearboxStatus(assetV2) !== 'in_stock' && (
-            <button
-              onClick={handleReturnGearboxToStock}
-              disabled={gearboxActionSaving}
-              className="min-w-[132px] flex-1 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl px-3 text-sm font-black flex items-center justify-center gap-2 hover:bg-emerald-100 transition active:scale-[0.97] min-h-11 disabled:opacity-50"
-            >
-              <PackageCheck className="w-5 h-5" />
-              Sklad
-            </button>
-          )}
-          {isGearbox && canAssignGearbox && (
-            <button
-              onClick={handleMoveGearboxToService}
-              disabled={gearboxActionSaving || getGearboxStatus(assetV2) === 'service'}
-              className="min-w-[132px] flex-1 bg-amber-50 border border-amber-200 text-amber-700 rounded-xl px-3 text-sm font-black flex items-center justify-center gap-2 hover:bg-amber-100 transition active:scale-[0.97] min-h-11 disabled:opacity-50"
-            >
-              <Wrench className="w-5 h-5" />
-              Servis
-            </button>
-          )}
-          {asset.category === 'extruder' && canCreateTask && (
-            <button
-              onClick={handlePrefilterChange}
-              disabled={prefilterSaving}
-              className="min-w-[132px] flex-1 bg-purple-50 border border-purple-200 text-purple-700 rounded-xl px-3 text-sm font-black flex items-center justify-center gap-2 hover:bg-purple-100 transition active:scale-[0.97] min-h-11 disabled:opacity-50"
-            >
-              {prefilterSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Filter className="w-5 h-5" />}
-              Předfiltr
-            </button>
-          )}
-          <button
-            onClick={printAssetPassport}
-            className="min-w-[132px] flex-1 bg-white border border-slate-200 text-slate-700 rounded-xl px-3 text-sm font-black flex items-center justify-center gap-2 hover:bg-slate-50 transition active:scale-[0.97] min-h-11"
-          >
-            <Printer className="w-5 h-5" />
-            Tisk historie
-          </button>
         </div>
 
         {/* Tabs */}
