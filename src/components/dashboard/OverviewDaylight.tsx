@@ -108,7 +108,7 @@ export default function OverviewDaylight({
       )}
 
       {/* 4 KPI */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 @2xl:grid-cols-4">
         {kpiCards.map((c) => (
           <button key={c.label} type="button" onClick={() => onNavigate(c.path)} className={`${CARD} text-left transition hover:border-emerald-200 hover:bg-emerald-50/30 active:scale-[0.98]`}>
             <div className="flex items-center justify-between">
@@ -121,8 +121,8 @@ export default function OverviewDaylight({
         ))}
       </div>
 
-      {/* 3 sloupce: práce | stav | tým & rychlé akce */}
-      <div className="grid gap-3 lg:grid-cols-[1.2fr_1fr_1fr] lg:items-start">
+      {/* 3 sloupce: práce | stav | tým (přizpůsobí se ŠÍŘCE panelu přes @container) */}
+      <div className="grid gap-3 @3xl:grid-cols-[1.2fr_1fr_1fr] @3xl:items-start">
 
         {/* Sloupec 1 — Prioritní fronta */}
         <div className={CARD}>

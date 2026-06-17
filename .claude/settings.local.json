@@ -21,5 +21,21 @@
       "Bash(wc:*)",
       "Bash(npm install:*)"
     ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:/Users/bsvk/Documents/Codex/2026-04-26/github-plugin-github-openai-curated-nominal/nominal-cmms/.claude/lint-changed.mjs\"",
+            "shell": "bash",
+            "timeout": 60,
+            "statusMessage": "Kontroluji upraveny soubor (ESLint)..."
+          }
+        ]
+      }
+    ]
   }
 }

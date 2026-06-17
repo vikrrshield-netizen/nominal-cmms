@@ -304,7 +304,7 @@ function ModuleShortcuts({ onNavigate, showHeader = true }: { onNavigate: (path:
           </div>
         </div>
       )}
-      <div className="grid grid-cols-2 gap-2.5 xl:grid-cols-1 2xl:grid-cols-2">
+      <div className="grid grid-cols-2 gap-2.5 @2xl:grid-cols-3 @4xl:grid-cols-4">
         {modules.map((mod) => {
           const { label, detail, path, icon: Icon, tone } = mod;
           const badge = (mod as { badge?: number }).badge ?? 0;
@@ -1030,7 +1030,7 @@ function SecondaryModules({
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 2xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-2.5 @md:grid-cols-2 @3xl:grid-cols-3">
         {visibleModules.map((widget, idx) => {
           const def = getWidgetDef(widget.widgetId);
           const data = getTileData(widget.widgetId);
