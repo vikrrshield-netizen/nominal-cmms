@@ -1931,15 +1931,15 @@ export default function KioskPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           {(() => {
             const defs = [
-              { id: 'breakdown', icon: <AlertTriangle className="w-12 h-12" />, label: 'Nahlásit poruchu', color: 'bg-red-600 hover:bg-red-500', onClick: () => setActiveView('BREAKDOWN'), show: true },
-              { id: 'order', icon: <Package className="w-12 h-12" />, label: 'Požadavek na díl', color: 'bg-blue-600 hover:bg-blue-500', onClick: () => setActiveView('ORDER'), show: true },
-              { id: 'handover', icon: <ClipboardList className="w-12 h-12" />, label: 'Předání směny', color: 'bg-indigo-600 hover:bg-indigo-500', onClick: () => setActiveView('HANDOVER'), show: true },
-              { id: 'datalogger', icon: <Thermometer className="w-12 h-12" />, label: 'Datalogery', color: 'bg-teal-700 hover:bg-teal-600', onClick: () => setActiveView('DATALOGGER_TEMP'), badge: dataloggerAlerts.missing.length, show: canUseDataloggerKiosk },
-              { id: 'prefilter', icon: <Filter className="w-12 h-12" />, label: 'Výměna předfiltru', color: 'bg-cyan-700 hover:bg-cyan-600', onClick: () => setActiveView('PREFILTER'), badge: prefilterAlerts.overdue.length + prefilterAlerts.warning.length, show: canUsePrefilterKiosk },
-              { id: 'gearbox', icon: <Thermometer className="w-12 h-12" />, label: 'Teplota převodovky', color: 'bg-violet-700 hover:bg-violet-600', onClick: () => setActiveView('GEARBOX_TEMP'), badge: gearboxTemperatureAlerts.missing.length, show: canUseGearboxKiosk },
-              { id: 'idea', icon: <Lightbulb className="w-12 h-12" />, label: 'Nápad', color: 'bg-emerald-700 hover:bg-emerald-600', onClick: () => setActiveView('IDEA'), show: true },
-              { id: 'assistant', icon: <HelpCircle className="w-12 h-12" />, label: 'Jak postupovat', color: 'bg-amber-700 hover:bg-amber-600', onClick: () => setActiveView('ASSISTANT'), show: true },
-              { id: 'message', icon: <ShieldCheck className="w-12 h-12" />, label: 'Schránka důvěry', color: 'bg-purple-700 hover:bg-purple-600', onClick: () => setActiveView('MESSAGE'), show: true },
+              { id: 'breakdown', icon: <AlertTriangle className="w-8 h-8" />, label: 'Nahlásit poruchu', tone: 'red', primary: true, onClick: () => setActiveView('BREAKDOWN'), show: true },
+              { id: 'order', icon: <Package className="w-8 h-8" />, label: 'Požadavek na díl', tone: 'blue', onClick: () => setActiveView('ORDER'), show: true },
+              { id: 'handover', icon: <ClipboardList className="w-8 h-8" />, label: 'Předání směny', tone: 'indigo', onClick: () => setActiveView('HANDOVER'), show: true },
+              { id: 'datalogger', icon: <Thermometer className="w-8 h-8" />, label: 'Datalogery', tone: 'teal', onClick: () => setActiveView('DATALOGGER_TEMP'), badge: dataloggerAlerts.missing.length, show: canUseDataloggerKiosk },
+              { id: 'prefilter', icon: <Filter className="w-8 h-8" />, label: 'Výměna předfiltru', tone: 'cyan', onClick: () => setActiveView('PREFILTER'), badge: prefilterAlerts.overdue.length + prefilterAlerts.warning.length, show: canUsePrefilterKiosk },
+              { id: 'gearbox', icon: <Thermometer className="w-8 h-8" />, label: 'Teplota převodovky', tone: 'violet', onClick: () => setActiveView('GEARBOX_TEMP'), badge: gearboxTemperatureAlerts.missing.length, show: canUseGearboxKiosk },
+              { id: 'idea', icon: <Lightbulb className="w-8 h-8" />, label: 'Nápad', tone: 'emerald', onClick: () => setActiveView('IDEA'), show: true },
+              { id: 'assistant', icon: <HelpCircle className="w-8 h-8" />, label: 'Jak postupovat', tone: 'amber', onClick: () => setActiveView('ASSISTANT'), show: true },
+              { id: 'message', icon: <ShieldCheck className="w-8 h-8" />, label: 'Schránka důvěry', tone: 'purple', onClick: () => setActiveView('MESSAGE'), show: true },
             ].filter((t) => t.show);
             const ordered = [...defs].sort((a, b) => {
               const ia = menuOrder.indexOf(a.id); const ib = menuOrder.indexOf(b.id);
@@ -1955,7 +1955,7 @@ export default function KioskPage() {
                 onDrop={() => reorderMenu(ids, t.id)}
                 className="cursor-grab active:cursor-grabbing"
               >
-                <MenuButton icon={t.icon} label={t.label} color={t.color} badge={(t as { badge?: number }).badge} onClick={t.onClick} />
+                <MenuButton icon={t.icon} label={t.label} tone={t.tone} primary={(t as { primary?: boolean }).primary} badge={(t as { badge?: number }).badge} onClick={t.onClick} />
               </div>
             ));
           })()}
@@ -2890,16 +2890,31 @@ export default function KioskPage() {
   );
 }
 
-function MenuButton({ icon, label, color, badge, onClick }: { icon: React.ReactNode; label: string; color: string; badge?: number; onClick: () => void }) {
+function MenuButton({ icon, label, tone, badge, primary, onClick }: { icon: React.ReactNode; label: string; tone: string; badge?: number; primary?: boolean; onClick: () => void }) {
+  const tones: Record<string, string> = {
+    red: 'bg-red-50 text-red-600',
+    blue: 'bg-blue-50 text-blue-700',
+    indigo: 'bg-indigo-50 text-indigo-700',
+    teal: 'bg-teal-50 text-teal-700',
+    cyan: 'bg-cyan-50 text-cyan-700',
+    violet: 'bg-violet-50 text-violet-700',
+    emerald: 'bg-emerald-50 text-emerald-700',
+    amber: 'bg-amber-50 text-amber-700',
+    purple: 'bg-purple-50 text-purple-700',
+  };
+  const iconCls = primary ? 'bg-red-600 text-white' : (tones[tone] || 'bg-slate-100 text-slate-700');
   return (
-    <button onClick={onClick} className={`${color} relative text-white rounded-2xl p-4 md:p-5 flex flex-col items-center justify-center transition-all shadow-xl active:scale-95 min-h-[118px] md:min-h-[148px] border border-slate-200 overflow-hidden`}>
+    <button
+      onClick={onClick}
+      className={`relative w-full bg-white rounded-2xl p-4 md:p-5 flex flex-col items-center justify-center transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5 active:scale-95 min-h-[118px] md:min-h-[148px] ${primary ? 'border-2 border-red-200' : 'border border-slate-200'}`}
+    >
       {Boolean(badge) && (
-        <span className="absolute right-3 top-3 flex min-h-7 min-w-7 items-center justify-center rounded-full bg-red-500 px-2 text-sm font-black text-white shadow-lg">
+        <span className="absolute right-3 top-3 flex min-h-7 min-w-7 items-center justify-center rounded-full bg-red-500 px-2 text-sm font-black text-white shadow">
           {badge && badge > 9 ? '9+' : badge}
         </span>
       )}
-      <span className="shrink-0">{icon}</span>
-      <span className="text-base md:text-lg font-black text-center mt-3 leading-snug break-words max-w-full">{label}</span>
+      <span className={`flex h-16 w-16 md:h-[72px] md:w-[72px] items-center justify-center rounded-2xl ${iconCls}`}>{icon}</span>
+      <span className="text-base md:text-lg font-black text-center mt-3 leading-snug break-words max-w-full text-slate-900">{label}</span>
     </button>
   );
 }
