@@ -6,7 +6,7 @@ import type { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, ClipboardList, Building2, ClipboardCheck, Cog,
-  Package, ShieldCheck, Calendar, BarChart3, Map as MapIcon, Settings, LogOut,
+  Package, ShieldCheck, Calendar, BarChart3, Settings, LogOut,
 } from 'lucide-react';
 import { useAuthContext } from '../context/AuthContext';
 import BrandMark from './ui/BrandMark';
@@ -22,7 +22,6 @@ const NAV: { path: string; icon: typeof LayoutDashboard; label: string; permissi
   { path: '/revisions', icon: ShieldCheck, label: 'Revize', permissions: ['asset.read'] },
   { path: '/calendar', icon: Calendar, label: 'Kalendář', permissions: ['wo.read', 'schedule.manage'] },
   { path: '/reports', icon: BarChart3, label: 'Reporty', permissions: ['report.read', 'audit.read'] },
-  { path: '/map', icon: MapIcon, label: 'Mapa', permissions: ['asset.read'] },
   { path: '/admin', icon: Settings, label: 'Správa', permissions: ['admin.view', 'admin.manage', 'user.manage'] },
 ];
 

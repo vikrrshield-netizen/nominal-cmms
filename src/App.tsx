@@ -27,7 +27,6 @@ const RevisionsPage = lazy(() => import('./pages/RevisionsPage'));
 const AssetCardPage = lazy(() => import('./pages/AssetCardPage'));
 const CalendarPage = lazy(() => import('./pages/CalendarPage'));
 const TrustBoxPage = lazy(() => import('./pages/TrustBoxPage'));
-const MapPage = lazy(() => import('./pages/MapPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
 const AdminPage = lazy(() => import('./pages/AdminPage'));
 const AIAssistantPage = lazy(() => import('./pages/AIAssistantPage'));
@@ -189,7 +188,7 @@ function ProtectedRoutes() {
         <Route path="/calendar" element={<ProtectedPage moduleId="calendar" permissions={['wo.read', 'schedule.manage']}><CalendarPage /></ProtectedPage>} />
         <Route path="/waste" element={<Navigate to="/" replace />} />
         <Route path="/trustbox" element={<ProtectedPage permissions={['secretbox.view']}><TrustBoxPage /></ProtectedPage>} />
-        <Route path="/map" element={<ProtectedPage permissions={['asset.read']}><MapPage /></ProtectedPage>} />
+        <Route path="/map" element={<Navigate to="/kartoteka" replace />} />
         <Route path="/reports" element={<ProtectedPage permissions={['report.read', 'audit.read']}><ReportsPage /></ProtectedPage>} />
         <Route
           path="/admin"
