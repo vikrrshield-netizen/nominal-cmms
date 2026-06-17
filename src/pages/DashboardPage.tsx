@@ -1,7 +1,7 @@
 // src/pages/DashboardPage.tsx
 // VIKRR — Asset Shield — Dashboard (refactored: widget system)
 
-import { useState, useEffect, useMemo, type ReactNode } from 'react';
+import { useState, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -1064,20 +1064,50 @@ function SecondaryModules({
   widgets,
   getTileData,
   onTileClick,
+  onReorder,
+  onSetVisible,
+  onReset,
 }: {
   widgets: WidgetInstance[];
   getTileData: (id: string) => { value?: string; subtext?: string; badge?: number };
   onTileClick: (tileId: string) => void;
+  onReorder?: (orderedIds: string[]) => void;
+  onSetVisible?: (widgetId: string, visible: boolean) => void;
+  onReset?: () => void;
 }) {
-  const primaryIds = new Set(['fault', 'tasks', 'map', 'inspections', 'reports']);
-  const hiddenIds = new Set(['semaphore', 'top5', 'lemon']);
-  const modules = widgets
-    .filter((widget) => widget.visible && !primaryIds.has(widget.widgetId) && !hiddenIds.has(widget.widgetId))
-    .sort((a, b) => a.position - b.position)
-    .map((widget) => ({ widget, def: getWidgetDef(widget.widgetId), data: getTileData(widget.widgetId) }))
-    .filter((item) => item.def && (item.def.type === 'tile' || item.def.type === 'action'));
+  const [editing, setEditing] = useState(false);
+  const dragIndex = useRef<number | null>(null);
 
-  if (modules.length === 0) return null;
+  const primaryIds = new Set(['fault', 'tasks', 'map', 'inspections', 'reports']);
+  const fullWidthIds = new Set(['semaphore', 'top5', 'lemon']);
+  const isModule = (id: string) => {
+    const def = getWidgetDef(id);
+    return Boolean(def && (def.type === 'tile' || def.type === 'action') && !primaryIds.has(id) && !fullWidthIds.has(id));
+  };
+
+  const visibleModules = widgets
+    .filter((w) => w.visible && isModule(w.widgetId))
+    .sort((a, b) => a.position - b.position);
+  const hiddenModules = widgets
+    .filter((w) => !w.visible && isModule(w.widgetId))
+    .sort((a, b) => a.position - b.position);
+
+  const canEdit = Boolean(onReorder && onSetVisible);
+  if (visibleModules.length === 0 && hiddenModules.length === 0) return null;
+
+  const visibleIds = visibleModules.map((w) => w.widgetId);
+  const move = (from: number, to: number) => {
+    if (to < 0 || to >= visibleIds.length || from === to) return;
+    const next = [...visibleIds];
+    const [m] = next.splice(from, 1);
+    next.splice(to, 0, m);
+    onReorder?.(next);
+  };
+  const onDrop = (to: number) => {
+    const from = dragIndex.current;
+    dragIndex.current = null;
+    if (from != null) move(from, to);
+  };
 
   return (
     <section className="mb-5">
@@ -1086,32 +1116,103 @@ function SecondaryModules({
           <div className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Další přehledy</div>
           <h2 className="text-lg font-black text-slate-950 mt-0.5">Méně časté vstupy</h2>
         </div>
-      </div>
-      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 2xl:grid-cols-3">
-        {modules.map(({ widget, def, data }) => (
-          <button
-            key={widget.widgetId}
-            type="button"
-            onClick={() => onTileClick(widget.widgetId)}
-            className={`min-h-[64px] ${DASH_PANEL} ${DASH_PANEL_HOVER} p-3 text-left flex items-center gap-3`}
-          >
-            <span className={`${DASH_ICON_BOX} text-lg`}>
-              {def?.icon}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-black text-slate-950 truncate">{def?.label}</span>
-              <span className="block text-xs font-semibold text-slate-500 truncate">
-                {data.value ? `${data.value} · ${data.subtext || ''}` : data.subtext || 'Otevřít modul'}
-              </span>
-            </span>
-            {data.badge != null && data.badge > 0 && (
-              <span className="min-w-6 h-6 px-2 rounded-full bg-red-50 border border-red-200 text-red-700 text-xs font-bold flex items-center justify-center">
-                {data.badge}
-              </span>
+        {canEdit && (
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {editing && onReset && (
+              <button
+                type="button"
+                onClick={() => { if (window.confirm('Obnovit výchozí rozložení dlaždic?')) onReset(); }}
+                className="rounded-full border border-stone-200 bg-stone-50 px-2.5 py-1 text-xs font-bold text-slate-600 hover:bg-white transition"
+              >
+                Obnovit
+              </button>
             )}
-          </button>
-        ))}
+            <button
+              type="button"
+              onClick={() => setEditing((v) => !v)}
+              className={`rounded-full px-2.5 py-1 text-xs font-bold transition ${editing ? 'bg-emerald-600 text-white' : 'border border-stone-200 bg-stone-50 text-slate-600 hover:bg-white'}`}
+            >
+              {editing ? 'Hotovo' : 'Upravit'}
+            </button>
+          </div>
+        )}
       </div>
+
+      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 2xl:grid-cols-3">
+        {visibleModules.map((widget, idx) => {
+          const def = getWidgetDef(widget.widgetId);
+          const data = getTileData(widget.widgetId);
+          if (editing) {
+            return (
+              <div
+                key={widget.widgetId}
+                draggable
+                onDragStart={() => { dragIndex.current = idx; }}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={() => onDrop(idx)}
+                className={`relative min-h-[64px] ${DASH_PANEL} p-3 flex items-center gap-2 cursor-grab active:cursor-grabbing ring-1 ring-emerald-200`}
+              >
+                <span className="text-slate-300 select-none text-lg leading-none" aria-hidden="true">⠿</span>
+                <span className={`${DASH_ICON_BOX} text-lg`}>{def?.icon}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-black text-slate-950 truncate">{def?.label}</span>
+                </span>
+                <span className="flex items-center gap-1">
+                  <button type="button" onClick={() => move(idx, idx - 1)} disabled={idx === 0} className="w-7 h-7 rounded-lg bg-stone-50 border border-stone-200 text-slate-600 disabled:opacity-30 hover:bg-white transition" aria-label="Nahoru">↑</button>
+                  <button type="button" onClick={() => move(idx, idx + 1)} disabled={idx === visibleModules.length - 1} className="w-7 h-7 rounded-lg bg-stone-50 border border-stone-200 text-slate-600 disabled:opacity-30 hover:bg-white transition" aria-label="Dolů">↓</button>
+                  <button type="button" onClick={() => onSetVisible?.(widget.widgetId, false)} className="w-7 h-7 rounded-lg bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 flex items-center justify-center transition" aria-label="Skrýt">
+                    <X className="w-4 h-4" />
+                  </button>
+                </span>
+              </div>
+            );
+          }
+          return (
+            <button
+              key={widget.widgetId}
+              type="button"
+              onClick={() => onTileClick(widget.widgetId)}
+              className={`min-h-[64px] ${DASH_PANEL} ${DASH_PANEL_HOVER} p-3 text-left flex items-center gap-3`}
+            >
+              <span className={`${DASH_ICON_BOX} text-lg`}>{def?.icon}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-black text-slate-950 truncate">{def?.label}</span>
+                <span className="block text-xs font-semibold text-slate-500 truncate">
+                  {data.value ? `${data.value} · ${data.subtext || ''}` : data.subtext || 'Otevřít modul'}
+                </span>
+              </span>
+              {data.badge != null && data.badge > 0 && (
+                <span className="min-w-6 h-6 px-2 rounded-full bg-red-50 border border-red-200 text-red-700 text-xs font-bold flex items-center justify-center">
+                  {data.badge}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {editing && hiddenModules.length > 0 && (
+        <div className="mt-4">
+          <div className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-2">Skryté — klepni pro přidání</div>
+          <div className="flex flex-wrap gap-2">
+            {hiddenModules.map((widget) => {
+              const def = getWidgetDef(widget.widgetId);
+              return (
+                <button
+                  key={widget.widgetId}
+                  type="button"
+                  onClick={() => onSetVisible?.(widget.widgetId, true)}
+                  className="flex items-center gap-2 rounded-full border border-stone-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:border-emerald-300 hover:bg-emerald-50 transition"
+                >
+                  <span className="text-base leading-none">{def?.icon}</span>
+                  {def?.label}
+                  <PlusCircle className="w-4 h-4 text-emerald-700" />
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </section>
   );
 }
@@ -2006,10 +2107,20 @@ function FullDashboard() {
   const recurringToday = useRecurringToday();
 
   // Widget config (Firestore + localStorage + role defaults)
-  const { widgets, loading: configLoading } = useDashboardConfig(
+  const { widgets, loading: configLoading, updateWidgets, resetToDefaults } = useDashboardConfig(
     user?.id,
     role
   );
+
+  // Přizpůsobení rozložení dlaždic modulů (drag-and-drop + skrýt/přidat) — ukládá přes useDashboardConfig
+  const handleModuleReorder = (orderedIds: string[]) => {
+    const pos = new Map(orderedIds.map((id, i) => [id, i]));
+    updateWidgets(widgets.map((w) => (pos.has(w.widgetId) ? { ...w, position: pos.get(w.widgetId) as number } : w)));
+  };
+  const handleModuleSetVisible = (widgetId: string, visible: boolean) => {
+    const maxPos = Math.max(0, ...widgets.map((w) => w.position));
+    updateWidgets(widgets.map((w) => (w.widgetId === widgetId ? { ...w, visible, position: visible ? maxPos + 1 : w.position } : w)));
+  };
 
   // Live data hooks
   const fleet = useFleet();
@@ -2355,6 +2466,9 @@ function FullDashboard() {
                   widgets={filteredWidgets}
                   getTileData={getTileData}
                   onTileClick={handleTileClick}
+                  onReorder={handleModuleReorder}
+                  onSetVisible={handleModuleSetVisible}
+                  onReset={resetToDefaults}
                 />
               )}
             </div>
