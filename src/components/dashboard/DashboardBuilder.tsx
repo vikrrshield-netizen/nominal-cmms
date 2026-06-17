@@ -6,7 +6,8 @@
 
 import { useState, type ReactNode } from 'react';
 import {
-  DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent,
+  DndContext, DragOverlay, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors,
+  type DragEndEvent, type DragStartEvent,
 } from '@dnd-kit/core';
 import { SortableContext, useSortable, rectSortingStrategy, arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -43,12 +44,13 @@ function SortablePanel({
   onSpan: (n: number) => void; onHide: () => void; children: ReactNode;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id, disabled: !editing });
+  // Drag řeší DragOverlay (plovoucí klon). Původní místo zůstává v toku jako ztlumený
+  // placeholder se stejným rozměrem → nic se nepřekrývá.
   const style: React.CSSProperties = {
     transform: CSS.Translate.toString(transform),
     transition,
     gridColumn: `span ${span}`,
-    opacity: isDragging ? 0.6 : 1,
-    zIndex: isDragging ? 30 : undefined,
+    opacity: isDragging ? 0.35 : 1,
   };
   return (
     <div ref={setNodeRef} style={style} className={`@container min-w-0 ${editing ? 'rounded-2xl ring-2 ring-emerald-300 ring-offset-2 ring-offset-[#f1ece3]' : ''}`}>
@@ -84,6 +86,7 @@ function SortablePanel({
 
 export default function DashboardBuilder({ panels, storageKey }: { panels: BuilderPanel[]; storageKey: string }) {
   const [editing, setEditing] = useState(false);
+  const [activeId, setActiveId] = useState<string | null>(null);
 
   const [layout, setLayout] = useState<SavedLayout>(() => {
     const base: SavedLayout = {
@@ -116,7 +119,9 @@ export default function DashboardBuilder({ panels, storageKey }: { panels: Build
   const visibleIds = layout.order.filter((id) => byId(id) && !layout.hidden.includes(id));
   const hiddenPanels = layout.order.filter((id) => byId(id) && layout.hidden.includes(id));
 
+  const onDragStart = (e: DragStartEvent) => setActiveId(String(e.active.id));
   const onDragEnd = (e: DragEndEvent) => {
+    setActiveId(null);
     const { active, over } = e;
     if (!over || active.id === over.id) return;
     const from = layout.order.indexOf(String(active.id));
@@ -156,9 +161,10 @@ export default function DashboardBuilder({ panels, storageKey }: { panels: Build
         </div>
       )}
 
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd} autoScroll>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setActiveId(null)} autoScroll>
         <SortableContext items={visibleIds} strategy={rectSortingStrategy}>
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          {/* normální tok dokumentu: auto-rows-min + items-start → řádky podle obsahu, nic se nepřekrývá */}
+          <div className="grid grid-cols-1 items-start gap-4 auto-rows-min lg:grid-cols-3">
             {visibleIds.map((id) => {
               const p = byId(id)!;
               const span = Math.min(3, Math.max(1, layout.spans[id] ?? 1));
@@ -171,6 +177,14 @@ export default function DashboardBuilder({ panels, storageKey }: { panels: Build
             })}
           </div>
         </SortableContext>
+        {/* Plovoucí klon taženého panelu — původní místo drží rozměr (placeholder), nic se nepřekrývá */}
+        <DragOverlay dropAnimation={null}>
+          {activeId ? (
+            <div className="@container rounded-2xl shadow-2xl ring-2 ring-emerald-400">
+              {byId(activeId)?.node}
+            </div>
+          ) : null}
+        </DragOverlay>
       </DndContext>
 
       {editing && hiddenPanels.length > 0 && (
