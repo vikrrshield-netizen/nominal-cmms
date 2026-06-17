@@ -43,12 +43,12 @@ export const AssetList = ({ filterRoomId, filterBuildingId, onAssetSelect }: Ass
           <div className="text-xs text-green-400/70">V provozu</div>
         </div>
         <div className="bg-amber-500/20 border border-amber-500/50 rounded-xl p-3 text-center">
-          <div className="text-2xl font-bold text-amber-400">{statusCounts.maintenance}</div>
-          <div className="text-xs text-amber-400/70">Údržba</div>
+          <div className="text-2xl font-bold text-amber-700">{statusCounts.maintenance}</div>
+          <div className="text-xs text-amber-700/70">Údržba</div>
         </div>
         <div className="bg-red-500/20 border border-red-500/50 rounded-xl p-3 text-center">
-          <div className="text-2xl font-bold text-red-400">{statusCounts.broken}</div>
-          <div className="text-xs text-red-400/70">Porucha</div>
+          <div className="text-2xl font-bold text-red-700">{statusCounts.broken}</div>
+          <div className="text-xs text-red-700/70">Porucha</div>
         </div>
       </div>
 
@@ -59,7 +59,7 @@ export const AssetList = ({ filterRoomId, filterBuildingId, onAssetSelect }: Ass
           placeholder="Hledat stroj..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 pl-10 text-white placeholder-slate-500 focus:outline-none focus:border-green-500"
+          className="w-full bg-white border border-slate-700 rounded-xl px-4 py-3 pl-10 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-green-500"
         />
         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">🔍</span>
       </div>
@@ -71,7 +71,7 @@ export const AssetList = ({ filterRoomId, filterBuildingId, onAssetSelect }: Ass
           className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-all ${
             statusFilter === 'all' 
               ? 'bg-green-500 text-white' 
-              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
           }`}
         >
           Vše
@@ -82,8 +82,8 @@ export const AssetList = ({ filterRoomId, filterBuildingId, onAssetSelect }: Ass
             onClick={() => setStatusFilter(status)}
             className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-all flex items-center gap-1 ${
               statusFilter === status 
-                ? `${ASSET_STATUS_CONFIG[status].color} text-white` 
-                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                ? `${ASSET_STATUS_CONFIG[status].color} text-slate-900` 
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
           >
             {ASSET_STATUS_CONFIG[status].icon} {ASSET_STATUS_CONFIG[status].label}
@@ -107,13 +107,13 @@ export const AssetList = ({ filterRoomId, filterBuildingId, onAssetSelect }: Ass
               <button
                 key={asset.id}
                 onClick={() => onAssetSelect?.(asset)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl p-4 text-left hover:border-slate-600 transition-all active:scale-98"
+                className="w-full bg-white border border-slate-700 rounded-xl p-4 text-left hover:border-slate-600 transition-all active:scale-98"
               >
                 <div className="flex items-start gap-3">
                   <div className="text-2xl">{categoryConfig.icon}</div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-white font-semibold truncate">{asset.name}</span>
+                      <span className="text-slate-900 font-semibold truncate">{asset.name}</span>
                       <span className={`w-2 h-2 rounded-full ${statusConfig.color}`}></span>
                     </div>
                     <div className="text-sm text-slate-400">{asset.code}</div>
@@ -129,10 +129,10 @@ export const AssetList = ({ filterRoomId, filterBuildingId, onAssetSelect }: Ass
                     )}
                   </div>
                   <div className="flex flex-col items-end gap-1">
-                    <span className={`text-xs px-2 py-0.5 rounded ${statusConfig.color} text-white`}>
+                    <span className={`text-xs px-2 py-0.5 rounded ${statusConfig.color} text-slate-900`}>
                       {statusConfig.label}
                     </span>
-                    <span className={`text-xs px-2 py-0.5 rounded ${criticalityConfig.color} text-white`}>
+                    <span className={`text-xs px-2 py-0.5 rounded ${criticalityConfig.color} text-slate-900`}>
                       {criticalityConfig.label}
                     </span>
                   </div>

@@ -1497,9 +1497,9 @@ export default function KioskPage() {
   ) : null;
 
   const renderSubmitting = () => isSubmitting ? (
-    <div className="fixed inset-0 bg-black/65 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
       <div className="bg-white px-8 py-6 rounded-2xl flex items-center gap-4 border border-slate-200">
-        <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
+        <Loader2 className="w-8 h-8 text-blue-700 animate-spin" />
         <span className="text-xl text-slate-900">Odesílám...</span>
       </div>
     </div>
@@ -2421,7 +2421,7 @@ export default function KioskPage() {
             <button
               type="button"
               onClick={() => gearboxPhotoInputRef.current?.click()}
-              className="flex w-full items-center justify-center gap-3 rounded-xl border border-dashed border-white/20 py-2.5 font-bold text-slate-700"
+              className="flex w-full items-center justify-center gap-3 rounded-xl border border-dashed border-slate-200 py-2.5 font-bold text-slate-700"
             >
               <Camera className="w-5 h-5" />
               {gearboxPhotoFile ? gearboxPhotoFile.name : 'Přidat fotku'}

@@ -189,7 +189,7 @@ export default function DashboardGrid({
               className={`
                 relative p-3.5 rounded-2xl bg-gradient-to-br ${def.gradient}
                 cursor-pointer transition-all min-h-[110px] flex flex-col justify-between
-                shadow-lg shadow-black/20 border border-white/10
+                shadow-lg shadow-black/20 border border-slate-200
                 ${isEditing ? 'tile-jiggle' : 'hover:scale-[1.03] active:scale-[0.95]'}
               `}
             >
@@ -198,21 +198,21 @@ export default function DashboardGrid({
                 <div className="absolute -top-1.5 left-0 right-0 flex items-center justify-between z-10 px-0.5">
                   <button
                     onClick={(e) => { e.stopPropagation(); removeTile(instance.widgetId); }}
-                    className="w-6 h-6 bg-slate-800 border-2 border-slate-600 rounded-full flex items-center justify-center hover:bg-red-600 hover:border-red-500 transition"
+                    className="w-6 h-6 bg-white border-2 border-slate-600 rounded-full flex items-center justify-center hover:bg-red-600 hover:border-red-500 transition"
                   >
-                    <X className="w-3.5 h-3.5 text-white" />
+                    <X className="w-3.5 h-3.5 text-slate-900" />
                   </button>
                   <div className="flex gap-1">
                     {idx > 0 && (
                       <button
                         onClick={(e) => { e.stopPropagation(); moveTile(idx, idx - 1); }}
-                        className="w-6 h-6 bg-slate-800/90 border border-slate-600 rounded-full flex items-center justify-center text-white text-[10px] font-bold hover:bg-blue-600 hover:border-blue-500 transition"
+                        className="w-6 h-6 bg-white/90 border border-slate-600 rounded-full flex items-center justify-center text-slate-900 text-[10px] font-bold hover:bg-blue-600 hover:border-blue-500 transition"
                       >◀</button>
                     )}
                     {idx < tileWidgets.length - 1 && (
                       <button
                         onClick={(e) => { e.stopPropagation(); moveTile(idx, idx + 1); }}
-                        className="w-6 h-6 bg-slate-800/90 border border-slate-600 rounded-full flex items-center justify-center text-white text-[10px] font-bold hover:bg-blue-600 hover:border-blue-500 transition"
+                        className="w-6 h-6 bg-white/90 border border-slate-600 rounded-full flex items-center justify-center text-slate-900 text-[10px] font-bold hover:bg-blue-600 hover:border-blue-500 transition"
                       >▶</button>
                     )}
                   </div>
@@ -231,12 +231,12 @@ export default function DashboardGrid({
 
               {/* Content */}
               <div>
-                <div className="text-[12px] font-bold text-white/90 leading-tight">{def.label}</div>
+                <div className="text-[12px] font-bold text-slate-900/90 leading-tight">{def.label}</div>
                 {data.value != null && (
-                  <div className="text-2xl font-extrabold text-white mt-0.5 leading-none">{data.value}</div>
+                  <div className="text-2xl font-extrabold text-slate-900 mt-0.5 leading-none">{data.value}</div>
                 )}
                 {data.subtext != null && (
-                  <div className="text-[10px] text-white/60 mt-0.5">{data.subtext}</div>
+                  <div className="text-[10px] text-slate-900/60 mt-0.5">{data.subtext}</div>
                 )}
               </div>
             </div>

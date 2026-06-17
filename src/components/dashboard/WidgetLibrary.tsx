@@ -36,7 +36,7 @@ export default function WidgetLibrary({ widgets, onRestore }: WidgetLibraryProps
             >
               <span className="text-2xl">{def!.icon}</span>
               <div className="text-[11px] text-slate-400 font-medium">{def!.label}</div>
-              <div className="text-[10px] text-emerald-400 font-bold">+ Přidat</div>
+              <div className="text-[10px] text-emerald-700 font-bold">+ Přidat</div>
             </button>
           ))}
         </div>

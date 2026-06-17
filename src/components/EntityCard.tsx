@@ -114,9 +114,9 @@ const SEMAPHORE_COLORS: Record<SemaphoreColor, string> = {
 };
 
 const SEMAPHORE_TEXT: Record<SemaphoreColor, string> = {
-  green: 'text-emerald-400',
-  yellow: 'text-amber-400',
-  red: 'text-red-400',
+  green: 'text-emerald-700',
+  yellow: 'text-amber-700',
+  red: 'text-red-700',
   gray: 'text-slate-400',
 };
 
@@ -293,11 +293,11 @@ export function EntityCardFull({ entity, blueprint, logs, breadcrumbs, children,
             <span key={i} className="flex items-center">
               {i > 0 && <ChevronRight className="w-4 h-4 mx-1 text-slate-600" />}
               {bc.onClick ? (
-                <button onClick={bc.onClick} className="hover:text-blue-400 transition">
+                <button onClick={bc.onClick} className="hover:text-blue-700 transition">
                   {bc.label}
                 </button>
               ) : (
-                <span className="text-white font-medium">{bc.label}</span>
+                <span className="text-slate-900 font-medium">{bc.label}</span>
               )}
             </span>
           ))}
@@ -314,21 +314,21 @@ export function EntityCardFull({ entity, blueprint, logs, breadcrumbs, children,
         </div>
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            <h2 className="text-xl font-bold text-white">{entity.name}</h2>
+            <h2 className="text-xl font-bold text-slate-900">{entity.name}</h2>
             <SemaphoreDot color={overallStatus} size="lg" />
           </div>
           {entity.code && (
             <div className="text-sm text-slate-500 font-mono">{entity.code}</div>
           )}
           {entity.data?.assigned_to && (
-            <div className="text-sm text-blue-400 mt-1">→ {entity.data.assigned_to}</div>
+            <div className="text-sm text-blue-700 mt-1">→ {entity.data.assigned_to}</div>
           )}
         </div>
       </div>
 
       {/* Blueprint fields */}
       {blueprint && (
-        <div className="bg-slate-800/40 rounded-2xl p-4 border border-slate-700/30">
+        <div className="bg-slate-50 rounded-2xl p-4 border border-slate-700/30">
           <h3 className="text-xs text-slate-500 uppercase font-bold mb-3">Rodný list</h3>
           <div className="grid grid-cols-2 gap-3">
             {blueprint.fields
@@ -339,12 +339,12 @@ export function EntityCardFull({ entity, blueprint, logs, breadcrumbs, children,
                 const daysLeft = f.type === 'date' ? daysUntilDate(val) : null;
 
                 return (
-                  <div key={f.key} className="bg-slate-700/30 rounded-xl p-3">
+                  <div key={f.key} className="bg-slate-50 rounded-xl p-3">
                     <div className="flex items-center gap-1.5 mb-1">
                       {sem !== 'gray' && <SemaphoreDot color={sem} />}
                       <span className="text-xs text-slate-500">{f.label}</span>
                     </div>
-                    <div className={`text-sm font-medium ${SEMAPHORE_TEXT[sem] || 'text-white'}`}>
+                    <div className={`text-sm font-medium ${SEMAPHORE_TEXT[sem] || 'text-slate-900'}`}>
                       {f.type === 'date'
                         ? (
                           <>
@@ -394,9 +394,9 @@ export function EntityCardFull({ entity, blueprint, logs, breadcrumbs, children,
           <h3 className="text-xs text-slate-500 uppercase font-bold mb-3">Podřízené entity</h3>
           <div className="space-y-2">
             {children.map((child) => (
-              <div key={child.id} className="bg-slate-700/30 rounded-xl p-3 flex items-center gap-3">
+              <div key={child.id} className="bg-slate-50 rounded-xl p-3 flex items-center gap-3">
                 <Box className="w-5 h-5 text-slate-400" />
-                <span className="text-sm text-white font-medium">{child.name}</span>
+                <span className="text-sm text-slate-900 font-medium">{child.name}</span>
                 {child.code && <span className="text-xs text-slate-500 font-mono">{child.code}</span>}
               </div>
             ))}
@@ -412,7 +412,7 @@ export function EntityCardFull({ entity, blueprint, logs, breadcrumbs, children,
           </h3>
           <div className="space-y-2">
             {logs.map((log) => (
-              <div key={log.id} className="bg-slate-700/30 rounded-xl p-3">
+              <div key={log.id} className="bg-slate-50 rounded-xl p-3">
                 <div className="flex items-center gap-2 mb-1">
                   <div className="w-7 h-7 rounded-full bg-slate-600 flex items-center justify-center text-[10px] text-white font-bold flex-shrink-0">
                     {log.userInitials}
@@ -421,9 +421,9 @@ export function EntityCardFull({ entity, blueprint, logs, breadcrumbs, children,
                     {formatLogTime(log.createdAt)}
                   </span>
                   <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                    log.type === 'handover' ? 'bg-blue-500/20 text-blue-400' :
-                    log.type === 'maintenance' ? 'bg-amber-500/20 text-amber-400' :
-                    log.type === 'inspection' ? 'bg-emerald-500/20 text-emerald-400' :
+                    log.type === 'handover' ? 'bg-blue-500/20 text-blue-700' :
+                    log.type === 'maintenance' ? 'bg-amber-500/20 text-amber-700' :
+                    log.type === 'inspection' ? 'bg-emerald-500/20 text-emerald-700' :
                     'bg-slate-500/20 text-slate-400'
                   }`}>
                     {log.type === 'handover' ? 'Předání' :
@@ -433,7 +433,7 @@ export function EntityCardFull({ entity, blueprint, logs, breadcrumbs, children,
                      log.type}
                   </span>
                 </div>
-                <div className="text-sm text-slate-300 ml-9">{log.text}</div>
+                <div className="text-sm text-slate-600 ml-9">{log.text}</div>
               </div>
             ))}
           </div>

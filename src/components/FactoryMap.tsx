@@ -41,7 +41,7 @@ export const FactoryMap = ({ onRoomSelect, selectedRoomId }: FactoryMapProps) =>
             >
               <div className="text-2xl font-bold text-slate-900">{building.shortName}</div>
               <div className="text-xs text-slate-600 truncate">{building.name}</div>
-              <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-slate-900 text-xs text-white flex items-center justify-center">
+              <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-white text-xs text-slate-900 flex items-center justify-center">
                 {getBuildingRooms(building.id).length}
               </div>
             </button>

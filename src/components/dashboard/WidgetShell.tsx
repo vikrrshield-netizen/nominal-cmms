@@ -27,9 +27,9 @@ export default function WidgetShell({
       {isEditing && (
         <button
           onClick={onRemove}
-          className="absolute -top-2 -right-2 z-10 w-6 h-6 bg-slate-800 border-2 border-slate-600 rounded-full flex items-center justify-center hover:bg-red-600 hover:border-red-500 transition"
+          className="absolute -top-2 -right-2 z-10 w-6 h-6 bg-white border-2 border-slate-600 rounded-full flex items-center justify-center hover:bg-red-600 hover:border-red-500 transition"
         >
-          <X className="w-3.5 h-3.5 text-white" />
+          <X className="w-3.5 h-3.5 text-slate-900" />
         </button>
       )}
 

@@ -353,7 +353,7 @@ export default function InventoryPage() {
           <button
             type="button"
             onClick={() => setShowScanner(true)}
-            className="min-h-12 rounded-xl bg-slate-800 px-4 py-3 text-white font-bold flex items-center justify-center gap-2 hover:bg-slate-900"
+            className="min-h-12 rounded-xl bg-white px-4 py-3 text-slate-900 font-bold flex items-center justify-center gap-2 hover:bg-white"
           >
             <QrCode className="w-5 h-5" />
             Skenovat QR
@@ -484,7 +484,7 @@ export default function InventoryPage() {
                           </span>
                         </div>
                       </div>
-                      <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-violet-400" />
+                      <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-violet-700" />
                     </div>
                   </button>
                 );
@@ -1198,7 +1198,7 @@ function QrScannerModal({ items, onClose, onSelect }: {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-end md:items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-t-3xl md:rounded-3xl w-full max-w-lg max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="sticky top-0 bg-white border-b p-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -1283,7 +1283,7 @@ function OrderModal({ items, onClose }: { items: any[]; onClose: () => void }) {
                     <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
                       selected.has(item.id) ? 'border-blue-500 bg-blue-500' : 'border-slate-300'
                     }`}>
-                      {selected.has(item.id) && <CheckCircle2 className="w-4 h-4 text-white" />}
+                      {selected.has(item.id) && <CheckCircle2 className="w-4 h-4 text-slate-900" />}
                     </div>
                     <div className="flex-1">
                       <div className="font-medium">{item.name}</div>

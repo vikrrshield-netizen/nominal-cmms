@@ -138,7 +138,7 @@ function ReminderStrip({ tasks, onNavigate }: { tasks: RecurringTask[]; onNaviga
     <div className="my-3">
       <div className="flex items-center justify-between mb-1.5 px-0.5">
         <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Dnešní rozvrh</span>
-        <button onClick={onNavigate} className="text-[10px] text-orange-400 hover:underline font-semibold">Spravovat →</button>
+        <button onClick={onNavigate} className="text-[10px] text-orange-700 hover:underline font-semibold">Spravovat →</button>
       </div>
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
         {tasks.map((t) => (
@@ -146,7 +146,7 @@ function ReminderStrip({ tasks, onNavigate }: { tasks: RecurringTask[]; onNaviga
             key={t.id}
             className={`flex-shrink-0 w-[140px] ${DASH_PANEL} p-3 flex flex-col gap-1`}
           >
-            <span className="text-[10px] text-amber-300 font-bold">{t.time}</span>
+            <span className="text-[10px] text-amber-700 font-bold">{t.time}</span>
             <span className="text-xs font-semibold text-slate-950 leading-tight line-clamp-2">{t.title}</span>
           </div>
         ))}
@@ -173,7 +173,7 @@ function AiTipCard({ stats }: { stats: { criticalTasks: number; breakdownAssets:
   return (
     <div className={`my-2 ${DASH_PANEL} p-3 flex items-start gap-2.5`}>
       <div className={DASH_ICON_BOX}>
-        <Sparkles className="w-4 h-4 text-amber-300" />
+        <Sparkles className="w-4 h-4 text-amber-700" />
       </div>
       <div>
         <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-0.5">Doporučení</div>
@@ -232,7 +232,7 @@ function DailyOperations({ openTasks, criticalTasks, overdueTasks, todayLogs, to
 
 function QuickActions({ onNavigate }: { onNavigate: (path: string) => void }) {
   const actions = [
-    { label: 'Zapsat práci', detail: 'deník údržby', path: '/work-diary?new=1', icon: FileText, tone: 'text-white', primaryClass: 'bg-emerald-700 border-emerald-700 hover:bg-emerald-600', iconClass: 'bg-emerald-900/35 border-emerald-300/40', primary: true },
+    { label: 'Zapsat práci', detail: 'deník údržby', path: '/work-diary?new=1', icon: FileText, tone: 'text-slate-900', primaryClass: 'bg-emerald-700 border-emerald-700 hover:bg-emerald-600', iconClass: 'bg-emerald-900/35 border-emerald-300/40', primary: true },
     { label: 'Nahlásit poruchu', detail: 'rychlá závada', path: 'fault', icon: AlertTriangle, tone: 'text-red-700', primaryClass: 'bg-white border-red-200 hover:bg-red-50 text-slate-950', iconClass: 'bg-red-50 border-red-100', primary: true },
     { label: 'Nový úkol', detail: 'naplánovat práci', path: '/tasks?new=1', icon: PlusCircle, tone: 'text-amber-600' },
     { label: 'Kontroly', detail: 'obchůzky a závady', path: '/inspections', icon: ClipboardCheck, tone: 'text-sky-600' },
@@ -1564,7 +1564,7 @@ function ActivityDetailCard({ item, onClose, onContinue, onEdit }: {
   ].filter(([, value]) => String(value || '').trim());
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/35 p-0 backdrop-blur-sm sm:items-center sm:p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-[#fbf9f4]/35 p-0 sm:items-center sm:p-4" onClick={onClose}>
       <section
         className="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl border border-stone-200 bg-white text-slate-950 shadow-2xl sm:max-w-2xl sm:rounded-2xl"
         onClick={(event) => event.stopPropagation()}
@@ -1803,7 +1803,7 @@ function KioskDashboard() {
   const stats = useDashboardStats();
 
   return (
-    <div className="min-h-screen bg-[#0f172a] flex flex-col">
+    <div className="min-h-screen bg-[#f1ece3] flex flex-col">
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 left-1/4 w-[300px] h-[300px] md:w-[500px] md:h-[500px] bg-blue-500/20 rounded-full blur-[120px]" />
         <div className="absolute bottom-0 right-1/4 w-[300px] h-[300px] md:w-[500px] md:h-[500px] bg-purple-500/20 rounded-full blur-[120px]" />
@@ -1813,7 +1813,7 @@ function KioskDashboard() {
           <div className="flex items-center gap-4">
             <BrandMark size="md" tone="light" />
           </div>
-          <button onClick={() => logout()} className="p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition">
+          <button onClick={() => logout()} className="p-3 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 transition">
             <LogOut className="w-5 h-5 text-slate-400" />
           </button>
         </header>
@@ -1826,51 +1826,51 @@ function KioskDashboard() {
 
         <section className="px-6 flex-1 flex flex-col gap-5">
           <button onClick={() => navigate('/tasks?new=1')}
-            className="flex-1 min-h-[140px] bg-gradient-to-br from-red-500/30 to-rose-600/20 backdrop-blur-xl rounded-3xl border-2 border-red-500/40 p-8 flex items-center gap-6 hover:from-red-500/40 hover:to-rose-600/30 transition-all active:scale-[0.98] shadow-xl shadow-red-500/10">
+            className="flex-1 min-h-[140px] bg-gradient-to-br from-red-500/30 to-rose-600/20 rounded-3xl border-2 border-red-500/40 p-8 flex items-center gap-6 hover:from-red-500/40 hover:to-rose-600/30 transition-all active:scale-[0.98] shadow-xl shadow-red-500/10">
             <div className="w-20 h-20 bg-gradient-to-br from-red-500 to-rose-600 rounded-2xl flex items-center justify-center shadow-lg shadow-red-500/40 flex-shrink-0">
-              <AlertTriangle className="w-10 h-10 text-white" />
+              <AlertTriangle className="w-10 h-10 text-slate-900" />
             </div>
             <div className="text-left">
-              <h2 className="text-2xl font-bold text-white mb-1">Nahlásit chybu</h2>
-              <p className="text-red-300/70 text-lg">Stroj nefunguje?</p>
+              <h2 className="text-2xl font-bold text-slate-900 mb-1">Nahlásit chybu</h2>
+              <p className="text-red-700/70 text-lg">Stroj nefunguje?</p>
             </div>
           </button>
 
           <button onClick={() => navigate('/inspections')}
-            className="flex-1 min-h-[120px] bg-gradient-to-br from-emerald-500/20 to-teal-600/10 backdrop-blur-xl rounded-3xl border border-emerald-500/30 p-8 flex items-center gap-6 hover:from-emerald-500/30 hover:to-teal-600/20 transition-all active:scale-[0.98]">
+            className="flex-1 min-h-[120px] bg-gradient-to-br from-emerald-500/20 to-teal-600/10 rounded-3xl border border-emerald-500/30 p-8 flex items-center gap-6 hover:from-emerald-500/30 hover:to-teal-600/20 transition-all active:scale-[0.98]">
             <div className="w-20 h-20 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/30 flex-shrink-0">
-              <ClipboardCheck className="w-10 h-10 text-white" />
+              <ClipboardCheck className="w-10 h-10 text-slate-900" />
             </div>
             <div className="text-left">
-              <h2 className="text-2xl font-bold text-white mb-1">Kontroly</h2>
-              <p className="text-emerald-300/70 text-lg">Denní obchůzka</p>
+              <h2 className="text-2xl font-bold text-slate-900 mb-1">Kontroly</h2>
+              <p className="text-emerald-700/70 text-lg">Denní obchůzka</p>
             </div>
           </button>
 
           <button onClick={() => navigate('/kartoteka')}
-            className="flex-1 min-h-[120px] bg-gradient-to-br from-blue-500/20 to-indigo-600/10 backdrop-blur-xl rounded-3xl border border-blue-500/30 p-8 flex items-center gap-6 hover:from-blue-500/30 hover:to-indigo-600/20 transition-all active:scale-[0.98]">
+            className="flex-1 min-h-[120px] bg-gradient-to-br from-blue-500/20 to-indigo-600/10 rounded-3xl border border-blue-500/30 p-8 flex items-center gap-6 hover:from-blue-500/30 hover:to-indigo-600/20 transition-all active:scale-[0.98]">
             <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30 flex-shrink-0">
-              <Wrench className="w-10 h-10 text-white" />
+              <Wrench className="w-10 h-10 text-slate-900" />
             </div>
             <div className="text-left">
-              <h2 className="text-2xl font-bold text-white mb-1">Kartotéka</h2>
-              <p className="text-blue-300/70 text-lg">{stats.totalAssets} zařízení</p>
+              <h2 className="text-2xl font-bold text-slate-900 mb-1">Kartotéka</h2>
+              <p className="text-blue-700/70 text-lg">{stats.totalAssets} zařízení</p>
             </div>
           </button>
         </section>
 
         <footer className="px-6 py-6 mt-4">
           <div className="grid grid-cols-3 gap-3">
-            <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-4 text-center border border-white/10">
-              <div className="text-2xl font-bold text-orange-400">{stats.openTasks}</div>
+            <div className="bg-slate-50 rounded-2xl p-4 text-center border border-slate-200">
+              <div className="text-2xl font-bold text-orange-700">{stats.openTasks}</div>
               <div className="text-xs text-slate-400 mt-1">Otevřené úkoly</div>
             </div>
-            <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-4 text-center border border-white/10">
-              <div className="text-2xl font-bold text-emerald-400">{stats.operationalAssets}</div>
+            <div className="bg-slate-50 rounded-2xl p-4 text-center border border-slate-200">
+              <div className="text-2xl font-bold text-emerald-700">{stats.operationalAssets}</div>
               <div className="text-xs text-slate-400 mt-1">Stroje OK</div>
             </div>
-            <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-4 text-center border border-white/10">
-              <div className="text-2xl font-bold text-red-400">{stats.criticalTasks}</div>
+            <div className="bg-slate-50 rounded-2xl p-4 text-center border border-slate-200">
+              <div className="text-2xl font-bold text-red-700">{stats.criticalTasks}</div>
               <div className="text-xs text-slate-400 mt-1">Havárie</div>
             </div>
           </div>

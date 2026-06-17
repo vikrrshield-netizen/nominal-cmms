@@ -53,7 +53,7 @@ export default function Top5TasksWidget() {
 
   if (tasks.length === 0) {
     return (
-      <div className="bg-slate-800/60 rounded-2xl p-4 border border-slate-700/50 mb-4">
+      <div className="bg-white rounded-2xl p-4 border border-slate-700/50 mb-4">
         <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Top úkoly</h2>
         <div className="text-center py-4 text-slate-600 text-sm">Žádné aktivní úkoly</div>
       </div>
@@ -61,19 +61,19 @@ export default function Top5TasksWidget() {
   }
 
   return (
-    <div className="bg-slate-800/60 rounded-2xl p-4 border border-slate-700/50 mb-4">
+    <div className="bg-white rounded-2xl p-4 border border-slate-700/50 mb-4">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Top 5 úkolů</h2>
-        <button onClick={() => navigate('/tasks')} className="text-[11px] text-orange-400 hover:text-orange-300 font-semibold">
+        <button onClick={() => navigate('/tasks')} className="text-[11px] text-orange-700 hover:text-orange-700 font-semibold">
           Vše →
         </button>
       </div>
       <div className="space-y-2">
         {tasks.map((task) => (
-          <div key={task.id} className="flex items-center gap-3 p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.06] transition">
+          <div key={task.id} className="flex items-center gap-3 p-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 transition">
             <div className={`w-2 h-8 rounded-full flex-shrink-0 ${PRIORITY_COLORS[task.priority] || 'bg-slate-500'}`} />
             <div className="flex-1 min-w-0">
-              <div className="text-[13px] font-medium text-white truncate">{task.title}</div>
+              <div className="text-[13px] font-medium text-slate-900 truncate">{task.title}</div>
               <div className="flex items-center gap-2 mt-0.5">
                 <span className="text-[10px] text-slate-500 font-mono">{task.code}</span>
                 <span className="text-[10px] text-slate-600">•</span>
@@ -85,7 +85,7 @@ export default function Top5TasksWidget() {
                 <button
                   onClick={() => handleStart(task.id)}
                   disabled={actionLoading === task.id}
-                  className="px-2.5 py-1.5 rounded-lg bg-blue-500/15 border border-blue-500/30 text-blue-400 text-[11px] font-semibold hover:bg-blue-500/25 transition flex items-center gap-1"
+                  className="px-2.5 py-1.5 rounded-lg bg-blue-500/15 border border-blue-500/30 text-blue-700 text-[11px] font-semibold hover:bg-blue-500/25 transition flex items-center gap-1"
                 >
                   {actionLoading === task.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
                   Přebrat
@@ -96,7 +96,7 @@ export default function Top5TasksWidget() {
                   data-testid="top5-task-complete"
                   onClick={() => handleComplete(task.id)}
                   disabled={actionLoading === task.id}
-                  className="px-2.5 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[11px] font-semibold hover:bg-emerald-500/25 transition flex items-center gap-1"
+                  className="px-2.5 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 text-[11px] font-semibold hover:bg-emerald-500/25 transition flex items-center gap-1"
                 >
                   {actionLoading === task.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
                   Dokončit
