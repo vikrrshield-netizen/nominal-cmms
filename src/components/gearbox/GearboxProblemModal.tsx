@@ -3,9 +3,10 @@
 // Používá se v GearboxesPage i AssetCardPage. Vytváří úkol přes createTask (ne work log).
 
 import { useState } from 'react';
-import { AlertTriangle, Loader2, Send, X } from 'lucide-react';
+import { AlertTriangle, Loader2, Send } from 'lucide-react';
 import { createTask } from '../../services/taskService';
 import { showToast } from '../ui/Toast';
+import BottomSheet from '../ui/BottomSheet';
 import type { Asset } from '../../types/asset';
 
 type ProblemUser = { id?: string; uid?: string; displayName?: string } | null | undefined;
@@ -70,23 +71,12 @@ export default function GearboxProblemModal({ asset, user, onClose, onSaved }: {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#fbf9f4]/35 p-0 sm:items-center sm:p-4" onClick={onClose}>
-      <div
-        className="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl border border-[var(--vik-border)] bg-white text-slate-950 shadow-2xl sm:max-w-lg sm:rounded-2xl"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-[var(--vik-border)] bg-white p-4">
-          <div className="min-w-0">
-            <div className="text-xs font-bold uppercase tracking-widest text-red-700">Nahlásit problém</div>
-            <h3 className="mt-1 truncate text-lg font-black text-slate-950">{asset.name}</h3>
-            <div className="text-sm text-slate-600">{asset.currentExtruderName || asset.location || 'Sklad ND'}</div>
+    <BottomSheet title="Nahlásit problém převodovky" isOpen onClose={onClose}>
+        <div className="space-y-4">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+            <span className="font-black text-slate-950">{asset.name}</span>
+            <span className="text-slate-600"> · {asset.currentExtruderName || asset.location || 'Sklad ND'}</span>
           </div>
-          <button type="button" onClick={onClose} className="rounded-xl border border-[var(--vik-border)] bg-[var(--vik-surface-2)] p-2 text-slate-600 hover:bg-white">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        <div className="space-y-4 p-4">
           <div>
             <div className="mb-2 text-sm font-black text-slate-950">Závažnost</div>
             <div className="grid grid-cols-2 gap-2">
@@ -156,7 +146,6 @@ export default function GearboxProblemModal({ asset, user, onClose, onSaved }: {
             Vytvoří se úkol pro údržbu. Oprava se zapisuje zvlášť přes „Oprava / úprava“.
           </div>
         </div>
-      </div>
-    </div>
+    </BottomSheet>
   );
 }
