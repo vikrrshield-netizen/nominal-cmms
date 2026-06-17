@@ -68,6 +68,15 @@ export type TaskPriority = 'P1' | 'P2' | 'P3' | 'P4';
 export type TaskType = 'corrective' | 'preventive' | 'inspection' | 'improvement';
 export type TaskSource = 'kiosk' | 'web' | 'scheduled' | 'ai' | 'inspection';
 
+// Dílčí závada v rámci jednoho (sdíleného) úkolu — odškrtává se samostatně.
+export interface TaskDefect {
+  id: string;
+  text: string;
+  done: boolean;
+  doneAt?: Timestamp | null;
+  doneByName?: string;
+}
+
 export interface TaskDoc {
   id: string;
   code: string;                   // "WO-2026-001"
@@ -127,6 +136,9 @@ export interface TaskDoc {
   resolution?: string;
   completedBy?: string;
   completedByNames?: string[];
+
+  // Seznam dílčích závad (checklist) — každá se dokončuje zvlášť
+  defects?: TaskDefect[];
 }
 
 // ═══════════════════════════════════════════════════════════════════

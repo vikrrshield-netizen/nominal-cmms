@@ -19,9 +19,14 @@ import {
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { formatCounter, nextCounterValue } from './counterService';
-import type { TaskDoc, TaskStatus, TaskPriority, TaskType, TaskSource } from '../types/firestore';
+import type { TaskDoc, TaskStatus, TaskPriority, TaskType, TaskSource, TaskDefect } from '../types/firestore';
 
 const COLLECTION = 'tasks';
+
+// Jedna dílčí závada (pro checklist v úkolu)
+export function newDefect(text: string): TaskDefect {
+  return { id: 'dfc-' + Math.random().toString(36).slice(2, 9), text: text.trim(), done: false, doneAt: null };
+}
 
 // ═══════════════════════════════════════════════════════════════════
 // TYPES
@@ -57,6 +62,7 @@ export interface CreateTaskInput {
   foodSafetyRisk?: boolean;
   foodSafetyHazardType?: string;
   foodSafetyImpact?: string;
+  defectTexts?: string[];   // dílčí závady (každá = samostatná položka checklistu)
   createdById: string;
   createdByName: string;
 }
@@ -142,6 +148,8 @@ export async function buildTaskData(input: CreateTaskInput): Promise<Record<stri
   if (input.foodSafetyRisk !== undefined) taskData.foodSafetyRisk = input.foodSafetyRisk;
   if (input.foodSafetyHazardType) taskData.foodSafetyHazardType = input.foodSafetyHazardType;
   if (input.foodSafetyImpact) taskData.foodSafetyImpact = input.foodSafetyImpact;
+  const defectTexts = (input.defectTexts || []).map((t) => t.trim()).filter(Boolean);
+  if (defectTexts.length) taskData.defects = defectTexts.map((t) => newDefect(t));
 
   return taskData;
 }
