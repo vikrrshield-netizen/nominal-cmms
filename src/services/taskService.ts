@@ -238,6 +238,19 @@ export async function completeTask(
   await updateDoc(doc(db, COLLECTION, taskId), updateData);
 }
 
+// Uložit seznam dílčích závad (checklist) — přepíše celé pole `defects`.
+// doneAt používá Timestamp.now() (serverTimestamp nelze uvnitř pole).
+export async function setTaskDefects(taskId: string, defects: TaskDefect[]): Promise<void> {
+  const clean = defects.map((d) => ({
+    id: d.id,
+    text: d.text,
+    done: !!d.done,
+    doneAt: d.done ? (d.doneAt ?? Timestamp.now()) : null,
+    ...(d.doneByName ? { doneByName: d.doneByName } : {}),
+  }));
+  await updateDoc(doc(db, COLLECTION, taskId), { defects: clean, updatedAt: serverTimestamp() });
+}
+
 // Zrušit úkol
 export async function cancelTask(taskId: string, reason?: string): Promise<void> {
   await updateDoc(doc(db, COLLECTION, taskId), {

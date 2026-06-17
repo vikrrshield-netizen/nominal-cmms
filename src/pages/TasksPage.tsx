@@ -42,6 +42,8 @@ import { showToast } from '../components/ui/Toast';
 import { assetService } from '../services/assetService';
 import type { Asset } from '../types/asset';
 import { isGearboxAsset } from '../services/gearboxService';
+import { setTaskDefects, newDefect } from '../services/taskService';
+import type { TaskDefect } from '../types/firestore';
 
 // ═══════════════════════════════════════════════════
 // TYPES
@@ -87,6 +89,7 @@ interface Task {
   foodSafetyImpact?: string;
   temporaryRepair?: boolean;
   permanentFixDueDate?: any;
+  defects?: TaskDefect[];
 }
 
 interface SourceWorkLog {
@@ -772,7 +775,15 @@ function TaskCard({ task, onClick, onEdit, onDelete, onAddLog, onTake, onComplet
               <FileText className="w-4 h-4" /> Zápis
             </button>
             <button
-              onClick={(e) => { e.stopPropagation(); onComplete(); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                const unresolved = (task.defects ?? []).filter((d) => !d.done).length;
+                if (unresolved > 0) {
+                  window.alert(`Úkol má ${unresolved} neodškrtnutých závad — otevři ho a odškrtni je. Jinak by se ztratily.`);
+                  return;
+                }
+                onComplete();
+              }}
               className="flex-1 min-h-11 rounded-lg flex items-center justify-center gap-1.5 border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs font-bold hover:bg-emerald-100 transition"
             >
               <CheckCircle2 className="w-4 h-4" /> Dokončit
@@ -1768,6 +1779,62 @@ function EditTaskSheet({ task, workerOptions, onClose, onSave }: {
 // ═══════════════════════════════════════════════════
 // TASK ACTIONS SHEET (status transitions)
 // ═══════════════════════════════════════════════════
+// Seznam dílčích závad v úkolu — každá se odškrtává zvlášť, ukládá se přes setTaskDefects.
+function TaskDefectChecklist({ task, userName }: { task: Task; userName: string }) {
+  const [defects, setDefects] = useState<TaskDefect[]>(() => task.defects ?? []);
+  const [newText, setNewText] = useState('');
+  useEffect(() => { setDefects(task.defects ?? []); }, [task.id, task.defects]);
+
+  const isDone = task.status === 'done' || task.status === 'completed';
+  const persist = (next: TaskDefect[]) => {
+    setDefects(next);
+    setTaskDefects(task.id, next).catch((e) => console.error('[defects]', e));
+  };
+  const toggle = (id: string) => persist(defects.map((d) => d.id === id ? { ...d, done: !d.done, doneByName: !d.done ? (userName || d.doneByName) : d.doneByName } : d));
+  const remove = (id: string) => persist(defects.filter((d) => d.id !== id));
+  const add = () => { const t = newText.trim(); if (!t) return; persist([...defects, newDefect(t)]); setNewText(''); };
+
+  if (defects.length === 0 && isDone) return null;
+  const doneCount = defects.filter((d) => d.done).length;
+
+  return (
+    <div className="mb-4 rounded-xl border border-slate-200 bg-white p-3.5">
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <div>
+          <div className="text-sm font-bold text-slate-950">Závady k vyřešení</div>
+          <div className="text-xs text-slate-600">Odškrtni každou zvlášť. Úkol dokonči, až jsou všechny hotové.</div>
+        </div>
+        {defects.length > 0 && (
+          <span className={`text-xs font-bold px-2 py-1 rounded-lg ${doneCount === defects.length ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{doneCount}/{defects.length}</span>
+        )}
+      </div>
+      <div className="space-y-1.5">
+        {defects.map((d) => (
+          <div key={d.id} className="flex items-start gap-2.5 rounded-xl border border-slate-100 px-2.5 py-2">
+            <button type="button" onClick={() => toggle(d.id)} aria-label={d.done ? 'Označit jako nehotové' : 'Označit jako hotové'}
+              className={`mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md border-2 transition ${d.done ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-300 bg-white'}`}>
+              {d.done && <CheckCircle2 className="h-4 w-4" />}
+            </button>
+            <span className={`min-w-0 flex-1 text-sm ${d.done ? 'text-slate-400 line-through' : 'text-slate-800'}`}>{d.text}</span>
+            {!isDone && (
+              <button type="button" onClick={() => remove(d.id)} aria-label="Smazat závadu"
+                className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md text-slate-400 transition hover:bg-red-50 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
+            )}
+          </div>
+        ))}
+        {defects.length === 0 && <div className="text-xs text-slate-500">Žádné dílčí závady. Přidej je níže, ať je můžeš dokončovat po jedné.</div>}
+      </div>
+      {!isDone && (
+        <div className="mt-2.5 flex gap-2">
+          <input value={newText} onChange={(e) => setNewText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') add(); }}
+            placeholder="Přidat závadu…" className="min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none placeholder:text-slate-400 focus:border-emerald-600" />
+          <button type="button" onClick={add} disabled={!newText.trim()} className="rounded-xl bg-emerald-600 px-3 text-sm font-bold text-white disabled:opacity-40">Přidat</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function TaskActionsSheet({ task, userName, onClose, onEdit, onComplete, onStatusChange }: {
   task: Task;
   userName: string;
@@ -1925,6 +1992,8 @@ function TaskActionsSheet({ task, userName, onClose, onEdit, onComplete, onStatu
         </div>
       )}
 
+      <TaskDefectChecklist task={task} userName={userName} />
+
       <div className="mb-4 rounded-xl border border-slate-200 bg-white p-3.5">
         <div className="flex items-center justify-between gap-3 mb-3">
           <div>
@@ -2051,7 +2120,14 @@ function TaskActionsSheet({ task, userName, onClose, onEdit, onComplete, onStatu
 
           {/* Dokončit */}
           <button
-            onClick={onComplete}
+            onClick={() => {
+              const unresolved = (task.defects ?? []).filter((d) => !d.done).length;
+              if (unresolved > 0) {
+                window.alert(`Nejdřív odškrtni všechny závady — zbývá ${unresolved}. Jinak by se nedokončené ztratily.`);
+                return;
+              }
+              onComplete();
+            }}
             className="w-full py-4 rounded-2xl bg-emerald-500 text-white font-bold text-base flex items-center justify-center gap-2.5 shadow-lg shadow-emerald-500/25 active:scale-[0.97] transition"
           >
             <CheckCircle2 className="w-5 h-5" /> Dokončit
