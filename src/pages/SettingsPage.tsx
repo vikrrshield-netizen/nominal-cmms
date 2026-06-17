@@ -23,12 +23,12 @@ interface SettingsTab {
 
 const SETTINGS_TABS: SettingsTab[] = [
   { id: 'general', label: 'Obecné', icon: Settings2, color: 'text-slate-400', module: '' },
-  { id: 'warehouse', label: 'Sklad výroby', icon: Package, color: 'text-teal-400', module: 'warehouse' },
-  { id: 'production', label: 'Výroba', icon: Factory, color: 'text-orange-400', module: 'production' },
-  { id: 'fleet', label: 'Vozidla', icon: Truck, color: 'text-cyan-400', module: 'fleet' },
-  { id: 'inspections', label: 'Kontroly', icon: ClipboardCheck, color: 'text-emerald-400', module: 'inspections' },
-  { id: 'reports', label: 'Reporty', icon: BarChart3, color: 'text-purple-400', module: 'reports' },
-  { id: 'shifts', label: 'Směny', icon: Users, color: 'text-violet-400', module: 'shifts' },
+  { id: 'warehouse', label: 'Sklad výroby', icon: Package, color: 'text-slate-400', module: 'warehouse' },
+  { id: 'production', label: 'Výroba', icon: Factory, color: 'text-slate-400', module: 'production' },
+  { id: 'fleet', label: 'Vozidla', icon: Truck, color: 'text-slate-400', module: 'fleet' },
+  { id: 'inspections', label: 'Kontroly', icon: ClipboardCheck, color: 'text-slate-400', module: 'inspections' },
+  { id: 'reports', label: 'Reporty', icon: BarChart3, color: 'text-slate-400', module: 'reports' },
+  { id: 'shifts', label: 'Směny', icon: Users, color: 'text-slate-400', module: 'shifts' },
 ];
 
 // ═══════════════════════════════════════════════════════

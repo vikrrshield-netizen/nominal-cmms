@@ -48,8 +48,8 @@ const TYPE_CONFIG: Record<NotificationType, { icon: typeof Bell; color: string; 
   revision: { icon: Calendar, color: 'bg-amber-500', label: 'Revize' },
   inventory: { icon: Package, color: 'bg-emerald-500', label: 'Sklad' },
   system: { icon: Settings, color: 'bg-slate-500', label: 'Systém' },
-  reminder: { icon: Clock, color: 'bg-purple-500', label: 'Upomínka' },
-  gearbox: { icon: Thermometer, color: 'bg-violet-500', label: 'Převodovka' },
+  reminder: { icon: Clock, color: 'bg-slate-500', label: 'Upomínka' },
+  gearbox: { icon: Thermometer, color: 'bg-slate-500', label: 'Převodovka' },
   inspection: { icon: ClipboardCheck, color: 'bg-amber-500', label: 'Kontrola' },
 };
 

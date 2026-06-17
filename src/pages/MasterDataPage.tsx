@@ -892,7 +892,7 @@ function DetailPanel({
                   />
                   {canManage && (
                     <button type="button" onClick={addWaterRow} className="inline-flex min-h-10 w-fit items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3 text-xs font-black text-sky-800">
-                      P?idat vodu
+                      Přidat vodu
                     </button>
                   )}
                   {recipe.length === 0 && <div className="rounded-xl bg-white px-3 py-3 text-sm font-semibold text-slate-500">Receptura zatím není vyplněná.</div>}

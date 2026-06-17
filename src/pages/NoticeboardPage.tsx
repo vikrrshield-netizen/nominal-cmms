@@ -53,7 +53,7 @@ const CATEGORY_CONFIG: Record<PostCategory, { label: string; icon: typeof Messag
   general:  { label: 'Všeobecné', icon: MessageSquare, color: 'text-blue-400',   bg: 'bg-blue-500/15',   border: 'border-blue-500/20' },
   shift:    { label: 'Směna',     icon: RefreshCw,     color: 'text-amber-400',  bg: 'bg-amber-500/15',  border: 'border-amber-500/20' },
   safety:   { label: 'Bezpečnost',icon: Shield,        color: 'text-red-400',    bg: 'bg-red-500/15',    border: 'border-red-500/20' },
-  personal: { label: 'Osobní',    icon: User,          color: 'text-purple-400', bg: 'bg-purple-500/15', border: 'border-purple-500/20' },
+  personal: { label: 'Osobní',    icon: User,          color: 'text-slate-500', bg: 'bg-slate-500/10', border: 'border-slate-200' },
 };
 
 const SHIFT_PRESETS = [

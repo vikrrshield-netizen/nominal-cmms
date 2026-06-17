@@ -51,7 +51,7 @@ const CATEGORIES: Record<MessageCategory, { label: string; description: string; 
     label: 'Ostatni',
     description: 'Cokoliv jineho',
     icon: MessageSquare,
-    tone: 'border-sky-300 bg-sky-50 text-sky-700',
+    tone: 'border-stone-300 bg-stone-50 text-stone-700',
   },
 };
 

@@ -34,8 +34,8 @@ const SECTIONS: AcademySection[] = [
     id: 'guide',
     icon: BookOpen,
     label: 'Uživatelská příručka',
-    color: 'text-blue-400',
-    borderColor: 'border-blue-500/30',
+    color: 'text-slate-500',
+    borderColor: 'border-stone-200',
     items: [
       {
         title: 'Jak nahlásit poruchu?',
@@ -127,8 +127,8 @@ Rozvržení se ukládá do paměti vašeho prohlížeče a zůstane i po zavřen
     id: 'tech',
     icon: Cpu,
     label: 'Pod kapotou',
-    color: 'text-emerald-400',
-    borderColor: 'border-emerald-500/30',
+    color: 'text-slate-500',
+    borderColor: 'border-stone-200',
     items: [
       {
         title: 'Firestore Data Flow — Jak tečou data?',
@@ -231,8 +231,8 @@ Oprávnění se kontrolují na dvou úrovních:
     id: 'ai',
     icon: Sparkles,
     label: 'AI Legacy — Příběh vzniku',
-    color: 'text-purple-400',
-    borderColor: 'border-purple-500/30',
+    color: 'text-slate-500',
+    borderColor: 'border-stone-200',
     items: [
       {
         title: 'Jak vznikl VIKRR Asset Shield?',

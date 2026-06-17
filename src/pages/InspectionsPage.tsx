@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, AlertTriangle, Building2,
   ChevronDown, ChevronRight, X, Loader2, ClipboardCheck, CheckCircle2, RotateCcw,
-  FileSpreadsheet, FileText, ExternalLink, Search, Archive, Unlock, Lock
+  FileSpreadsheet, FileText, ExternalLink, Search, Archive, Unlock, Lock, Clock
 } from 'lucide-react';
 import { useInspections } from '../hooks/useInspections';
 import type { InspectionFrequency, InspectionLog, InspectionStats } from '../hooks/useInspections';
@@ -25,9 +25,9 @@ import type { Asset } from '../types/asset';
 // ═══════════════════════════════════════
 
 const STATUS = {
-  ok: { label: 'OK', icon: '✅', color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30' },
-  defect: { label: 'Závada', icon: '⚠️', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/30' },
-  pending: { label: 'Čeká', icon: '⏳', color: 'text-slate-400', bg: 'bg-slate-500/10', border: 'border-slate-500/30' },
+  ok: { label: 'OK', icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30' },
+  defect: { label: 'Závada', icon: AlertTriangle, color: 'text-amber-600', bg: 'bg-amber-500/10', border: 'border-amber-500/30' },
+  pending: { label: 'Čeká', icon: Clock, color: 'text-slate-500', bg: 'bg-slate-500/10', border: 'border-slate-500/30' },
 };
 
 const TASK_PRIORITY_OPTIONS: Array<{ value: TaskPriority; label: string; hint: string; className: string }> = [
@@ -2121,7 +2121,7 @@ export function InspectionItem({
       {/* Content */}
       <div className="flex-1 p-3 min-w-0">
         <div className="flex items-start gap-2">
-          <span className="text-lg">{st.icon}</span>
+          <st.icon className={`h-5 w-5 ${st.color}`} />
           <div className="flex-1 min-w-0">
             <div className="flex items-baseline gap-2">
               <span className="font-bold text-base">{log.roomName}</span>
