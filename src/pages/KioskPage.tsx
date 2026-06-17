@@ -365,6 +365,21 @@ export default function KioskPage() {
   const [submitError, setSubmitError] = useState('');
   const [showTodayActions, setShowTodayActions] = useState(false);
 
+  // Drag-and-drop pořadí dlaždic MENU — uloženo na zařízení (jen UI, nemění logiku akcí)
+  const [menuOrder, setMenuOrder] = useState<string[]>(() => {
+    try { const v = JSON.parse(window.localStorage.getItem('kiosk:menuOrder') || 'null'); return Array.isArray(v) ? (v as string[]) : []; } catch { return []; }
+  });
+  const dragMenuId = useRef<string | null>(null);
+  const reorderMenu = (visibleIds: string[], targetId: string) => {
+    const from = dragMenuId.current; dragMenuId.current = null;
+    if (!from || from === targetId) return;
+    const next = visibleIds.filter((id) => id !== from);
+    const idx = next.indexOf(targetId);
+    next.splice(idx < 0 ? next.length : idx, 0, from);
+    setMenuOrder(next);
+    try { window.localStorage.setItem('kiosk:menuOrder', JSON.stringify(next)); } catch { /* ignore */ }
+  };
+
   const [assets, setAssets] = useState<Asset[]>([]);
   const [assetSearch, setAssetSearch] = useState('');
   const [selectedBuilding, setSelectedBuilding] = useState('');
@@ -1457,10 +1472,10 @@ export default function KioskPage() {
 
   const renderClock = () => (
     <div className="text-center">
-      <div className="text-4xl md:text-6xl font-mono font-bold text-white tracking-wide">
+      <div className="text-4xl md:text-6xl font-mono font-bold text-slate-900 tracking-wide">
         {currentTime.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}
       </div>
-      <div className="text-base md:text-lg text-slate-300 mt-1">
+      <div className="text-base md:text-lg text-slate-600 mt-1">
         {currentTime.toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
       </div>
     </div>
@@ -1910,24 +1925,40 @@ export default function KioskPage() {
     <div className="w-full max-w-6xl space-y-5">
       {renderClock()}
       <div>
-        <h1 className="text-2xl md:text-3xl font-black text-white text-center mb-2 leading-tight">Kiosk výroby</h1>
-        <p className="text-slate-300 text-center mb-6 text-base md:text-lg leading-snug">Rychlé hlášení pro údržbu a předání směny.</p>
+        <h1 className="text-2xl md:text-3xl font-black text-slate-900 text-center mb-2 leading-tight">Kiosk výroby</h1>
+        <p className="text-slate-600 text-center mb-2 text-base md:text-lg leading-snug">Rychlé hlášení pro údržbu a předání směny.</p>
+        <p className="text-slate-400 text-center mb-6 text-xs md:text-sm">Tip: dlaždice můžeš přetáhnout a srovnat si je podle sebe (uloží se na tomto zařízení).</p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-          <MenuButton icon={<AlertTriangle className="w-12 h-12" />} label="Nahlásit poruchu" color="bg-red-600 hover:bg-red-500" onClick={() => setActiveView('BREAKDOWN')} />
-          <MenuButton icon={<Package className="w-12 h-12" />} label="Požadavek na díl" color="bg-blue-600 hover:bg-blue-500" onClick={() => setActiveView('ORDER')} />
-          <MenuButton icon={<ClipboardList className="w-12 h-12" />} label="Předání směny" color="bg-indigo-600 hover:bg-indigo-500" onClick={() => setActiveView('HANDOVER')} />
-          {canUseDataloggerKiosk && (
-            <MenuButton icon={<Thermometer className="w-12 h-12" />} label="Datalogery" color="bg-teal-700 hover:bg-teal-600" badge={dataloggerAlerts.missing.length} onClick={() => setActiveView('DATALOGGER_TEMP')} />
-          )}
-          {canUsePrefilterKiosk && (
-            <MenuButton icon={<Filter className="w-12 h-12" />} label="Výměna předfiltru" color="bg-cyan-700 hover:bg-cyan-600" badge={prefilterAlerts.overdue.length + prefilterAlerts.warning.length} onClick={() => setActiveView('PREFILTER')} />
-          )}
-          {canUseGearboxKiosk && (
-            <MenuButton icon={<Thermometer className="w-12 h-12" />} label="Teplota převodovky" color="bg-violet-700 hover:bg-violet-600" badge={gearboxTemperatureAlerts.missing.length} onClick={() => setActiveView('GEARBOX_TEMP')} />
-          )}
-          <MenuButton icon={<Lightbulb className="w-12 h-12" />} label="Nápad" color="bg-emerald-700 hover:bg-emerald-600" onClick={() => setActiveView('IDEA')} />
-          <MenuButton icon={<HelpCircle className="w-12 h-12" />} label="Jak postupovat" color="bg-amber-700 hover:bg-amber-600" onClick={() => setActiveView('ASSISTANT')} />
-          <MenuButton icon={<ShieldCheck className="w-12 h-12" />} label="Schránka důvěry" color="bg-purple-700 hover:bg-purple-600" onClick={() => setActiveView('MESSAGE')} />
+          {(() => {
+            const defs = [
+              { id: 'breakdown', icon: <AlertTriangle className="w-12 h-12" />, label: 'Nahlásit poruchu', color: 'bg-red-600 hover:bg-red-500', onClick: () => setActiveView('BREAKDOWN'), show: true },
+              { id: 'order', icon: <Package className="w-12 h-12" />, label: 'Požadavek na díl', color: 'bg-blue-600 hover:bg-blue-500', onClick: () => setActiveView('ORDER'), show: true },
+              { id: 'handover', icon: <ClipboardList className="w-12 h-12" />, label: 'Předání směny', color: 'bg-indigo-600 hover:bg-indigo-500', onClick: () => setActiveView('HANDOVER'), show: true },
+              { id: 'datalogger', icon: <Thermometer className="w-12 h-12" />, label: 'Datalogery', color: 'bg-teal-700 hover:bg-teal-600', onClick: () => setActiveView('DATALOGGER_TEMP'), badge: dataloggerAlerts.missing.length, show: canUseDataloggerKiosk },
+              { id: 'prefilter', icon: <Filter className="w-12 h-12" />, label: 'Výměna předfiltru', color: 'bg-cyan-700 hover:bg-cyan-600', onClick: () => setActiveView('PREFILTER'), badge: prefilterAlerts.overdue.length + prefilterAlerts.warning.length, show: canUsePrefilterKiosk },
+              { id: 'gearbox', icon: <Thermometer className="w-12 h-12" />, label: 'Teplota převodovky', color: 'bg-violet-700 hover:bg-violet-600', onClick: () => setActiveView('GEARBOX_TEMP'), badge: gearboxTemperatureAlerts.missing.length, show: canUseGearboxKiosk },
+              { id: 'idea', icon: <Lightbulb className="w-12 h-12" />, label: 'Nápad', color: 'bg-emerald-700 hover:bg-emerald-600', onClick: () => setActiveView('IDEA'), show: true },
+              { id: 'assistant', icon: <HelpCircle className="w-12 h-12" />, label: 'Jak postupovat', color: 'bg-amber-700 hover:bg-amber-600', onClick: () => setActiveView('ASSISTANT'), show: true },
+              { id: 'message', icon: <ShieldCheck className="w-12 h-12" />, label: 'Schránka důvěry', color: 'bg-purple-700 hover:bg-purple-600', onClick: () => setActiveView('MESSAGE'), show: true },
+            ].filter((t) => t.show);
+            const ordered = [...defs].sort((a, b) => {
+              const ia = menuOrder.indexOf(a.id); const ib = menuOrder.indexOf(b.id);
+              return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib);
+            });
+            const ids = ordered.map((t) => t.id);
+            return ordered.map((t) => (
+              <div
+                key={t.id}
+                draggable
+                onDragStart={() => { dragMenuId.current = t.id; }}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={() => reorderMenu(ids, t.id)}
+                className="cursor-grab active:cursor-grabbing"
+              >
+                <MenuButton icon={t.icon} label={t.label} color={t.color} badge={(t as { badge?: number }).badge} onClick={t.onClick} />
+              </div>
+            ));
+          })()}
         </div>
       </div>
       {canViewProductionPlan && (
@@ -2842,7 +2873,7 @@ export default function KioskPage() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-start overflow-y-auto p-3 md:p-6 relative">
+    <div className="min-h-screen bg-[#f1ece3] flex flex-col items-center justify-start overflow-y-auto p-3 md:p-6 relative">
       {renderSubmitting()}
       {showSuccess && renderSuccess()}
       {activeView === 'MENU' && renderMenu()}
