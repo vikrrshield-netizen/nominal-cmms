@@ -2342,6 +2342,12 @@ function FullDashboard() {
             gearbox={{ installed: gearboxDashboard.installed || 0, stock: gearboxDashboard.stock || 0, service: gearboxDashboard.service || 0 }}
             onNavigate={navigate}
             onResolveAlarm={() => navigate('/tasks')}
+            quickActions={(
+              <QuickActions onNavigate={(path) => {
+                if (path === 'fault') { setActiveModal('fault'); return; }
+                navigate(path);
+              }} />
+            )}
           />
         </DashboardZone>
 
@@ -2376,11 +2382,6 @@ function FullDashboard() {
           </main>
 
           <aside className="order-1 space-y-5 xl:order-2 xl:sticky xl:top-4">
-        <QuickActions onNavigate={(path) => {
-          if (path === 'fault') { setActiveModal('fault'); return; }
-          navigate(path);
-        }} />
-
         <DashboardZone title="Moduly" description="Kompaktni menu podle opravneni a role.">
           <ModuleShortcuts onNavigate={navigate} showHeader={false} />
         </DashboardZone>

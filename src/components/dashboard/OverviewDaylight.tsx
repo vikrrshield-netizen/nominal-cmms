@@ -3,6 +3,7 @@
 // prioritní fronta + donut „stav strojů" + tým → mini-karty (revize/sklad/převodovky).
 // Pouze prezentace dat (žádná logika/auth). Data dostává v props.
 
+import type { ReactNode } from 'react';
 import { AlertTriangle, ClipboardList, Cog, Activity, Package, ChevronRight } from 'lucide-react';
 
 export interface OverviewTask {
@@ -44,6 +45,7 @@ export interface OverviewDaylightProps {
   gearbox: { installed: number; stock: number; service: number };
   onNavigate: (path: string) => void;
   onResolveAlarm: () => void;
+  quickActions?: ReactNode;   // slot „Rychlé akce" do 3. sloupce
 }
 
 const PRI = {
@@ -82,7 +84,7 @@ const EYEBROW = 'text-[11px] font-bold uppercase tracking-wide text-slate-400';
 
 export default function OverviewDaylight({
   alarmCount, alarmDetail, kpi, priorityTasks, machineStatus, team, revisions, lowStockItems, gearbox,
-  onNavigate, onResolveAlarm,
+  onNavigate, onResolveAlarm, quickActions,
 }: OverviewDaylightProps) {
   const kpiCards = [
     { label: 'Otevřené úkoly', value: kpi.openTasks, sub: `${kpi.p1}× P1 · ${kpi.p2}× P2`, icon: ClipboardList, box: 'bg-amber-50 text-amber-700', path: '/tasks' },
@@ -119,8 +121,10 @@ export default function OverviewDaylight({
         ))}
       </div>
 
-      {/* Prioritní fronta + (donut, tým) */}
-      <div className="grid gap-3 xl:grid-cols-[1.7fr_1fr]">
+      {/* 3 sloupce: práce | stav | tým & rychlé akce */}
+      <div className="grid gap-3 lg:grid-cols-[1.2fr_1fr_1fr] lg:items-start">
+
+        {/* Sloupec 1 — Prioritní fronta */}
         <div className={CARD}>
           <div className="mb-2 flex items-center justify-between">
             <span className="text-[15px] font-black text-slate-950">Prioritní fronta</span>
@@ -147,6 +151,7 @@ export default function OverviewDaylight({
           })}
         </div>
 
+        {/* Sloupec 2 — Stav strojů + revize + sklad */}
         <div className="space-y-3">
           <div className={CARD}>
             <div className="mb-2 text-[15px] font-black text-slate-950">Stav strojů</div>
@@ -164,6 +169,37 @@ export default function OverviewDaylight({
             </div>
           </div>
 
+          <div className={CARD}>
+            <button type="button" onClick={() => onNavigate('/revisions')} className="mb-1 flex w-full items-center justify-between">
+              <span className="text-sm font-black text-slate-950">Nejbližší revize</span>
+              <ChevronRight className="h-4 w-4 text-slate-400" />
+            </button>
+            {revisions.length === 0 ? <div className="py-2 text-xs text-slate-400">Nic v dohledu.</div> : revisions.map((r, i) => (
+              <div key={i} className="flex items-center gap-2 border-t border-stone-100 py-1.5 text-xs first:border-t-0">
+                <span className={`h-2 w-2 rounded-full ${r.status === 'expired' ? 'bg-red-500' : r.status === 'expiring' ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+                <span className="min-w-0 flex-1 truncate text-slate-600">{r.label}</span>
+                <b className={r.status === 'expired' ? 'text-red-600' : r.status === 'expiring' ? 'text-amber-700' : 'text-slate-700'}>{r.due}</b>
+              </div>
+            ))}
+          </div>
+
+          <div className={CARD}>
+            <button type="button" onClick={() => onNavigate('/inventory')} className="mb-1 flex w-full items-center justify-between">
+              <span className="text-sm font-black text-slate-950">Sklad pod minimem</span>
+              <ChevronRight className="h-4 w-4 text-slate-400" />
+            </button>
+            {lowStockItems.length === 0 ? <div className="py-2 text-xs text-slate-400">Vše skladem.</div> : lowStockItems.map((p, i) => (
+              <div key={i} className="flex items-center gap-2 border-t border-stone-100 py-1.5 text-xs first:border-t-0">
+                <Package className={`h-3.5 w-3.5 ${p.qty === 0 ? 'text-red-600' : 'text-amber-600'}`} />
+                <span className="min-w-0 flex-1 truncate text-slate-600">{p.name}</span>
+                <b className={p.qty === 0 ? 'text-red-600' : 'text-amber-700'}>{p.qty}/{p.min}</b>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Sloupec 3 — Tým + Převodovky + Rychlé akce */}
+        <div className="space-y-3">
           {team.length > 0 && (
             <div className={CARD}>
               <div className="mb-2 text-[15px] font-black text-slate-950">Tým dnes</div>
@@ -177,50 +213,22 @@ export default function OverviewDaylight({
               </div>
             </div>
           )}
-        </div>
-      </div>
 
-      {/* Mini-karty */}
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        <div className={CARD}>
-          <button type="button" onClick={() => onNavigate('/revisions')} className="mb-1 flex w-full items-center justify-between">
-            <span className="text-sm font-black text-slate-950">Nejbližší revize</span>
-            <ChevronRight className="h-4 w-4 text-slate-400" />
-          </button>
-          {revisions.length === 0 ? <div className="py-2 text-xs text-slate-400">Nic v dohledu.</div> : revisions.map((r, i) => (
-            <div key={i} className="flex items-center gap-2 border-t border-stone-100 py-1.5 text-xs first:border-t-0">
-              <span className={`h-2 w-2 rounded-full ${r.status === 'expired' ? 'bg-red-500' : r.status === 'expiring' ? 'bg-amber-500' : 'bg-emerald-500'}`} />
-              <span className="min-w-0 flex-1 truncate text-slate-600">{r.label}</span>
-              <b className={r.status === 'expired' ? 'text-red-600' : r.status === 'expiring' ? 'text-amber-700' : 'text-slate-700'}>{r.due}</b>
+          <div className={CARD}>
+            <button type="button" onClick={() => onNavigate('/gearboxes')} className="mb-2 flex w-full items-center justify-between">
+              <span className="text-sm font-black text-slate-950">Převodovky</span>
+              <Cog className="h-4 w-4 text-slate-400" />
+            </button>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="rounded-xl bg-emerald-50 py-2"><div className="text-lg font-black text-emerald-700">{gearbox.installed}</div><div className="text-[10px] font-bold text-slate-500">v provozu</div></div>
+              <div className="rounded-xl bg-stone-100 py-2"><div className="text-lg font-black text-slate-700">{gearbox.stock}</div><div className="text-[10px] font-bold text-slate-500">sklad</div></div>
+              <div className="rounded-xl bg-amber-50 py-2"><div className="text-lg font-black text-amber-700">{gearbox.service}</div><div className="text-[10px] font-bold text-slate-500">servis</div></div>
             </div>
-          ))}
-        </div>
-
-        <div className={CARD}>
-          <button type="button" onClick={() => onNavigate('/inventory')} className="mb-1 flex w-full items-center justify-between">
-            <span className="text-sm font-black text-slate-950">Sklad pod minimem</span>
-            <ChevronRight className="h-4 w-4 text-slate-400" />
-          </button>
-          {lowStockItems.length === 0 ? <div className="py-2 text-xs text-slate-400">Vše skladem.</div> : lowStockItems.map((p, i) => (
-            <div key={i} className="flex items-center gap-2 border-t border-stone-100 py-1.5 text-xs first:border-t-0">
-              <Package className={`h-3.5 w-3.5 ${p.qty === 0 ? 'text-red-600' : 'text-amber-600'}`} />
-              <span className="min-w-0 flex-1 truncate text-slate-600">{p.name}</span>
-              <b className={p.qty === 0 ? 'text-red-600' : 'text-amber-700'}>{p.qty}/{p.min}</b>
-            </div>
-          ))}
-        </div>
-
-        <div className={CARD}>
-          <button type="button" onClick={() => onNavigate('/gearboxes')} className="mb-2 flex w-full items-center justify-between">
-            <span className="text-sm font-black text-slate-950">Převodovky</span>
-            <Cog className="h-4 w-4 text-slate-400" />
-          </button>
-          <div className="grid grid-cols-3 gap-2 text-center">
-            <div className="rounded-xl bg-emerald-50 py-2"><div className="text-lg font-black text-emerald-700">{gearbox.installed}</div><div className="text-[10px] font-bold text-slate-500">v provozu</div></div>
-            <div className="rounded-xl bg-stone-100 py-2"><div className="text-lg font-black text-slate-700">{gearbox.stock}</div><div className="text-[10px] font-bold text-slate-500">sklad</div></div>
-            <div className="rounded-xl bg-amber-50 py-2"><div className="text-lg font-black text-amber-700">{gearbox.service}</div><div className="text-[10px] font-bold text-slate-500">servis</div></div>
           </div>
+
+          {quickActions}
         </div>
+
       </div>
     </div>
   );
