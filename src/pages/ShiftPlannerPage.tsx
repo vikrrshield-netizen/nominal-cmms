@@ -47,11 +47,11 @@ interface ShiftNote {
 // ═══════════════════════════════════════════════════════════════════
 
 const SHIFT_TYPES: Record<ShiftType, { label: string; short: string; color: string; bg: string; icon: typeof Sun }> = {
-  'R': { label: 'Ranní',      short: 'R', color: 'text-amber-400',   bg: 'bg-amber-500/20',   icon: Sun },
-  'O': { label: 'Odpolední',  short: 'O', color: 'text-blue-400',    bg: 'bg-blue-500/20',    icon: Sunset },
-  'N': { label: 'Noční',      short: 'N', color: 'text-indigo-400',  bg: 'bg-indigo-500/20',  icon: Moon },
+  'R': { label: 'Ranní',      short: 'R', color: 'text-amber-700',   bg: 'bg-amber-500/20',   icon: Sun },
+  'O': { label: 'Odpolední',  short: 'O', color: 'text-blue-700',    bg: 'bg-blue-500/20',    icon: Sunset },
+  'N': { label: 'Noční',      short: 'N', color: 'text-indigo-700',  bg: 'bg-indigo-500/20',  icon: Moon },
   'V': { label: 'Volno',      short: 'V', color: 'text-slate-500',   bg: 'bg-slate-500/20',   icon: Users },
-  '-': { label: 'Nepřiřazeno', short: '-', color: 'text-slate-600',  bg: 'bg-white/5',        icon: Users },
+  '-': { label: 'Nepřiřazeno', short: '-', color: 'text-slate-600',  bg: 'bg-slate-50',        icon: Users },
 };
 
 const DAY_KEYS = ['po', 'ut', 'st', 'ct', 'pa', 'so', 'ne'] as const;
@@ -260,12 +260,12 @@ export default function ShiftPlannerPage() {
 
   if (!canView) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6">
+      <div className="min-h-screen bg-[#f1ece3] flex items-center justify-center p-6">
         <div className="bg-red-500/20 border border-red-500/30 rounded-2xl p-8 text-center max-w-md">
-          <Users className="w-16 h-16 text-red-400 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-white mb-2">Přístup odepřen</h2>
+          <Users className="w-16 h-16 text-red-700 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-slate-900 mb-2">Přístup odepřen</h2>
           <p className="text-slate-400 mb-4">Nemáte oprávnění pro Plánování směn</p>
-          <button onClick={() => goBack()} className="px-6 py-2 bg-slate-700 text-white rounded-xl hover:bg-slate-600">Zpět</button>
+          <button onClick={() => goBack()} className="px-6 py-2 bg-slate-100 text-slate-900 rounded-xl hover:bg-slate-200">Zpět</button>
         </div>
       </div>
     );
@@ -282,16 +282,16 @@ export default function ShiftPlannerPage() {
   const todayDayIdx = isCurrentWeek ? (today.getDay() === 0 ? 6 : today.getDay() - 1) : -1;
 
   return (
-    <div className="min-h-screen bg-slate-900 pb-24">
+    <div className="min-h-screen bg-[#f1ece3] pb-24">
       {/* Header */}
-      <div className="bg-slate-800/80 backdrop-blur-sm border-b border-slate-700/50 px-4 py-4 sticky top-0 z-20">
+      <div className="bg-white border-b border-slate-700/50 px-4 py-4 sticky top-0 z-20">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
-            <button onClick={() => goBack()} className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition">
+            <button onClick={() => goBack()} className="p-2 rounded-xl bg-slate-50 border border-slate-200 hover:bg-slate-100 transition">
               <ArrowLeft className="w-5 h-5 text-slate-400" />
             </button>
             <div>
-              <h1 className="text-lg font-bold text-white">Plánování směn</h1>
+              <h1 className="text-lg font-bold text-slate-900">Plánování směn</h1>
               <p className="text-xs text-slate-500">Přiřazení techniků na týden</p>
             </div>
           </div>
@@ -305,20 +305,20 @@ export default function ShiftPlannerPage() {
         </div>
 
         {/* Week navigation */}
-        <div className="flex items-center justify-between bg-white/5 rounded-xl p-2">
-          <button onClick={prevWeek} className="p-2 rounded-lg hover:bg-white/10 transition">
+        <div className="flex items-center justify-between bg-slate-50 rounded-xl p-2">
+          <button onClick={prevWeek} className="p-2 rounded-lg hover:bg-slate-100 transition">
             <ChevronLeft className="w-5 h-5 text-slate-400" />
           </button>
           <div className="text-center">
-            <div className="text-sm font-bold text-white">{formatWeekRange(currentMonday)}</div>
+            <div className="text-sm font-bold text-slate-900">{formatWeekRange(currentMonday)}</div>
             <div className="text-[11px] text-slate-500">{weekId}</div>
           </div>
-          <button onClick={nextWeek} className="p-2 rounded-lg hover:bg-white/10 transition">
+          <button onClick={nextWeek} className="p-2 rounded-lg hover:bg-slate-100 transition">
             <ChevronRight className="w-5 h-5 text-slate-400" />
           </button>
         </div>
         {!isCurrentWeek && (
-          <button onClick={goToday} className="w-full mt-2 py-1.5 text-xs text-center text-blue-400 hover:text-blue-300 transition">
+          <button onClick={goToday} className="w-full mt-2 py-1.5 text-xs text-center text-blue-700 hover:text-blue-700 transition">
             Zpět na aktuální týden
           </button>
         )}
@@ -333,7 +333,7 @@ export default function ShiftPlannerPage() {
                 <ClipboardList className="w-5 h-5 text-indigo-200" />
               </div>
               <div>
-                <h2 className="text-base font-bold text-white">Předání směny</h2>
+                <h2 className="text-base font-bold text-slate-900">Předání směny</h2>
                 <p className="text-sm text-indigo-100/80">Poslední zprávy z kiosku pro další směnu.</p>
               </div>
             </div>
@@ -346,23 +346,23 @@ export default function ShiftPlannerPage() {
           </div>
 
           {loadingShiftNotes ? (
-            <div className="flex items-center gap-2 text-sm text-slate-300">
+            <div className="flex items-center gap-2 text-sm text-slate-600">
               <Loader2 className="w-4 h-4 animate-spin" />
               Načítám předání...
             </div>
           ) : shiftNotes.length === 0 ? (
-            <div className="rounded-xl border border-white/10 bg-slate-950/40 p-4 text-sm text-slate-400">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-400">
               Zatím není zapsané žádné předání směny.
             </div>
           ) : (
             <div className="space-y-3">
               {latestShiftNote && (
-                <div className={`rounded-xl border p-4 ${latestShiftNote.priority === 'important' ? 'border-red-400/30 bg-red-500/10' : 'border-white/10 bg-slate-950/40'}`}>
+                <div className={`rounded-xl border p-4 ${latestShiftNote.priority === 'important' ? 'border-red-400/30 bg-red-500/10' : 'border-slate-200 bg-slate-50'}`}>
                   <div className="flex items-center justify-between gap-3 mb-1">
-                    <span className="text-sm font-bold text-white">{latestShiftNote.author}</span>
-                    <span className="text-xs text-slate-300">{formatShiftNoteDate(latestShiftNote.createdAt)}</span>
+                    <span className="text-sm font-bold text-slate-900">{latestShiftNote.author}</span>
+                    <span className="text-xs text-slate-600">{formatShiftNoteDate(latestShiftNote.createdAt)}</span>
                   </div>
-                  <p className="text-base text-slate-100 leading-snug">{latestShiftNote.text}</p>
+                  <p className="text-base text-slate-900 leading-snug">{latestShiftNote.text}</p>
                   {latestShiftNote.priority === 'important' && (
                     <span className="mt-2 inline-block rounded-full bg-red-500/20 px-2 py-1 text-xs font-bold text-red-100">Důležité</span>
                   )}
@@ -371,17 +371,17 @@ export default function ShiftPlannerPage() {
 
               {shiftNotes.length > 1 && (
                 <details className="group">
-                  <summary className="cursor-pointer list-none rounded-xl border border-white/10 bg-slate-950/30 px-4 py-3 text-sm font-bold text-slate-200">
+                  <summary className="cursor-pointer list-none rounded-xl border border-slate-200 bg-[#fbf9f4]/30 px-4 py-3 text-sm font-bold text-slate-700">
                     Starší předání ({shiftNotes.length - 1})
                   </summary>
                   <div className="mt-2 space-y-2">
                     {shiftNotes.slice(1).map(note => (
-                      <div key={note.id} className={`rounded-xl border p-3 ${note.priority === 'important' ? 'border-red-400/25 bg-red-500/10' : 'border-white/10 bg-slate-950/30'}`}>
+                      <div key={note.id} className={`rounded-xl border p-3 ${note.priority === 'important' ? 'border-red-400/25 bg-red-500/10' : 'border-slate-200 bg-[#fbf9f4]/30'}`}>
                         <div className="flex items-center justify-between gap-3 mb-1">
-                          <span className="text-xs font-bold text-white">{note.author}</span>
+                          <span className="text-xs font-bold text-slate-900">{note.author}</span>
                           <span className="text-xs text-slate-400">{formatShiftNoteDate(note.createdAt)}</span>
                         </div>
-                        <p className="text-sm text-slate-200">{note.text}</p>
+                        <p className="text-sm text-slate-700">{note.text}</p>
                       </div>
                     ))}
                   </div>
@@ -416,7 +416,7 @@ export default function ShiftPlannerPage() {
         ) : technicians.length === 0 ? (
           <div className="text-center py-16">
             <Users className="w-14 h-14 text-slate-600 mx-auto" />
-            <h3 className="text-lg font-bold text-white mt-3 mb-1">Žádní technici</h3>
+            <h3 className="text-lg font-bold text-slate-900 mt-3 mb-1">Žádní technici</h3>
             <p className="text-slate-500 text-sm">V systému nejsou uživatelé s rolí Údržba/Výroba</p>
           </div>
         ) : (
@@ -427,7 +427,7 @@ export default function ShiftPlannerPage() {
                   <th className="text-left text-xs text-slate-500 font-semibold pb-2 pr-2 w-[140px]">Technik</th>
                   {DAY_KEYS.map((key, i) => (
                     <th key={key} className={`text-center text-xs font-semibold pb-2 px-1 ${
-                      todayDayIdx === i ? 'text-orange-400' : i >= 5 ? 'text-slate-600' : 'text-slate-500'
+                      todayDayIdx === i ? 'text-orange-700' : i >= 5 ? 'text-slate-600' : 'text-slate-500'
                     }`}>
                       {DAY_LABELS[i]}
                     </th>
@@ -436,9 +436,9 @@ export default function ShiftPlannerPage() {
               </thead>
               <tbody>
                 {technicians.map(tech => (
-                  <tr key={tech.id} className="border-t border-white/5">
+                  <tr key={tech.id} className="border-t border-slate-200">
                     <td className="py-2 pr-2">
-                      <div className="text-sm font-medium text-white truncate max-w-[140px]">{tech.displayName}</div>
+                      <div className="text-sm font-medium text-slate-900 truncate max-w-[140px]">{tech.displayName}</div>
                       <div className="text-[10px] text-slate-500">{tech.role}</div>
                     </td>
                     {DAY_KEYS.map((dayKey, dayIdx) => {

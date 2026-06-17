@@ -437,7 +437,7 @@ function DetailPanel({
     return (
       <aside className={`${PANEL} p-5 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto`}>
         <div className="flex h-full min-h-56 flex-col items-center justify-center text-center">
-          <ShieldCheck className="h-10 w-10 text-slate-300" />
+          <ShieldCheck className="h-10 w-10 text-slate-600" />
           <div className="mt-3 text-lg font-black text-slate-950">Vyber kartu</div>
           <div className="mt-1 text-sm font-semibold text-slate-500">Rodný list zobrazí auditní údaje, šarži a compliance pole.</div>
         </div>
@@ -1101,7 +1101,7 @@ function NewItemModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-3 sm:items-center">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-3 sm:items-center">
       <div className="w-full max-w-lg rounded-3xl border border-[#ded6c8] bg-white p-5 shadow-2xl">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -1346,7 +1346,7 @@ export default function MasterDataPage() {
 
   return (
     <div className="min-h-screen bg-[#f1ece3] text-slate-950">
-      <header className="sticky top-0 z-20 border-b border-[#ded6c8] bg-[#f1ece3]/95 backdrop-blur">
+      <header className="sticky top-0 z-20 border-b border-[#ded6c8] bg-[#f1ece3]/95">
         <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-4">
           <button type="button" onClick={() => navigate('/')} className="flex h-12 w-12 items-center justify-center rounded-xl border border-[#ded6c8] bg-white text-slate-700">
             <ArrowLeft className="h-5 w-5" />

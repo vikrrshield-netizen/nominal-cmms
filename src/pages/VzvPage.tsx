@@ -57,13 +57,13 @@ export default function VzvPage() {
   const broken = vzvAssets.length - active;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white pb-24">
-      <header className="sticky top-0 z-20 border-b border-white/10 bg-slate-950/95 backdrop-blur px-4 py-3">
+    <div className="min-h-screen bg-[#f1ece3] text-slate-900 pb-24">
+      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white px-4 py-3">
         <div className="mx-auto flex max-w-6xl items-center gap-3">
-          <button onClick={() => navigate(-1)} className="rounded-xl border border-white/10 bg-slate-900 p-3 text-slate-200">
+          <button onClick={() => navigate(-1)} className="rounded-xl border border-slate-200 bg-white p-3 text-slate-700">
             <ArrowLeft className="h-5 w-5" />
           </button>
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-500/15 text-cyan-300">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-500/15 text-cyan-700">
             <Forklift className="h-7 w-7" />
           </div>
           <div className="min-w-0 flex-1">
@@ -75,16 +75,16 @@ export default function VzvPage() {
 
       <main className="mx-auto max-w-6xl space-y-4 px-4 py-4">
         <section className="grid grid-cols-3 gap-3">
-          <div className="rounded-2xl border border-white/10 bg-slate-900 p-4">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4">
             <div className="text-2xl font-black">{vzvAssets.length}</div>
             <div className="text-xs font-bold uppercase text-slate-500">Celkem</div>
           </div>
           <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-4">
-            <div className="text-2xl font-black text-emerald-300">{active}</div>
+            <div className="text-2xl font-black text-emerald-700">{active}</div>
             <div className="text-xs font-bold uppercase text-emerald-100/70">V provozu</div>
           </div>
           <div className="rounded-2xl border border-red-500/25 bg-red-500/10 p-4">
-            <div className="text-2xl font-black text-red-300">{broken}</div>
+            <div className="text-2xl font-black text-red-700">{broken}</div>
             <div className="text-xs font-bold uppercase text-red-100/70">Mimo provoz</div>
           </div>
         </section>
@@ -95,21 +95,21 @@ export default function VzvPage() {
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Hledat VZV, kód nebo stanoviště..."
-            className="min-h-14 w-full rounded-2xl border border-white/10 bg-slate-900 py-4 pl-12 pr-4 text-base text-white outline-none focus:border-cyan-400"
+            className="min-h-14 w-full rounded-2xl border border-slate-200 bg-white py-4 pl-12 pr-4 text-base text-slate-900 outline-none focus:border-cyan-400"
           />
         </label>
 
         <section className="grid grid-cols-1 gap-3 md:grid-cols-2">
           {vzvAssets.map((asset) => (
-            <article key={asset.id} className="rounded-2xl border border-white/10 bg-slate-900 p-4">
+            <article key={asset.id} className="rounded-2xl border border-slate-200 bg-white p-4">
               <div className="flex items-start gap-3">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-cyan-500/15 text-cyan-300">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-cyan-500/15 text-cyan-700">
                   <Forklift className="h-6 w-6" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <h2 className="truncate text-lg font-black">{asset.name}</h2>
                   <p className="text-sm text-slate-400">{asset.code || 'Bez kódu'}</p>
-                  <p className="mt-1 text-sm text-slate-300">{placeLabel(asset)}</p>
+                  <p className="mt-1 text-sm text-slate-600">{placeLabel(asset)}</p>
                 </div>
               </div>
               <div className="mt-4 grid grid-cols-2 gap-2">
@@ -123,14 +123,14 @@ export default function VzvPage() {
                 <button
                   type="button"
                   onClick={() => navigate(`/tasks?asset=${asset.id}`)}
-                  className="min-h-12 rounded-xl border border-white/10 bg-slate-800 px-3 font-bold text-slate-100"
+                  className="min-h-12 rounded-xl border border-slate-200 bg-white px-3 font-bold text-slate-900"
                 >
                   <span className="inline-flex items-center gap-2"><ClipboardList className="h-4 w-4" /> Úkoly</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => navigate(`/work-diary?asset=${asset.id}`)}
-                  className="col-span-2 min-h-12 rounded-xl border border-white/10 bg-slate-800 px-3 font-bold text-slate-100"
+                  className="col-span-2 min-h-12 rounded-xl border border-slate-200 bg-white px-3 font-bold text-slate-900"
                 >
                   <span className="inline-flex items-center gap-2"><Wrench className="h-4 w-4" /> Zapsat práci na VZV</span>
                 </button>
@@ -140,7 +140,7 @@ export default function VzvPage() {
         </section>
 
         {vzvAssets.length === 0 && (
-          <div className="rounded-2xl border border-white/10 bg-slate-900 p-8 text-center text-slate-400">
+          <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-slate-400">
             V kartotéce zatím není žádné VZV. Přidej ho v kartotéce jako typ/kategorii VZV nebo forklift.
           </div>
         )}

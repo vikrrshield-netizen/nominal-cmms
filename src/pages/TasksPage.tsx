@@ -229,9 +229,9 @@ const taskSuggestionPanelClass = 'mt-2 max-h-[min(22rem,52vh)] overflow-y-auto r
 // PRIORITY CONFIG
 // ═══════════════════════════════════════════════════
 const PRIORITY_CONFIG: Record<string, { bg: string; border: string; color: string; label: string; textClass: string; borderLeft: string }> = {
-  P1: { bg: 'bg-red-500/12', border: 'border-red-500/35', color: '#f87171', label: 'P1 — Havárie', textClass: 'text-red-400', borderLeft: 'border-l-4 border-l-red-500' },
-  P2: { bg: 'bg-amber-500/10', border: 'border-amber-500/30', color: '#fbbf24', label: 'P2 — Tento týden', textClass: 'text-amber-400', borderLeft: 'border-l-4 border-l-orange-400' },
-  P3: { bg: 'bg-blue-500/8', border: 'border-blue-500/20', color: '#60a5fa', label: 'P3 — Běžná', textClass: 'text-blue-400', borderLeft: 'border-l-4 border-l-blue-400' },
+  P1: { bg: 'bg-red-500/12', border: 'border-red-500/35', color: '#f87171', label: 'P1 — Havárie', textClass: 'text-red-700', borderLeft: 'border-l-4 border-l-red-500' },
+  P2: { bg: 'bg-amber-500/10', border: 'border-amber-500/30', color: '#fbbf24', label: 'P2 — Tento týden', textClass: 'text-amber-700', borderLeft: 'border-l-4 border-l-orange-400' },
+  P3: { bg: 'bg-blue-500/8', border: 'border-blue-500/20', color: '#60a5fa', label: 'P3 — Běžná', textClass: 'text-blue-700', borderLeft: 'border-l-4 border-l-blue-400' },
   P4: { bg: 'bg-slate-500/8', border: 'border-slate-500/20', color: '#94a3b8', label: 'P4 — Nápad', textClass: 'text-slate-400', borderLeft: 'border-l-4 border-l-gray-500' },
 };
 
@@ -590,7 +590,7 @@ function WorkerMultiSelect({
   return (
     <div className="mb-4">
       <label className="block text-sm text-slate-600 font-medium mb-2">
-        {label} {required && <span className="text-red-400">*</span>}
+        {label} {required && <span className="text-red-700">*</span>}
       </label>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         {allOptions.map((name) => {
@@ -620,7 +620,7 @@ function WorkerMultiSelect({
       </div>
       {selected.length > 0 && (
         <div className="mt-2 text-xs text-slate-600">
-          Vybráno: <span className="text-slate-200">{selected.join(', ')}</span>
+          Vybráno: <span className="text-slate-700">{selected.join(', ')}</span>
         </div>
       )}
     </div>
@@ -671,8 +671,8 @@ function TaskCard({ task, onClick, onEdit, onDelete, onAddLog, onTake, onComplet
       {isActive && assignee !== '—' && (
         <div className="px-2.5 py-1 bg-amber-500/15 border-b border-amber-500/20 flex items-center gap-1.5">
           <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse flex-shrink-0" />
-          <span className="text-[10px] font-bold text-amber-400 truncate">{assignee}</span>
-          <span className="text-[9px] text-amber-400/50 ml-auto flex-shrink-0">řeší</span>
+          <span className="text-[10px] font-bold text-amber-700 truncate">{assignee}</span>
+          <span className="text-[9px] text-amber-700/50 ml-auto flex-shrink-0">řeší</span>
         </div>
       )}
 
@@ -690,7 +690,7 @@ function TaskCard({ task, onClick, onEdit, onDelete, onAddLog, onTake, onComplet
             </span>
           )}
           {typeLabel && (
-            <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-slate-700 text-white">
+            <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-slate-100 text-slate-900">
               {typeLabel}
             </span>
           )}
@@ -729,8 +729,8 @@ function TaskCard({ task, onClick, onEdit, onDelete, onAddLog, onTake, onComplet
         {/* META: Assignee + Asset — single dense line */}
         <div className="flex flex-wrap items-center gap-2 text-[13px] text-slate-600">
           <div className="flex items-center gap-1 min-w-0">
-            <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${isActive ? 'bg-amber-100 border border-amber-300' : 'bg-slate-700'}`}>
-              <span className={`text-[8px] font-black ${isActive ? 'text-amber-700' : 'text-white'}`}>{initials}</span>
+            <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${isActive ? 'bg-amber-100 border border-amber-300' : 'bg-slate-100'}`}>
+              <span className={`text-[8px] font-black ${isActive ? 'text-amber-700' : 'text-slate-900'}`}>{initials}</span>
             </div>
             <span className={`truncate ${isActive ? 'text-amber-700 font-bold' : 'font-medium'}`}>{assignee}</span>
           </div>
@@ -1075,7 +1075,7 @@ export default function TasksPage() {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="flex-1">
-            <h1 className="text-xl font-bold text-white">Úkoly</h1>
+            <h1 className="text-xl font-bold text-slate-900">Úkoly</h1>
             <p className="text-xs text-slate-500">
               {activeCount} otevřených · {doneCount} hotových
             </p>
@@ -1114,7 +1114,7 @@ export default function TasksPage() {
         )}
 
         {/* Tab filters */}
-        <div className="flex gap-2 mb-3 border-b border-white/10 pb-2 overflow-x-auto">
+        <div className="flex gap-2 mb-3 border-b border-slate-200 pb-2 overflow-x-auto">
           {TAB_OPTIONS.map((tab) => (
             <button
               key={tab.key}
@@ -1274,7 +1274,7 @@ export default function TasksPage() {
                     className="w-full min-h-14 rounded-xl px-4 py-3 text-left text-base font-black leading-snug text-slate-950 active:bg-emerald-50"
                   >
                     <span className="flex items-start gap-3">
-                      <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-blue-300" />
+                      <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-blue-700" />
                       <span className="break-words">{option}</span>
                     </span>
                   </button>
@@ -1315,7 +1315,7 @@ export default function TasksPage() {
                     className="w-full min-h-16 rounded-xl px-4 py-3 text-left active:bg-emerald-50"
                   >
                     <span className="flex items-start gap-3">
-                      <Wrench className="mt-0.5 h-5 w-5 shrink-0 text-blue-300" />
+                      <Wrench className="mt-0.5 h-5 w-5 shrink-0 text-blue-700" />
                       <span className="min-w-0">
                         <span className="block text-base font-black leading-snug text-slate-950 break-words">{asset.name}</span>
                         <span className="mt-1 block text-sm leading-snug text-slate-600 break-words">
@@ -1988,7 +1988,7 @@ function TaskActionsSheet({ task, userName, onClose, onEdit, onComplete, onStatu
       {/* Date picker (conditionally shown) */}
       {showPlanner && (
         <div className="mb-4 p-3.5 rounded-xl bg-blue-500/10 border border-blue-500/20">
-          <label className="block text-sm text-blue-400 font-medium mb-2">
+          <label className="block text-sm text-blue-700 font-medium mb-2">
             <CalendarDays className="w-4 h-4 inline mr-1.5" />
             Datum plánování
           </label>
@@ -2025,7 +2025,7 @@ function TaskActionsSheet({ task, userName, onClose, onEdit, onComplete, onStatu
               if (!isInProgress) update.startedAt = serverTimestamp();
               doAction(update);
             }}
-            className="w-full py-4 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 font-bold text-base flex items-center justify-center gap-2.5 active:scale-[0.97] transition disabled:opacity-40"
+            className="w-full py-4 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-700 font-bold text-base flex items-center justify-center gap-2.5 active:scale-[0.97] transition disabled:opacity-40"
           >
             <Play className="w-5 h-5" /> Přebírám
           </button>
@@ -2034,7 +2034,7 @@ function TaskActionsSheet({ task, userName, onClose, onEdit, onComplete, onStatu
           {!showPlanner && (
             <button
               onClick={() => setShowPlanner(true)}
-              className="w-full py-4 rounded-2xl bg-blue-500/15 border border-blue-500/30 text-blue-400 font-bold text-base flex items-center justify-center gap-2.5 active:scale-[0.97] transition"
+              className="w-full py-4 rounded-2xl bg-blue-500/15 border border-blue-500/30 text-blue-700 font-bold text-base flex items-center justify-center gap-2.5 active:scale-[0.97] transition"
             >
               <CalendarDays className="w-5 h-5" /> Naplánovat
             </button>
@@ -2044,7 +2044,7 @@ function TaskActionsSheet({ task, userName, onClose, onEdit, onComplete, onStatu
           <button
             disabled={saving}
             onClick={() => doAction({ status: 'deferred', updatedBy: userName })}
-            className="w-full py-4 rounded-2xl bg-violet-500/15 border border-violet-500/30 text-violet-400 font-bold text-base flex items-center justify-center gap-2.5 active:scale-[0.97] transition disabled:opacity-40"
+            className="w-full py-4 rounded-2xl bg-violet-500/15 border border-violet-500/30 text-violet-700 font-bold text-base flex items-center justify-center gap-2.5 active:scale-[0.97] transition disabled:opacity-40"
           >
             <PauseCircle className="w-5 h-5" /> Odložit
           </button>
@@ -2060,7 +2060,7 @@ function TaskActionsSheet({ task, userName, onClose, onEdit, onComplete, onStatu
       )}
 
       {isDone && (
-        <div className="text-center py-6 text-emerald-400 font-semibold">
+        <div className="text-center py-6 text-emerald-700 font-semibold">
           <CheckCircle2 className="w-8 h-8 mx-auto mb-2" />
           Tento úkol je dokončen
         </div>

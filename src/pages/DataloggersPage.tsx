@@ -339,7 +339,7 @@ export default function DataloggersPage() {
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Hledat datalogger, sklad, místnost nebo kód..."
-              className="h-12 w-full bg-transparent text-base font-semibold text-slate-950 outline-none placeholder:text-slate-500"
+              className="h-12 w-full bg-transparent text-base font-semibold text-slate-950 outline-none placeholder:text-slate-400"
             />
           </div>
           <div className="flex gap-2 overflow-x-auto pb-1">
@@ -680,7 +680,7 @@ function AssignRoomModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/45 p-2 sm:items-center sm:p-3">
       <div className="max-h-[92dvh] w-full max-w-xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-3 shadow-2xl sm:p-4">
-        <div className="sticky top-0 z-10 -mx-3 -mt-3 mb-3 flex items-start justify-between gap-3 border-b border-slate-100 bg-white/95 px-3 py-3 backdrop-blur sm:-mx-4 sm:-mt-4 sm:px-4">
+        <div className="sticky top-0 z-10 -mx-3 -mt-3 mb-3 flex items-start justify-between gap-3 border-b border-slate-100 bg-white/95 px-3 py-3 sm:-mx-4 sm:-mt-4 sm:px-4">
           <div>
             <div className="text-xs font-black uppercase tracking-widest text-cyan-700">Umístění</div>
             <h2 className="mt-1 text-2xl font-black text-slate-950">Přiřadit místnost</h2>

@@ -680,34 +680,34 @@ export default function BuildingInspectionPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900">
+    <div className="min-h-screen bg-[#f1ece3]">
       <div className="max-w-4xl mx-auto px-3 pt-4 pb-24">
 
         {/* Header */}
         <div className="flex items-center gap-3 mb-3">
-          <button onClick={() => goBack()} className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 hover:text-white transition">
+          <button onClick={() => goBack()} className="w-9 h-9 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-900 transition">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="flex-1">
-            <h1 className="text-xl font-bold text-white flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-teal-400" />
+            <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+              <Building2 className="w-5 h-5 text-teal-700" />
               Kontroly
             </h1>
             <p className="text-xs text-slate-500">{done}/{points.length} zkontrolováno · {progress}%</p>
           </div>
           {loading && <Loader2 className="w-5 h-5 text-slate-500 animate-spin" />}
-          <button onClick={printInspectionReport} className="px-3 py-1.5 rounded-lg bg-white/5 text-[11px] text-slate-400 font-semibold hover:text-white transition active:scale-95">
+          <button onClick={printInspectionReport} className="px-3 py-1.5 rounded-lg bg-slate-50 text-[11px] text-slate-400 font-semibold hover:text-slate-900 transition active:scale-95">
             <Printer className="w-3.5 h-3.5 inline mr-1" /> Tisk
           </button>
           {isAdmin && (
-            <button onClick={resetAll} className="px-3 py-1.5 rounded-lg bg-white/5 text-[11px] text-slate-400 font-semibold hover:text-white transition active:scale-95">
+            <button onClick={resetAll} className="px-3 py-1.5 rounded-lg bg-slate-50 text-[11px] text-slate-400 font-semibold hover:text-slate-900 transition active:scale-95">
               <RotateCcw className="w-3.5 h-3.5 inline mr-1" /> Reset
             </button>
           )}
         </div>
 
         {/* Progress bar */}
-        <div className="h-2 rounded-full bg-white/5 mb-3 overflow-hidden">
+        <div className="h-2 rounded-full bg-slate-50 mb-3 overflow-hidden">
           <div className="h-full rounded-full transition-all duration-500" style={{ width: `${progress}%`, background: progress === 100 ? '#34d399' : 'linear-gradient(90deg, #14b8a6, #34d399)' }} />
         </div>
 
@@ -717,7 +717,7 @@ export default function BuildingInspectionPage() {
           <select
             value={selectedInspector}
             onChange={(e) => setSelectedInspector(e.target.value)}
-            className="flex-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-teal-500/50 transition appearance-none"
+            className="flex-1 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-teal-500/50 transition appearance-none"
           >
             <option value="">-- Vyberte inspektora --</option>
             {[...new Set([user?.displayName || '', ...employeeNames].filter(Boolean))]
@@ -737,7 +737,7 @@ export default function BuildingInspectionPage() {
               <button
                 type="button"
                 onClick={clearAllFilters}
-                className="text-[11px] text-slate-400 px-2 py-1 rounded-lg bg-white/5 active:scale-95"
+                className="text-[11px] text-slate-400 px-2 py-1 rounded-lg bg-slate-50 active:scale-95"
               >
                 Zobrazit vše
               </button>
@@ -757,7 +757,7 @@ export default function BuildingInspectionPage() {
                   className={`min-h-[54px] rounded-xl border px-2 py-2 text-left transition active:scale-[0.98] ${
                     active
                       ? 'bg-orange-500/20 border-orange-400/60 text-orange-200'
-                      : 'bg-white/5 border-white/10 text-slate-300'
+                      : 'bg-slate-50 border-slate-200 text-slate-600'
                   }`}
                 >
                   <div className="text-base font-bold leading-none">{bid}</div>
@@ -776,7 +776,7 @@ export default function BuildingInspectionPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Napiš D pro budovu D, nebo D 1.25 pro místnost..."
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-slate-600 focus:outline-none focus:border-teal-500/50 transition"
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm placeholder-slate-400 focus:outline-none focus:border-teal-500/50 transition"
           />
         </div>
         {searchScope.buildingId && !filterBuilding && (
@@ -823,7 +823,7 @@ export default function BuildingInspectionPage() {
             <button
               type="button"
               onClick={clearAllFilters}
-              className="px-3 py-1.5 rounded-lg text-[12px] font-semibold flex-shrink-0 bg-white/5 border border-white/10 text-slate-300 active:scale-95"
+              className="px-3 py-1.5 rounded-lg text-[12px] font-semibold flex-shrink-0 bg-slate-50 border border-slate-200 text-slate-600 active:scale-95"
             >
               Vyčistit ({activeFilterCount})
             </button>
@@ -887,9 +887,9 @@ export default function BuildingInspectionPage() {
       <BottomSheet title="⚠ Popsat závadu" isOpen={!!showIssueModal} onClose={() => setShowIssueModal(null)}>
         {showIssueModal && (
           <>
-            <div className="bg-white/5 rounded-xl p-3 mb-4">
+            <div className="bg-slate-50 rounded-xl p-3 mb-4">
               <div className="text-[11px] text-slate-500">{showIssueModal.roomCode} · {showIssueModal.floor}</div>
-              <div className="text-sm font-semibold text-white mt-0.5">{showIssueModal.roomName}</div>
+              <div className="text-sm font-semibold text-slate-900 mt-0.5">{showIssueModal.roomName}</div>
               <div className="text-[12px] text-slate-400 mt-1">{showIssueModal.description}</div>
             </div>
             <FormField label="Popis závady" value={issueNote} onChange={setIssueNote} type="textarea" placeholder="Co je špatně?" required />
@@ -897,7 +897,7 @@ export default function BuildingInspectionPage() {
               <button
                 type="button"
                 onClick={() => navigate(`/tasks?task=${showIssueModal.taskId}`)}
-                className="w-full mb-3 py-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-sm font-bold flex items-center justify-center gap-2 active:scale-95"
+                className="w-full mb-3 py-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-700 text-sm font-bold flex items-center justify-center gap-2 active:scale-95"
               >
                 <ClipboardList className="w-4 h-4" />
                 Úkol už je založený - otevřít
@@ -939,12 +939,12 @@ export default function BuildingInspectionPage() {
         {showDeleteConfirm && (
           <>
             <div className="bg-red-500/10 rounded-xl p-4 mb-4 border border-red-500/20">
-              <p className="text-sm text-white font-semibold">{showDeleteConfirm.roomCode} — {showDeleteConfirm.roomName}</p>
+              <p className="text-sm text-slate-900 font-semibold">{showDeleteConfirm.roomCode} — {showDeleteConfirm.roomName}</p>
               <p className="text-xs text-slate-400 mt-1">{showDeleteConfirm.description}</p>
-              <p className="text-xs text-red-400 mt-2">Tato akce je nevratná!</p>
+              <p className="text-xs text-red-700 mt-2">Tato akce je nevratná!</p>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => setShowDeleteConfirm(null)} className="py-3 rounded-xl bg-white/5 border border-white/10 text-slate-400 text-sm font-semibold active:scale-95 transition">
+              <button onClick={() => setShowDeleteConfirm(null)} className="py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-400 text-sm font-semibold active:scale-95 transition">
                 Zrušit
               </button>
               <button onClick={handleDelete} className="py-3 rounded-xl bg-red-500 text-white text-sm font-semibold active:scale-95 transition shadow-lg shadow-red-500/30">

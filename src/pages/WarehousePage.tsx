@@ -63,21 +63,21 @@ interface WarehouseShipment {
 // ═══════════════════════════════════════════════════════════════════
 
 const RECEIPT_STATUS: Record<ReceiptStatus, { label: string; dot: string; bg: string; text: string }> = {
-  pending:  { label: 'Čeká',      dot: 'bg-amber-400',   bg: 'bg-amber-500/15', text: 'text-amber-400' },
-  accepted: { label: 'Přijato',   dot: 'bg-emerald-400', bg: 'bg-emerald-500/15', text: 'text-emerald-400' },
-  rejected: { label: 'Odmítnuto', dot: 'bg-red-400',     bg: 'bg-red-500/15',   text: 'text-red-400' },
+  pending:  { label: 'Čeká',      dot: 'bg-amber-400',   bg: 'bg-amber-500/15', text: 'text-amber-700' },
+  accepted: { label: 'Přijato',   dot: 'bg-emerald-400', bg: 'bg-emerald-500/15', text: 'text-emerald-700' },
+  rejected: { label: 'Odmítnuto', dot: 'bg-red-400',     bg: 'bg-red-500/15',   text: 'text-red-700' },
 };
 
 const SHIPMENT_STATUS: Record<ShipmentStatus, { label: string; dot: string; bg: string; text: string }> = {
-  planned: { label: 'Plánováno', dot: 'bg-blue-400',    bg: 'bg-blue-500/15',    text: 'text-blue-400' },
-  loading: { label: 'Nakládka',  dot: 'bg-amber-400 animate-pulse', bg: 'bg-amber-500/15', text: 'text-amber-400' },
-  shipped: { label: 'Odesláno',  dot: 'bg-emerald-400', bg: 'bg-emerald-500/15', text: 'text-emerald-400' },
+  planned: { label: 'Plánováno', dot: 'bg-blue-400',    bg: 'bg-blue-500/15',    text: 'text-blue-700' },
+  loading: { label: 'Nakládka',  dot: 'bg-amber-400 animate-pulse', bg: 'bg-amber-500/15', text: 'text-amber-700' },
+  shipped: { label: 'Odesláno',  dot: 'bg-emerald-400', bg: 'bg-emerald-500/15', text: 'text-emerald-700' },
 };
 
 const STOCK_CATEGORIES: Record<string, { label: string; color: string }> = {
-  raw:      { label: 'Surovina',   color: 'text-amber-400' },
-  semi:     { label: 'Polotovar',  color: 'text-blue-400' },
-  finished: { label: 'Hotový výr.', color: 'text-emerald-400' },
+  raw:      { label: 'Surovina',   color: 'text-amber-700' },
+  semi:     { label: 'Polotovar',  color: 'text-blue-700' },
+  finished: { label: 'Hotový výr.', color: 'text-emerald-700' },
 };
 
 const UNITS = ['kg', 't', 'ks', 'pal', 'bal', 'l'];
@@ -204,12 +204,12 @@ export default function WarehousePage() {
 
   if (!canView) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6">
+      <div className="min-h-screen bg-[#f1ece3] flex items-center justify-center p-6">
         <div className="bg-red-500/20 border border-red-500/30 rounded-2xl p-8 text-center max-w-md">
-          <Package className="w-16 h-16 text-red-400 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-white mb-2">Přístup odepřen</h2>
+          <Package className="w-16 h-16 text-red-700 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-slate-900 mb-2">Přístup odepřen</h2>
           <p className="text-slate-400 mb-4">Nemáte oprávnění pro Sklad výroby</p>
-          <button onClick={() => goBack()} className="px-6 py-2 bg-slate-700 text-white rounded-xl hover:bg-slate-600">Zpět</button>
+          <button onClick={() => goBack()} className="px-6 py-2 bg-slate-100 text-slate-900 rounded-xl hover:bg-slate-200">Zpět</button>
         </div>
       </div>
     );
@@ -298,16 +298,16 @@ export default function WarehousePage() {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-900 pb-24">
+    <div className="min-h-screen bg-[#f1ece3] pb-24">
       {/* Header */}
-      <div className="bg-slate-800/80 backdrop-blur-sm border-b border-slate-700/50 px-4 py-4 sticky top-0 z-20">
+      <div className="bg-white border-b border-slate-700/50 px-4 py-4 sticky top-0 z-20">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
-            <button onClick={() => goBack()} className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition">
+            <button onClick={() => goBack()} className="p-2 rounded-xl bg-slate-50 border border-slate-200 hover:bg-slate-100 transition">
               <ArrowLeft className="w-5 h-5 text-slate-400" />
             </button>
             <div>
-              <h1 className="text-lg font-bold text-white">Sklad výroby</h1>
+              <h1 className="text-lg font-bold text-slate-900">Sklad výroby</h1>
               <p className="text-xs text-slate-500">Příjem, zásoby, expedice</p>
             </div>
           </div>
@@ -327,20 +327,20 @@ export default function WarehousePage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 bg-white/5 p-1 rounded-xl">
+        <div className="flex gap-1 bg-slate-50 p-1 rounded-xl">
           {TABS.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition ${
-                activeTab === tab.id ? 'bg-white text-slate-900' : 'text-slate-400 hover:text-white'
+                activeTab === tab.id ? 'bg-white text-slate-900' : 'text-slate-400 hover:text-slate-900'
               }`}
             >
               <tab.icon className="w-4 h-4" />
               {tab.label}
               {tab.count > 0 && (
                 <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                  activeTab === tab.id ? 'bg-amber-200 text-amber-800' : 'bg-amber-500/20 text-amber-400'
+                  activeTab === tab.id ? 'bg-amber-200 text-amber-800' : 'bg-amber-500/20 text-amber-700'
                 }`}>{tab.count}</span>
               )}
             </button>
@@ -380,7 +380,7 @@ export default function WarehousePage() {
             {receipts.map(r => {
               const st = RECEIPT_STATUS[r.status];
               return (
-                <div key={r.id} className="bg-slate-800/60 rounded-2xl border border-slate-700/40 overflow-hidden">
+                <div key={r.id} className="bg-white rounded-2xl border border-slate-700/40 overflow-hidden">
                   <div className={`px-4 py-2.5 ${st.bg} flex items-center justify-between`}>
                     <div className="flex items-center gap-2">
                       <div className={`w-2.5 h-2.5 rounded-full ${st.dot}`} />
@@ -392,21 +392,21 @@ export default function WarehousePage() {
                     <div className="grid grid-cols-3 gap-3 mb-2">
                       <div>
                         <div className="text-[10px] text-slate-500 uppercase">Materiál</div>
-                        <div className="text-sm font-medium text-white">{r.materialName}</div>
+                        <div className="text-sm font-medium text-slate-900">{r.materialName}</div>
                       </div>
                       <div>
                         <div className="text-[10px] text-slate-500 uppercase">Množství</div>
-                        <div className="text-sm font-medium text-white">{r.quantity} {r.unit}</div>
+                        <div className="text-sm font-medium text-slate-900">{r.quantity} {r.unit}</div>
                       </div>
                       <div>
                         <div className="text-[10px] text-slate-500 uppercase">Dodavatel</div>
-                        <div className="text-sm font-medium text-white">{r.supplier || '—'}</div>
+                        <div className="text-sm font-medium text-slate-900">{r.supplier || '—'}</div>
                       </div>
                     </div>
                     {r.note && <p className="text-xs text-slate-400 mb-2">{r.note}</p>}
                     {canManage && r.status === 'pending' && (
                       <button onClick={() => acceptReceipt(r.id)}
-                        className="w-full py-2.5 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-emerald-500/25 transition">
+                        className="w-full py-2.5 bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-emerald-500/25 transition">
                         <CheckCircle2 className="w-3.5 h-3.5" /> Potvrdit příjem
                       </button>
                     )}
@@ -425,14 +425,14 @@ export default function WarehousePage() {
               const isLow = s.minQuantity > 0 && s.quantity <= s.minQuantity;
               const cat = STOCK_CATEGORIES[s.category] || STOCK_CATEGORIES.raw;
               return (
-                <div key={s.id} className={`bg-slate-800/60 rounded-2xl border ${isLow ? 'border-red-500/30 ring-1 ring-red-500/20' : 'border-slate-700/40'} p-4`}>
+                <div key={s.id} className={`bg-white rounded-2xl border ${isLow ? 'border-red-500/30 ring-1 ring-red-500/20' : 'border-slate-700/40'} p-4`}>
                   <div className="flex items-center justify-between mb-2">
                     <div>
-                      <div className="text-sm font-bold text-white">{s.materialName}</div>
+                      <div className="text-sm font-bold text-slate-900">{s.materialName}</div>
                       <span className={`text-[10px] font-semibold ${cat.color}`}>{cat.label}</span>
                     </div>
                     <div className="text-right">
-                      <div className={`text-lg font-bold ${isLow ? 'text-red-400' : 'text-white'}`}>{s.quantity} {s.unit}</div>
+                      <div className={`text-lg font-bold ${isLow ? 'text-red-700' : 'text-slate-900'}`}>{s.quantity} {s.unit}</div>
                       {s.minQuantity > 0 && (
                         <div className="text-[10px] text-slate-500">min: {s.minQuantity} {s.unit}</div>
                       )}
@@ -444,7 +444,7 @@ export default function WarehousePage() {
                     </div>
                   )}
                   {isLow && (
-                    <div className="mt-2 px-2 py-1 bg-red-500/10 border border-red-500/20 rounded-lg text-[11px] text-red-400 font-semibold text-center">
+                    <div className="mt-2 px-2 py-1 bg-red-500/10 border border-red-500/20 rounded-lg text-[11px] text-red-700 font-semibold text-center">
                       Pod minimem!
                     </div>
                   )}
@@ -461,7 +461,7 @@ export default function WarehousePage() {
             {shipments.map(s => {
               const st = SHIPMENT_STATUS[s.status];
               return (
-                <div key={s.id} className={`bg-slate-800/60 rounded-2xl border ${
+                <div key={s.id} className={`bg-white rounded-2xl border ${
                   s.status === 'shipped' ? 'border-emerald-500/20 opacity-70' : 'border-slate-700/40'
                 } overflow-hidden`}>
                   <div className={`px-4 py-2.5 ${st.bg} flex items-center justify-between`}>
@@ -475,21 +475,21 @@ export default function WarehousePage() {
                     <div className="grid grid-cols-3 gap-3 mb-2">
                       <div>
                         <div className="text-[10px] text-slate-500 uppercase">Produkt</div>
-                        <div className="text-sm font-medium text-white">{s.productName}</div>
+                        <div className="text-sm font-medium text-slate-900">{s.productName}</div>
                       </div>
                       <div>
                         <div className="text-[10px] text-slate-500 uppercase">Palet</div>
-                        <div className="text-sm font-medium text-white">{s.palletCount}</div>
+                        <div className="text-sm font-medium text-slate-900">{s.palletCount}</div>
                       </div>
                       <div>
                         <div className="text-[10px] text-slate-500 uppercase">Cíl</div>
-                        <div className="text-sm font-medium text-white">{s.destination || '—'}</div>
+                        <div className="text-sm font-medium text-slate-900">{s.destination || '—'}</div>
                       </div>
                     </div>
                     {s.note && <p className="text-xs text-slate-400 mb-2">{s.note}</p>}
                     {canManage && s.status !== 'shipped' && (
                       <button onClick={() => advanceShipment(s.id, s.status)}
-                        className="w-full py-2.5 bg-blue-500/15 border border-blue-500/30 text-blue-400 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-blue-500/25 transition">
+                        className="w-full py-2.5 bg-blue-500/15 border border-blue-500/30 text-blue-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-blue-500/25 transition">
                         {s.status === 'planned' ? <><TruckIcon className="w-3.5 h-3.5" /> Zahájit nakládku</> : <><ArrowUpFromLine className="w-3.5 h-3.5" /> Odeslat</>}
                       </button>
                     )}
@@ -503,7 +503,7 @@ export default function WarehousePage() {
 
       {/* ═══ NEW RECEIPT MODAL ═══ */}
       {canManage && showNewReceipt && (
-        <ModalShell title="Nový příjem" icon={<ArrowDownToLine className="w-5 h-5 text-teal-400" />} onClose={() => setShowNewReceipt(false)}>
+        <ModalShell title="Nový příjem" icon={<ArrowDownToLine className="w-5 h-5 text-teal-700" />} onClose={() => setShowNewReceipt(false)}>
           <div className="space-y-4">
             <Field label="Materiál">
               <input value={receiptForm.materialName} onChange={e => setReceiptForm(p => ({ ...p, materialName: e.target.value }))}
@@ -517,7 +517,7 @@ export default function WarehousePage() {
               <Field label="Jednotka">
                 <select value={receiptForm.unit} onChange={e => setReceiptForm(p => ({ ...p, unit: e.target.value }))}
                   className={INP_CLS} style={{ appearance: 'auto' }}>
-                  {UNITS.map(u => <option key={u} value={u} className="bg-slate-800">{u}</option>)}
+                  {UNITS.map(u => <option key={u} value={u} className="bg-white">{u}</option>)}
                 </select>
               </Field>
             </div>
@@ -540,7 +540,7 @@ export default function WarehousePage() {
 
       {/* ═══ NEW STOCK MODAL ═══ */}
       {canManage && showNewStock && (
-        <ModalShell title="Nová položka skladu" icon={<Boxes className="w-5 h-5 text-blue-400" />} onClose={() => setShowNewStock(false)}>
+        <ModalShell title="Nová položka skladu" icon={<Boxes className="w-5 h-5 text-blue-700" />} onClose={() => setShowNewStock(false)}>
           <div className="space-y-4">
             <Field label="Název materiálu">
               <input value={stockForm.materialName} onChange={e => setStockForm(p => ({ ...p, materialName: e.target.value }))}
@@ -554,14 +554,14 @@ export default function WarehousePage() {
               <Field label="Jednotka">
                 <select value={stockForm.unit} onChange={e => setStockForm(p => ({ ...p, unit: e.target.value }))}
                   className={INP_CLS} style={{ appearance: 'auto' }}>
-                  {UNITS.map(u => <option key={u} value={u} className="bg-slate-800">{u}</option>)}
+                  {UNITS.map(u => <option key={u} value={u} className="bg-white">{u}</option>)}
                 </select>
               </Field>
             </div>
             <Field label="Kategorie">
               <select value={stockForm.category} onChange={e => setStockForm(p => ({ ...p, category: e.target.value }))}
                 className={INP_CLS} style={{ appearance: 'auto' }}>
-                {Object.entries(STOCK_CATEGORIES).map(([k, v]) => <option key={k} value={k} className="bg-slate-800">{v.label}</option>)}
+                {Object.entries(STOCK_CATEGORIES).map(([k, v]) => <option key={k} value={k} className="bg-white">{v.label}</option>)}
               </select>
             </Field>
             <Field label="Umístění">
@@ -583,7 +583,7 @@ export default function WarehousePage() {
 
       {/* ═══ NEW SHIPMENT MODAL ═══ */}
       {canManage && showNewShipment && (
-        <ModalShell title="Nová expedice" icon={<TruckIcon className="w-5 h-5 text-blue-400" />} onClose={() => setShowNewShipment(false)}>
+        <ModalShell title="Nová expedice" icon={<TruckIcon className="w-5 h-5 text-blue-700" />} onClose={() => setShowNewShipment(false)}>
           <div className="space-y-4">
             <Field label="Produkt">
               <input value={shipmentForm.productName} onChange={e => setShipmentForm(p => ({ ...p, productName: e.target.value }))}
@@ -623,23 +623,23 @@ export default function WarehousePage() {
 // SHARED UI HELPERS
 // ═══════════════════════════════════════════════════════════════════
 
-const INP_CLS = 'w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-slate-600 focus:outline-none focus:border-teal-500/50 transition';
+const INP_CLS = 'w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm placeholder-slate-400 focus:outline-none focus:border-teal-500/50 transition';
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <div><label className="block text-sm text-slate-400 font-medium mb-1.5">{label}</label>{children}</div>;
 }
 
 function EmptyState({ icon, text, sub }: { icon: React.ReactNode; text: string; sub: string }) {
-  return <div className="text-center py-16">{icon}<h3 className="text-lg font-bold text-white mt-3 mb-1">{text}</h3><p className="text-slate-500 text-sm">{sub}</p></div>;
+  return <div className="text-center py-16">{icon}<h3 className="text-lg font-bold text-slate-900 mt-3 mb-1">{text}</h3><p className="text-slate-500 text-sm">{sub}</p></div>;
 }
 
 function ModalShell({ title, icon, onClose, children }: { title: string; icon: React.ReactNode; onClose: () => void; children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-[9999] flex items-end sm:items-center justify-center" onClick={onClose}>
-      <div className="bg-slate-800 rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-white/10" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-white/10">
-          <div className="flex items-center gap-2">{icon}<h2 className="text-xl font-bold text-white">{title}</h2></div>
-          <button onClick={onClose} className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-slate-400 hover:text-white transition"><X className="w-5 h-5" /></button>
+    <div className="fixed inset-0 bg-black/50 z-[9999] flex items-end sm:items-center justify-center" onClick={onClose}>
+      <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-slate-200" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-200">
+          <div className="flex items-center gap-2">{icon}<h2 className="text-xl font-bold text-slate-900">{title}</h2></div>
+          <button onClick={onClose} className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-900 transition"><X className="w-5 h-5" /></button>
         </div>
         <div className="px-6 py-5">{children}</div>
       </div>

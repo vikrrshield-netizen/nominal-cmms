@@ -120,17 +120,17 @@ export default function SchedulesPage() {
   const today = new Date().getDay();
 
   return (
-    <div className="min-h-screen bg-slate-900">
+    <div className="min-h-screen bg-[#f1ece3]">
       <div className="max-w-4xl mx-auto px-3 pt-4 pb-24">
 
         {/* Header */}
         <div className="flex items-center gap-3 mb-4">
-          <button onClick={() => goBack()} className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 hover:text-white transition">
+          <button onClick={() => goBack()} className="w-9 h-9 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-900 transition">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="flex-1">
-            <h1 className="text-xl font-bold text-white flex items-center gap-2">
-              <CalendarDays className="w-5 h-5 text-orange-400" />
+            <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+              <CalendarDays className="w-5 h-5 text-orange-700" />
               Opakované úkoly
             </h1>
             <p className="text-xs text-slate-500">{tasks.filter((t) => t.active).length} aktivních · {tasks.length} celkem</p>
@@ -140,9 +140,9 @@ export default function SchedulesPage() {
 
         {/* Today indicator */}
         <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl px-4 py-2.5 mb-4 flex items-center gap-2">
-          <Clock className="w-4 h-4 text-orange-400" />
-          <span className="text-sm text-orange-400 font-medium">Dnes: {DAY_LABELS_FULL[today]}</span>
-          <span className="text-xs text-orange-400/60 ml-auto">
+          <Clock className="w-4 h-4 text-orange-700" />
+          <span className="text-sm text-orange-700 font-medium">Dnes: {DAY_LABELS_FULL[today]}</span>
+          <span className="text-xs text-orange-700/60 ml-auto">
             {tasks.filter((t) => t.active && t.daysOfWeek.includes(today)).length} úkolů dnes
           </span>
         </div>
@@ -169,10 +169,10 @@ export default function SchedulesPage() {
                   key={task.id}
                   className={`rounded-2xl border p-4 transition ${
                     !task.active
-                      ? 'bg-slate-800/30 border-slate-700/20 opacity-50'
+                      ? 'bg-slate-50 border-slate-700/20 opacity-50'
                       : isToday
                         ? 'bg-orange-500/8 border-orange-500/25'
-                        : 'bg-slate-800/50 border-slate-700/30'
+                        : 'bg-white border-slate-700/30'
                   }`}
                 >
                   <div className="flex items-center gap-3">
@@ -180,7 +180,7 @@ export default function SchedulesPage() {
                     {canManage && (
                       <button onClick={() => toggleActive(task)} className="flex-shrink-0">
                         {task.active
-                          ? <ToggleRight className="w-7 h-7 text-emerald-400" />
+                          ? <ToggleRight className="w-7 h-7 text-emerald-700" />
                           : <ToggleLeft className="w-7 h-7 text-slate-600" />
                         }
                       </button>
@@ -189,9 +189,9 @@ export default function SchedulesPage() {
                     {/* Content */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1.5">
-                        <h3 className="text-sm font-semibold text-white truncate">{task.title}</h3>
+                        <h3 className="text-sm font-semibold text-slate-900 truncate">{task.title}</h3>
                         {isToday && task.active && (
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-orange-500/20 text-orange-400 flex-shrink-0">DNES</span>
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-orange-500/20 text-orange-700 flex-shrink-0">DNES</span>
                         )}
                       </div>
                       {/* Day chips */}
@@ -204,7 +204,7 @@ export default function SchedulesPage() {
                                 ? idx === today && task.active
                                   ? 'bg-orange-500 text-white'
                                   : 'bg-slate-600 text-white'
-                                : 'bg-white/5 text-slate-600'
+                                : 'bg-slate-50 text-slate-600'
                             }`}
                           >
                             {lbl}
@@ -219,10 +219,10 @@ export default function SchedulesPage() {
                     {/* Actions */}
                     {canManage && (
                       <div className="flex gap-1 flex-shrink-0">
-                        <button onClick={() => openEdit(task)} className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-slate-500 hover:text-blue-400 transition">
+                        <button onClick={() => openEdit(task)} className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-500 hover:text-blue-700 transition">
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
-                        <button onClick={() => setConfirmDelete(task)} className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-slate-500 hover:text-red-400 transition">
+                        <button onClick={() => setConfirmDelete(task)} className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-500 hover:text-red-700 transition">
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
@@ -253,8 +253,8 @@ export default function SchedulesPage() {
                 onClick={() => toggleDay(idx)}
                 className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition ${
                   formDays.includes(idx)
-                    ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
-                    : 'bg-white/5 text-slate-600 border border-white/10'
+                    ? 'bg-orange-500/20 text-orange-700 border border-orange-500/30'
+                    : 'bg-slate-50 text-slate-600 border border-slate-200'
                 }`}
               >
                 {lbl}
@@ -262,8 +262,8 @@ export default function SchedulesPage() {
             ))}
           </div>
           <div className="flex gap-2 mt-2">
-            <button onClick={() => setFormDays([1, 2, 3, 4, 5])} className="text-[10px] text-blue-400 hover:underline">Po-Pá</button>
-            <button onClick={() => setFormDays([0, 1, 2, 3, 4, 5, 6])} className="text-[10px] text-blue-400 hover:underline">Každý den</button>
+            <button onClick={() => setFormDays([1, 2, 3, 4, 5])} className="text-[10px] text-blue-700 hover:underline">Po-Pá</button>
+            <button onClick={() => setFormDays([0, 1, 2, 3, 4, 5, 6])} className="text-[10px] text-blue-700 hover:underline">Každý den</button>
             <button onClick={() => setFormDays([])} className="text-[10px] text-slate-500 hover:underline">Vymazat</button>
           </div>
         </div>
@@ -282,12 +282,12 @@ export default function SchedulesPage() {
         {confirmDelete && (
           <>
             <div className="bg-red-500/10 rounded-xl p-4 mb-4 border border-red-500/20">
-              <p className="text-sm text-white font-semibold">{confirmDelete.title}</p>
+              <p className="text-sm text-slate-900 font-semibold">{confirmDelete.title}</p>
               <p className="text-xs text-slate-400 mt-1">{confirmDelete.daysOfWeek.map((d) => DAY_LABELS[d]).join(', ')} · {confirmDelete.time}</p>
-              <p className="text-xs text-red-400 mt-2">Tato akce je nevratná!</p>
+              <p className="text-xs text-red-700 mt-2">Tato akce je nevratná!</p>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => setConfirmDelete(null)} className="py-3 rounded-xl bg-white/5 border border-white/10 text-slate-400 text-sm font-semibold active:scale-95 transition">
+              <button onClick={() => setConfirmDelete(null)} className="py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-400 text-sm font-semibold active:scale-95 transition">
                 Zrušit
               </button>
               <button onClick={handleDelete} className="py-3 rounded-xl bg-red-500 text-white text-sm font-semibold active:scale-95 transition shadow-lg shadow-red-500/30">
