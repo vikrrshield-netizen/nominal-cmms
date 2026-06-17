@@ -43,6 +43,7 @@ import SemaphoreWidget from '../components/dashboard/SemaphoreWidget';
 import Top5TasksWidget from '../components/dashboard/Top5TasksWidget';
 import LemonListWidget from '../components/dashboard/LemonListWidget';
 import OverviewDaylight, { type OverviewTask } from '../components/dashboard/OverviewDaylight';
+import MiniChart from '../components/ui/MiniChart';
 import { useEmployeeDirectory } from '../hooks/useEmployeeDirectory';
 import { TYPE_CONFIG as REVISION_TYPE_CONFIG } from '../hooks/useRevisions';
 
@@ -534,14 +535,6 @@ function DashboardGearboxTrend({ logs }: { logs: GearboxTemperatureLog[] }) {
   }
 
   const values = points.map((log) => log.temperatureC);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const spread = Math.max(1, max - min);
-  const polyline = points.map((log, index) => {
-    const x = points.length === 1 ? 50 : (index / (points.length - 1)) * 100;
-    const y = 34 - ((log.temperatureC - min) / spread) * 24;
-    return `${x.toFixed(2)},${y.toFixed(2)}`;
-  }).join(' ');
   const first = points[0];
   const latest = points[points.length - 1];
 
@@ -554,16 +547,15 @@ function DashboardGearboxTrend({ logs }: { logs: GearboxTemperatureLog[] }) {
         </span>
         <span className="text-cyan-800">{first.temperatureC} °C → {latest.temperatureC} °C</span>
       </div>
-      <svg viewBox="0 0 100 40" preserveAspectRatio="none" className="h-10 w-full overflow-visible">
-        <line x1="0" y1="34" x2="100" y2="34" className="stroke-slate-300" strokeWidth="1" />
-        <line x1="0" y1="10" x2="100" y2="10" className="stroke-cyan-100" strokeWidth="1" />
-        <polyline points={polyline} fill="none" className="stroke-cyan-600" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-        {points.map((log, index) => {
-          const x = points.length === 1 ? 50 : (index / (points.length - 1)) * 100;
-          const y = 34 - ((log.temperatureC - min) / spread) * 24;
-          return <circle key={`${log.id}-${index}`} cx={x} cy={y} r="2" className="fill-cyan-700" />;
-        })}
-      </svg>
+      <MiniChart
+        type="line"
+        data={values}
+        color="#0e7490"
+        height={48}
+        thresholds={[{ value: 70, color: '#e8932b' }, { value: 85, color: '#d7503a' }]}
+        unit=" °C"
+        ariaLabel="Trend teplot převodovky"
+      />
       <div className="mt-1 flex justify-between text-[11px] font-semibold text-slate-500">
         <span>{dashboardGearboxShortDate(first.measuredAt)}</span>
         <span>{dashboardGearboxShortDate(latest.measuredAt)}</span>
