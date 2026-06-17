@@ -95,15 +95,15 @@ export default function PersonalDiaryPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0f172a]">
+    <div className="min-h-screen bg-[#f1ece3]">
       {/* Header */}
-      <header className="sticky top-0 z-30 bg-[#0f172a]/95 backdrop-blur-lg border-b border-white/10">
+      <header className="sticky top-0 z-30 bg-white border-b border-slate-200">
         <div className="max-w-3xl mx-auto flex items-center gap-3 px-4 py-3">
-          <button onClick={() => goBack()} className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition">
+          <button onClick={() => goBack()} className="p-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 transition">
             <ArrowLeft className="w-5 h-5 text-slate-400" />
           </button>
           <BookOpen className="w-6 h-6 text-violet-400" />
-          <h1 className="text-lg font-bold text-white flex-1">Osobní poznámky</h1>
+          <h1 className="text-lg font-bold text-slate-900 flex-1">Osobní poznámky</h1>
           <button
             onClick={() => { setShowNew(true); setTimeout(() => textareaRef.current?.focus(), 100); }}
             className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-violet-600 text-white text-sm font-semibold hover:bg-violet-500 transition"
@@ -117,13 +117,13 @@ export default function PersonalDiaryPage() {
       <div className="max-w-3xl mx-auto px-4 py-6 space-y-4">
         {/* New Note Form */}
         {showNew && (
-          <div className="bg-slate-800/80 border border-violet-500/30 rounded-2xl p-5 space-y-4 shadow-lg shadow-violet-500/5">
+          <div className="bg-white border border-violet-200 rounded-2xl p-5 space-y-4 shadow-lg">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-bold text-violet-400 flex items-center gap-2">
                 <FileText className="w-4 h-4" /> Nová poznámka
               </h2>
               <button onClick={() => { setShowNew(false); setNewText(''); setNewAudioUrl(''); }}
-                className="p-1.5 rounded-lg bg-white/5 text-slate-500 hover:text-white transition">
+                className="p-1.5 rounded-lg bg-slate-100 text-slate-500 hover:text-slate-700 transition">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -136,7 +136,7 @@ export default function PersonalDiaryPage() {
                 onChange={(e) => setNewText(e.target.value)}
                 placeholder="Co si chceš poznamenat? Můžeš i diktovat..."
                 rows={4}
-                className="flex-1 px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-[15px] placeholder-slate-600 focus:outline-none focus:border-violet-500/50 transition resize-none min-h-[48px]"
+                className="flex-1 px-4 py-3 rounded-xl bg-[#fbf9f4] border border-slate-200 text-slate-900 text-[15px] placeholder-slate-400 focus:outline-none focus:border-emerald-600 transition resize-none min-h-[48px]"
               />
               <div className="pt-2">
                 <MicButton onTranscript={(t) => setNewText((prev) => prev ? prev + ' ' + t : t)} />
@@ -187,11 +187,11 @@ export default function PersonalDiaryPage() {
 
         {/* Notes List */}
         {notes.map((note) => (
-          <div key={note.id} className="bg-slate-800/60 border border-white/5 rounded-2xl p-4 hover:border-white/10 transition group">
+          <div key={note.id} className="bg-white border border-slate-200 rounded-2xl p-4 hover:border-slate-300 transition group">
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1 min-w-0">
                 {note.text && (
-                  <p className="text-white text-sm whitespace-pre-wrap leading-relaxed">{note.text}</p>
+                  <p className="text-slate-900 text-sm whitespace-pre-wrap leading-relaxed">{note.text}</p>
                 )}
                 {note.audioUrl && (
                   <div className="mt-2 flex items-center gap-2">
@@ -203,7 +203,7 @@ export default function PersonalDiaryPage() {
               </div>
               <button
                 onClick={() => handleDelete(note.id)}
-                className="p-2 rounded-lg bg-white/5 text-slate-600 hover:text-red-400 hover:bg-red-500/10 transition opacity-0 group-hover:opacity-100"
+                className="p-2 rounded-lg bg-slate-100 text-slate-400 hover:text-red-600 hover:bg-red-50 transition opacity-0 group-hover:opacity-100"
                 title="Smazat"
               >
                 <Trash2 className="w-3.5 h-3.5" />

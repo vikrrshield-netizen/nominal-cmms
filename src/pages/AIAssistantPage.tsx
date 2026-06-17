@@ -281,7 +281,7 @@ export default function AIAssistantPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0f172a] flex flex-col">
+    <div className="min-h-screen bg-[#f1ece3] flex flex-col">
       {/* Background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/4 left-1/4 w-[300px] h-[300px] md:w-[500px] md:h-[500px] bg-amber-500/10 rounded-full blur-[120px]" />
@@ -289,11 +289,11 @@ export default function AIAssistantPage() {
       </div>
 
       {/* Header */}
-      <header className="relative z-10 p-4 border-b border-white/10">
+      <header className="relative z-10 p-4 border-b border-slate-200">
         <div className="flex items-center gap-4">
           <button 
             onClick={() => goBack()}
-            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition"
+            className="p-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 transition"
           >
             <ArrowLeft className="w-5 h-5 text-slate-400" />
           </button>
@@ -303,7 +303,7 @@ export default function AIAssistantPage() {
               <Sparkles className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-white">{appConfig.PRODUCT_NAME} AI</h1>
+              <h1 className="text-lg font-bold text-slate-900">{appConfig.PRODUCT_NAME} AI</h1>
               <p className="text-xs text-slate-400">
                 {isListening ? '🎤 Poslouchám...' : isProcessing ? '🤔 Přemýšlím...' : '✨ Připraven'}
               </p>
@@ -313,14 +313,14 @@ export default function AIAssistantPage() {
           <button
             onClick={() => setShowOcr(!showOcr)}
             title="Skenovat papírový deník"
-            className={`p-2 rounded-xl transition ${showOcr ? 'bg-violet-500 text-white' : 'bg-white/5 hover:bg-white/10 text-slate-400'}`}
+            className={`p-2 rounded-xl transition ${showOcr ? 'bg-violet-500 text-white' : 'bg-white border border-slate-200 hover:bg-slate-50 text-slate-500'}`}
           >
             <Camera className="w-5 h-5" />
           </button>
 
           <button
             onClick={() => isSpeaking ? speechSynthesis.cancel() : null}
-            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition"
+            className="p-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 transition"
           >
             {isSpeaking ? <VolumeX className="w-5 h-5 text-amber-400" /> : <Volume2 className="w-5 h-5 text-slate-400" />}
           </button>
@@ -329,12 +329,12 @@ export default function AIAssistantPage() {
 
       {/* OCR Panel */}
       {showOcr && (
-        <div className="relative z-10 mx-4 mt-3 bg-violet-500/10 border border-violet-500/30 rounded-2xl p-4 space-y-3">
+        <div className="relative z-10 mx-4 mt-3 bg-violet-50 border border-violet-200 rounded-2xl p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-violet-400 flex items-center gap-2">
+            <h3 className="text-sm font-bold text-violet-700 flex items-center gap-2">
               <Camera className="w-4 h-4" /> Skenovat papírový deník
             </h3>
-            <button onClick={() => { setShowOcr(false); setOcrResult(null); }} className="p-1 rounded-lg bg-white/5 text-slate-500 hover:text-white transition">
+            <button onClick={() => { setShowOcr(false); setOcrResult(null); }} className="p-1 rounded-lg bg-slate-100 text-slate-500 hover:text-slate-700 transition">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -343,7 +343,7 @@ export default function AIAssistantPage() {
           <div>
             <input ref={ocrInputRef} type="file" accept="image/*" capture="environment" onChange={handleOcrImageSelect} className="hidden" id="ocr-upload" />
             <label htmlFor="ocr-upload"
-              className="w-full py-3 rounded-xl bg-white/5 border border-dashed border-violet-500/40 text-violet-300 text-sm font-semibold hover:bg-white/8 transition flex items-center justify-center gap-2 cursor-pointer min-h-[48px]">
+              className="w-full py-3 rounded-xl bg-slate-50 border border-dashed border-violet-300 text-violet-700 text-sm font-semibold hover:bg-slate-100 transition flex items-center justify-center gap-2 cursor-pointer min-h-[48px]">
               <Camera className="w-4 h-4" />
               {ocrProcessing ? 'Zpracovávám...' : 'Vyfotit nebo nahrát obrázek'}
             </label>
@@ -351,33 +351,33 @@ export default function AIAssistantPage() {
 
           {/* Processing */}
           {ocrProcessing && (
-            <div className="flex items-center gap-3 text-violet-300 text-sm">
+            <div className="flex items-center gap-3 text-violet-700 text-sm">
               <Loader2 className="w-4 h-4 animate-spin" /> Rozpoznávám text z obrázku...
             </div>
           )}
 
           {/* Result preview */}
           {ocrResult && !ocrProcessing && (
-            <div className="bg-white/5 rounded-xl p-3 space-y-2">
+            <div className="bg-slate-50 rounded-xl p-3 space-y-2">
               <div className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">Rozpoznaná data</div>
-              <div className="text-xs text-slate-300 italic bg-black/20 rounded-lg p-2">&ldquo;{ocrResult.rawText}&rdquo;</div>
+              <div className="text-xs text-slate-600 italic bg-white border border-slate-200 rounded-lg p-2">&ldquo;{ocrResult.rawText}&rdquo;</div>
               <div className="grid grid-cols-1 gap-1.5 mt-2">
                 {ocrResult.assetName && (
                   <div className="flex items-center gap-2 text-xs">
                     <span className="text-slate-500 w-16">Zařízení:</span>
-                    <span className="text-white font-medium">{ocrResult.assetName}</span>
+                    <span className="text-slate-900 font-medium">{ocrResult.assetName}</span>
                   </div>
                 )}
                 {ocrResult.task && (
                   <div className="flex items-center gap-2 text-xs">
                     <span className="text-slate-500 w-16">Úkol:</span>
-                    <span className="text-white font-medium">{ocrResult.task}</span>
+                    <span className="text-slate-900 font-medium">{ocrResult.task}</span>
                   </div>
                 )}
                 {ocrResult.technician && (
                   <div className="flex items-center gap-2 text-xs">
                     <span className="text-slate-500 w-16">Technik:</span>
-                    <span className="text-white font-medium">{ocrResult.technician}</span>
+                    <span className="text-slate-900 font-medium">{ocrResult.technician}</span>
                   </div>
                 )}
               </div>
@@ -411,7 +411,7 @@ export default function AIAssistantPage() {
             <div className={`max-w-[80%] p-4 rounded-2xl ${
               message.role === 'user' 
                 ? 'bg-blue-500 text-white' 
-                : 'bg-white/10 text-white'
+                : 'bg-white border border-slate-200 text-slate-900'
             }`}>
               <p className="whitespace-pre-wrap">{message.content}</p>
 
@@ -427,8 +427,8 @@ export default function AIAssistantPage() {
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
               <Bot className="w-5 h-5 text-white" />
             </div>
-            <div className="bg-white/10 p-4 rounded-2xl">
-              <Loader2 className="w-5 h-5 text-white animate-spin" />
+            <div className="bg-white border border-slate-200 p-4 rounded-2xl">
+              <Loader2 className="w-5 h-5 text-slate-500 animate-spin" />
             </div>
           </div>
         )}
@@ -465,14 +465,14 @@ export default function AIAssistantPage() {
       </div>
 
       {/* Input */}
-      <div className="relative z-10 p-4 border-t border-white/10">
+      <div className="relative z-10 p-4 border-t border-slate-200">
         <div className="flex gap-2">
           <button
             onClick={toggleListening}
             className={`p-4 rounded-2xl transition ${
               isListening
                 ? 'bg-red-500 text-white animate-pulse'
-                : 'bg-white/10 text-slate-400 hover:bg-white/20'
+                : 'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'
             }`}
           >
             {isListening ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
@@ -484,7 +484,7 @@ export default function AIAssistantPage() {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
             placeholder={isListening ? 'Poslouchám...' : 'Napište nebo řekněte příkaz...'}
-            className="flex-1 p-4 bg-white/10 border border-white/10 rounded-2xl text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/50"
+            className="flex-1 p-4 bg-[#fbf9f4] border border-slate-200 rounded-2xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-600"
             disabled={isListening}
           />
 
