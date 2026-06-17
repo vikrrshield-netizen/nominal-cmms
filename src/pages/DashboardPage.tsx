@@ -1963,9 +1963,12 @@ function DashboardZone({
   return (
     <section className="mb-5 rounded-3xl border border-stone-200 bg-white/90 p-4 shadow-sm shadow-stone-200/70">
       <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <div className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700">{title}</div>
-          <div className="mt-1 text-sm font-semibold text-slate-600">{description}</div>
+        <div className="flex items-start gap-2.5">
+          <span className="mt-0.5 h-7 w-1.5 flex-shrink-0 rounded-full bg-emerald-600" aria-hidden="true" />
+          <div>
+            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700">{title}</div>
+            <div className="mt-1 text-sm font-semibold text-slate-600">{description}</div>
+          </div>
         </div>
       </div>
       <div className="space-y-4">{children}</div>
@@ -2167,12 +2170,12 @@ function FullDashboard() {
       <div className="mx-auto max-w-[1360px] px-3 pt-4 pb-24 sm:px-4 xl:px-5">
 
         {/* HEADER */}
-        <div className="flex items-center justify-between mb-5 rounded-2xl border border-stone-200 bg-white px-4 py-3 shadow-sm shadow-stone-200/70">
-          <div className="flex min-w-0 items-center gap-3">
-            <BrandMark size="sm" tone="dark" showText={false} />
+        <div className="flex items-center justify-between gap-3 mb-5 overflow-hidden rounded-3xl border border-stone-200 bg-gradient-to-br from-emerald-50 via-white to-white px-4 py-4 sm:px-5 shadow-sm shadow-stone-200/70">
+          <div className="flex min-w-0 items-center gap-3.5">
+            <BrandMark size="md" tone="dark" showText={false} />
             <div className="min-w-0">
               <div className="truncate text-[10px] text-emerald-700 uppercase tracking-widest font-bold">{appConfig.APP_NAME}</div>
-              <h1 className="truncate text-xl font-black text-slate-950 mt-0.5">{greeting()}, {userName}</h1>
+              <h1 className="truncate text-2xl font-black text-slate-950 mt-0.5">{greeting()}, {userName}</h1>
             <div className="text-xs text-slate-500 mt-0.5">
               {time.toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
             </div>
