@@ -2276,6 +2276,21 @@ function FullDashboard() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <form
+              onSubmit={(e) => { e.preventDefault(); const q = (e.currentTarget.elements.namedItem('q') as HTMLInputElement)?.value?.trim() || ''; navigate(q ? `/kartoteka?q=${encodeURIComponent(q)}` : '/kartoteka'); }}
+              className="hidden md:flex items-center gap-2 h-10 rounded-xl border border-stone-200 bg-white px-3 focus-within:border-emerald-300 transition"
+            >
+              <Search className="w-4 h-4 text-slate-400" />
+              <input name="q" placeholder="Hledat stroj, úkol, revizi…" className="w-44 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400" />
+            </form>
+            <button
+              type="button"
+              onClick={() => navigate('/tasks?new=1')}
+              className="w-10 h-10 rounded-xl bg-emerald-700 text-white flex items-center justify-center hover:bg-emerald-600 transition"
+              aria-label="Nový úkol"
+            >
+              <PlusCircle className="w-5 h-5" />
+            </button>
             <button
               type="button"
               onClick={() => navigate('/notifications')}
@@ -2299,23 +2314,6 @@ function FullDashboard() {
           </div>
         </div>
 
-        {/* Hlavní akce */}
-        <div className="mb-4 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setActiveModal('fault')}
-            className="flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-black text-white transition hover:bg-red-700 active:scale-[0.98]"
-          >
-            <AlertTriangle className="h-4 w-4" /> Nahlásit poruchu
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate('/tasks?new=1')}
-            className="flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-black text-white transition hover:bg-emerald-600 active:scale-[0.98]"
-          >
-            <PlusCircle className="h-4 w-4" /> Nový úkol
-          </button>
-        </div>
 
         {/* LOADING */}
         {(stats.loading || configLoading) && (
