@@ -10,6 +10,7 @@ import {
   Search, Plus, QrCode, Truck, X,
   CheckCircle2, TrendingDown, TrendingUp, Loader2,
   Download, Trash2, Upload, Cog, Printer, PackageCheck, ChevronRight,
+  Circle, Droplet, Filter, Link2, Package, Zap,
 } from 'lucide-react';
 import { useReports } from '../hooks/useReports';
 import { doc, deleteDoc } from 'firebase/firestore';
@@ -28,13 +29,13 @@ import type { InventoryItem, ItemCategory, NewInventoryItemInput } from '../type
 type StockStatus = 'ok' | 'low' | 'critical' | 'out';
 
 const CATEGORIES = [
-  { id: 'bearings', label: 'Ložiska', icon: '⚙️' },
-  { id: 'belts', label: 'Řemeny', icon: '🔗' },
-  { id: 'seals', label: 'Těsnění', icon: '⭕' },
-  { id: 'oils', label: 'Oleje', icon: '🛢️' },
-  { id: 'filters', label: 'Filtry', icon: '🌀' },
-  { id: 'electrical', label: 'Elektro', icon: '⚡' },
-  { id: 'other', label: 'Ostatní', icon: '📦' },
+  { id: 'bearings', label: 'Ložiska', icon: Cog },
+  { id: 'belts', label: 'Řemeny', icon: Link2 },
+  { id: 'seals', label: 'Těsnění', icon: Circle },
+  { id: 'oils', label: 'Oleje', icon: Droplet },
+  { id: 'filters', label: 'Filtry', icon: Filter },
+  { id: 'electrical', label: 'Elektro', icon: Zap },
+  { id: 'other', label: 'Ostatní', icon: Package },
 ];
 
 const STATUS_CONFIG: Record<StockStatus, { label: string; color: string; bgColor: string }> = {
@@ -425,7 +426,7 @@ export default function InventoryPage() {
                 filterCategory === cat.id ? 'bg-emerald-700 text-white' : 'bg-white border text-slate-600'
               }`}
             >
-              <span>{cat.icon}</span>
+              <cat.icon className="w-4 h-4" />
               <span>{cat.label}</span>
             </button>
           ))}
@@ -514,8 +515,8 @@ export default function InventoryPage() {
                     onClick={() => setSelectedItem(item)}
                     className="w-full p-4 text-left hover:bg-emerald-50/40 transition flex items-center gap-3"
                   >
-                    <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-xl flex-shrink-0">
-                      {category?.icon || '📦'}
+                    <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
+                      {category?.icon ? <category.icon className="w-5 h-5 text-slate-600" /> : <Package className="w-5 h-5 text-slate-600" />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
@@ -725,7 +726,7 @@ function CreateItemModal({ onClose, onCreate }: {
                 className={inputClass}
               >
                 {CATEGORIES.map((cat) => (
-                  <option key={cat.id} value={cat.id}>{cat.icon} {cat.label}</option>
+                  <option key={cat.id} value={cat.id}>{cat.label}</option>
                 ))}
               </select>
             </div>
@@ -933,7 +934,7 @@ function ItemDetailModal({ item, onClose, canManage, onIssue, onReceive, assets,
       <div className="bg-white rounded-t-3xl md:rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="sticky top-0 bg-white border-b p-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-2xl">{category?.icon}</span>
+            {category?.icon ? <category.icon className="h-6 w-6 text-slate-600" /> : null}
             <span className="font-mono text-base font-semibold text-slate-700">{item.code}</span>
           </div>
           <button onClick={onClose} className="p-3 min-h-12 min-w-12 rounded-lg hover:bg-slate-100">
