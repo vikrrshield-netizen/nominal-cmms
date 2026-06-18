@@ -964,23 +964,21 @@ export default function InspectionsPage() {
                 <div className="rounded-xl border border-slate-200 bg-[#fbf9f4] p-3">
                   <div className="text-xs font-black uppercase tracking-wide text-slate-600">Dnes provedeno</div>
                   {todayResultLogs.length > 0 ? (
-                    <div className="mt-2 space-y-2">
+                    <div className="mt-1">
                       {todayResultLogs.slice(0, 6).map((log) => (
-                        <div key={log.id} className="rounded-lg border border-slate-200 bg-white p-2">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <div className="truncate text-sm font-black text-slate-950">{log.roomName || 'Bez místnosti'}</div>
-                              <div className="truncate text-xs font-semibold text-slate-600">{log.checkPoints || log.roomCode || frequencyLabel(log.frequency)}</div>
-                            </div>
-                            <span className={`shrink-0 rounded-full px-2 py-1 text-xs font-black ${log.status === 'defect' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'}`}>
-                              {log.status === 'defect' ? 'Závada' : 'OK'}
-                            </span>
+                        <div key={log.id} className="flex items-center justify-between gap-2 border-t border-stone-100 py-2 first:border-t-0">
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-bold text-slate-950">{log.roomName || 'Bez místnosti'}</div>
+                            <div className="truncate text-xs text-slate-600">{log.checkPoints || log.roomCode || frequencyLabel(log.frequency)}</div>
                           </div>
+                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${log.status === 'defect' ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-800'}`}>
+                            {log.status === 'defect' ? 'Závada' : 'OK'}
+                          </span>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div className="mt-2 rounded-lg border border-slate-200 bg-white p-3 text-sm font-semibold text-slate-600">
+                    <div className="mt-2 py-3 text-sm font-medium text-slate-500">
                       Dnes v aktuálním výběru není žádný dokončený zápis.
                     </div>
                   )}
@@ -989,18 +987,20 @@ export default function InspectionsPage() {
                 <div className="rounded-xl border border-red-200 bg-red-50 p-3">
                   <div className="text-xs font-black uppercase tracking-wide text-red-700">Závady k reportu</div>
                   {resultDefectLogs.length > 0 ? (
-                    <div className="mt-2 space-y-2">
+                    <div className="mt-1">
                       {resultDefectLogs.slice(0, 6).map((log) => (
-                        <div key={log.id} className="rounded-lg border border-red-200 bg-white p-2">
-                          <div className="text-sm font-black text-slate-950">{log.roomName || 'Bez místnosti'}</div>
-                          <div className="inspection-text-block mt-1 text-sm font-semibold">{log.defectNote || 'Bez popisu závady'}</div>
+                        <div key={log.id} className="flex items-start justify-between gap-3 border-t border-red-100 py-2 first:border-t-0">
+                          <div className="min-w-0">
+                            <div className="text-sm font-bold text-slate-950">{log.roomName || 'Bez místnosti'}</div>
+                            <div className="inspection-text-block text-xs text-slate-600">{log.defectNote || 'Bez popisu závady'}</div>
+                          </div>
                           {log.taskId && (
                             <button
                               type="button"
                               onClick={() => navigate(`/tasks?task=${log.taskId}`)}
-                              className="mt-2 text-xs font-black text-blue-700 underline"
+                              className="shrink-0 whitespace-nowrap text-xs font-bold text-blue-700 hover:underline"
                             >
-                              otevřít úkol
+                              otevřít →
                             </button>
                           )}
                         </div>
