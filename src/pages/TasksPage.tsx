@@ -708,20 +708,20 @@ function TaskCard({ task, onClick, onEdit, onDelete, onAddLog, onTake, onComplet
         {/* TITLE */}
         <h4 className="text-base font-black text-slate-950 leading-tight mb-2 line-clamp-2">{task.title}</h4>
 
-        <div className="space-y-2 mb-3">
-          <div className="rounded-xl border border-red-200 bg-red-50 p-2.5">
-            <div className="text-[10px] font-black uppercase tracking-wide text-red-600 mb-1">Problém</div>
+        <div className="mb-3 border-y border-stone-100 divide-y divide-stone-100">
+          <div className="py-2">
+            <div className="text-[10px] font-black uppercase tracking-wide text-slate-400 mb-0.5">Problém</div>
             <div className="text-sm font-semibold text-slate-900 line-clamp-3">{problem || 'Bez popisu problému.'}</div>
           </div>
-          <div className="rounded-xl border border-blue-200 bg-blue-50 p-2.5">
-            <div className="text-[10px] font-black uppercase tracking-wide text-blue-600 mb-1">Týká se</div>
+          <div className="py-2">
+            <div className="text-[10px] font-black uppercase tracking-wide text-slate-400 mb-0.5">Týká se</div>
             <div className="text-sm font-semibold text-slate-900 line-clamp-2">{action}</div>
           </div>
           {task.lastUpdate && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-2.5">
-              <div className="flex items-center justify-between gap-2 text-[10px] font-black uppercase tracking-wide text-amber-600 mb-1">
+            <div className="py-2">
+              <div className="flex items-center justify-between gap-2 text-[10px] font-black uppercase tracking-wide text-slate-400 mb-0.5">
                 <span>Poslední aktualizace</span>
-                {task.lastUpdateAt && <span className="normal-case tracking-normal text-amber-700">{timeAgo(task.lastUpdateAt)}</span>}
+                {task.lastUpdateAt && <span className="normal-case tracking-normal text-slate-500">{timeAgo(task.lastUpdateAt)}</span>}
               </div>
               <div className="text-sm font-semibold text-slate-900 line-clamp-2">{task.lastUpdate}</div>
               {task.lastUpdateBy && <div className="text-xs font-medium text-slate-600 mt-1">{task.lastUpdateBy}</div>}
@@ -764,15 +764,15 @@ function TaskCard({ task, onClick, onEdit, onDelete, onAddLog, onTake, onComplet
           <>
             <button
               onClick={(e) => { e.stopPropagation(); onTake(); }}
-              className="flex-1 min-h-11 rounded-lg flex items-center justify-center gap-1.5 border border-amber-200 bg-amber-50 text-amber-800 text-xs font-bold hover:bg-amber-100 transition"
+              className="flex-1 min-h-11 rounded-lg flex items-center justify-center gap-1.5 border border-stone-200 bg-white text-slate-700 text-xs font-bold hover:bg-stone-50 transition"
             >
-              <Play className="w-4 h-4" /> Přebírám
+              <Play className="w-4 h-4 text-amber-600" /> Přebírám
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); onAddLog(); }}
-              className="flex-1 min-h-11 rounded-lg flex items-center justify-center gap-1.5 border border-sky-200 bg-sky-50 text-sky-700 text-xs font-bold hover:bg-sky-100 transition"
+              className="flex-1 min-h-11 rounded-lg flex items-center justify-center gap-1.5 border border-stone-200 bg-white text-slate-700 text-xs font-bold hover:bg-stone-50 transition"
             >
-              <FileText className="w-4 h-4" /> Zápis
+              <FileText className="w-4 h-4 text-slate-500" /> Zápis
             </button>
             <button
               onClick={(e) => {
@@ -792,7 +792,7 @@ function TaskCard({ task, onClick, onEdit, onDelete, onAddLog, onTake, onComplet
         )}
         <button
           onClick={(e) => { e.stopPropagation(); onEdit(); }}
-          className="w-11 h-11 shrink-0 rounded-lg flex items-center justify-center border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 transition"
+          className="w-11 h-11 shrink-0 rounded-lg flex items-center justify-center border border-stone-200 bg-white text-slate-600 hover:bg-stone-50 transition"
         >
           <Edit2 className="w-4 h-4" />
         </button>
