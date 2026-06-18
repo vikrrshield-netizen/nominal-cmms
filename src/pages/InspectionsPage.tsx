@@ -708,7 +708,7 @@ export default function InspectionsPage() {
     <div className="vik-page min-h-screen text-slate-950 pb-24">
       {/* Header */}
       <div className="vik-page-header sticky top-0 z-30 px-4 py-3">
-        <div className="flex items-center gap-3">
+        <div className="mx-auto w-full max-w-[1200px] flex items-center gap-3">
           <button onClick={() => navigate(-1)} className="p-2 rounded-lg hover:bg-slate-100">
             <ArrowLeft className="w-5 h-5" />
           </button>
@@ -735,7 +735,7 @@ export default function InspectionsPage() {
         </div>
       </div>
 
-      <div className="px-4 pt-3">
+      <div className="mx-auto w-full max-w-[1200px] px-4 pt-3">
         <section className="mb-3">
           <div className="mb-2 flex items-center justify-between gap-3">
             <div>
@@ -1118,7 +1118,7 @@ export default function InspectionsPage() {
           </div>
         </div>
 
-      <div className="px-4 mb-4">
+      <div className="mx-auto w-full max-w-[1200px] px-4 mb-4">
         <div className="bg-white border border-slate-200 rounded-2xl p-3 space-y-3 shadow-sm">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -1350,7 +1350,7 @@ export default function InspectionsPage() {
 
       {/* ═══ NEDODĚLKY Z MINULA ═══ */}
       {previousDefects.length > 0 && (
-        <div className="px-4 mb-4">
+        <div className="mx-auto w-full max-w-[1200px] px-4 mb-4">
           <div className="bg-white rounded-2xl border border-red-200 shadow-sm overflow-hidden">
             <div className="flex items-center justify-between p-4 border-b border-red-100 bg-red-50">
               <div className="flex items-center gap-3">
@@ -1417,7 +1417,7 @@ export default function InspectionsPage() {
       )}
 
       {/* Excel-like checklist */}
-      <div className="px-4 space-y-3">
+      <div className="mx-auto w-full max-w-[1200px] px-4 space-y-3">
         {Object.entries(excelGrouped).map(([groupKey, items]) => {
           const isExpanded = expandedGroups[groupKey] !== false; // default expanded
           const groupDone = items.filter((l) => inspectionEffectiveStatus(l, selectedMonth) !== 'pending').length;
@@ -1815,7 +1815,7 @@ function InspectionArchiveView({
   return (
     <div className="vik-page min-h-screen text-slate-950 pb-24">
       <div className="vik-page-header sticky top-0 z-30 px-4 py-3">
-        <div className="flex items-center gap-3">
+        <div className="mx-auto w-full max-w-[1200px] flex items-center gap-3">
           <button onClick={onBack} className="p-2 rounded-lg hover:bg-slate-100">
             <ArrowLeft className="w-5 h-5" />
           </button>
