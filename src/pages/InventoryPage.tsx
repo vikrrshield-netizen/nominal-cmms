@@ -285,7 +285,7 @@ export default function InventoryPage() {
             {canManage && (
               <button
                 onClick={() => setShowImportModal(true)}
-                className="min-h-12 bg-sky-600 text-white px-3 py-3 rounded-lg font-medium flex items-center gap-2 hover:bg-sky-700"
+                className="min-h-12 bg-white border border-stone-200 text-slate-700 px-3 py-3 rounded-lg font-medium flex items-center gap-2 hover:bg-stone-50"
                 title="Import z Excelu"
               >
                 <Upload className="w-5 h-5" />
@@ -843,7 +843,7 @@ function CreateItemModal({ onClose, onCreate }: {
               type="button"
               onClick={handleSubmit}
               disabled={saving}
-              className="flex-1 min-h-12 py-3 bg-blue-600 text-white rounded-xl font-bold disabled:opacity-50 flex items-center justify-center gap-2 hover:bg-blue-700"
+              className="flex-1 min-h-12 py-3 bg-emerald-600 text-white rounded-xl font-bold disabled:opacity-50 flex items-center justify-center gap-2 hover:bg-blue-700"
             >
               {saving && <Loader2 className="w-4 h-4 animate-spin" />}
               Vytvořit položku
@@ -1131,7 +1131,7 @@ function ItemDetailModal({ item, onClose, canManage, onIssue, onReceive, assets,
                     <button
                       onClick={handleAdjust}
                       disabled={!adjustAmount || saving}
-                      className="flex-1 min-h-12 py-3 bg-blue-600 text-white rounded-xl font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                      className="flex-1 min-h-12 py-3 bg-emerald-600 text-white rounded-xl font-medium disabled:opacity-50 flex items-center justify-center gap-2"
                     >
                       {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                       Zapsat
@@ -1226,7 +1226,7 @@ function QrScannerModal({ items, onClose, onSelect }: {
               <button
                 type="button"
                 onClick={handleManualSearch}
-                className="min-h-12 rounded-xl bg-blue-600 px-4 font-bold text-white"
+                className="min-h-12 rounded-xl bg-emerald-600 px-4 font-bold text-white"
               >
                 Najít
               </button>

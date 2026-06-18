@@ -820,7 +820,7 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
                     <button
                       data-testid="admin-user-edit"
                       onClick={() => setIsEditing(true)}
-                      className="flex-1 flex items-center justify-center gap-2 p-3 bg-blue-500 text-white rounded-xl"
+                      className="flex-1 flex items-center justify-center gap-2 p-3 bg-emerald-600 text-white rounded-xl"
                     >
                       <Edit2 className="w-4 h-4" />
                       Upravit

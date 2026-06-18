@@ -488,8 +488,8 @@ function TaskSummary({ tasks }: { tasks: Task[] }) {
       {[
         { value: p1, label: 'Havárie', color: '#f87171' },
         { value: p2, label: 'Tento týden', color: '#fbbf24' },
-        { value: inProgress, label: 'V řešení', color: '#f97316' },
-        { value: open.length, label: 'Otevřeno', color: '#60a5fa' },
+        { value: inProgress, label: 'V řešení', color: '#64748b' },
+        { value: open.length, label: 'Otevřeno', color: '#64748b' },
         { value: done, label: 'Hotovo', color: '#34d399' },
       ].map((s) => (
         <div

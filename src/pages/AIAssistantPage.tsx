@@ -284,8 +284,8 @@ export default function AIAssistantPage() {
     <div className="min-h-screen bg-[#f1ece3] flex flex-col">
       {/* Background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-[300px] h-[300px] md:w-[500px] md:h-[500px] bg-amber-500/10 rounded-full blur-[120px]" />
-        <div className="absolute bottom-1/4 right-1/4 w-[300px] h-[300px] md:w-[500px] md:h-[500px] bg-orange-500/10 rounded-full blur-[120px]" />
+        <div className="absolute top-1/4 left-1/4 w-[300px] h-[300px] md:w-[500px] md:h-[500px] bg-emerald-600/10 rounded-full blur-[120px]" />
+        <div className="absolute bottom-1/4 right-1/4 w-[300px] h-[300px] md:w-[500px] md:h-[500px] bg-emerald-700/5 rounded-full blur-[120px]" />
       </div>
 
       {/* Header */}
@@ -403,7 +403,7 @@ export default function AIAssistantPage() {
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
               message.role === 'user' 
                 ? 'bg-blue-500' 
-                : 'bg-gradient-to-br from-amber-400 to-orange-500'
+                : 'bg-emerald-600'
             }`}>
               {message.role === 'user' ? <User className="w-5 h-5 text-white" /> : <Bot className="w-5 h-5 text-white" />}
             </div>
