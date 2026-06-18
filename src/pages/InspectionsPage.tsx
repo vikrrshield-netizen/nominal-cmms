@@ -5,9 +5,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, AlertTriangle, Building2,
-  ChevronDown, ChevronRight, X, Loader2, ClipboardCheck, CheckCircle2, RotateCcw,
-  FileSpreadsheet, FileText, ExternalLink, Search, Archive, Unlock, Lock, Clock
+  ArrowLeft, AlertTriangle,
+  ChevronDown, ChevronRight, ChevronLeft, X, Loader2, ClipboardCheck, CheckCircle2, RotateCcw,
+  FileSpreadsheet, FileText, Search, Archive, Unlock, Lock, Clock, Check, MoreVertical
 } from 'lucide-react';
 import { useInspections } from '../hooks/useInspections';
 import type { InspectionFrequency, InspectionLog, InspectionStats } from '../hooks/useInspections';
@@ -185,6 +185,22 @@ function runTimestamp(value: unknown): number {
   return runDate(value)?.getTime() || 0;
 }
 
+function initialsOf(name?: string): string {
+  const parts = safeText(name).trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function timeLabel(log: InspectionLog): string {
+  const date = log.completedAt?.toDate?.();
+  return date ? date.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' }) : '';
+}
+
+// Donut (stav kontroly) — ruční SVG, bez knihovny
+const DONUT_R = 30;
+const DONUT_C = 2 * Math.PI * DONUT_R;
+
 // ═══════════════════════════════════════
 // PAGE
 // ═══════════════════════════════════════
@@ -231,9 +247,8 @@ export default function InspectionsPage() {
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState<'xlsx' | 'pdf' | null>(null);
   const [filter, setFilter] = useState<'all' | 'pending' | 'ok' | 'defect'>('pending');
-  const [showResultPanel, setShowResultPanel] = useState(true);
-  const [showStatusFilters, setShowStatusFilters] = useState(false);
   const [showPlanningTools, setShowPlanningTools] = useState(false);
+  const [modalStatus, setModalStatus] = useState<'none' | 'ok' | 'defect'>('defect');
   const [selectedBuildings, setSelectedBuildings] = useState<string[]>([]);
   const [selectedFloors, setSelectedFloors] = useState<string[]>([]);
   const [selectedFrequencies, setSelectedFrequencies] = useState<InspectionFrequency[]>([]);
@@ -386,6 +401,8 @@ export default function InspectionsPage() {
     [scopedBaseLogs, selectedMonth],
   );
 
+  const donutDash = (scopedStats.percentDone / 100) * DONUT_C;
+
   const resultLogs = useMemo(() => (
     scopedBaseLogs
       .slice()
@@ -511,6 +528,20 @@ export default function InspectionsPage() {
       showToast('Chyba při ukládání', 'error');
     }
     setSaving(false);
+  };
+
+  const openInspectionModal = (log: InspectionLog, mode: 'none' | 'ok' | 'defect') => {
+    if (mode === 'ok') {
+      void handleOk(log);
+      return;
+    }
+    setActiveLog(log);
+    setDefectNote(log.defectNote || '');
+    setTaskPriority('P2');
+    setFoodSafetyRisk(log.foodSafetyRisk === true);
+    setFoodSafetyHazardType(log.foodSafetyHazardType || 'foreign_body');
+    setFoodSafetyImpact(log.foodSafetyImpact || 'medium');
+    setModalStatus(mode);
   };
 
   const openInspectionNote = (log: InspectionLog) => {
@@ -713,413 +744,140 @@ export default function InspectionsPage() {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="flex-1">
-            <h1 className="text-xl font-bold flex items-center gap-2">
+            <h1 className="text-xl font-black flex items-center gap-2">
               <ClipboardCheck className="w-6 h-6 text-emerald-700" />
               Kontroly
             </h1>
-            <p className="text-sm text-slate-600">Uložené doklady podle data uzavření</p>
+            <p className="truncate text-sm font-semibold text-slate-600">Měsíční kontrolní checklist · doklad podle data uzavření</p>
+          </div>
+          <div className="hidden items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 sm:flex">
+            <button
+              type="button"
+              onClick={() => setSelectedMonth((m) => shiftMonthKey(m, -1))}
+              aria-label="Předchozí měsíc"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-700 hover:bg-slate-100"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <span className="min-w-[116px] text-center text-sm font-black capitalize">{monthLabel}</span>
+            <button
+              type="button"
+              onClick={() => setSelectedMonth((m) => shiftMonthKey(m, 1))}
+              aria-label="Další měsíc"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-700 hover:bg-slate-100"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
           </div>
           <button
             type="button"
             onClick={() => setViewMode('archive')}
-            className="hidden sm:inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800 hover:bg-slate-50"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-black text-slate-800 hover:bg-slate-50"
           >
-            <Archive className="w-4 h-4" />
-            Hotové
+            <Archive className="h-4 w-4" />
+            <span className="hidden sm:inline">Archiv</span>
           </button>
-          {/* Progress badge */}
-          <div className="text-right">
-            <div className="text-2xl font-bold text-emerald-700">{scopedStats.percentDone}%</div>
-            <div className="text-xs text-slate-600">{scopedStats.ok + scopedStats.defect}/{scopedStats.total}</div>
-          </div>
         </div>
       </div>
 
-      <div className="mx-auto w-full max-w-[1200px] px-4 pt-3">
-        <section className="mb-3">
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <div>
-              <div className="text-xs font-black uppercase tracking-wide text-emerald-800">Složky kontrol</div>
-              <h2 className="text-lg font-black text-slate-950">Doklady podle data</h2>
-            </div>
-            <button
-              type="button"
-              onClick={() => setViewMode('archive')}
-              className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-800"
-            >
-              <Archive className="h-4 w-4" />
-              Archiv
-            </button>
-          </div>
+      <div className="mx-auto w-full max-w-[1200px] px-4 pt-4">
+        {/* Měsíční navigace na mobilu */}
+        <div className="mb-3 flex items-center justify-between gap-2 sm:hidden">
+          <button
+            type="button"
+            onClick={() => setSelectedMonth((m) => shiftMonthKey(m, -1))}
+            aria-label="Předchozí měsíc"
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          <span className="flex-1 text-center text-sm font-black capitalize">{monthLabel}</span>
+          <button
+            type="button"
+            onClick={() => setSelectedMonth((m) => shiftMonthKey(m, 1))}
+            aria-label="Další měsíc"
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        </div>
 
-          <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-            <div className={`rounded-2xl border p-3 shadow-sm ${draftRun ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-white'}`}>
-              <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wide text-emerald-800">
-                {draftRun ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
-                Aktuální doklad
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_336px] lg:items-start">
+          {/* ─────────── LEVÝ SLOUPEC: pracovní checklist ─────────── */}
+          <div className="min-w-0 space-y-4">
+
+            {/* Teď provést */}
+            <section className="rounded-2xl border border-amber-200 bg-gradient-to-b from-amber-50 to-white p-4 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="eyebrow text-amber-700">Teď provést</div>
+                  <h2 className="mt-0.5 text-lg font-black text-slate-950">
+                    <span className="text-amber-700">{scopedStats.pending} kontrol</span> čeká na provedení
+                  </h2>
+                </div>
               </div>
-              <div className="mt-2 text-xl font-black text-slate-950">
-                {draftRun ? 'Rozpracováno' : currentRun?.status === 'closed' ? 'Uzavřeno' : 'Nezahájeno'}
-              </div>
-              <div className="mt-1 min-h-10 text-xs font-bold text-slate-600">
-                {draftRun
-                  ? `${runDayLabel(draftRun.startedAt)} · ${draftRun.summary?.defect || 0} závad`
-                  : currentRun?.status === 'closed'
-                    ? `${runDayLabel(currentRun.closedAt)} · založ nový měsíc nebo otevři archiv`
-                    : 'Založ draft a průběžně dopisuj OK/závady.'}
-              </div>
-              {draftRun ? (
-                <button
-                  type="button"
-                  onClick={handleCloseRun}
-                  disabled={closingRun || saving}
-                  className="mt-3 min-h-10 w-full rounded-xl bg-emerald-700 px-3 text-sm font-black text-white disabled:opacity-50"
-                >
-                  {closingRun ? 'Uzavírám…' : 'Uzavřít'}
-                </button>
+              {nextInspectionItems.length > 0 ? (
+                <div className="mt-3 space-y-2">
+                  {nextInspectionItems.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 transition hover:border-amber-200"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => openInspectionModal(item, 'none')}
+                        className="min-w-0 flex-1 text-left"
+                      >
+                        <span className="block truncate text-[15px] font-black text-slate-950">{item.roomName || 'Bez místnosti'}</span>
+                        <span className="block truncate text-[13px] font-semibold text-slate-600">
+                          {[item.roomCode, item.checkPoints].filter(Boolean).join(' · ') || frequencyLabel(item.frequency)}
+                        </span>
+                      </button>
+                      <span className="hidden shrink-0 rounded-lg bg-amber-50 px-2.5 py-1 font-mono text-[11px] font-bold text-amber-700 sm:inline">
+                        {frequencyLabel(item.frequency)}
+                      </span>
+                      <div className="flex shrink-0 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleOk(item)}
+                          disabled={saving}
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-black text-white transition hover:bg-emerald-500 active:scale-95 disabled:opacity-50"
+                        >
+                          <Check className="h-4 w-4" />OK
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openInspectionModal(item, 'defect')}
+                          disabled={saving}
+                          className="rounded-xl border-[1.5px] border-red-200 bg-white px-4 py-2 text-sm font-black text-red-700 transition hover:bg-red-50 active:scale-95 disabled:opacity-50"
+                        >
+                          Závada
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               ) : (
-                <button
-                  type="button"
-                  onClick={handleStartRun}
-                  disabled={saving || currentRun?.status === 'closed'}
-                  className="mt-3 min-h-10 w-full rounded-xl bg-emerald-700 px-3 text-sm font-black text-white disabled:opacity-50"
-                >
-                  Zahájit
-                </button>
+                <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800">
+                  V aktuálním výběru není nic k provedení.
+                </div>
               )}
-            </div>
+            </section>
 
-            <button
-              type="button"
-              onClick={() => setViewMode('archive')}
-              className="rounded-2xl border border-slate-200 bg-white p-3 text-left shadow-sm active:scale-[0.98]"
-            >
-              <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wide text-slate-500">
-                <Archive className="h-4 w-4" />
-                Hotové kontroly
-              </div>
-              <div className="mt-2 text-3xl font-black text-slate-950">{closedRuns.length}</div>
-              <div className="mt-1 text-xs font-bold text-slate-600">
-                {latestClosedRun ? `Poslední: ${runDayLabel(latestClosedRun.closedAt || latestClosedRun.startedAt)}` : 'Zatím bez uzavřeného dokladu'}
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setFilter('defect')}
-              className="rounded-2xl border border-red-200 bg-red-50 p-3 text-left shadow-sm active:scale-[0.98]"
-            >
-              <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wide text-red-800">
-                <AlertTriangle className="h-4 w-4" />
-                Závady
-              </div>
-              <div className="mt-2 text-3xl font-black text-red-800">{scopedStats.defect}</div>
-              <div className="mt-1 text-xs font-bold text-slate-600">ve vybraném měsíci</div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setFilter('pending')}
-              className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-left shadow-sm active:scale-[0.98]"
-            >
-              <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wide text-amber-800">
-                <ClipboardCheck className="h-4 w-4" />
-                Čeká
-              </div>
-              <div className="mt-2 text-3xl font-black text-slate-950">{scopedStats.pending}</div>
-              <div className="mt-1 text-xs font-bold text-slate-600">bodů k provedení</div>
-            </button>
-          </div>
-        </section>
-
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 mb-3">
-          <div className="text-xs font-black uppercase tracking-wide text-amber-800">Teď provést</div>
-          <div className="mt-1 flex items-end justify-between gap-3">
-            <div>
-              <div className="text-3xl font-black text-slate-950">{scopedStats.pending}</div>
-              <div className="text-sm font-bold text-slate-700">kontrol čeká na provedení</div>
-            </div>
-            {scopedStats.defect > 0 && (
-              <button
-                type="button"
-                onClick={() => setFilter('defect')}
-                className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-right active:scale-[0.98]"
-              >
-                <div className="text-xl font-black text-red-700">{scopedStats.defect}</div>
-                <div className="text-xs font-bold text-red-700">závad</div>
-              </button>
-            )}
-          </div>
-          {nextInspectionItems.length > 0 ? (
-            <div className="mt-3 space-y-1.5">
-              {nextInspectionItems.map((item) => (
-                <div
-                  key={item.id}
-                  className="rounded-xl border border-amber-200 bg-white px-3 py-2"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-black text-slate-950">{item.roomName || 'Bez místnosti'}</span>
-                      <span className="block truncate text-sm font-bold text-slate-600">{item.checkPoints || item.roomCode || frequencyLabel(item.frequency)}</span>
-                    </span>
-                    <span className="shrink-0 text-sm font-black text-amber-800">{frequencyLabel(item.frequency)}</span>
-                  </div>
-                  <div className="mt-2 grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleOk(item)}
-                      disabled={saving}
-                      className="min-h-12 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold transition active:scale-[0.98] disabled:opacity-50"
-                    >
-                      ✓ OK
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveLog(item);
-                        setDefectNote(item.defectNote || '');
-                        setTaskPriority('P2');
-                        setFoodSafetyRisk(item.foodSafetyRisk === true);
-                        setFoodSafetyHazardType(item.foodSafetyHazardType || 'foreign_body');
-                        setFoodSafetyImpact(item.foodSafetyImpact || 'medium');
-                      }}
-                      disabled={saving}
-                      className="min-h-12 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-sm font-bold transition active:scale-[0.98] disabled:opacity-50"
-                    >
-                      ✗ Závada
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800">
-              V aktuálním výběru není nic k provedení.
-            </div>
-          )}
-        </div>
-
-        <div className="mb-3 rounded-2xl border border-[#ded6c8] bg-white shadow-sm overflow-hidden">
-          <button
-            type="button"
-            onClick={() => setShowResultPanel((value) => !value)}
-            className="flex min-h-14 w-full items-center justify-between gap-3 px-4 text-left"
-          >
-            <span>
-              <span className="block text-base font-black text-slate-950">Výsledek kontroly</span>
-              <span className="block text-xs font-bold text-slate-600">
-                {todayResultLogs.length} dnes · {scopedStats.ok} OK · {scopedStats.defect} závad · {scopedStats.percentDone}% hotovo
-              </span>
-            </span>
-            {showResultPanel ? <ChevronDown className="h-5 w-5 shrink-0 text-slate-500" /> : <ChevronRight className="h-5 w-5 shrink-0 text-slate-500" />}
-          </button>
-
-          {showResultPanel && (
-            <div className="border-t border-[#eee6da] p-3 sm:p-4">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                  <div className="text-2xl font-black text-slate-950">{scopedStats.total}</div>
-                  <div className="text-xs font-bold uppercase tracking-wide text-slate-600">Celkem</div>
-                </div>
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-                  <div className="text-2xl font-black text-emerald-800">{scopedStats.ok}</div>
-                  <div className="text-xs font-bold uppercase tracking-wide text-emerald-800">OK</div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setFilter('defect')}
-                  className="rounded-xl border border-red-200 bg-red-50 p-3 text-left active:scale-[0.98]"
-                >
-                  <div className="text-2xl font-black text-red-700">{scopedStats.defect}</div>
-                  <div className="text-xs font-bold uppercase tracking-wide text-red-700">Závady</div>
-                </button>
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
-                  <div className="text-2xl font-black text-amber-800">{todayResultLogs.length}</div>
-                  <div className="text-xs font-bold uppercase tracking-wide text-amber-800">Dnes</div>
-                </div>
-              </div>
-
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={handleExportXLSX}
-                  disabled={exporting != null || resultLogs.length === 0}
-                  className="min-h-12 rounded-xl bg-emerald-700 text-white font-black flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-50"
-                >
-                  {exporting === 'xlsx' ? <Loader2 className="w-5 h-5 animate-spin" /> : <FileSpreadsheet className="w-5 h-5" />}
-                  Excel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleExportPDF}
-                  disabled={exporting != null || resultLogs.length === 0}
-                  className="min-h-12 rounded-xl bg-blue-700 text-white font-black flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-50"
-                >
-                  {exporting === 'pdf' ? <Loader2 className="w-5 h-5 animate-spin" /> : <FileText className="w-5 h-5" />}
-                  PDF
-                </button>
-              </div>
-
-              <div className="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-3">
-                <div className="rounded-xl border border-slate-200 bg-[#fbf9f4] p-3">
-                  <div className="text-xs font-black uppercase tracking-wide text-slate-600">Dnes provedeno</div>
-                  {todayResultLogs.length > 0 ? (
-                    <div className="mt-1">
-                      {todayResultLogs.slice(0, 6).map((log) => (
-                        <div key={log.id} className="flex items-center justify-between gap-2 border-t border-stone-100 py-2 first:border-t-0">
-                          <div className="min-w-0">
-                            <div className="truncate text-sm font-bold text-slate-950">{log.roomName || 'Bez místnosti'}</div>
-                            <div className="truncate text-xs text-slate-600">{log.checkPoints || log.roomCode || frequencyLabel(log.frequency)}</div>
-                          </div>
-                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${log.status === 'defect' ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-800'}`}>
-                            {log.status === 'defect' ? 'Závada' : 'OK'}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="mt-2 py-3 text-sm font-medium text-slate-500">
-                      Dnes v aktuálním výběru není žádný dokončený zápis.
-                    </div>
-                  )}
-                </div>
-
-                <div className="rounded-xl border border-red-200 bg-red-50 p-3">
-                  <div className="text-xs font-black uppercase tracking-wide text-red-700">Závady k reportu</div>
-                  {resultDefectLogs.length > 0 ? (
-                    <div className="mt-1">
-                      {resultDefectLogs.slice(0, 6).map((log) => (
-                        <div key={log.id} className="flex items-start justify-between gap-3 border-t border-red-100 py-2 first:border-t-0">
-                          <div className="min-w-0">
-                            <div className="text-sm font-bold text-slate-950">{log.roomName || 'Bez místnosti'}</div>
-                            <div className="inspection-text-block text-xs text-slate-600">{log.defectNote || 'Bez popisu závady'}</div>
-                          </div>
-                          {log.taskId && (
-                            <button
-                              type="button"
-                              onClick={() => navigate(`/tasks?task=${log.taskId}`)}
-                              className="shrink-0 whitespace-nowrap text-xs font-bold text-blue-700 hover:underline"
-                            >
-                              otevřít →
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">
-                      Bez závad v aktuálním výběru.
-                    </div>
-                  )}
-                </div>
+            {/* Filtry stavu + přepínač nástrojů */}
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" onClick={() => setFilter('pending')} className={filter === 'pending' ? 'vik-chip vik-chip-active' : 'vik-chip'}>Čeká <span className="opacity-70">{scopedStats.pending}</span></button>
+              <button type="button" onClick={() => setFilter('defect')} className={filter === 'defect' ? 'vik-chip vik-chip-active' : 'vik-chip'}>Závady <span className="opacity-70">{scopedStats.defect}</span></button>
+              <button type="button" onClick={() => setFilter('ok')} className={filter === 'ok' ? 'vik-chip vik-chip-active' : 'vik-chip'}>OK <span className="opacity-70">{scopedStats.ok}</span></button>
+              <button type="button" onClick={() => setFilter('all')} className={filter === 'all' ? 'vik-chip vik-chip-active' : 'vik-chip'}>Vše</button>
+              <div className="ml-auto flex gap-2">
+                <button type="button" onClick={() => setShowPlanningTools((v) => !v)} className="vik-chip">{showPlanningTools ? 'Skrýt filtry a plán' : 'Filtry a plán'}</button>
+                <button type="button" onClick={openPlanModal} className="vik-chip vik-chip-active">Nastavit plán</button>
               </div>
             </div>
-          )}
-        </div>
-
-        {showStatusFilters && (
-        <div className="mx-auto w-full max-w-[1200px] px-4 grid grid-cols-1 md:grid-cols-3 gap-2 mb-3">
-          <button
-            type="button"
-            onClick={() => setFilter('pending')}
-            className="min-h-16 rounded-2xl bg-white border border-amber-200 px-4 text-left active:scale-[0.98] shadow-sm"
-          >
-            <div className="text-2xl font-black text-amber-700">{scopedStats.pending}</div>
-            <div className="text-sm font-bold text-slate-950">Kontroly k provedení</div>
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate('/revisions')}
-            className="min-h-16 rounded-2xl bg-white border border-blue-200 px-4 text-left active:scale-[0.98] shadow-sm"
-          >
-            <div className="text-sm font-black text-slate-950">Revize</div>
-            <div className="text-xs text-blue-700">termíny, doklady, platnosti</div>
-          </button>
-          <button
-            type="button"
-            onClick={() => setFilter('defect')}
-            className="min-h-16 rounded-2xl bg-white border border-red-200 px-4 text-left active:scale-[0.98] shadow-sm"
-          >
-            <div className="text-2xl font-black text-red-700">{scopedStats.defect}</div>
-            <div className="text-sm font-bold text-slate-950">Závady z kontrol</div>
-          </button>
-        </div>
-        )}
-
-        <div className="mx-auto w-full max-w-[1200px] px-4 grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
-          <button
-            type="button"
-            onClick={() => setShowStatusFilters((value) => !value)}
-            className="min-h-12 rounded-xl bg-white border border-slate-200 px-4 text-left text-sm font-black text-slate-700 active:scale-[0.98]"
-          >
-            {showStatusFilters ? 'Skrýt přehled' : 'Přehled a filtry'}
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowPlanningTools((value) => !value)}
-            className="min-h-12 rounded-xl bg-white border border-slate-200 px-4 text-left text-sm font-black text-slate-700 active:scale-[0.98]"
-          >
-            {showPlanningTools ? 'Skrýt správu plánů' : 'Správa plánů a filtrů'}
-          </button>
-          <button
-            type="button"
-            onClick={openPlanModal}
-            className="min-h-12 rounded-xl bg-emerald-700 border border-emerald-600 px-4 text-left text-sm font-black text-white active:scale-[0.98]"
-          >
-            Nastavit plán
-          </button>
-        </div>
-
-      </div>
 
       {showPlanningTools && (
-          <>
-        <div className="mx-4 mb-3 bg-white border border-slate-200 rounded-2xl p-3 shadow-sm">
-          <div className="flex items-center justify-between gap-3 mb-3">
-            <div>
-              <div className="font-bold text-slate-950">Historie a období</div>
-              <div className="text-xs text-slate-600">
-                Zobrazený měsíc: <span className="capitalize text-slate-700">{monthLabel}</span>
-              </div>
-            </div>
-            {selectedMonth !== currentMonthKey() && (
-              <button
-                type="button"
-                onClick={() => setSelectedMonth(currentMonthKey())}
-                className="px-3 py-2 rounded-xl bg-emerald-700 text-xs font-bold text-white active:scale-95"
-              >
-                Aktuální
-              </button>
-            )}
-          </div>
-          <div className="grid grid-cols-[44px_1fr_44px] gap-2">
-            <button
-              type="button"
-              onClick={() => setSelectedMonth((month) => shiftMonthKey(month, -1))}
-              className="min-h-11 rounded-xl bg-white border border-slate-200 text-lg font-bold text-slate-700 active:scale-95"
-              aria-label="Předchozí měsíc"
-            >
-              &lt;
-            </button>
-            <input
-              type="month"
-              value={selectedMonth}
-              onChange={(event) => setSelectedMonth(event.target.value || currentMonthKey())}
-              className="min-h-11 rounded-xl bg-white border border-slate-200 px-3 text-center text-sm font-bold text-slate-950"
-            />
-            <button
-              type="button"
-              onClick={() => setSelectedMonth((month) => shiftMonthKey(month, 1))}
-              className="min-h-11 rounded-xl bg-white border border-slate-200 text-lg font-bold text-slate-700 active:scale-95"
-              aria-label="Další měsíc"
-            >
-              &gt;
-            </button>
-          </div>
-        </div>
-
-      <div className="mx-auto w-full max-w-[1200px] px-4 mb-4">
-        <div className="bg-white border border-slate-200 rounded-2xl p-3 space-y-3 shadow-sm">
+        <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div>
               <div className="font-bold text-slate-950">Výběr z kartotéky</div>
@@ -1304,53 +1062,11 @@ export default function InspectionsPage() {
             </div>
           )}
         </div>
-      </div>
-          </>
         )}
-
-      {/* Stats */}
-      <div className="mx-auto w-full max-w-[1200px] grid grid-cols-2 sm:grid-cols-4 gap-2 px-4 mb-4">
-        <button
-          onClick={() => setFilter('all')}
-          className={`p-3 rounded-xl text-center transition ${
-            filter === 'all' ? 'bg-[#1a6b4f] text-white ring-2 ring-emerald-200' : 'bg-white border border-slate-200 text-slate-950 shadow-sm'
-          }`}
-        >
-          <div className={`text-2xl font-bold ${filter === 'all' ? 'text-white' : 'text-blue-700'}`}>{scopedStats.total}</div>
-          <div className={`text-xs ${filter === 'all' ? 'text-emerald-50' : 'text-slate-600'}`}>Vše</div>
-        </button>
-        <button
-          onClick={() => setFilter(filter === 'ok' ? 'all' : 'ok')}
-          className={`p-3 rounded-xl text-center transition ${
-            filter === 'ok' ? 'bg-emerald-700 text-white ring-2 ring-emerald-200' : 'bg-white border border-slate-200 text-slate-950 shadow-sm'
-          }`}
-        >
-          <div className={`text-2xl font-bold ${filter === 'ok' ? 'text-white' : 'text-emerald-700'}`}>{scopedStats.ok}</div>
-          <div className={`text-xs ${filter === 'ok' ? 'text-emerald-50' : 'text-slate-600'}`}>OK</div>
-        </button>
-        <button
-          onClick={() => setFilter(filter === 'defect' ? 'all' : 'defect')}
-          className={`p-3 rounded-xl text-center transition ${
-            filter === 'defect' ? 'bg-amber-600 text-white ring-2 ring-amber-200' : 'bg-white border border-slate-200 text-slate-950 shadow-sm'
-          }`}
-        >
-          <div className={`text-2xl font-bold ${filter === 'defect' ? 'text-white' : 'text-amber-700'}`}>{scopedStats.defect}</div>
-          <div className={`text-xs ${filter === 'defect' ? 'text-amber-50' : 'text-slate-600'}`}>Závady</div>
-        </button>
-        <button
-          onClick={() => setFilter(filter === 'pending' ? 'all' : 'pending')}
-          className={`p-3 rounded-xl text-center transition ${
-            filter === 'pending' ? 'bg-slate-700 text-white ring-2 ring-slate-200' : 'bg-white border border-slate-200 text-slate-950 shadow-sm'
-          }`}
-        >
-          <div className={`text-2xl font-bold ${filter === 'pending' ? 'text-white' : 'text-slate-700'}`}>{scopedStats.pending}</div>
-          <div className={`text-xs ${filter === 'pending' ? 'text-slate-100' : 'text-slate-600'}`}>Čeká</div>
-        </button>
-      </div>
 
       {/* ═══ NEDODĚLKY Z MINULA ═══ */}
       {previousDefects.length > 0 && (
-        <div className="mx-auto w-full max-w-[1200px] px-4 mb-4">
+        <div>
           <div className="bg-white rounded-2xl border border-red-200 shadow-sm overflow-hidden">
             <div className="flex items-center justify-between p-4 border-b border-red-100 bg-red-50">
               <div className="flex items-center gap-3">
@@ -1416,64 +1132,43 @@ export default function InspectionsPage() {
         </div>
       )}
 
-      {/* Excel-like checklist */}
-      <div className="mx-auto w-full max-w-[1200px] px-4 space-y-3">
+      {/* Checklist po zónách */}
+      <div className="space-y-5">
         {Object.entries(excelGrouped).map(([groupKey, items]) => {
-          const isExpanded = expandedGroups[groupKey] !== false; // default expanded
-          const groupDone = items.filter((l) => inspectionEffectiveStatus(l, selectedMonth) !== 'pending').length;
+          const collapsed = expandedGroups[groupKey] === false; // default rozbaleno
+          const total = items.length;
+          const done = items.filter((l) => inspectionEffectiveStatus(l, selectedMonth) !== 'pending').length;
+          const pct = total > 0 ? Math.round((done / total) * 100) : 0;
 
           return (
-            <div key={groupKey} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              {/* Group header */}
-              <button
-                onClick={() => toggleGroup(groupKey)}
-                className="w-full flex items-center justify-between p-4 hover:bg-slate-50 transition"
-              >
-                <div className="flex items-center gap-3">
-                  <Building2 className="w-5 h-5 text-emerald-700" />
-                  <span className="font-bold text-lg">{groupKey}</span>
-                  <span className="text-sm text-slate-500">
-                    {groupDone}/{items.length}
-                  </span>
-                </div>
-                {isExpanded ? (
-                  <ChevronDown className="w-5 h-5 text-slate-500" />
-                ) : (
-                  <ChevronRight className="w-5 h-5 text-slate-500" />
-                )}
-              </button>
+            <div key={groupKey}>
+              <div className="mb-2 flex items-center gap-3 px-1">
+                <button type="button" onClick={() => toggleGroup(groupKey)} className="flex items-center gap-2 text-left">
+                  {collapsed ? <ChevronRight className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
+                  <h3 className="text-[14.5px] font-black text-slate-950">{groupKey}</h3>
+                </button>
+                <span className="h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-slate-200">
+                  <span className="block h-full rounded-full bg-emerald-500" style={{ width: `${pct}%` }} />
+                </span>
+                <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 font-mono text-[11px] font-bold text-slate-600">{done}/{total} hotovo</span>
+                <span className="h-px flex-1 bg-slate-200" />
+              </div>
 
-              {/* Items */}
-              {isExpanded && (
-                <div className="border-t border-slate-200">
-                  <div className="hidden lg:grid grid-cols-[1.2fr_0.7fr_2.4fr_1fr_0.8fr_0.8fr_1.1fr] gap-3 px-4 py-2 bg-slate-50 text-xs uppercase tracking-wide text-slate-500 font-bold">
-                    <div>Místnosti</div>
-                    <div>Číslo</div>
-                    <div>Popis kontroly</div>
-                    <div>Provedl</div>
-                    <div>Datum</div>
-                    <div>Podpis</div>
-                    <div className="text-right">Akce</div>
-                  </div>
+              {!collapsed && (
+                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                   {items.map((log) => (
-                    <ExcelInspectionItem
+                    <InspectionRow
                       key={log.id}
                       log={log}
                       status={inspectionEffectiveStatus(log, selectedMonth)}
                       due={isInspectionDue(log, selectedMonth)}
                       onOk={() => handleOk(log)}
-                      onDefect={() => {
-                        setActiveLog(log);
-                        setDefectNote(log.defectNote || '');
-                        setTaskPriority('P2');
-                        setFoodSafetyRisk(log.foodSafetyRisk === true);
-                        setFoodSafetyHazardType(log.foodSafetyHazardType || 'foreign_body');
-                        setFoodSafetyImpact(log.foodSafetyImpact || 'medium');
-                      }}
+                      onDefect={() => openInspectionModal(log, 'defect')}
                       onNote={() => openInspectionNote(log)}
                       onFrequency={() => openInspectionFrequency(log)}
                       onReset={() => handleReset(log)}
                       onOpenTask={log.taskId ? () => navigate(`/tasks?task=${log.taskId}`) : undefined}
+                      onOpenModal={() => openInspectionModal(log, 'none')}
                       saving={saving}
                     />
                   ))}
@@ -1482,126 +1177,334 @@ export default function InspectionsPage() {
             </div>
           );
         })}
+
+        {Object.keys(excelGrouped).length === 0 && (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-white py-12 text-center text-slate-500">
+            <ClipboardCheck className="mx-auto mb-3 h-12 w-12 opacity-30" />
+            <p className="font-bold">Žádné záznamy pro tento filtr</p>
+          </div>
+        )}
       </div>
 
-      {/* ═══ AUDIT SECTION ═══ */}
+      {/* Provozní audit po budovách */}
       <AuditPanel />
+          </div>
 
-      {/* Empty state */}
-      {Object.keys(excelGrouped).length === 0 && (
-        <div className="text-center py-12 text-slate-500">
-          <ClipboardCheck className="w-12 h-12 mx-auto mb-3 opacity-30" />
-          <p>Žádné záznamy pro tento filtr</p>
-        </div>
-      )}
-
-      {/* Defect Modal */}
-      {activeLog && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setActiveLog(null)}>
-          <div
-            className="bg-white text-slate-950 rounded-t-3xl md:rounded-3xl w-full max-w-lg border border-slate-200 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-4 border-b border-slate-200 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-amber-400" />
-                <h2 className="text-lg font-bold">Zapsat závadu</h2>
+          {/* ─────────── PRAVÝ PANEL: doklad / stav / závady ─────────── */}
+          <aside className="flex flex-col gap-4 lg:sticky lg:top-[84px]">
+            {/* Aktuální doklad */}
+            <div className="rounded-2xl border border-emerald-200 bg-gradient-to-b from-emerald-50 to-white p-4 shadow-sm">
+              <div className="eyebrow flex items-center gap-1.5 text-emerald-800">
+                {draftRun ? <Unlock className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
+                Aktuální doklad
               </div>
-              <button onClick={() => setActiveLog(null)} className="p-2 rounded-lg hover:bg-slate-100">
-                <X className="w-5 h-5 text-slate-600" />
-              </button>
-            </div>
-            <div className="p-4 space-y-4">
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                <div className="text-sm text-slate-600">{activeLog.roomCode}</div>
-                <div className="text-slate-950 font-bold">{activeLog.roomName}</div>
-                <div className="text-xs text-slate-600 mt-1">{activeLog.checkPoints}</div>
+              <div className="mt-1.5 text-xl font-black text-slate-950">
+                {draftRun ? 'Rozpracováno' : currentRun?.status === 'closed' ? 'Uzavřeno' : 'Nezahájeno'}
               </div>
-              <div>
-                <label className="text-sm text-slate-700 mb-1.5 block">
-                  Popis závady <span className="text-red-400">*</span>
-                </label>
-                <textarea
-                  value={defectNote}
-                  onChange={(e) => setDefectNote(e.target.value)}
-                  placeholder="Co je špatně? Např. prasklá hadice u okna..."
-                  rows={3}
-                  autoFocus
-                  className="inspection-text-block w-full bg-[#fbf9f4] p-3 rounded-xl border border-slate-300 placeholder:text-slate-500 focus:border-amber-600 focus:ring-2 focus:ring-amber-600/20 outline-none resize-none"
-                />
+              <div className="mt-1 text-[13px] font-semibold text-slate-600">
+                {draftRun
+                  ? `Zahájeno ${runDayLabel(draftRun.startedAt)} · ${draftRun.summary?.defect || 0} závad zapsáno`
+                  : currentRun?.status === 'closed'
+                    ? `Uzavřeno ${runDayLabel(currentRun.closedAt)} · založ nový měsíc nebo otevři archiv`
+                    : 'Založ doklad a průběžně dopisuj OK / závady.'}
               </div>
-              <div>
-                <label className="text-sm text-slate-700 mb-2 block">
-                  Důležitost úkolu
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {TASK_PRIORITY_OPTIONS.map((option) => {
-                    const active = taskPriority === option.value;
-                    return (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() => setTaskPriority(option.value)}
-                        className={`min-h-14 rounded-xl border px-3 text-left transition active:scale-[0.98] ${
-                          active ? option.className : 'border-slate-200 bg-white text-slate-700'
-                        }`}
-                      >
-                        <div className="text-sm font-black">{option.label}</div>
-                        <div className="text-xs opacity-80">{option.hint}</div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3 space-y-3">
+              {draftRun ? (
                 <button
                   type="button"
-                  onClick={() => setFoodSafetyRisk((value) => !value)}
-                  className={`w-full min-h-12 rounded-xl border px-3 flex items-center justify-between gap-3 text-left active:scale-[0.98] transition ${
-                    foodSafetyRisk ? 'bg-red-50 border-red-200 text-red-900' : 'bg-white border-slate-200 text-slate-800'
+                  onClick={handleCloseRun}
+                  disabled={closingRun || saving}
+                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-3 py-3 text-sm font-black text-white transition hover:bg-emerald-600 disabled:opacity-50"
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  {closingRun ? 'Uzavírám…' : 'Uzavřít kontrolu'}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleStartRun}
+                  disabled={saving || currentRun?.status === 'closed'}
+                  className="mt-3 w-full rounded-xl bg-emerald-700 px-3 py-3 text-sm font-black text-white transition hover:bg-emerald-600 disabled:opacity-50"
+                >
+                  Zahájit kontrolu
+                </button>
+              )}
+            </div>
+
+            {/* Stav kontroly */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <h3 className="text-[15px] font-black text-slate-950">Stav kontroly</h3>
+              <div className="mt-3 flex items-center gap-4">
+                <svg width="78" height="78" viewBox="0 0 78 78" className="shrink-0">
+                  <circle cx="39" cy="39" r={DONUT_R} fill="none" stroke="#e7e0d4" strokeWidth="9" />
+                  <circle cx="39" cy="39" r={DONUT_R} fill="none" stroke="#2e9e74" strokeWidth="9" strokeLinecap="round" strokeDasharray={`${donutDash} ${DONUT_C}`} transform="rotate(-90 39 39)" />
+                  <text x="39" y="38" textAnchor="middle" fontSize="18" fontWeight="800" fill="#1b2620">{scopedStats.percentDone}%</text>
+                  <text x="39" y="50" textAnchor="middle" fontSize="7" fontWeight="800" fill="#97a096" letterSpacing="1">HOTOVO</text>
+                </svg>
+                <div className="flex-1 text-[13px] font-semibold text-slate-600">
+                  {scopedStats.ok + scopedStats.defect} z {scopedStats.total} bodů hotovo
+                  <br />
+                  <span className="text-slate-800">{scopedStats.pending} bodů zbývá · {todayResultLogs.length} dnes</span>
+                </div>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                  <div className="text-2xl font-black text-emerald-800">{scopedStats.ok}</div>
+                  <div className="text-[11px] font-black uppercase tracking-wide text-emerald-800">OK</div>
+                </div>
+                <button type="button" onClick={() => setFilter('defect')} className="rounded-xl border border-red-200 bg-red-50 p-3 text-left active:scale-95">
+                  <div className="text-2xl font-black text-red-700">{scopedStats.defect}</div>
+                  <div className="text-[11px] font-black uppercase tracking-wide text-red-700">Závady</div>
+                </button>
+                <button type="button" onClick={() => setFilter('pending')} className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-left active:scale-95">
+                  <div className="text-2xl font-black text-amber-700">{scopedStats.pending}</div>
+                  <div className="text-[11px] font-black uppercase tracking-wide text-amber-700">Čeká</div>
+                </button>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <div className="text-2xl font-black text-slate-900">{scopedStats.total}</div>
+                  <div className="text-[11px] font-black uppercase tracking-wide text-slate-600">Celkem</div>
+                </div>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={handleExportXLSX}
+                  disabled={exporting != null || resultLogs.length === 0}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-700 text-sm font-black text-white transition hover:bg-emerald-600 disabled:opacity-50"
+                >
+                  {exporting === 'xlsx' ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
+                  Excel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportPDF}
+                  disabled={exporting != null || resultLogs.length === 0}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-blue-700 text-sm font-black text-white transition hover:bg-blue-600 disabled:opacity-50"
+                >
+                  {exporting === 'pdf' ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+                  PDF
+                </button>
+              </div>
+            </div>
+
+            {/* Závady k reportu */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <h3 className="text-[15px] font-black text-slate-950">Závady k reportu</h3>
+                <span className="rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-black text-red-700">{resultDefectLogs.length}</span>
+              </div>
+              {resultDefectLogs.length > 0 ? (
+                <div className="mt-2 divide-y divide-stone-100">
+                  {resultDefectLogs.slice(0, 8).map((log) => (
+                    <div key={log.id} className="flex items-start gap-2.5 py-2.5">
+                      <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-red-500" />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-[13.5px] font-black text-slate-950">{log.roomName || 'Bez místnosti'}</div>
+                        <div className="truncate text-xs font-semibold text-slate-500">{[log.roomCode, log.defectNote].filter(Boolean).join(' · ') || 'Bez popisu'}</div>
+                      </div>
+                      {log.taskId && (
+                        <button type="button" onClick={() => navigate(`/tasks?task=${log.taskId}`)} className="shrink-0 whitespace-nowrap text-xs font-black text-blue-700 hover:underline">
+                          otevřít →
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">
+                  Bez závad v aktuálním výběru.
+                </div>
+              )}
+            </div>
+
+            {/* Hotové kontroly */}
+            <button
+              type="button"
+              onClick={() => setViewMode('archive')}
+              className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:bg-slate-50"
+            >
+              <span>
+                <span className="block text-[15px] font-black text-slate-950">Hotové kontroly</span>
+                <span className="block text-xs font-semibold text-slate-500">
+                  {latestClosedRun ? `Poslední: ${runDayLabel(latestClosedRun.closedAt || latestClosedRun.startedAt)}` : 'Zatím bez uzavřeného dokladu'}
+                </span>
+              </span>
+              <span className="flex shrink-0 items-center gap-2">
+                <span className="text-2xl font-black text-slate-900">{closedRuns.length}</span>
+                <Archive className="h-5 w-5 text-slate-400" />
+              </span>
+            </button>
+          </aside>
+        </div>
+      </div>
+
+      {/* Modal: Provést kontrolu */}
+      {activeLog && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-4" onClick={() => setActiveLog(null)}>
+          <div
+            className="flex max-h-[92vh] w-full max-w-[560px] flex-col rounded-t-3xl border border-slate-200 bg-white shadow-2xl sm:rounded-3xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Hlavička */}
+            <div className="flex items-start justify-between gap-3 border-b border-stone-100 p-5">
+              <div className="min-w-0">
+                <div className="eyebrow flex items-center gap-1.5 text-emerald-800">
+                  <ClipboardCheck className="h-3.5 w-3.5" />
+                  Kontrolní bod
+                </div>
+                <h2 className="mt-1.5 text-xl font-black leading-tight text-slate-950">{activeLog.roomName || 'Kontrolní bod'}</h2>
+                <div className="mt-1 font-mono text-xs font-semibold text-slate-500">
+                  {[activeLog.roomCode, frequencyLabel(activeLog.frequency)].filter(Boolean).join(' · ')}
+                </div>
+              </div>
+              <button onClick={() => setActiveLog(null)} aria-label="Zavřít" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Tělo */}
+            <div className="flex-1 space-y-4 overflow-y-auto p-5">
+              {activeLog.checkPoints && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <span className="text-xs font-black uppercase tracking-wide text-slate-500">Co kontrolovat</span>
+                  <div className="inspection-text-block mt-1 text-sm font-semibold text-slate-700">{activeLog.checkPoints}</div>
+                </div>
+              )}
+
+              {/* Segment stav */}
+              <div className="grid grid-cols-2 gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => { if (activeLog) { void handleOk(activeLog); setActiveLog(null); } }}
+                  disabled={saving}
+                  className="flex flex-col items-center gap-1.5 rounded-2xl border-[1.5px] border-slate-200 bg-white p-4 font-black text-slate-600 transition hover:border-emerald-300 active:scale-[0.98] disabled:opacity-50"
+                >
+                  <Check className="h-6 w-6 text-emerald-600" />
+                  Bez závady
+                  <span className="font-mono text-[10px] font-bold uppercase text-slate-400">Stav OK</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModalStatus('defect')}
+                  className={`flex flex-col items-center gap-1.5 rounded-2xl border-[1.5px] p-4 font-black transition active:scale-[0.98] ${
+                    modalStatus === 'defect' ? 'border-red-500 bg-red-50 text-red-700' : 'border-slate-200 bg-white text-slate-600 hover:border-red-300'
                   }`}
                 >
-                  <span className="font-bold">Riziko pro bezpečnost potravin?</span>
-                  <span className="text-sm font-black">{foodSafetyRisk ? 'ANO' : 'NE'}</span>
+                  <AlertTriangle className="h-6 w-6" />
+                  Závada
+                  <span className="font-mono text-[10px] font-bold uppercase opacity-70">Zapsat nález</span>
                 </button>
-
-                {foodSafetyRisk && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <label className="space-y-1">
-                      <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Typ rizika</span>
-                      <select
-                        value={foodSafetyHazardType}
-                        onChange={(event) => setFoodSafetyHazardType(event.target.value)}
-                        className="w-full min-h-11 rounded-xl bg-[#fbf9f4] border border-slate-300 px-3 text-sm font-semibold text-[#1A1A1A] outline-none focus:border-red-600"
-                      >
-                        {FOOD_SAFETY_HAZARDS.map((item) => (
-                          <option key={item.value} value={item.value}>{item.label}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="space-y-1">
-                      <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Dopad</span>
-                      <select
-                        value={foodSafetyImpact}
-                        onChange={(event) => setFoodSafetyImpact(event.target.value)}
-                        className="w-full min-h-11 rounded-xl bg-[#fbf9f4] border border-slate-300 px-3 text-sm font-semibold text-[#1A1A1A] outline-none focus:border-red-600"
-                      >
-                        {FOOD_SAFETY_IMPACTS.map((item) => (
-                          <option key={item.value} value={item.value}>{item.label}</option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-                )}
               </div>
-              <button
-                onClick={handleDefect}
-                disabled={saving || defectNote.trim().length < 3}
-                className="w-full py-3 bg-amber-600 hover:bg-amber-500 text-white rounded-xl font-bold disabled:opacity-50 flex items-center justify-center gap-2 transition"
-              >
-                {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <AlertTriangle className="w-5 h-5" />}
-                {saving ? 'Ukládám...' : 'Zapsat závadu'}
+
+              {/* Blok závady */}
+              {modalStatus === 'defect' && (
+                <div className="space-y-4 rounded-2xl border border-red-200 bg-red-50 p-4">
+                  <div>
+                    <label className="text-xs font-black uppercase tracking-wide text-red-800">Důležitost úkolu</label>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {TASK_PRIORITY_OPTIONS.map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => setTaskPriority(option.value)}
+                          className={`rounded-xl border-[1.5px] px-3 py-1.5 text-sm font-black transition ${
+                            taskPriority === option.value ? option.className : 'border-slate-200 bg-white text-slate-600'
+                          }`}
+                        >
+                          {option.label} <span className="font-semibold opacity-70">{option.hint}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setFoodSafetyRisk((value) => !value)}
+                    className={`flex w-full items-center justify-between gap-3 rounded-xl border-[1.5px] px-3 py-2.5 text-left font-bold transition ${
+                      foodSafetyRisk ? 'border-red-300 bg-white text-red-800' : 'border-slate-200 bg-white text-slate-700'
+                    }`}
+                  >
+                    <span>Riziko pro bezpečnost potravin?</span>
+                    <span className="font-black">{foodSafetyRisk ? 'ANO' : 'NE'}</span>
+                  </button>
+
+                  {foodSafetyRisk && (
+                    <>
+                      <div>
+                        <label className="text-xs font-black uppercase tracking-wide text-red-800">Kategorie</label>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {FOOD_SAFETY_HAZARDS.map((item) => (
+                            <button
+                              key={item.value}
+                              type="button"
+                              onClick={() => setFoodSafetyHazardType(item.value)}
+                              className={`rounded-xl border-[1.5px] px-3 py-1.5 text-sm font-bold transition ${
+                                foodSafetyHazardType === item.value ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-600'
+                              }`}
+                            >
+                              {item.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs font-black uppercase tracking-wide text-red-800">Dopad</label>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {FOOD_SAFETY_IMPACTS.map((item) => (
+                            <button
+                              key={item.value}
+                              type="button"
+                              onClick={() => setFoodSafetyImpact(item.value)}
+                              className={`rounded-xl border-[1.5px] px-3 py-1.5 text-sm font-bold transition ${
+                                foodSafetyImpact === item.value ? 'border-amber-600 bg-amber-600 text-white' : 'border-slate-200 bg-white text-slate-600'
+                              }`}
+                            >
+                              {item.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  <div>
+                    <label className="text-xs font-black uppercase tracking-wide text-red-800">Popis závady *</label>
+                    <textarea
+                      value={defectNote}
+                      onChange={(e) => setDefectNote(e.target.value)}
+                      placeholder="Popis zjištění, umístění, doporučení…"
+                      rows={3}
+                      autoFocus
+                      className="inspection-text-block mt-2 w-full resize-y rounded-xl border-[1.5px] border-slate-200 bg-white p-3 text-sm outline-none focus:border-red-500"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Patička */}
+            <div className="flex items-center justify-between gap-2 border-t border-stone-100 bg-slate-50 p-4">
+              <button onClick={() => setActiveLog(null)} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 transition hover:bg-slate-100">
+                Zrušit
               </button>
+              {modalStatus === 'defect' ? (
+                <button
+                  onClick={handleDefect}
+                  disabled={saving || defectNote.trim().length < 3}
+                  className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-black text-white transition hover:bg-red-500 disabled:opacity-50"
+                >
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <AlertTriangle className="h-4 w-4" />}
+                  {saving ? 'Ukládám…' : 'Zapsat závadu'}
+                </button>
+              ) : (
+                <button
+                  onClick={() => { if (activeLog) { void handleOk(activeLog); setActiveLog(null); } }}
+                  disabled={saving}
+                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-black text-white transition hover:bg-emerald-600 disabled:opacity-50"
+                >
+                  <Check className="h-4 w-4" />
+                  Uložit jako OK
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -1770,10 +1673,6 @@ export default function InspectionsPage() {
 // INSPECTION ITEM COMPONENT
 // ═══════════════════════════════════════
 
-function formatInspectionDate(log: InspectionLog): string {
-  return log.completedAt?.toDate?.()?.toLocaleDateString('cs-CZ') || '';
-}
-
 interface InspectionArchiveViewProps {
   buildingOptions: string[];
   archiveBuilding: string;
@@ -1936,7 +1835,7 @@ function InspectionArchiveView({
   );
 }
 
-function ExcelInspectionItem({
+function InspectionRow({
   log,
   status,
   due,
@@ -1946,6 +1845,7 @@ function ExcelInspectionItem({
   onFrequency,
   onReset,
   onOpenTask,
+  onOpenModal,
   saving,
 }: {
   log: InspectionLog;
@@ -1957,137 +1857,125 @@ function ExcelInspectionItem({
   onFrequency: () => void;
   onReset: () => void;
   onOpenTask?: () => void;
+  onOpenModal: () => void;
   saving: boolean;
 }) {
-  const st = STATUS[status as keyof typeof STATUS] || STATUS.pending;
-  const date = formatInspectionDate(log);
+  const [showActions, setShowActions] = useState(false);
+  const isPending = status === 'pending';
 
   return (
-    <div className={`border-b border-slate-200 last:border-b-0 ${status === 'pending' ? '' : 'opacity-85'}`}>
-      <div className="hidden lg:grid grid-cols-[1.2fr_0.7fr_2.4fr_1fr_0.8fr_0.8fr_1.1fr] gap-3 px-4 py-3 items-start text-sm">
-        <div>
-          <div className="font-bold text-slate-950">{log.roomName}</div>
-          <div className="text-xs text-slate-500">Budova {log.building} - {frequencyLabel(log.frequency)}</div>
-          {due && log.status === 'ok' && (
-            <div className="mt-1 text-xs font-bold text-amber-300">Je čas zopakovat kontrolu</div>
+    <div className="border-t border-stone-100 first:border-t-0">
+      <div className="flex items-center gap-3 px-3 py-3 transition hover:bg-[#faf8f3] sm:px-4">
+        {/* Stav ikona */}
+        <span
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
+            status === 'ok'
+              ? 'bg-emerald-50 text-emerald-700'
+              : status === 'defect'
+                ? 'bg-red-50 text-red-700'
+                : 'border border-dashed border-slate-300 bg-slate-50 text-slate-400'
+          }`}
+        >
+          {status === 'ok' ? (
+            <Check className="h-4 w-4" strokeWidth={2.6} />
+          ) : status === 'defect' ? (
+            <AlertTriangle className="h-4 w-4" />
+          ) : (
+            <Clock className="h-3.5 w-3.5" />
           )}
-        </div>
-        <div className="font-mono text-slate-700">{log.roomCode || '-'}</div>
-        <div className="text-slate-700 leading-relaxed">{log.checkPoints}</div>
-        <div className="text-slate-700">{log.completedBy || '-'}</div>
-        <div className="text-slate-700">{date || '-'}</div>
-        <div className="space-y-1">
-          <span className={`inline-flex px-2 py-1 rounded-lg text-xs font-bold ${st.bg} ${st.border} ${st.color} border`}>
-            {st.label}
-          </span>
-          {log.taskId && (
+        </span>
+
+        {/* Info — klik otevře okno */}
+        <button type="button" onClick={onOpenModal} className="min-w-0 flex-1 text-left">
+          <div className="truncate text-[14px] font-black text-slate-950">{log.roomName || 'Bez místnosti'}</div>
+          <div className="truncate text-[12.5px] font-semibold text-slate-500">
+            {log.roomCode && <span className="font-mono">{log.roomCode}</span>}
+            {log.roomCode ? ' · ' : ''}{frequencyLabel(log.frequency)}
+            {log.completedBy && (
+              <span className="ml-1.5 font-mono text-slate-400">{[timeLabel(log), initialsOf(log.completedBy)].filter(Boolean).join(' · ')}</span>
+            )}
+          </div>
+          {log.status === 'defect' && log.defectNote && (
+            <div className="mt-1 flex items-start gap-1.5 text-[12.5px] font-semibold text-red-700">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span className="inspection-text-block">{log.defectNote}</span>
+            </div>
+          )}
+          {due && log.status === 'ok' && (
+            <div className="mt-0.5 text-[11px] font-bold text-amber-700">Je čas zopakovat kontrolu</div>
+          )}
+        </button>
+
+        {/* Pravá strana */}
+        {isPending ? (
+          <div className="flex shrink-0 items-center gap-2">
             <button
               type="button"
-              onClick={onOpenTask}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold bg-blue-500/15 text-blue-300 border border-blue-500/25"
+              onClick={onOk}
+              disabled={saving}
+              className="inline-flex items-center gap-1 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-black text-white transition hover:bg-emerald-500 active:scale-95 disabled:opacity-50"
             >
-              Úkol <ExternalLink className="w-3 h-3" />
+              <Check className="h-4 w-4" />
+              <span className="hidden sm:inline">OK</span>
             </button>
-          )}
-        </div>
-        <div className="flex justify-end gap-1.5">
-          {status === 'pending' ? (
-            <>
-              <button onClick={onOk} disabled={saving} className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs rounded-lg font-bold transition disabled:opacity-50">
-                OK
-              </button>
-              <button onClick={onDefect} disabled={saving} className="px-3 py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs rounded-lg font-bold transition disabled:opacity-50">
-                Závada
-              </button>
-            </>
-          ) : (
-            <button onClick={onReset} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs rounded-lg transition">
-              Zpět
+            <button
+              type="button"
+              onClick={onDefect}
+              disabled={saving}
+              className="rounded-xl border-[1.5px] border-red-200 bg-white px-3 py-2 text-sm font-black text-red-700 transition hover:bg-red-50 active:scale-95 disabled:opacity-50"
+            >
+              Závada
             </button>
-          )}
-          <button onClick={onNote} disabled={saving} className="px-3 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs rounded-lg font-bold transition disabled:opacity-50">
-            Pozn.
-          </button>
-          <button onClick={onFrequency} disabled={saving} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs rounded-lg font-bold transition disabled:opacity-50">
-            Pravid.
-          </button>
-        </div>
-      </div>
-
-      <div className="lg:hidden flex items-stretch">
-        <div className={`w-1.5 ${status === 'ok' ? 'bg-emerald-500' : status === 'defect' ? 'bg-amber-500' : 'bg-slate-600'}`} />
-        <div className="flex-1 p-3 min-w-0">
-          <div className="grid grid-cols-[88px_1fr] gap-x-3 gap-y-1 text-sm">
-            <div className="text-slate-500">Místnost</div>
-            <div className="font-bold text-slate-950">{log.roomName}</div>
-            <div className="text-slate-500">Číslo</div>
-            <div className="font-mono text-slate-700">{log.roomCode || '-'}</div>
-            <div className="text-slate-500">Popis</div>
-            <div className="text-slate-700">{log.checkPoints}</div>
-            <div className="text-slate-500">Provedl</div>
-            <div className="text-slate-700">{log.completedBy || '-'}</div>
-            <div className="text-slate-500">Datum</div>
-            <div className="text-slate-700">{date || '-'}</div>
-            <div className="text-slate-500">Podpis</div>
-            <div className={st.color}>{st.label}</div>
-            {due && log.status === 'ok' && (
-              <>
-                <div className="text-slate-500">Stav</div>
-                <div className="text-amber-300 font-bold">Znovu na rade</div>
-              </>
-            )}
-            <div className="text-slate-500">Pravidelnost</div>
-            <button type="button" onClick={onFrequency} className="text-blue-300 font-bold text-left">
-              {frequencyLabel(log.frequency)}
-            </button>
-            {log.taskId && (
-              <>
-                <div className="text-slate-500">Úkol</div>
-                <button
-                  type="button"
-                  onClick={onOpenTask}
-                  className="inline-flex items-center gap-1 text-blue-300 font-bold"
-                >
-                  otevřít <ExternalLink className="w-3 h-3" />
-                </button>
-              </>
-            )}
-          </div>
-          <div className="flex gap-2 mt-3">
-            {status === 'pending' ? (
-              <>
-                <button onClick={onOk} disabled={saving} className="flex-1 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm rounded-lg font-bold transition disabled:opacity-50">
-                  OK
-                </button>
-                <button onClick={onDefect} disabled={saving} className="flex-1 px-3 py-2 bg-amber-600 hover:bg-amber-500 text-white text-sm rounded-lg font-bold transition disabled:opacity-50">
-                  Závada
-                </button>
-              </>
-            ) : (
-              <button onClick={onReset} className="w-full px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm rounded-lg transition">
-                Zpět
-              </button>
-            )}
-            <button onClick={onNote} disabled={saving} className="flex-1 px-3 py-2 bg-sky-600 hover:bg-sky-700 text-white text-sm rounded-lg font-bold transition disabled:opacity-50">
-              Pozn.
-            </button>
-            <button onClick={onFrequency} disabled={saving} className="flex-1 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm rounded-lg font-bold transition disabled:opacity-50">
-              Pravid.
+            <button
+              type="button"
+              onClick={() => setShowActions((v) => !v)}
+              aria-label="Další akce"
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+            >
+              <MoreVertical className="h-4 w-4" />
             </button>
           </div>
-        </div>
+        ) : (
+          <div className="flex shrink-0 items-center gap-2">
+            {log.taskId && onOpenTask && (
+              <button type="button" onClick={onOpenTask} className="whitespace-nowrap text-xs font-black text-blue-700 hover:underline">
+                úkol →
+              </button>
+            )}
+            <span className={`rounded-full px-2.5 py-1 text-xs font-black ${status === 'defect' ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-800'}`}>
+              {status === 'defect' ? 'Závada' : 'OK'}
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowActions((v) => !v)}
+              aria-label="Další akce"
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+            >
+              <MoreVertical className="h-4 w-4" />
+            </button>
+          </div>
+        )}
       </div>
 
-      {log.status === 'defect' && log.defectNote && (
-        <div className="grid lg:grid-cols-[1.9fr_2.4fr_3.7fr] border-t border-amber-200 bg-amber-50 px-4 py-2 text-sm">
-          <div className="font-bold text-amber-800">závada</div>
-          <div className="inspection-text-block lg:col-span-2 font-semibold">{log.defectNote}</div>
+      {showActions && (
+        <div className="flex flex-wrap gap-2 px-3 pb-3 sm:px-4">
+          {!isPending && (
+            <button type="button" onClick={onReset} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50">
+              ↩ Zpět na Čeká
+            </button>
+          )}
+          <button type="button" onClick={onNote} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50">
+            Poznámka
+          </button>
+          <button type="button" onClick={onFrequency} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50">
+            Pravidelnost: {frequencyLabel(log.frequency)}
+          </button>
         </div>
       )}
+
       {log.inspectionNote && (
-        <div className="grid lg:grid-cols-[1.9fr_2.4fr_3.7fr] border-t border-blue-200 bg-blue-50 px-4 py-2 text-sm">
-          <div className="font-bold text-blue-800">připomínka</div>
-          <div className="inspection-text-block lg:col-span-2">{log.inspectionNote}</div>
+        <div className="px-3 pb-2.5 sm:px-4">
+          <div className="inspection-text-block rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-900">{log.inspectionNote}</div>
         </div>
       )}
     </div>
