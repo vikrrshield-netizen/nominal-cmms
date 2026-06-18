@@ -428,6 +428,8 @@ export default function GearboxesPage() {
               onRepair={() => setRepairAsset(asset)}
               canReport={canReportProblem}
               onReport={() => setProblemAsset(asset)}
+              canAssign={canLogRepair}
+              onAssign={() => navigate(`/asset/${asset.id}?action=assign`, { state: { from: '/gearboxes' } })}
               savingStatus={savingStatusId === asset.id}
               onSetStockStatus={(status) => handleStockStatusChange(asset, status)}
             />
@@ -490,6 +492,8 @@ function GearboxCard({
   onRepair,
   canReport,
   onReport,
+  canAssign,
+  onAssign,
   savingStatus,
   onSetStockStatus,
 }: {
@@ -502,6 +506,8 @@ function GearboxCard({
   onRepair: () => void;
   canReport: boolean;
   onReport: () => void;
+  canAssign: boolean;
+  onAssign: () => void;
   savingStatus: boolean;
   onSetStockStatus: (status: Extract<GearboxStatus, 'in_stock' | 'service'>) => void;
 }) {
@@ -570,6 +576,12 @@ function GearboxCard({
             <FileText className="h-4 w-4 text-emerald-600" />
             Zapsat
           </button>
+          {canAssign && (
+            <button type="button" onClick={onAssign} className={`${BUTTON} flex-1 min-w-[120px] inline-flex items-center justify-center gap-2`}>
+              <Cog className="h-4 w-4 text-violet-600" />
+              Přiřadit
+            </button>
+          )}
           {canReport && (
             <button type="button" onClick={onReport} className={`${BUTTON} flex-1 min-w-[120px] inline-flex items-center justify-center gap-2`}>
               <AlertTriangle className="h-4 w-4 text-red-600" />

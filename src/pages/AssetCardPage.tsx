@@ -1041,6 +1041,13 @@ export default function AssetCardPage() {
               Nový úkol
             </button>
           )}
+          <button
+            onClick={() => setRepairOpen(true)}
+            className="min-w-[120px] flex-1 bg-white border border-stone-200 text-slate-700 rounded-xl px-3 text-sm font-bold flex items-center justify-center gap-2 hover:bg-stone-50 transition active:scale-[0.97] min-h-11"
+          >
+            <FileText className="w-5 h-5 text-slate-500" />
+            Zapsat
+          </button>
           {canEditAsset && (
             <button
               onClick={() => { setIsEditing(!isEditing); setActiveTab('passport'); }}

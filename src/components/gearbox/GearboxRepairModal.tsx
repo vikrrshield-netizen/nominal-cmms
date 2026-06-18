@@ -44,7 +44,7 @@ export default function GearboxRepairModal({ asset, user, onClose, onSaved }: {
         type: workLogType,
         workType: 'gearbox_repair',
         content: [
-          `${typeLabel} převodovky: ${asset.name}`,
+          `${typeLabel}: ${asset.name}`,
           asset.currentExtruderName ? `Extruder: ${asset.currentExtruderName}` : '',
           trimmed,
         ].filter(Boolean).join('\n'),
@@ -64,7 +64,7 @@ export default function GearboxRepairModal({ asset, user, onClose, onSaved }: {
   };
 
   return (
-    <BottomSheet title="Oprava / úprava převodovky" isOpen onClose={onClose}>
+    <BottomSheet title="Zápis do historie" isOpen onClose={onClose}>
         <div className="space-y-4">
           <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
             <span className="font-black text-slate-950">{asset.name}</span>
@@ -105,7 +105,7 @@ export default function GearboxRepairModal({ asset, user, onClose, onSaved }: {
             <textarea
               value={note}
               onChange={(event) => setNote(event.target.value)}
-              placeholder="Popis opravy / úpravy / kontroly převodovky"
+              placeholder="Popis opravy / úpravy / kontroly zařízení"
               className="h-32 w-full resize-none rounded-xl border border-[var(--vik-border)] bg-[var(--vik-surface-2)] p-4 text-base text-slate-950 outline-none focus:border-amber-400"
             />
           </label>
