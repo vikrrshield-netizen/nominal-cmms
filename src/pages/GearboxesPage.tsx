@@ -6,6 +6,8 @@ import {
   AlertTriangle,
   ArrowLeft,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   Clock,
   Cog,
   ExternalLink,
@@ -413,7 +415,7 @@ export default function GearboxesPage() {
           </div>
         )}
 
-        <div className="grid gap-3 lg:grid-cols-2">
+        <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
           {filteredGearboxes.map((asset) => (
             <GearboxCard
               key={asset.id}
@@ -507,6 +509,7 @@ function GearboxCard({
   const temp = temperatureInfo(asset);
   const faultCount = logs.filter(isFaultLikeLog).length + (asset.repairLog?.length || 0);
   const canSetStockStatus = true;
+  const [open, setOpen] = useState(false);
 
   return (
     <article className={`${PANEL} overflow-hidden`}>
@@ -556,8 +559,44 @@ function GearboxCard({
           />
         </div>
 
-        <TemperatureTrend logs={temperatureLogs} />
-        <MotorLoadTrend logs={temperatureLogs} />
+        <MiniSparkline logs={temperatureLogs} accentHex={TEMP_ACCENT.hex} />
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button type="button" onClick={onOpen} className={`${BUTTON} flex-1 min-w-[120px] inline-flex items-center justify-center gap-2`}>
+            <ExternalLink className="h-4 w-4 text-violet-600" />
+            Karta
+          </button>
+          <button type="button" onClick={onWorkLog} className={`${BUTTON} flex-1 min-w-[120px] inline-flex items-center justify-center gap-2`}>
+            <FileText className="h-4 w-4 text-emerald-600" />
+            Zapsat
+          </button>
+          {canReport && (
+            <button type="button" onClick={onReport} className={`${BUTTON} flex-1 min-w-[120px] inline-flex items-center justify-center gap-2`}>
+              <AlertTriangle className="h-4 w-4 text-red-600" />
+              Nahlásit
+            </button>
+          )}
+          {canRepair && (
+            <button type="button" onClick={onRepair} className={`${BUTTON} flex-1 min-w-[120px] inline-flex items-center justify-center gap-2`}>
+              <Wrench className="h-4 w-4 text-amber-600" />
+              Oprava
+            </button>
+          )}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-stone-200 bg-stone-50 py-2 text-xs font-bold text-slate-600 transition hover:bg-stone-100"
+        >
+          {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          {open ? 'Skrýt detail' : 'Detail — grafy, stav, zápisy'}
+        </button>
+
+        {open && (
+          <div>
+            <TemperatureTrend logs={temperatureLogs} asset={asset} />
+            <MotorLoadTrend logs={temperatureLogs} />
 
         {canSetStockStatus && (
           <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
@@ -629,45 +668,32 @@ function GearboxCard({
             </div>
           </div>
         )}
-
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <button type="button" onClick={onOpen} className={`${BUTTON} inline-flex items-center justify-center gap-2`}>
-            <ExternalLink className="h-4 w-4 text-violet-600" />
-            Karta
-          </button>
-          <button type="button" onClick={onWorkLog} className={`${BUTTON} inline-flex items-center justify-center gap-2`}>
-            <FileText className="h-4 w-4 text-emerald-600" />
-            Zapsat práci
-          </button>
-        </div>
-
-        {canReport && (
-          <button
-            type="button"
-            onClick={onReport}
-            className={`${BUTTON} mt-2 inline-flex w-full items-center justify-center gap-2`}
-          >
-            <AlertTriangle className="h-4 w-4 text-red-600" />
-            Nahlásit problém
-          </button>
-        )}
-
-        {canRepair && (
-          <button
-            type="button"
-            onClick={onRepair}
-            className={`${BUTTON} mt-2 inline-flex w-full items-center justify-center gap-2`}
-          >
-            <Wrench className="h-4 w-4 text-amber-600" />
-            Oprava / úprava
-          </button>
+          </div>
         )}
       </div>
     </article>
   );
 }
 
-function TemperatureTrend({ logs }: { logs: GearboxTemperatureLog[] }) {
+function MiniSparkline({ logs, accentHex }: { logs: GearboxTemperatureLog[]; accentHex: string }) {
+  const vals = logs
+    .filter((log) => typeof log.temperatureC === 'number')
+    .slice(0, 14)
+    .reverse()
+    .map((log) => log.temperatureC as number);
+  if (vals.length < 2) return null;
+  const min = Math.min(...vals);
+  const max = Math.max(...vals);
+  const spread = Math.max(1, max - min);
+  const pts = vals.map((v, i) => `${((i / (vals.length - 1)) * 100).toFixed(1)},${(22 - ((v - min) / spread) * 18).toFixed(1)}`).join(' ');
+  return (
+    <svg viewBox="0 0 100 24" preserveAspectRatio="none" className="mt-3 h-8 w-full">
+      <polyline points={pts} fill="none" stroke={accentHex} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+    </svg>
+  );
+}
+
+function TemperatureTrend({ logs, asset }: { logs: GearboxTemperatureLog[]; asset: Asset }) {
   const points: TrendPoint[] = logs
     .filter((log) => typeof log.temperatureC === 'number' && asDate(log.measuredAt))
     .slice(0, 12)
@@ -681,6 +707,8 @@ function TemperatureTrend({ logs }: { logs: GearboxTemperatureLog[] }) {
       unit="°C"
       accent={TEMP_ACCENT}
       points={points}
+      warn={asset.gearboxWarningTemperatureC ?? 70}
+      crit={asset.gearboxCriticalTemperatureC ?? 85}
       emptyText="Trend bude vidět po dalším zápisu."
     />
   );
@@ -716,6 +744,8 @@ function TrendChart({
   accent,
   points,
   emptyText,
+  warn,
+  crit,
 }: {
   title: string;
   icon: typeof Thermometer;
@@ -723,6 +753,8 @@ function TrendChart({
   accent: TrendAccent;
   points: TrendPoint[];
   emptyText: string;
+  warn?: number;
+  crit?: number;
 }) {
   const gradientId = useMemo(() => `trend-grad-${Math.random().toString(36).slice(2, 9)}`, []);
 
@@ -741,12 +773,18 @@ function TrendChart({
   const values = points.map((point) => point.value);
   const min = Math.min(...values);
   const max = Math.max(...values);
-  const spread = Math.max(1, max - min);
+  // doména zahrne i prahy, aby čáry výstrahy/kritická byly v grafu vidět
+  const domLo = Math.min(min, ...(typeof warn === 'number' ? [warn] : []));
+  const domHi = Math.max(max, ...(typeof crit === 'number' ? [crit] : []), ...(typeof warn === 'number' ? [warn] : []));
+  const pad = Math.max(1, (domHi - domLo) * 0.12);
+  const lo = domLo - pad;
+  const hi = domHi + pad;
+  const spread = Math.max(1, hi - lo);
+  const yOf = (v: number) => 46 - ((v - lo) / spread) * 36;
 
   const coords = points.map((point, index) => {
     const x = points.length === 1 ? 50 : (index / (points.length - 1)) * 100;
-    const y = 46 - ((point.value - min) / spread) * 36;
-    return { x, y };
+    return { x, y: yOf(point.value) };
   });
 
   const polyline = coords.map((c) => `${c.x.toFixed(2)},${c.y.toFixed(2)}`).join(' ');
@@ -765,10 +803,13 @@ function TrendChart({
         </div>
         <div className="text-xs font-bold text-slate-500">
           min {min} · max {max} {unit}
+          {typeof warn === 'number' && typeof crit === 'number' && (
+            <span className="ml-1 text-slate-400">· limit {warn}/{crit}</span>
+          )}
         </div>
       </div>
 
-      <svg viewBox="0 0 100 56" preserveAspectRatio="none" className="h-28 w-full overflow-visible sm:h-36">
+      <svg viewBox="0 0 100 56" preserveAspectRatio="none" className="h-36 w-full overflow-visible sm:h-44">
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={accent.hex} stopOpacity="0.28" />
@@ -778,6 +819,12 @@ function TrendChart({
         {[10, 28, 46].map((y) => (
           <line key={y} x1="0" y1={y} x2="100" y2={y} className="stroke-slate-200" strokeWidth="1" vectorEffect="non-scaling-stroke" />
         ))}
+        {typeof crit === 'number' && (
+          <line x1="0" y1={yOf(crit)} x2="100" y2={yOf(crit)} stroke="#dc2626" strokeWidth="1" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />
+        )}
+        {typeof warn === 'number' && (
+          <line x1="0" y1={yOf(warn)} x2="100" y2={yOf(warn)} stroke="#e0982a" strokeWidth="1" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />
+        )}
         <path d={areaPath} fill={`url(#${gradientId})`} stroke="none" />
         <polyline
           points={polyline}
