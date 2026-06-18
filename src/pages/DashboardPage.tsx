@@ -255,7 +255,7 @@ function czNewMessages(n: number): string {
   return `${n} nových zpráv`;
 }
 
-function ModuleShortcuts({ onNavigate, showHeader = true }: { onNavigate: (path: string) => void; showHeader?: boolean }) {
+function ModuleShortcuts({ onNavigate, showHeader = true, counts }: { onNavigate: (path: string) => void; showHeader?: boolean; counts?: Record<string, number> }) {
   const { canViewSecretBox, hasPermission, user } = useAuthContext();
   const [trustboxNew, setTrustboxNew] = useState(0);
 
@@ -308,6 +308,7 @@ function ModuleShortcuts({ onNavigate, showHeader = true }: { onNavigate: (path:
         {modules.map((mod) => {
           const { label, detail, path, icon: Icon, tone } = mod;
           const badge = (mod as { badge?: number }).badge ?? 0;
+          const count = counts?.[path];
           return (
           <button
             key={path}
@@ -326,6 +327,9 @@ function ModuleShortcuts({ onNavigate, showHeader = true }: { onNavigate: (path:
               <span className="absolute right-2 top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-black text-white">
                 {badge}
               </span>
+            )}
+            {badge === 0 && count != null && (
+              <span className="absolute right-3 top-2.5 text-lg font-black text-slate-300">{count}</span>
             )}
           </button>
           );
@@ -2321,7 +2325,7 @@ function FullDashboard() {
         )}
 
         <DashboardBuilder
-          storageKey="vikrr-dash-builder-v2"
+          storageKey="vikrr-dash-builder-v3"
           panels={[
             {
               id: 'prehled',
@@ -2354,9 +2358,8 @@ function FullDashboard() {
             },
             {
               id: 'rychle-akce',
-              title: 'Rychlé akce',
-              defaultSpan: 1,
-              defaultHidden: true,
+              title: 'Moje zkratky',
+              defaultSpan: 3,
               node: (
                 <QuickActions onNavigate={(path) => {
                   if (path === 'fault') { setActiveModal('fault'); return; }
@@ -2367,11 +2370,10 @@ function FullDashboard() {
             {
               id: 'moduly',
               title: 'Moduly',
-              defaultSpan: 1,
-              defaultHidden: true,
+              defaultSpan: 3,
               node: (
                 <DashboardZone title="Moduly" description="Kompaktni menu podle opravneni a role.">
-                  <ModuleShortcuts onNavigate={navigate} showHeader={false} />
+                  <ModuleShortcuts onNavigate={navigate} showHeader={false} counts={{ '/kartoteka': stats.totalAssets || 0, '/tasks': stats.openTasks || 0, '/inspections': inspStats.defect || 0, '/inventory': lowStockCount }} />
                 </DashboardZone>
               ),
             },
