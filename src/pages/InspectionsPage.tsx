@@ -1018,7 +1018,7 @@ export default function InspectionsPage() {
         </div>
 
         {showStatusFilters && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-3">
+        <div className="mx-auto w-full max-w-[1200px] px-4 grid grid-cols-1 md:grid-cols-3 gap-2 mb-3">
           <button
             type="button"
             onClick={() => setFilter('pending')}
@@ -1046,7 +1046,7 @@ export default function InspectionsPage() {
         </div>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
+        <div className="mx-auto w-full max-w-[1200px] px-4 grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
           <button
             type="button"
             onClick={() => setShowStatusFilters((value) => !value)}
@@ -1309,7 +1309,7 @@ export default function InspectionsPage() {
         )}
 
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 px-4 mb-4">
+      <div className="mx-auto w-full max-w-[1200px] grid grid-cols-2 sm:grid-cols-4 gap-2 px-4 mb-4">
         <button
           onClick={() => setFilter('all')}
           className={`p-3 rounded-xl text-center transition ${
