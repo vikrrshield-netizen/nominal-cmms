@@ -1229,24 +1229,28 @@ export default function ProductionPage() {
                         <div className="text-sm font-black text-slate-900">{batch.planDate || 'Bez data'}</div>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 mb-3 lg:grid-cols-4">
-                      <div className="rounded-xl border border-slate-200 bg-[#fbf9f4]/35 p-2.5">
-                        <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">Výrobek</div>
-                        <div className="text-sm font-medium text-slate-900">{batch.productName || 'nezadáno'}</div>
-                        {batch.productBatch && <div className="mt-1 font-mono text-[11px] text-emerald-700">{batch.productBatch}</div>}
+                    <div className="mb-3 divide-y divide-stone-100 border-y border-stone-100">
+                      <div className="flex items-start justify-between gap-3 py-2">
+                        <span className="text-xs font-bold uppercase tracking-wide text-slate-400">Výrobek</span>
+                        <span className="min-w-0 text-right text-sm font-medium text-slate-900">
+                          {batch.productName || 'nezadáno'}
+                          {batch.productBatch && <span className="ml-2 font-mono text-[11px] text-emerald-700">{batch.productBatch}</span>}
+                        </span>
                       </div>
-                      <div className="rounded-xl border border-slate-200 bg-[#fbf9f4]/35 p-2.5">
-                        <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">Surovina</div>
-                        <div className="text-sm font-medium text-slate-900">{batch.materialName || batch.rawMaterial}</div>
-                        {batch.materialBatch && <div className="mt-1 font-mono text-[11px] text-emerald-700">{batch.materialBatch}</div>}
+                      <div className="flex items-start justify-between gap-3 py-2">
+                        <span className="text-xs font-bold uppercase tracking-wide text-slate-400">Surovina</span>
+                        <span className="min-w-0 text-right text-sm font-medium text-slate-900">
+                          {batch.materialName || batch.rawMaterial}
+                          {batch.materialBatch && <span className="ml-2 font-mono text-[11px] text-emerald-700">{batch.materialBatch}</span>}
+                        </span>
                       </div>
-                      <div className="rounded-xl border border-slate-200 bg-[#fbf9f4]/35 p-2.5">
-                        <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">Hmotnost</div>
-                        <div className="text-sm font-medium text-slate-900">{batch.targetWeight} kg</div>
+                      <div className="flex items-center justify-between gap-3 py-2">
+                        <span className="text-xs font-bold uppercase tracking-wide text-slate-400">Hmotnost</span>
+                        <span className="text-right text-sm font-medium text-slate-900">{batch.targetWeight} kg</span>
                       </div>
-                      <div className="rounded-xl border border-slate-200 bg-[#fbf9f4]/35 p-2.5">
-                        <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">Stroj</div>
-                        <div className="text-sm font-medium text-slate-900">{machineLabel}</div>
+                      <div className="flex items-center justify-between gap-3 py-2">
+                        <span className="text-xs font-bold uppercase tracking-wide text-slate-400">Stroj</span>
+                        <span className="text-right text-sm font-medium text-slate-900">{machineLabel}</span>
                       </div>
                     </div>
 

@@ -792,9 +792,9 @@ export default function InspectionsPage() {
             <button
               type="button"
               onClick={() => setViewMode('archive')}
-              className="rounded-2xl border border-sky-200 bg-sky-50 p-3 text-left shadow-sm active:scale-[0.98]"
+              className="rounded-2xl border border-slate-200 bg-white p-3 text-left shadow-sm active:scale-[0.98]"
             >
-              <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wide text-sky-800">
+              <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wide text-slate-500">
                 <Archive className="h-4 w-4" />
                 Hotové kontroly
               </div>
