@@ -1,0 +1,516 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>NOMINAL CMMS — Kontroly (návrh B)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --sand:#f0eee9; --sand-2:#e9e5dd; --card:#ffffff;
+    --ink:#1d2520; --ink-2:#454c44; --muted:#7c8278; --faint:#a7ab9f;
+    --line:#e7e2d8; --line-2:#efece4;
+    --green:#1f8a5b; --green-2:#2e9e74; --green-deep:#16623f; --green-tint:#e8f3ec;
+    --red:#cf4a36; --red-deep:#a83a28; --red-tint:#fbeae6;
+    --amber:#cf8a1f; --amber-deep:#9a6510; --amber-tint:#f8efdc;
+    --blue:#3c7ba0; --blue-tint:#e7f0f5;
+    --shadow:0 1px 2px rgba(40,36,28,.05), 0 6px 18px -10px rgba(40,36,28,.18);
+    --r:18px; --r-sm:12px;
+    --sans:"Hanken Grotesk",system-ui,sans-serif;
+    --mono:"JetBrains Mono",ui-monospace,monospace;
+    --disp:"Space Grotesk",var(--sans);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--sand-2);font-family:var(--sans);color:var(--ink);-webkit-font-smoothing:antialiased}
+  body{min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:28px}
+  .app{width:1440px;flex-shrink:0;background:var(--sand);border-radius:26px;overflow:hidden;display:grid;grid-template-columns:236px 1fr;box-shadow:0 30px 80px -30px rgba(40,36,28,.45);border:1px solid var(--line)}
+
+  /* ── Sidebar ── */
+  .side{background:#1c241f;color:#cdd3cb;padding:22px 16px;display:flex;flex-direction:column;gap:26px;min-height:1080px}
+  .brand{display:flex;align-items:center;gap:10px;padding:4px 8px}
+  .brand .mark{width:34px;height:34px;border-radius:10px;background:var(--green-2);display:flex;align-items:center;justify-content:center;color:#0e2418;font-weight:800;font-size:18px;font-family:var(--disp)}
+  .brand .wm{font-family:var(--disp);font-weight:700;font-size:18px;letter-spacing:.02em;color:#fff}
+  .brand .wm small{display:block;font-family:var(--sans);font-weight:500;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:#7f877d;margin-top:1px}
+  .nav{display:flex;flex-direction:column;gap:3px}
+  .nav .lbl{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#6b7268;font-weight:700;padding:10px 12px 4px}
+  .nav a{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:11px;color:#c2c8bf;text-decoration:none;font-size:14px;font-weight:600;transition:background .14s,color .14s}
+  .nav a:not(.on):hover{background:#252e27;color:#eef1ec}
+  .nav a:not(.on):hover svg{stroke:#cdd3cb}
+  .nav a svg{width:18px;height:18px;stroke:#9aa097;stroke-width:2;fill:none;flex-shrink:0}
+  .nav a.on{background:var(--green-2);color:#08200f}
+  .nav a.on svg{stroke:#0e2418}
+  .nav a .ct{margin-left:auto;font-size:11px;font-weight:700;background:#cf4a36;color:#fff;padding:1px 7px;border-radius:999px}
+  .side .foot{margin-top:auto;display:flex;align-items:center;gap:10px;padding:10px;border-radius:12px;background:#252e27}
+  .side .foot .av{width:32px;height:32px;border-radius:9px;background:var(--green-2);color:#08200f;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:13px}
+  .side .foot b{font-size:13px;color:#eef1ec;display:block}
+  .side .foot span{font-size:11px;color:#838a80}
+
+  /* ── Main ── */
+  .main{padding:0 30px 40px}
+  .top{display:flex;align-items:center;gap:16px;padding:22px 0 16px;position:sticky;top:0;background:linear-gradient(var(--sand) 80%,transparent);z-index:5}
+  .back{width:40px;height:40px;border-radius:12px;background:var(--card);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer}
+  .back svg{width:18px;height:18px;stroke:var(--ink-2);stroke-width:2;fill:none}
+  .title h1{font-family:var(--disp);font-size:24px;font-weight:700;display:flex;align-items:center;gap:9px}
+  .title h1 svg{width:24px;height:24px;stroke:var(--green-deep);stroke-width:2;fill:none}
+  .title p{font-size:13px;color:var(--muted);font-weight:600;margin-top:2px}
+  .monthnav{margin-left:auto;display:flex;align-items:center;gap:2px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:4px}
+  .monthnav button{width:32px;height:32px;border:0;background:none;border-radius:9px;cursor:pointer;color:var(--ink-2);font-size:16px;display:flex;align-items:center;justify-content:center}
+  .monthnav button:hover{background:var(--sand)}
+  .monthnav .m{font-size:13.5px;font-weight:700;padding:0 12px;text-transform:capitalize;min-width:130px;text-align:center}
+  .btn{border:0;border-radius:12px;padding:10px 16px;font-family:var(--sans);font-size:13.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:8px;transition:filter .12s,transform .08s,box-shadow .14s}
+  .btn:hover{filter:brightness(1.04)}
+  .btn:active{transform:translateY(1px)}
+  .btn-ghost:hover{box-shadow:var(--shadow);border-color:#ddd6c8}
+  .btn svg{width:16px;height:16px;stroke-width:2;fill:none}
+  .btn-ghost{background:var(--card);border:1px solid var(--line);color:var(--ink-2)}
+  .btn-ghost svg{stroke:var(--ink-2)}
+
+  .eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:600}
+  .layout{display:grid;grid-template-columns:1fr 336px;gap:18px;align-items:start}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+
+  /* Teď provést */
+  .nowcard{border:1px solid #ecd9ad;background:linear-gradient(180deg,#fcf6e8,#fff);border-radius:var(--r);box-shadow:var(--shadow);padding:18px 20px;margin-bottom:16px}
+  .nowcard .h{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+  .nowcard .h .l .eyebrow{color:var(--amber-deep)}
+  .nowcard .h .l h2{font-family:var(--disp);font-size:18px;font-weight:700;margin-top:3px}
+  .nowcard .h .l h2 b{color:var(--amber-deep)}
+  .nowq{display:flex;flex-direction:column;gap:9px}
+  .qitem{display:flex;align-items:center;gap:14px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px 15px;transition:border-color .15s,box-shadow .15s,transform .15s}
+  .qitem:hover{border-color:#e9d9ab;box-shadow:0 6px 18px -10px rgba(120,90,20,.28);transform:translateY(-1px)}
+  .qitem .rm{flex:1;min-width:0}
+  .qitem .rm b{font-size:14.5px;font-weight:700;color:var(--ink);display:block}
+  .qitem .rm span{font-size:12.5px;color:var(--muted);font-weight:500}
+  .freq{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--amber-deep);background:var(--amber-tint);padding:4px 9px;border-radius:8px;flex-shrink:0}
+  .acts{display:flex;gap:8px;flex-shrink:0}
+  .act{border:0;border-radius:11px;padding:9px 16px;font-family:var(--sans);font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px}
+  .act-ok{background:var(--green);color:#fff}
+  .act-bad{background:var(--card);border:1.5px solid #e6b9ae;color:var(--red-deep)}
+  .act{transition:filter .12s,transform .08s,background .14s}
+  .act-ok:hover{filter:brightness(1.06)}
+  .act-bad:hover{background:var(--red-tint)}
+  .act:active{transform:scale(.96)}
+
+  /* Checklist groups */
+  .grp{margin-top:18px}
+  .grp .gh{display:flex;align-items:center;gap:10px;padding:0 2px 10px}
+  .grp .gh h3{font-family:var(--disp);font-size:14.5px;font-weight:700}
+  .grp .gh .pl{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--muted);background:var(--sand);padding:2px 9px;border-radius:999px}
+  .grp .gh .gprog{width:62px;height:6px;border-radius:999px;background:var(--line);overflow:hidden;flex-shrink:0}
+  .grp .gh .gprog i{display:block;height:100%;background:var(--green-2);border-radius:999px}
+  .cp .by{color:var(--faint);font-weight:600;font-family:var(--mono);font-size:11.5px}
+  .evi{display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:10px;font-weight:600;color:var(--ink-2);background:var(--card);border:1px solid var(--line);padding:2px 7px;border-radius:7px;margin-left:6px}
+  .evi svg{width:11px;height:11px;stroke:currentColor;stroke-width:2;fill:none}
+  .grp .gh .ln{flex:1;height:1px;background:var(--line)}
+  .rows{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden}
+  .row{display:flex;align-items:center;gap:14px;padding:13px 18px;border-top:1px solid var(--line-2);transition:background .12s}
+  .row:hover{background:#faf8f3}
+  .row:first-child{border-top:0}
+  .row .st{width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .row .st svg{width:15px;height:15px;stroke-width:2.4;fill:none}
+  .st-ok{background:var(--green-tint);color:var(--green-deep)}
+  .st-bad{background:var(--red-tint);color:var(--red-deep)}
+  .st-wait{background:var(--sand);color:var(--faint);border:1px dashed var(--line)}
+  .row .info{flex:1;min-width:0}
+  .row .info b{font-size:14px;font-weight:700;color:var(--ink)}
+  .row .info .cp{font-size:12.5px;color:var(--muted);font-weight:500;margin-top:1px}
+  .row .info .note{font-size:12.5px;color:var(--red-deep);font-weight:600;margin-top:3px;display:flex;align-items:center;gap:6px}
+  .row .info .note svg{width:13px;height:13px;stroke:currentColor;stroke-width:2;fill:none;flex-shrink:0}
+  .chip{font-size:12px;font-weight:700;padding:5px 11px;border-radius:999px;flex-shrink:0}
+  .chip-ok{background:var(--green-tint);color:var(--green-deep)}
+  .chip-bad{background:var(--red-tint);color:var(--red-deep)}
+  .row .mini{display:flex;gap:7px;flex-shrink:0}
+  .mini .act{padding:8px 14px}
+  .tasklink{font-size:12px;font-weight:700;color:var(--blue);text-decoration:none;flex-shrink:0;white-space:nowrap;transition:color .12s}
+  .tasklink:hover{color:#2c6589;text-decoration:underline}
+
+  /* Right rail */
+  .rail{display:flex;flex-direction:column;gap:16px;position:sticky;top:88px}
+  .doc{padding:18px 20px;border:1px solid #bfe0cd;background:linear-gradient(180deg,#edf7f1,#fff);border-radius:var(--r);box-shadow:var(--shadow)}
+  .doc .eyebrow{color:var(--green-deep);display:flex;align-items:center;gap:6px}
+  .doc .eyebrow svg{width:13px;height:13px;stroke:currentColor;stroke-width:2.2;fill:none}
+  .doc .stx{font-family:var(--disp);font-size:20px;font-weight:700;margin:6px 0 2px}
+  .doc .meta{font-size:12.5px;color:var(--muted);font-weight:600;margin-bottom:14px}
+  .btn-close{width:100%;justify-content:center;background:var(--green);color:#fff;padding:13px}
+  .btn-close svg{stroke:#fff}
+
+  .pcard{padding:18px 20px}
+  .pcard h3{font-family:var(--disp);font-size:15px;font-weight:700;margin-bottom:14px}
+  .prog{display:flex;align-items:center;gap:16px;margin-bottom:14px}
+  .prog .pct{font-family:var(--disp);font-size:15px;font-weight:700;color:var(--green-deep)}
+  .statgrid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .stat{border-radius:12px;padding:11px 13px;border:1px solid var(--line)}
+  .stat .n{font-family:var(--disp);font-size:22px;font-weight:700;line-height:1}
+  .stat .l{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-top:3px;color:var(--muted)}
+  .stat.ok{background:var(--green-tint);border-color:#cfe7d8}.stat.ok .n{color:var(--green-deep)}.stat.ok .l{color:var(--green-deep)}
+  .stat.bad{background:var(--red-tint);border-color:#f0cabf}.stat.bad .n{color:var(--red-deep)}.stat.bad .l{color:var(--red-deep)}
+  .stat.wait{background:var(--amber-tint);border-color:#ecd9ad}.stat.wait .n{color:var(--amber-deep)}.stat.wait .l{color:var(--amber-deep)}
+
+  .exp{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:14px}
+  .btn-exp{justify-content:center;font-size:13px;padding:11px}
+  .btn-xls{background:var(--green-deep);color:#fff}.btn-xls svg{stroke:#fff}
+  .btn-pdf{background:var(--blue);color:#fff}.btn-pdf svg{stroke:#fff}
+
+  .deflist .dh{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+  .deflist .dh h3{font-family:var(--disp);font-size:15px;font-weight:700}
+  .deflist .dh .c{font-size:12px;font-weight:700;color:var(--red-deep);background:var(--red-tint);padding:2px 9px;border-radius:999px}
+  .def{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-top:1px solid var(--line-2)}
+  .def:first-of-type{border-top:0}
+  .def .dot{width:8px;height:8px;border-radius:50%;background:var(--red);margin-top:5px;flex-shrink:0}
+  .def .dx{flex:1;min-width:0}
+  .def .dx b{font-size:13.5px;font-weight:700;color:var(--ink);display:block}
+  .def .dx span{font-size:12px;color:var(--muted);font-weight:500;display:block;margin-top:1px}
+  .row .info{cursor:pointer}
+  .qitem .rm{cursor:pointer}
+
+  /* ── Modal: provést kontrolu ── */
+  .modal{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;padding:32px}
+  .modal.open{display:flex}
+  .mback{position:absolute;inset:0;background:rgba(24,28,22,.5);backdrop-filter:blur(3px);animation:mfade .18s ease}
+  .mcard{position:relative;width:560px;max-width:100%;max-height:calc(100vh - 64px);background:var(--card);border-radius:22px;border:1px solid var(--line);box-shadow:0 40px 90px -30px rgba(20,24,18,.6);display:flex;flex-direction:column;overflow:hidden;animation:mpop .22s cubic-bezier(.2,.9,.3,1.2)}
+  @keyframes mfade{from{opacity:0}to{opacity:1}}
+  @keyframes mpop{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
+  .mx{position:absolute;top:16px;right:16px;width:34px;height:34px;border:0;border-radius:10px;background:var(--sand);color:var(--ink-2);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .12s}
+  .mx:hover{background:var(--sand-2)}
+  .mhead{padding:24px 26px 18px;border-bottom:1px solid var(--line-2)}
+  .mhead .eyebrow{display:flex;align-items:center;gap:6px}
+  .mhead .eyebrow svg{width:13px;height:13px;stroke:currentColor;stroke-width:2.2;fill:none}
+  .mhead h2{font-family:var(--disp);font-size:21px;font-weight:700;margin:7px 0 4px;line-height:1.2;padding-right:36px}
+  .mmeta{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--muted)}
+  .mbody{padding:20px 26px;overflow-y:auto;display:flex;flex-direction:column;gap:18px}
+  .seg{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .seg button{border:1.5px solid var(--line);background:var(--card);border-radius:14px;padding:16px;cursor:pointer;font-family:var(--sans);font-weight:700;font-size:15px;color:var(--ink-2);display:flex;flex-direction:column;align-items:center;gap:7px;transition:all .14s}
+  .seg button svg{width:24px;height:24px;stroke-width:2.2;fill:none;stroke:currentColor}
+  .seg button small{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.04em;color:var(--faint);text-transform:uppercase}
+  .seg button:hover{border-color:#d9d2c4}
+  .seg .seg-ok.on{background:var(--green-tint);border-color:var(--green-2);color:var(--green-deep)}
+  .seg .seg-ok.on small{color:var(--green-deep)}
+  .seg .seg-bad.on{background:var(--red-tint);border-color:var(--red);color:var(--red-deep)}
+  .seg .seg-bad.on small{color:var(--red-deep)}
+  .fld{display:flex;flex-direction:column;gap:9px}
+  .fld>label{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chips button{border:1.5px solid var(--line);background:var(--card);border-radius:10px;padding:8px 13px;font-family:var(--sans);font-size:13px;font-weight:600;color:var(--ink-2);cursor:pointer;transition:all .12s}
+  .chips button:hover{border-color:#d9d2c4}
+  .chips button.sel{background:var(--ink);border-color:var(--ink);color:#fff}
+  .chips.sev button.sel{background:var(--amber-deep);border-color:var(--amber-deep)}
+  .defwrap{display:none;flex-direction:column;gap:16px;padding:16px;background:var(--red-tint);border:1px solid #f0cabf;border-radius:14px}
+  .defwrap.show{display:flex;animation:mfade .2s ease}
+  .defwrap>.fld>label{color:var(--red-deep)}
+  textarea{width:100%;border:1.5px solid var(--line);border-radius:12px;padding:12px 14px;font-family:var(--sans);font-size:14px;color:var(--ink);resize:vertical;min-height:74px;background:var(--card)}
+  textarea:focus{outline:none;border-color:var(--green-2)}
+  textarea::placeholder{color:var(--faint)}
+  .photos{display:flex;gap:10px;flex-wrap:wrap}
+  .pslot{width:84px;height:84px;border-radius:12px;border:1.5px dashed var(--line);background:var(--sand);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;cursor:pointer;color:var(--muted);transition:all .14s;background-size:cover;background-position:center;overflow:hidden;position:relative}
+  .pslot:hover{border-color:var(--green-2);color:var(--green-deep)}
+  .pslot svg{width:20px;height:20px;stroke:currentColor;stroke-width:2;fill:none}
+  .pslot span{font-family:var(--mono);font-size:9.5px;font-weight:600}
+  .pslot input{display:none}
+  .pslot.filled{border-style:solid;border-color:var(--green-2)}
+  .pslot.filled svg,.pslot.filled span{display:none}
+  .mfoot{padding:16px 26px;border-top:1px solid var(--line-2);display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--sand)}
+  .btn-ghost2{background:var(--card);border:1px solid var(--line);color:var(--ink-2)}
+  .btn-save{background:var(--green);color:#fff}
+  .btn-save svg{stroke:#fff}
+</style>
+</head>
+<body>
+<div class="app" data-screen-label="Kontroly — návrh B">
+
+  <!-- Sidebar -->
+  <aside class="side">
+    <div class="brand"><div class="mark">N</div><div class="wm">NOMINAL<small>CMMS</small></div></div>
+    <nav class="nav">
+      <a href="#"><svg viewBox="0 0 24 24"><path d="M3 12l9-9 9 9M5 10v10h14V10"/></svg>Přehled</a>
+      <a href="#"><svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Úkoly<span class="ct">7</span></a>
+      <a href="#"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>Stroje</a>
+      <a class="on" href="#"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Kontroly<span class="ct">18</span></a>
+      <a href="#"><svg viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M5 12H2M22 12h-3M19 5l-2 2M7 17l-2 2M19 19l-2-2M7 7L5 5"/><circle cx="12" cy="12" r="3"/></svg>Revize<span class="ct">3</span></a>
+      <a href="#"><svg viewBox="0 0 24 24"><path d="M3 3v18h18M7 14l4-4 3 3 5-6"/></svg>Reporty</a>
+      <div class="lbl">Provoz</div>
+      <a href="#"><svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="13" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>Sklad</a>
+      <a href="#"><svg viewBox="0 0 24 24"><path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg>Kalendář</a>
+      <a href="#"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h6"/></svg>Deník práce</a>
+    </nav>
+    <div class="foot"><div class="av">PK</div><div><b>Pavel Krejčí</b><span>Vedoucí údržby</span></div></div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <header class="top">
+      <div class="back"><svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></div>
+      <div class="title">
+        <h1><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Kontroly budovy C, D</h1>
+        <p>Měsíční kontrolní checklist · doklad podle data uzavření</p>
+      </div>
+      <div class="monthnav">
+        <button>‹</button><span class="m">červen 2026</span><button>›</button>
+      </div>
+      <button class="btn btn-ghost"><svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="5" rx="1"/><path d="M4 9v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9M10 13h4"/></svg>Archiv</button>
+    </header>
+
+    <div class="layout">
+      <!-- LEFT: working checklist -->
+      <div>
+        <!-- Teď provést -->
+        <section class="nowcard">
+          <div class="h">
+            <div class="l"><div class="eyebrow">Teď provést</div><h2><b>11 kontrol</b> čeká na provedení</h2></div>
+          </div>
+          <div class="nowq">
+            <div class="qitem">
+              <div class="rm"><b>Výrobní hala C — strop a podhledy</b><span>C / 1.NP · cizí předmět, kondenzace</span></div>
+              <span class="freq">Měsíčně</span>
+              <div class="acts"><button class="act act-ok"><svg viewBox="0 0 24 24" style="width:15px;height:15px;stroke:#fff;stroke-width:2.6;fill:none"><path d="M20 6 9 17l-5-5"/></svg>OK</button><button class="act act-bad">✗ Závada</button></div>
+            </div>
+            <div class="qitem">
+              <div class="rm"><b>Sklad obalů — police a regály</b><span>C / 1.NP · škůdci, hygiena</span></div>
+              <span class="freq">Měsíčně</span>
+              <div class="acts"><button class="act act-ok"><svg viewBox="0 0 24 24" style="width:15px;height:15px;stroke:#fff;stroke-width:2.6;fill:none"><path d="M20 6 9 17l-5-5"/></svg>OK</button><button class="act act-bad">✗ Závada</button></div>
+            </div>
+            <div class="qitem">
+              <div class="rm"><b>Expedice — vrata a těsnění</b><span>D / přízemí · teplota, konstrukce</span></div>
+              <span class="freq">Týdně</span>
+              <div class="acts"><button class="act act-ok"><svg viewBox="0 0 24 24" style="width:15px;height:15px;stroke:#fff;stroke-width:2.6;fill:none"><path d="M20 6 9 17l-5-5"/></svg>OK</button><button class="act act-bad">✗ Závada</button></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Group: 1.NP -->
+        <div class="grp">
+          <div class="gh"><h3>Budova C — 1.NP</h3><span class="gprog"><i style="width:38%"></i></span><span class="pl">3/8 hotovo</span><span class="ln"></span></div>
+          <div class="rows">
+            <div class="row">
+              <span class="st st-ok"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></span>
+              <div class="info"><b>Vstupní chodba — podlaha a osvětlení</b><div class="cp">C-101 · měsíčně <span class="by">09:12 · PK</span></div></div>
+              <span class="chip chip-ok">OK</span>
+            </div>
+            <div class="row">
+              <span class="st st-bad"><svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg></span>
+              <div class="info"><b>Šatny — obklady a odpady</b><div class="cp">C-104 · měsíčně <span class="by">09:28 · PK</span></div><div class="note"><svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>Prasklý obklad u umyvadla — riziko cizího předmětu<span class="evi"><svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>2 foto</span></div></div>
+              <a class="tasklink" href="#">úkol P2 →</a>
+              <span class="chip chip-bad">Závada</span>
+            </div>
+            <div class="row">
+              <span class="st st-ok"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></span>
+              <div class="info"><b>Výrobní hala C — stěny a nátěry</b><div class="cp">C-110 · měsíčně <span class="by">09:41 · PK</span></div></div>
+              <span class="chip chip-ok">OK</span>
+            </div>
+            <div class="row">
+              <span class="st st-wait"></span>
+              <div class="info"><b>Výrobní hala C — strop a podhledy</b><div class="cp">C-110 · měsíčně</div></div>
+              <div class="mini"><button class="act act-ok"><svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:#fff;stroke-width:2.6;fill:none"><path d="M20 6 9 17l-5-5"/></svg>OK</button><button class="act act-bad">✗ Závada</button></div>
+            </div>
+            <div class="row">
+              <span class="st st-wait"></span>
+              <div class="info"><b>Sklad obalů — police a regály</b><div class="cp">C-120 · měsíčně</div></div>
+              <div class="mini"><button class="act act-ok"><svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:#fff;stroke-width:2.6;fill:none"><path d="M20 6 9 17l-5-5"/></svg>OK</button><button class="act act-bad">✗ Závada</button></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Group: budova D -->
+        <div class="grp">
+          <div class="gh"><h3>Budova D — přízemí</h3><span class="gprog"><i style="width:33%"></i></span><span class="pl">2/6 hotovo</span><span class="ln"></span></div>
+          <div class="rows">
+            <div class="row">
+              <span class="st st-ok"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></span>
+              <div class="info"><b>Expedice — podlaha a značení</b><div class="cp">D-001 · týdně <span class="by">08:50 · MJ</span></div></div>
+              <span class="chip chip-ok">OK</span>
+            </div>
+            <div class="row">
+              <span class="st st-wait"></span>
+              <div class="info"><b>Expedice — vrata a těsnění</b><div class="cp">D-001 · týdně</div></div>
+              <div class="mini"><button class="act act-ok"><svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:#fff;stroke-width:2.6;fill:none"><path d="M20 6 9 17l-5-5"/></svg>OK</button><button class="act act-bad">✗ Závada</button></div>
+            </div>
+            <div class="row">
+              <span class="st st-bad"><svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg></span>
+              <div class="info"><b>Chodba D — únikové dveře</b><div class="cp">D-005 · měsíčně <span class="by">09:05 · MJ</span></div><div class="note"><svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>Zatuhlé panikové kování — nutná oprava<span class="evi"><svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>1 foto</span></div></div>
+              <a class="tasklink" href="#">úkol P1 →</a>
+              <span class="chip chip-bad">Závada</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: doc panel -->
+      <aside class="rail">
+        <div class="doc">
+          <div class="eyebrow"><svg viewBox="0 0 24 24"><path d="M8 11V7a4 4 0 0 1 8 0M5 11h14v10H5z"/></svg>Aktuální doklad</div>
+          <div class="stx">Rozpracováno</div>
+          <div class="meta">Zahájeno 18. 6. · 2 závady zapsané</div>
+          <button class="btn btn-close"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Uzavřít kontrolu</button>
+        </div>
+
+        <div class="card pcard">
+          <h3>Stav kontroly</h3>
+          <div class="prog">
+            <svg width="78" height="78" viewBox="0 0 78 78">
+              <circle cx="39" cy="39" r="31" fill="none" stroke="#efe9de" stroke-width="10"/>
+              <circle cx="39" cy="39" r="31" fill="none" stroke="#2e9e74" stroke-width="10" stroke-linecap="round" stroke-dasharray="117 195" transform="rotate(-90 39 39)"/>
+              <text x="39" y="37" text-anchor="middle" font-size="19" font-weight="700" font-family="Space Grotesk" fill="#1b2620">60%</text>
+              <text x="39" y="50" text-anchor="middle" font-size="7.5" font-weight="700" font-family="Hanken Grotesk" fill="#97a096" letter-spacing="1">HOTOVO</text>
+            </svg>
+            <div style="flex:1;font-size:13px;color:var(--muted);font-weight:600">21 z 35 bodů hotovo<br><span style="color:var(--ink-2)">14 bodů zbývá provést</span></div>
+          </div>
+          <div class="statgrid">
+            <div class="stat ok"><div class="n">19</div><div class="l">OK</div></div>
+            <div class="stat bad"><div class="n">2</div><div class="l">Závady</div></div>
+            <div class="stat wait"><div class="n">14</div><div class="l">Čeká</div></div>
+            <div class="stat"><div class="n">35</div><div class="l">Celkem</div></div>
+          </div>
+          <div class="exp">
+            <button class="btn btn-exp btn-xls"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13l2 3 2-3M11 16v-3"/></svg>Excel</button>
+            <button class="btn btn-exp btn-pdf"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 15h6M9 18h4"/></svg>PDF</button>
+          </div>
+        </div>
+
+        <div class="card pcard deflist">
+          <div class="dh"><h3>Závady k reportu</h3><span class="c">2</span></div>
+          <div class="def"><span class="dot"></span><div class="dx"><b>Šatny — prasklý obklad</b><span>C-104 · cizí předmět · vysoký dopad</span></div><a class="tasklink" href="#">otevřít →</a></div>
+          <div class="def"><span class="dot"></span><div class="dx"><b>Chodba D — únikové dveře</b><span>D-005 · konstrukce · střední dopad</span></div><a class="tasklink" href="#">otevřít →</a></div>
+        </div>
+      </aside>
+    </div>
+  </main>
+</div>
+
+<!-- ── Modal: provést kontrolu ── -->
+<div class="modal" id="kModal" aria-hidden="true">
+  <div class="mback" data-close></div>
+  <div class="mcard" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+    <button class="mx" data-close aria-label="Zavřít">✕</button>
+    <div class="mhead">
+      <div class="eyebrow" style="color:var(--green-deep)"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Kontrolní bod</div>
+      <h2 id="mTitle">Kontrolní bod</h2>
+      <div class="mmeta" id="mMeta">—</div>
+    </div>
+    <div class="mbody">
+      <div class="seg" id="mSeg">
+        <button class="seg-ok" data-st="ok"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>Bez závady<small>Stav OK</small></button>
+        <button class="seg-bad" data-st="bad"><svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>Závada<small>Zapsat nález</small></button>
+      </div>
+
+      <div class="defwrap" id="mDef">
+        <div class="fld">
+          <label>Kategorie závady</label>
+          <div class="chips" id="mCat">
+            <button>Cizí předmět</button><button>Hygiena</button><button>Škůdci</button><button>Konstrukce</button><button>Teplota</button><button>Ostatní</button>
+          </div>
+        </div>
+        <div class="fld">
+          <label>Dopad</label>
+          <div class="chips sev" id="mSev">
+            <button>Nízký</button><button>Střední</button><button>Vysoký</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="fld">
+        <label>Poznámka</label>
+        <textarea id="mNote" placeholder="Popis zjištění, umístění, doporučení…"></textarea>
+      </div>
+
+      <div class="fld">
+        <label>Fotodokumentace</label>
+        <div class="photos" id="mPhotos">
+          <label class="pslot"><input type="file" accept="image/*"><svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg><span>Přidat</span></label>
+          <label class="pslot"><input type="file" accept="image/*"><svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg><span>Přidat</span></label>
+          <label class="pslot"><input type="file" accept="image/*"><svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg><span>Přidat</span></label>
+        </div>
+      </div>
+    </div>
+    <div class="mfoot">
+      <button class="btn btn-ghost" data-close>Zrušit</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost2" id="mNext">Uložit a další ›</button>
+        <button class="btn btn-save" id="mSave"><svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke-width:2;fill:none"><path d="M20 6 9 17l-5-5"/></svg>Uložit bod</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const modal = document.getElementById('kModal');
+  const elTitle = document.getElementById('mTitle');
+  const elMeta = document.getElementById('mMeta');
+  const def = document.getElementById('mDef');
+  const segBtns = modal.querySelectorAll('#mSeg button');
+
+  function setStatus(st){
+    segBtns.forEach(b=>b.classList.toggle('on', b.dataset.st===st));
+    def.classList.toggle('show', st==='bad');
+  }
+  function resetForm(){
+    segBtns.forEach(b=>b.classList.remove('on'));
+    def.classList.remove('show');
+    modal.querySelectorAll('.chips button').forEach(b=>b.classList.remove('sel'));
+    document.getElementById('mNote').value='';
+    modal.querySelectorAll('.pslot').forEach(p=>{p.classList.remove('filled');p.style.backgroundImage='';const i=p.querySelector('input');if(i)i.value='';});
+  }
+  function open(name, meta, st){
+    resetForm();
+    elTitle.textContent = name || 'Kontrolní bod';
+    elMeta.textContent = meta || '—';
+    if(st) setStatus(st);
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden','false');
+    document.body.style.overflow='hidden';
+  }
+  function close(){
+    modal.classList.remove('open');
+    modal.setAttribute('aria-hidden','true');
+    document.body.style.overflow='';
+  }
+
+  // status toggle
+  segBtns.forEach(b=>b.addEventListener('click',()=>setStatus(b.dataset.st)));
+  // chip select (single per group)
+  modal.querySelectorAll('.chips').forEach(group=>{
+    group.addEventListener('click',e=>{
+      const b=e.target.closest('button'); if(!b)return;
+      const was=b.classList.contains('sel');
+      group.querySelectorAll('button').forEach(x=>x.classList.remove('sel'));
+      if(!was) b.classList.add('sel');
+    });
+  });
+  // photo preview
+  modal.querySelectorAll('.pslot input').forEach(inp=>{
+    inp.addEventListener('change',()=>{
+      const f=inp.files&&inp.files[0]; if(!f)return;
+      const slot=inp.closest('.pslot');
+      slot.style.backgroundImage='url('+URL.createObjectURL(f)+')';
+      slot.classList.add('filled');
+    });
+  });
+  // close handlers
+  modal.querySelectorAll('[data-close]').forEach(el=>el.addEventListener('click',close));
+  document.getElementById('mSave').addEventListener('click',close);
+  document.getElementById('mNext').addEventListener('click',()=>{const t=elTitle.textContent;close();});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&modal.classList.contains('open'))close();});
+
+  // open from list
+  function metaFromRow(row){
+    const cp=row.querySelector('.cp'); if(!cp)return '';
+    return (cp.cloneNode(true).textContent||'').replace(/\s+/g,' ').trim();
+  }
+  document.addEventListener('click',e=>{
+    const act=e.target.closest('.act');
+    if(act){
+      const st = act.classList.contains('act-bad') ? 'bad' : 'ok';
+      const qi=act.closest('.qitem'), row=act.closest('.row');
+      if(qi){ e.preventDefault(); open(qi.querySelector('.rm b').textContent, qi.querySelector('.rm span').textContent, st); return; }
+      if(row){ e.preventDefault(); open(row.querySelector('.info b').textContent, metaFromRow(row), st); return; }
+    }
+    const qrm=e.target.closest('.qitem .rm');
+    if(qrm){ const qi=qrm.closest('.qitem'); open(qi.querySelector('.rm b').textContent, qi.querySelector('.rm span').textContent); return; }
+    const info=e.target.closest('.row .info');
+    if(info){ const row=info.closest('.row'); open(info.querySelector('b').textContent, metaFromRow(row)); return; }
+  });
+})();
+</script>
+</body>
+</html>
