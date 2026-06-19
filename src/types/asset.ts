@@ -1,6 +1,8 @@
 // src/types/asset.ts
 // VIKRR Asset Shield — Asset types
 // v2 — rekurzivní strom, tenant-aware
+import type { AssetComponent } from './monitoring';
+
 export type AssetStatus = 'operational' | 'maintenance' | 'broken' | 'stopped';
 export const ASSET_STATUS_CONFIG: Record<AssetStatus, {
   label: string; color: string; icon: string
@@ -67,6 +69,8 @@ export interface Asset {
   notes?: string;
   image?: string;
   documents?: string[];
+  // Monitoring: komponenty stroje a jejich hlídané veličiny (aditivní, nepovinné).
+  components?: AssetComponent[];
   isDeleted?: boolean;
   createdAt?: string;
   updatedAt?: string;

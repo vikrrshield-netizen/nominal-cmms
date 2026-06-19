@@ -31,6 +31,7 @@ import {
   Thermometer, Camera, PackageCheck, Link2,
 } from 'lucide-react';
 import MicButton from '../components/ui/MicButton';
+import AssetMonitoringSection from '../components/asset/AssetMonitoringSection';
 import { exportAssetCardPDF, exportAssetCardXLSX } from '../utils/exportAssetCard';
 import {
   addGearboxTemperatureLog,
@@ -1319,6 +1320,17 @@ export default function AssetCardPage() {
                 </div>
               )}
             </div>
+
+            {assetV2 && (
+              <div className={activeTab === 'passport' ? undefined : 'hidden'}>
+                <AssetMonitoringSection
+                  asset={assetV2}
+                  tenantId={tenantId}
+                  canEdit={canEditAsset}
+                  onChanged={refreshAssetV2}
+                />
+              </div>
+            )}
 
             <div id="asset-section-links" className={activeTab === 'relations' ? undefined : 'hidden'} style={{ background: '#fff', borderRadius: 24, padding: 24, border: '1px solid #f1f5f9', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 16 }}>
