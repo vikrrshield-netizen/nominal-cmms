@@ -71,6 +71,9 @@ export interface Asset {
   documents?: string[];
   // Monitoring: komponenty stroje a jejich hlídané veličiny (aditivní, nepovinné).
   components?: AssetComponent[];
+  // Výrobní linka (entityType 'Linka'): odkazy na stroje v pořadí + produkt (aditivní).
+  lineMachineIds?: string[];
+  linePurpose?: string;
   isDeleted?: boolean;
   createdAt?: string;
   updatedAt?: string;

@@ -17,6 +17,8 @@ import {
   allParams,
   paramStatus,
 } from '../types/monitoring';
+import { isLineAsset } from '../lib/lines';
+import StrojeLinkyTabs from '../components/StrojeLinkyTabs';
 
 const TONE: Record<MonitoringStatus, { dot: string; text: string; soft: string; border: string }> = {
   ok: { dot: '#22c55e', text: '#16a34a', soft: '#f0fdf4', border: '#bbf7d0' },
@@ -63,7 +65,7 @@ export default function MachineOverviewPage() {
     return () => { alive = false; };
   }, [tenantId]);
 
-  const machines = useMemo(() => assets.filter((a) => (a.components?.length ?? 0) > 0), [assets]);
+  const machines = useMemo(() => assets.filter((a) => (a.components?.length ?? 0) > 0 && !isLineAsset(a)), [assets]);
 
   const counts = useMemo(() => {
     const c: Record<MonitoringStatus, number> = { ok: 0, warn: 0, crit: 0 };
@@ -77,6 +79,7 @@ export default function MachineOverviewPage() {
 
   return (
     <div className="px-4 py-6 md:px-8 max-w-6xl mx-auto">
+      <StrojeLinkyTabs active="stroje" />
       <div className="flex items-start justify-between gap-3 mb-5">
         <div className="flex items-center gap-3">
           <Gauge className="text-emerald-700" size={26} />
