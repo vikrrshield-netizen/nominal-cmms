@@ -1328,6 +1328,8 @@ export default function AssetCardPage() {
                   tenantId={tenantId}
                   canEdit={canEditAsset}
                   onChanged={refreshAssetV2}
+                  onReportFault={() => setShowFaultModal(true)}
+                  onCreateTask={() => setShowTaskModal(true)}
                 />
               </div>
             )}
