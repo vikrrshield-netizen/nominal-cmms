@@ -9,6 +9,7 @@ import {
   Building2,
   FileText,
   Truck,
+  Gauge,
 } from 'lucide-react';
 
 const navItems = [
@@ -16,6 +17,7 @@ const navItems = [
   { path: '/tasks', icon: ClipboardList, label: 'Úkoly', permissions: ['wo.read', 'wo.create', 'wo.update'] },
   { path: '/work-diary', icon: FileText, label: 'Deník', permissions: ['wo.read', 'wo.create', 'wo.update'] },
   { path: '/kartoteka', icon: Building2, label: 'Kartotéka', permissions: ['asset.read'] },
+  { path: '/stroje', icon: Gauge, label: 'Stroje', permissions: ['asset.read'] },
   { path: '/vzv', icon: Truck, label: 'VZV', permissions: ['fleet.read', 'fleet.manage'] },
 ];
 
