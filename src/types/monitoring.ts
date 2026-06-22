@@ -33,6 +33,8 @@ export interface AssetComponent {
   serial?: string;
   since?: string;
   note?: string;
+  linkedAssetId?: string; // odkaz na existující asset z kartotéky (přiřazené zařízení)
+  linkedAssetName?: string; // denormalizovaný název pro zobrazení
   params: MonitoredParam[];
 }
 

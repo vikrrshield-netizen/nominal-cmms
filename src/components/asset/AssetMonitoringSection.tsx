@@ -4,9 +4,12 @@
 // Data jsou uložená přímo na assetu (asset.components). Logika výpočtu stavu je v src/types/monitoring.ts.
 
 import { useState, type CSSProperties } from 'react';
-import { Activity, Plus, Pencil, Trash2, FileText, AlertTriangle, Wrench } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Activity, Plus, Pencil, Trash2, FileText, AlertTriangle, Wrench, ExternalLink, Loader2, Link2 } from 'lucide-react';
 import type { Asset } from '../../types/asset';
 import { assetService } from '../../services/assetService';
+import { isGearboxAsset } from '../../services/gearboxService';
+import { isLineAsset } from '../../lib/lines';
 import BottomSheet, { FormField, FormFooter } from '../ui/BottomSheet';
 import { showToast } from '../ui/Toast';
 import {
@@ -102,6 +105,11 @@ export default function AssetMonitoringSection({ asset, tenantId, canEdit, onCha
   const [saving, setSaving] = useState(false);
   const [compSheet, setCompSheet] = useState<CompDraft | null>(null);
   const [paramSheet, setParamSheet] = useState<ParamDraft | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerAssets, setPickerAssets] = useState<Asset[]>([]);
+  const [pickerLoading, setPickerLoading] = useState(false);
+  const [pickerQuery, setPickerQuery] = useState('');
+  const navigate = useNavigate();
 
   // Nezakládat prázdnou sekci lidem bez práva editace.
   if (components.length === 0 && !canEdit) return null;
@@ -256,6 +264,40 @@ export default function AssetMonitoringSection({ asset, tenantId, canEdit, onCha
       newValue: '',
     });
 
+  const openPicker = async () => {
+    setPickerOpen(true);
+    if (pickerAssets.length === 0) {
+      setPickerLoading(true);
+      try {
+        setPickerAssets(await assetService.getAll(tenantId));
+      } catch (err) {
+        console.error('[Monitoring] picker load error:', err);
+      } finally {
+        setPickerLoading(false);
+      }
+    }
+  };
+
+  // Připojí EXISTUJÍCÍ asset z kartotéky jako komponentu (odkaz, ne kopie).
+  const createFromAsset = async (a: Asset) => {
+    const preset = isGearboxAsset(a) ? COMPONENT_TYPE_PRESETS.find((p) => p.id === 'gearbox') : undefined;
+    const base: AssetComponent = preset
+      ? componentFromPreset(preset, a.name)
+      : { id: newMonitoringId('cmp'), type: 'other', name: a.name, params: [] };
+    const created: AssetComponent = {
+      ...base,
+      name: a.name,
+      code: a.code || undefined,
+      maker: a.manufacturer || undefined,
+      serial: a.serialNumber || undefined,
+      linkedAssetId: a.id,
+      linkedAssetName: a.name,
+    };
+    setPickerOpen(false);
+    setPickerQuery('');
+    await persist(upsertComponent(components, created), 'Zařízení připojeno');
+  };
+
   const railBtn: CSSProperties = {
     fontSize: 11, fontWeight: 700, color: '#475569', background: 'none',
     border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, padding: 0,
@@ -269,13 +311,22 @@ export default function AssetMonitoringSection({ asset, tenantId, canEdit, onCha
           Skladba stroje
         </h3>
         {canEdit && (
-          <button
-            type="button"
-            onClick={() => setCompSheet({ id: null, type: 'motor', name: '', code: '', maker: '', serial: '', since: '' })}
-            style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: '#1a6b4f', background: 'none', border: 'none', cursor: 'pointer' }}
-          >
-            <Plus size={15} /> přidat komponentu
-          </button>
+          <div style={{ marginLeft: 'auto', display: 'inline-flex', gap: 14, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={openPicker}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: '#1a6b4f', background: 'none', border: 'none', cursor: 'pointer' }}
+            >
+              <Link2 size={15} /> přidat z kartotéky
+            </button>
+            <button
+              type="button"
+              onClick={() => setCompSheet({ id: null, type: 'motor', name: '', code: '', maker: '', serial: '', since: '' })}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: '#1a6b4f', background: 'none', border: 'none', cursor: 'pointer' }}
+            >
+              <Plus size={15} /> nová komponenta
+            </button>
+          </div>
         )}
       </div>
 
@@ -295,6 +346,16 @@ export default function AssetMonitoringSection({ asset, tenantId, canEdit, onCha
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: comp.params.length ? 6 : 0 }}>
                       <span style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>{comp.name}</span>
                       {comp.code && <span style={{ fontSize: 12, color: '#94a3b8', fontFamily: 'monospace' }}>{comp.code}</span>}
+                      {comp.linkedAssetId && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); navigate(`/asset/${comp.linkedAssetId}`); }}
+                          title="Otevřít v kartotéce"
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, color: '#1a6b4f', background: '#eaf3ee', border: 'none', borderRadius: 8, padding: '2px 6px', cursor: 'pointer' }}
+                        >
+                          <ExternalLink size={11} /> z kartotéky
+                        </button>
+                      )}
                       {canEdit && (
                         <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8 }}>
                           <button type="button" onClick={() => openCompEdit(comp)} aria-label="Upravit komponentu" style={{ color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}>
@@ -494,6 +555,48 @@ export default function AssetMonitoringSection({ asset, tenantId, canEdit, onCha
             <FormFooter onCancel={() => setParamSheet(null)} onSubmit={saveParam} loading={saving} submitLabel={paramSheet.id ? 'Uložit' : 'Přidat'} />
           </>
         )}
+      </BottomSheet>
+
+      {/* ── Sheet: přidat z kartotéky (existující zařízení jako komponenta) ── */}
+      <BottomSheet title="Přidat z kartotéky" isOpen={pickerOpen} onClose={() => { setPickerOpen(false); setPickerQuery(''); }}>
+        <p className="text-[13px] text-slate-500 mb-3">Vyber existující zařízení z kartotéky (např. převodovku) a připoj ho jako komponentu tohoto stroje.</p>
+        <input
+          value={pickerQuery}
+          onChange={(e) => setPickerQuery(e.target.value)}
+          placeholder="hledat podle názvu nebo kódu…"
+          autoFocus
+          className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-300 text-slate-950 text-[15px] placeholder-slate-400 focus:outline-none focus:border-emerald-600 focus:bg-white transition min-h-[48px] mb-3"
+        />
+        {pickerLoading ? (
+          <div className="flex items-center gap-2 text-slate-400 py-6 justify-center"><Loader2 className="animate-spin" size={18} /> Načítám…</div>
+        ) : (() => {
+          const linkedIds = new Set(components.map((c) => c.linkedAssetId).filter(Boolean) as string[]);
+          const q = pickerQuery.trim().toLowerCase();
+          const cands = pickerAssets
+            .filter((a) => a.id !== asset.id && !linkedIds.has(a.id) && !isLineAsset(a))
+            .filter((a) => !q || `${a.name} ${a.code ?? ''}`.toLowerCase().includes(q))
+            .slice(0, 50);
+          if (cands.length === 0) return <p className="text-[13px] text-slate-400 py-4 text-center">Nic nenalezeno.</p>;
+          return (
+            <div className="flex flex-col gap-2 max-h-80 overflow-y-auto">
+              {cands.map((a) => (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => createFromAsset(a)}
+                  disabled={saving}
+                  className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-left hover:bg-emerald-50 hover:border-emerald-300 transition min-h-[48px] disabled:opacity-50"
+                >
+                  <Link2 size={16} className="text-emerald-700 flex-shrink-0" />
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-[14px] font-semibold text-slate-800 truncate">{a.name}</span>
+                    <span className="block text-[12px] text-slate-400 truncate">{[a.entityType || a.category, a.code, a.location].filter(Boolean).join(' · ')}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          );
+        })()}
       </BottomSheet>
     </div>
   );

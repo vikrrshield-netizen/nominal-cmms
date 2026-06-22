@@ -4,7 +4,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Gauge, Plus, Loader2 } from 'lucide-react';
+import { Gauge, Plus, Loader2, Star } from 'lucide-react';
 import { useAuthContext } from '../context/AuthContext';
 import { assetService } from '../services/assetService';
 import type { Asset } from '../types/asset';
@@ -19,6 +19,7 @@ import {
 } from '../types/monitoring';
 import { isLineAsset } from '../lib/lines';
 import StrojeLinkyTabs from '../components/StrojeLinkyTabs';
+import { useWatchedAssets } from '../hooks/useWatchedAssets';
 
 const TONE: Record<MonitoringStatus, { dot: string; text: string; soft: string; border: string }> = {
   ok: { dot: '#22c55e', text: '#16a34a', soft: '#f0fdf4', border: '#bbf7d0' },
@@ -51,6 +52,7 @@ export default function MachineOverviewPage() {
   const { user, hasPermission } = useAuthContext();
   const tenantId = user?.tenantId ?? 'main_firm';
   const navigate = useNavigate();
+  const { toggle: toggleWatch, isWatched } = useWatchedAssets();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -160,10 +162,20 @@ export default function MachineOverviewPage() {
                       {[m.entityType || m.category, m.location].filter(Boolean).join(' · ')}
                     </div>
                   </div>
-                  <span className="flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-bold flex-shrink-0" style={{ background: TONE[status].soft, color: TONE[status].text }}>
-                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: TONE[status].dot }} />
-                    {MONITORING_STATUS_CONFIG[status].label}
-                  </span>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <button
+                      type="button"
+                      aria-label={isWatched(m.id) ? 'Odebrat ze sledování' : 'Přidat do sledování'}
+                      onClick={(e) => { e.stopPropagation(); toggleWatch(m.id); }}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-amber-50 transition"
+                    >
+                      <Star size={16} style={{ color: isWatched(m.id) ? '#f59e0b' : '#cbd5e1', fill: isWatched(m.id) ? '#fbbf24' : 'none' }} />
+                    </button>
+                    <span className="flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-bold" style={{ background: TONE[status].soft, color: TONE[status].text }}>
+                      <span style={{ width: 7, height: 7, borderRadius: '50%', background: TONE[status].dot }} />
+                      {MONITORING_STATUS_CONFIG[status].label}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="mt-4">

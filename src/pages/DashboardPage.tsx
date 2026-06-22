@@ -42,6 +42,7 @@ import BrandMark from '../components/ui/BrandMark';
 import SemaphoreWidget from '../components/dashboard/SemaphoreWidget';
 import Top5TasksWidget from '../components/dashboard/Top5TasksWidget';
 import LemonListWidget from '../components/dashboard/LemonListWidget';
+import WatchedMachinesWidget from '../components/dashboard/WatchedMachinesWidget';
 import OverviewDaylight, { type OverviewTask } from '../components/dashboard/OverviewDaylight';
 import DashboardBuilder from '../components/dashboard/DashboardBuilder';
 import MiniChart from '../components/ui/MiniChart';
@@ -2212,6 +2213,10 @@ function FullDashboard() {
   const persistWatchHidden = (h: string[]) => { setWatchHidden(h); try { localStorage.setItem('dash:watchHidden', JSON.stringify(h)); } catch { /* ignore */ } };
 
   const watchBlocks = [
+    {
+      id: 'watched', label: 'Sledované stroje', available: true,
+      node: (<WatchedMachinesWidget onNavigate={navigate} />),
+    },
     {
       id: 'gearbox', label: 'Převodovky', available: dashboardProfile.showGearbox,
       node: (
