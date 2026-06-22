@@ -13,7 +13,7 @@ import {
   type MonitoringStatus,
   machineMonitoringStatus,
 } from '../types/monitoring';
-import { LINE_ENTITY_TYPE, isLineAsset } from '../lib/lines';
+import { LINE_ENTITY_TYPE, isLineAsset, isLineMachineCandidate } from '../lib/lines';
 import BottomSheet, { FormField, FormFooter } from '../components/ui/BottomSheet';
 import { showToast } from '../components/ui/Toast';
 import StrojeLinkyTabs from '../components/StrojeLinkyTabs';
@@ -24,6 +24,9 @@ const TONE: Record<MonitoringStatus, { dot: string; text: string; soft: string }
   crit: { dot: '#ef4444', text: '#dc2626', soft: '#fef2f2' },
 };
 const RANK: Record<MonitoringStatus, number> = { ok: 0, warn: 1, crit: 2 };
+
+const INPUT_CLASS =
+  'w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-300 text-slate-950 text-[15px] placeholder-slate-400 focus:outline-none focus:border-emerald-600 focus:bg-white focus:ring-2 focus:ring-emerald-600/15 transition min-h-[48px]';
 
 type LineDraft = { id: string | null; name: string; loc: string; purpose: string; machineIds: string[] };
 
@@ -65,12 +68,15 @@ export default function ProductionLinesPage() {
   }, [assets]);
 
   const lines = useMemo(() => assets.filter(isLineAsset), [assets]);
-  const machines = useMemo(() => assets.filter((a) => !isLineAsset(a) && (a.components?.length ?? 0) > 0), [assets]);
+  const machines = useMemo(() => assets.filter(isLineMachineCandidate), [assets]);
+  const knownLocations = useMemo(
+    () => Array.from(new Set(assets.map((a) => (a.location || '').trim()).filter(Boolean))).sort(),
+    [assets],
+  );
 
   const lineStatus = (line: Asset): MonitoringStatus => {
-    const ids = line.lineMachineIds ?? [];
     let worst: MonitoringStatus = 'ok';
-    for (const id of ids) {
+    for (const id of line.lineMachineIds ?? []) {
       const m = byId.get(id);
       if (!m) continue;
       const s = machineMonitoringStatus(m.components);
@@ -85,6 +91,26 @@ export default function ProductionLinesPage() {
     return c;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lines, byId]);
+
+  // Umístění odvozené ze strojů: když jsou z jednoho místa, vrátí ho.
+  const deriveLoc = (ids: string[]): string => {
+    const locs = Array.from(
+      new Set(ids.map((id) => { const m = byId.get(id); return (m?.location || m?.areaName || '').trim(); }).filter(Boolean)),
+    );
+    return locs.length === 1 ? locs[0] : '';
+  };
+
+  const toggleMachine = (id: string) => {
+    if (!draft) return;
+    const has = draft.machineIds.includes(id);
+    const machineIds = has ? draft.machineIds.filter((x) => x !== id) : [...draft.machineIds, id];
+    let loc = draft.loc;
+    if (!loc.trim()) {
+      const d = deriveLoc(machineIds);
+      if (d) loc = d;
+    }
+    setDraft({ ...draft, machineIds, loc });
+  };
 
   const saveLine = async () => {
     if (!draft) return;
@@ -146,14 +172,7 @@ export default function ProductionLinesPage() {
     }
   };
 
-  const toggleMachine = (id: string) => {
-    if (!draft) return;
-    const has = draft.machineIds.includes(id);
-    setDraft({
-      ...draft,
-      machineIds: has ? draft.machineIds.filter((x) => x !== id) : [...draft.machineIds, id],
-    });
-  };
+  const newLine = () => setDraft({ id: null, name: '', loc: '', purpose: '', machineIds: [] });
 
   return (
     <div className="px-4 py-6 md:px-8 max-w-6xl mx-auto">
@@ -168,11 +187,7 @@ export default function ProductionLinesPage() {
           </div>
         </div>
         {canEdit && (
-          <button
-            type="button"
-            onClick={() => setDraft({ id: null, name: '', loc: '', purpose: '', machineIds: [] })}
-            className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-[13px] font-bold text-white hover:bg-slate-800 transition flex-shrink-0"
-          >
+          <button type="button" onClick={newLine} className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-[13px] font-bold text-white hover:bg-slate-800 transition flex-shrink-0">
             <Plus size={16} /> Nová linka
           </button>
         )}
@@ -209,7 +224,7 @@ export default function ProductionLinesPage() {
           <div className="text-slate-700 font-semibold mb-1">Zatím žádná linka</div>
           <div className="text-[13px] text-slate-500 mb-4">Vytvoř linku a poskládej ji ze strojů z kartotéky.</div>
           {canEdit && (
-            <button type="button" onClick={() => setDraft({ id: null, name: '', loc: '', purpose: '', machineIds: [] })} className="rounded-xl bg-emerald-600 px-4 py-2.5 text-[13px] font-bold text-white hover:bg-emerald-700 transition">
+            <button type="button" onClick={newLine} className="rounded-xl bg-emerald-600 px-4 py-2.5 text-[13px] font-bold text-white hover:bg-emerald-700 transition">
               Nová linka
             </button>
           )}
@@ -290,13 +305,29 @@ export default function ProductionLinesPage() {
         {draft && (
           <>
             <FormField label="Název linky" value={draft.name} onChange={(v) => setDraft({ ...draft, name: v })} placeholder="např. Extruzní linka A" required autoFocus />
-            <FormField label="Umístění" value={draft.loc} onChange={(v) => setDraft({ ...draft, loc: v })} placeholder="např. Budova D · Extrudovna II" />
-            <FormField label="Produkt" value={draft.purpose} onChange={(v) => setDraft({ ...draft, purpose: v })} placeholder="např. PE trubky" />
+
+            <div className="mb-1">
+              <label className="block text-sm text-slate-600 font-medium mb-1.5">Umístění</label>
+              <input
+                list="line-loc-list"
+                value={draft.loc}
+                onChange={(e) => setDraft({ ...draft, loc: e.target.value })}
+                placeholder="napiš nebo vyber stroje a doplní se samo"
+                className={INPUT_CLASS}
+              />
+              <datalist id="line-loc-list">
+                {knownLocations.map((l) => <option key={l} value={l} />)}
+              </datalist>
+            </div>
+            <p className="text-xs text-slate-400 mb-4">Když přidáš stroje z jednoho místa, umístění se doplní automaticky.</p>
+
+            <FormField label="Produkt (co linka vyrábí)" value={draft.purpose} onChange={(v) => setDraft({ ...draft, purpose: v })} placeholder="např. PE trubky" />
+            <p className="text-xs text-slate-400 -mt-2 mb-4">Nepovinné. Co se na lince vyrábí — ukáže se na kartě linky. Můžeš nechat prázdné.</p>
 
             <div className="mb-4">
               <label className="block text-sm text-slate-600 font-medium mb-1.5">Stroje na lince ({draft.machineIds.length})</label>
               {machines.length === 0 ? (
-                <p className="text-[13px] text-slate-400">Zatím žádné monitorované stroje. Nejdřív přidej strojům komponenty na jejich kartě.</p>
+                <p className="text-[13px] text-slate-400">Zatím žádné stroje v kartotéce. Nejdřív přidej stroj v Kartotéce.</p>
               ) : (
                 <div className="flex flex-col gap-2 max-h-72 overflow-y-auto">
                   {machines.map((m) => {
