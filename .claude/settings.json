@@ -9,6 +9,19 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/lint-changed.mjs\"",
+            "timeout": 60,
+            "statusMessage": "Kontroluji upravený soubor (ESLint)..."
+          }
+        ]
+      }
     ]
   }
 }
