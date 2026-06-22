@@ -2,6 +2,13 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Znalostní báze (`docs/`)
+
+Doménové detaily (továrna, role/oprávnění, work ordery, glosář) jsou v markdown
+vaultu `docs/` (viz `docs/README.md`). Slouží jako kontext pro Claude Code i jako
+Obsidian vault. Tento `CLAUDE.md` drž krátký a operační; doménovou encyklopedii
+piš do `docs/` a při změně doménového konceptu v kódu aktualizuj i příslušnou poznámku.
+
 ## Commands
 
 ```bash
