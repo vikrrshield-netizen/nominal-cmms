@@ -14,6 +14,7 @@ import VoiceMemoRecorder from '../components/ui/VoiceMemoRecorder';
 import {
   ArrowLeft, Plus, Trash2, BookOpen, Mic, FileText, Loader2, X,
 } from 'lucide-react';
+import { SkeletonList } from '../components/ui';
 
 // ═══════════════════════════════════════════
 // TYPES
@@ -169,12 +170,7 @@ export default function PersonalDiaryPage() {
         )}
 
         {/* Loading */}
-        {loading && (
-          <div className="text-center py-16">
-            <Loader2 className="w-8 h-8 text-violet-400 animate-spin mx-auto mb-3" />
-            <p className="text-slate-500 text-sm">Načítám poznámky...</p>
-          </div>
-        )}
+        {loading && <SkeletonList rows={6} />}
 
         {/* Empty state */}
         {!loading && notes.length === 0 && !showNew && (

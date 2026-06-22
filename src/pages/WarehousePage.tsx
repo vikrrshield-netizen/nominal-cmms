@@ -14,6 +14,7 @@ import {
   Warehouse, CheckCircle2, ArrowDownToLine, Boxes, ArrowUpFromLine,
 } from 'lucide-react';
 import { showToast } from '../components/ui/Toast';
+import { Skeleton, SkeletonList } from '../components/ui';
 
 // ═══════════════════════════════════════════════════════════════════
 // TYPES
@@ -368,8 +369,9 @@ export default function WarehousePage() {
       {/* Content */}
       <div className="max-w-2xl mx-auto px-4 space-y-3">
         {loading && (
-          <div className="flex items-center justify-center py-16 text-slate-500">
-            <Loader2 className="w-6 h-6 animate-spin mr-2" /> Načítám...
+          <div className="space-y-3">
+            <Skeleton width="w-32" height="h-5" />
+            <SkeletonList rows={6} />
           </div>
         )}
 

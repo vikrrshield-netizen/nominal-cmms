@@ -16,6 +16,7 @@ import {
   X, User, ArrowLeft, Loader2, Inbox, Users
 } from 'lucide-react';
 import type { VacationPlan, VacationPlanKind } from '../types/vacation';
+import { Skeleton } from '../components/ui';
 
 // ═══════════════════════════════════════════
 // TYPES
@@ -936,6 +937,19 @@ export default function CalendarPage() {
         </div>
 
         {/* Days */}
+        {loading ? (
+          <div className="space-y-2" role="status" aria-busy="true" aria-label="Načítám týdenní plán…">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="bg-white rounded-2xl border border-slate-200 p-3 flex items-center gap-3">
+                <Skeleton width="w-10" height="h-10" rounded="rounded-xl" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton width="w-24" height="h-4" />
+                  <Skeleton width="w-32" height="h-3" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
         <div className="space-y-2">
           {weekDays.slice(1, 6).map((date, _i) => {
             const dayIndex = date.getDay(); // 1-5 (Po-Pá)
@@ -1066,6 +1080,7 @@ export default function CalendarPage() {
             );
           })()}
         </div>
+        )}
       </div>
 
       {/* Backlog Modal */}

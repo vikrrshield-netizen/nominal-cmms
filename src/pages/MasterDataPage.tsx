@@ -8,6 +8,7 @@ import { useAuthContext } from '../context/AuthContext';
 import { db, storage } from '../lib/firebase';
 import { MATERIAL_SEED, PRODUCT_SEED, materialBatch, productBatch } from '../data/productionMasterSeed';
 import { showToast } from '../components/ui/Toast';
+import { Skeleton } from '../components/ui';
 import appConfig from '../appConfig';
 import type { GearboxTemperatureLog } from '../types/gearbox';
 
@@ -1403,7 +1404,15 @@ export default function MasterDataPage() {
             </div>
 
             {loading ? (
-              <div className="py-16 text-center text-sm font-bold text-slate-500">Načítám master data...</div>
+              <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="vik-card p-4 space-y-3">
+                    <Skeleton height="h-5" width="w-2/3" />
+                    <Skeleton height="h-4" />
+                    <Skeleton height="h-4" width="w-1/2" />
+                  </div>
+                ))}
+              </div>
             ) : (
               <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
                 {filteredItems.map((item) => (

@@ -13,6 +13,7 @@ import {
   Users, Sun, Sunset, Moon, Save, ClipboardList, AlertTriangle,
 } from 'lucide-react';
 import { showToast } from '../components/ui/Toast';
+import { Skeleton } from '../components/ui';
 
 // ═══════════════════════════════════════════════════════════════════
 // TYPES
@@ -410,8 +411,20 @@ export default function ShiftPlannerPage() {
       {/* Grid */}
       <div className="max-w-3xl mx-auto px-4">
         {loading ? (
-          <div className="flex items-center justify-center py-16 text-slate-500">
-            <Loader2 className="w-6 h-6 animate-spin mr-2" /> Načítám...
+          <div className="space-y-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="vik-card p-3 flex items-center gap-3">
+                <div className="w-[140px] space-y-2">
+                  <Skeleton width="w-2/3" height="h-4" />
+                  <Skeleton width="w-1/2" height="h-3" />
+                </div>
+                <div className="flex-1 grid grid-cols-7 gap-1.5">
+                  {Array.from({ length: 7 }).map((_, d) => (
+                    <Skeleton key={d} height="h-9" rounded="rounded-xl" />
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         ) : technicians.length === 0 ? (
           <div className="text-center py-16">

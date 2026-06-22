@@ -16,6 +16,7 @@ import {
 import { parseExcelFile } from '../utils/importers/excelImporter';
 import type { ParseResult } from '../utils/importers/excelImporter';
 import { showToast } from '../components/ui/Toast';
+import { Skeleton, SkeletonList } from '../components/ui';
 import { exportMigrationData, downloadMigrationJson } from '../utils/vikrr_migration';
 import { MODULE_DEFINITIONS, ROLE_PERMISSIONS } from '../types/user';
 import { KIOSK_TILES, KIOSK_TILE_IDS, KIOSK_ALWAYS_ON } from '../config/kioskTiles';
@@ -415,8 +416,10 @@ export default function AdminPage() {
 
         <div className="px-6 space-y-6">
           {activeTab === 'users' && usersLoading && (
-            <div className="flex items-center gap-2 py-8 text-slate-500 justify-center">
-              <Loader2 className="w-5 h-5 animate-spin" /> Načítám uživatele...
+            <div className="space-y-2 vik-fade-in">
+              <Skeleton width="w-48" height="h-7" />
+              <Skeleton width="w-64" height="h-4" className="mb-3" />
+              <SkeletonList rows={6} />
             </div>
           )}
 

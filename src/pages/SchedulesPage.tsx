@@ -12,6 +12,7 @@ import {
 import BottomSheet, { FormField, FormFooter } from '../components/ui/BottomSheet';
 import EmptyState from '../components/ui/EmptyState';
 import FAB from '../components/ui/FAB';
+import { SkeletonList } from '../components/ui';
 
 // ═══════════════════════════════════════════════════
 // TYPES
@@ -149,9 +150,7 @@ export default function SchedulesPage() {
 
         {/* Task list */}
         {loading ? (
-          <div className="flex items-center justify-center py-16 text-slate-500">
-            <Loader2 className="w-6 h-6 animate-spin mr-2" /> Načítám...
-          </div>
+          <SkeletonList rows={6} />
         ) : tasks.length === 0 ? (
           <EmptyState
             icon={<CalendarDays className="w-12 h-12" />}
