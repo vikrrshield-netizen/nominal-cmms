@@ -1772,11 +1772,11 @@ export default function KartotekaPage() {
               <span>Žádné výsledky</span>
             </div>
           ) : viewMode === 'route' ? (
-            <div className="k-route-groups">
+            <div className="space-y-3">
               {routeGroups.map((group, index) => (
                 <section
                   key={group.key}
-                  className={`k-route-group ${routeDraggingKey === group.key ? 'is-dragging' : ''} ${routeDropKey === group.key && routeDraggingKey !== group.key ? 'is-drop-target' : ''}`}
+                  className={`vik-card p-3 transition ${routeDraggingKey === group.key ? 'opacity-50' : ''} ${routeDropKey === group.key && routeDraggingKey !== group.key ? 'border-emerald-300 ring-2 ring-emerald-500/40' : ''}`}
                   onDragOver={(event) => {
                     if (!canManageRoute || routeAssetDraggingId || !routeDraggingKey || routeDraggingKey === group.key) return;
                     event.preventDefault();
@@ -1794,17 +1794,17 @@ export default function KartotekaPage() {
                     if (sourceKey) void reorderRouteGroup(sourceKey, group.key);
                   }}
                 >
-                  <div className="k-route-header">
-                    <span className="k-route-title">
-                      {group.title}
-                      <small>{group.subtitle}</small>
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <span className="min-w-0">
+                      <span className="block truncate text-[15px] font-black text-slate-950">{group.title}</span>
+                      <span className="block truncate text-[11px] font-bold uppercase tracking-wide text-slate-400">{group.subtitle}</span>
                     </span>
-                    <div className="k-route-actions">
-                      <small>{group.assets.length} položek</small>
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <span className="font-mono text-[11px] font-semibold text-slate-500">{group.assets.length} pol.</span>
                       {canManageRoute && (
                         <>
                           <span
-                            className="k-route-drag-hint"
+                            className="ml-1 inline-flex cursor-grab items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-600 active:cursor-grabbing"
                             draggable
                             onDragStart={(event) => {
                               event.stopPropagation();
@@ -1827,6 +1827,7 @@ export default function KartotekaPage() {
                             disabled={index === 0 || routeSavingKey === group.key}
                             aria-label="Posunout místnost na začátek"
                             title="Na začátek"
+                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40"
                           >
                             <ChevronsUp size={15} />
                           </button>
@@ -1835,6 +1836,7 @@ export default function KartotekaPage() {
                             onClick={() => handleMoveRouteGroup(group.key, -1)}
                             disabled={index === 0 || routeSavingKey === group.key}
                             aria-label="Posunout místnost nahoru"
+                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40"
                           >
                             <ArrowUp size={15} />
                           </button>
@@ -1843,6 +1845,7 @@ export default function KartotekaPage() {
                             onClick={() => handleMoveRouteGroup(group.key, 1)}
                             disabled={index === routeGroups.length - 1 || routeSavingKey === group.key}
                             aria-label="Posunout místnost dolů"
+                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40"
                           >
                             <ArrowDown size={15} />
                           </button>
@@ -1852,6 +1855,7 @@ export default function KartotekaPage() {
                             disabled={index === routeGroups.length - 1 || routeSavingKey === group.key}
                             aria-label="Posunout místnost na konec"
                             title="Na konec"
+                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40"
                           >
                             <ChevronsDown size={15} />
                           </button>
@@ -1859,11 +1863,11 @@ export default function KartotekaPage() {
                       )}
                     </div>
                   </div>
-                  <div className="k-tile-grid k-route-grid">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     {group.assets.map((asset) => (
                       <div
                         key={asset.id}
-                        className={`k-route-tile-wrap ${routeAssetDraggingId === asset.id ? 'is-dragging' : ''} ${routeAssetDropId === asset.id && routeAssetDraggingId !== asset.id ? 'is-drop-target' : ''}`}
+                        className={`relative rounded-2xl transition ${routeAssetDraggingId === asset.id ? 'opacity-50' : ''} ${routeAssetDropId === asset.id && routeAssetDraggingId !== asset.id ? 'ring-2 ring-emerald-400' : ''}`}
                         draggable={canManageRoute}
                         onDragStart={(event) => {
                           if (!canManageRoute) return;
@@ -1903,7 +1907,7 @@ export default function KartotekaPage() {
                         }}
                       >
                         {canManageRoute && (
-                          <span className="k-route-tile-grip" title="Přetáhnout zařízení">
+                          <span className="absolute right-2 top-2 z-10 text-slate-300" title="Přetáhnout zařízení">
                             <GripVertical size={14} />
                           </span>
                         )}
