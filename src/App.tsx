@@ -143,6 +143,7 @@ function RoutedContent() {
   const location = useLocation();
   return (
     <RouteErrorBoundary key={location.pathname}>
+      <div className="vik-fade-in">
       <Routes>
         <Route path="/" element={<DashboardPage />} />
         <Route path="/inspection" element={<ProtectedPage moduleId="inspections" permissions={['asset.read', 'weekly.modify']}><BuildingInspectionPage /></ProtectedPage>} />
@@ -189,6 +190,7 @@ function RoutedContent() {
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </div>
     </RouteErrorBoundary>
   );
 }
