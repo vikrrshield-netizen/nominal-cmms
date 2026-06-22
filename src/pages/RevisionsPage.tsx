@@ -9,14 +9,32 @@ import {
   formatRevisionDate, daysUntilRevision,
 } from '../hooks/useRevisions';
 import type { Revision, RevisionType, RevisionStatus } from '../hooks/useRevisions';
-import { Breadcrumb } from '../components/ui';
 import { useReports } from '../hooks/useReports';
 import {
   Shield, AlertTriangle, CheckCircle2,
-  Loader2, Calendar, Search, X, Download, Edit2, Trash2,
+  Loader2, Calendar, Search, X, Download, Trash2,
+  ArrowLeft, ChevronRight, Zap, Flame, Gauge, Forklift, FireExtinguisher, Wrench,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { doc, deleteDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+
+// Typ revize → lucide ikona (klidná, místo barevných emoji v TYPE_CONFIG)
+const TYPE_ICON: Record<RevisionType, LucideIcon> = {
+  electrical: Zap,
+  gas: Flame,
+  pressure: Gauge,
+  lifting: Forklift,
+  fire: FireExtinguisher,
+  other: Wrench,
+};
+
+// České skloňování „revize" pro počty
+function pluralRevize(n: number): string {
+  if (n === 1) return 'revize';
+  if (n >= 2 && n <= 4) return 'revize';
+  return 'revizí';
+}
 
 // ═══════════════════════════════════════════
 // COMPONENT
@@ -58,6 +76,12 @@ export default function RevisionsPage() {
 
   const alertCount = stats.expired + stats.expiring;
 
+  // Prošlé + brzy končící revize pro kartu „Vyžaduje pozornost".
+  // `revisions` jsou z hooku už seřazené (prošlé → končící → dle dní), bereme max 4 nejnaléhavější.
+  const attentionRevisions = revisions
+    .filter((r) => r.status === 'expired' || r.status === 'expiring')
+    .slice(0, 4);
+
   // ─────────────────────────────────────────
   // LOADING
   // ─────────────────────────────────────────
@@ -74,35 +98,23 @@ export default function RevisionsPage() {
   // ─────────────────────────────────────────
   return (
     <div className="vik-page pb-24">
-      {/* Expired Alert */}
-      {stats.expired > 0 && (
-        <div className="bg-red-500 text-white px-4 py-3 flex items-center gap-3">
-          <Shield className="w-5 h-5 animate-pulse" />
-          <div>
-            <div className="font-bold">{stats.expired} prošlých revizí!</div>
-            <div className="text-sm opacity-90">Kontaktujte revizní techniky</div>
-          </div>
-        </div>
-      )}
-
       {/* Header */}
-      <div className="vik-page-header px-4 py-4">
-        <div className="vik-page-shell">
-          <Breadcrumb items={[
-            { label: 'Dashboard', onClick: () => navigate('/') },
-            { label: 'Revize' },
-          ]} />
-        <div className="flex justify-between items-center gap-3">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+      <div className="vik-page-header sticky top-0 z-30 px-4 py-3">
+        <div className="vik-page-shell flex items-center gap-3">
+          <button onClick={() => navigate('/')} aria-label="Zpět" className="p-2 rounded-lg hover:bg-slate-100">
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl font-black flex items-center gap-2">
               <Shield className="w-6 h-6 text-emerald-700" />
               Revize
+              {alertCount > 0 && (
+                <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-black text-red-700">
+                  {alertCount}
+                </span>
+              )}
             </h1>
-            {alertCount > 0 && (
-              <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full animate-pulse">
-                {alertCount} ⚠️
-              </span>
-            )}
+            <p className="truncate text-sm font-semibold text-slate-600">Revizní zprávy a zákonné lhůty · semafor platnosti</p>
           </div>
           {canExport && (
             <button
@@ -129,10 +141,48 @@ export default function RevisionsPage() {
             </button>
           )}
         </div>
-        </div>
       </div>
 
       <div className="vik-page-shell p-4 space-y-4">
+        {/* Vyžaduje pozornost — prošlé + brzy končící revize */}
+        {attentionRevisions.length > 0 && (
+          <section className="rounded-2xl border border-amber-200 bg-gradient-to-b from-amber-50 to-white p-4 shadow-sm">
+            <div className="eyebrow text-amber-700">Vyžaduje pozornost</div>
+            <h2 className="mt-0.5 text-lg font-black text-slate-950">
+              <span className="text-amber-700">{attentionRevisions.length} {pluralRevize(attentionRevisions.length)}</span> potřebuje termín
+            </h2>
+            <div className="mt-3 space-y-2">
+              {attentionRevisions.map((rev) => {
+                const Icon = TYPE_ICON[rev.type] || Wrench;
+                const cfg = STATUS_CONFIG[rev.status];
+                const days = daysUntilRevision(rev.nextRevisionDate);
+                return (
+                  <div key={rev.id} className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 transition hover:border-amber-200">
+                    <button type="button" onClick={() => setSelectedRevision(rev)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${cfg.bgColor} ${cfg.color}`}>
+                        <Icon className="h-5 w-5" />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-[15px] font-black text-slate-950">{rev.title}</span>
+                        <span className="block truncate text-[13px] font-semibold text-slate-600">{rev.assetName} · {rev.revisionCompany}</span>
+                      </span>
+                    </button>
+                    <span className={`hidden shrink-0 text-right sm:block ${cfg.color}`}>
+                      <span className="block font-mono text-[15px] font-black leading-none">{days < 0 ? `${Math.abs(days)} d` : `${days} d`}</span>
+                      <span className="block text-[11px] font-bold">{days < 0 ? 'po termínu' : 'zbývá'}</span>
+                    </span>
+                    {canEdit && (
+                      <button type="button" onClick={() => setSelectedRevision(rev)} className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-sm font-black text-white transition hover:bg-emerald-500 active:scale-95">
+                        <Shield className="h-4 w-4" />Zapsat
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
         {/* Semafor Stats */}
         <div className="grid grid-cols-4 gap-2">
           <button
@@ -190,18 +240,21 @@ export default function RevisionsPage() {
           >
             Vše
           </button>
-          {(Object.entries(TYPE_CONFIG) as [RevisionType, { label: string; icon: string; color: string }][]).map(([key, cfg]) => (
-            <button
-              key={key}
-              onClick={() => setFilterType(key)}
-              className={`vik-chip ${
-                filterType === key ? 'vik-chip-active' : ''
-              }`}
-            >
-              <span>{cfg.icon}</span>
-              <span>{cfg.label}</span>
-            </button>
-          ))}
+          {(Object.entries(TYPE_CONFIG) as [RevisionType, { label: string; icon: string; color: string }][]).map(([key, cfg]) => {
+            const Icon = TYPE_ICON[key] || Wrench;
+            return (
+              <button
+                key={key}
+                onClick={() => setFilterType(key)}
+                className={`vik-chip ${
+                  filterType === key ? 'vik-chip-active' : ''
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                <span>{cfg.label}</span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Revisions List */}
@@ -248,53 +301,46 @@ function RevisionCard({ revision, onClick }: { revision: Revision; onClick: () =
   const typeCfg = TYPE_CONFIG[revision.type] || TYPE_CONFIG.other;
   const days = daysUntilRevision(revision.nextRevisionDate);
 
+  const Icon = TYPE_ICON[revision.type] || Wrench;
+
   return (
     <button
       onClick={onClick}
-      className={`w-full vik-row-card p-4 text-left ${
-        revision.status === 'expired' ? 'border-red-300' : ''
-      }`}
+      className="vik-row-card flex w-full items-center gap-3 p-3 text-left"
     >
-      <div className="flex items-center gap-4">
-        {/* Type Icon */}
-        <div className={`w-12 h-12 rounded-xl ${typeCfg.color} flex items-center justify-center text-2xl text-white`}>
-          {typeCfg.icon}
-        </div>
+      {/* Ikona typu — barevné pozadí dle stavu (zelená/žlutá/červená) */}
+      <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${statusCfg.bgColor} ${statusCfg.color}`}>
+        <Icon className="h-5 w-5" />
+      </span>
 
-        {/* Info */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${statusCfg.bgColor} ${statusCfg.color}`}>
-              {statusCfg.label}
-            </span>
-            <span className="text-xs text-slate-400">{typeCfg.label}</span>
-          </div>
-          <h4 className="font-medium text-slate-900 truncate">{revision.title}</h4>
-          <div className="flex items-center gap-3 mt-1 text-xs vik-muted">
-            <span>{revision.assetName}</span>
-            <span>•</span>
-            <span className="flex items-center gap-1">
-              <Calendar className="w-3 h-3" />
-              {formatRevisionDate(revision.nextRevisionDate)}
-            </span>
-          </div>
-          <div className="text-xs text-slate-400 mt-0.5">
-            {revision.revisionCompany} • {revision.certificateNumber}
-          </div>
+      {/* Info */}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <h4 className="truncate text-[15px] font-black text-slate-950">{revision.title}</h4>
+          <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-black ${statusCfg.bgColor} ${statusCfg.color}`}>
+            {statusCfg.label}
+          </span>
         </div>
-
-        {/* Days counter */}
-        <div className={`text-right flex-shrink-0 ${statusCfg.color}`}>
-          <div className="text-lg font-bold">
-            {days < 0 ? `${Math.abs(days)}d` : `${days}d`}
-          </div>
-          <div className="text-[10px]">
-            {days < 0 ? 'po termínu' : 'zbývá'}
-          </div>
+        <div className="mt-0.5 truncate text-[12.5px] font-semibold text-slate-600">
+          {typeCfg.label} · {revision.assetName}
         </div>
-
-        <Edit2 className="w-4 h-4 text-slate-400 flex-shrink-0" />
+        <div className="mt-0.5 flex items-center gap-1.5 truncate font-mono text-[11px] text-slate-400">
+          <Calendar className="h-3 w-3 shrink-0" />
+          {formatRevisionDate(revision.nextRevisionDate)}
+          {revision.certificateNumber ? ` · ${revision.certificateNumber}` : ''}
+        </div>
       </div>
+
+      {/* Počet dní */}
+      <div className={`shrink-0 text-right ${statusCfg.color}`}>
+        <div className="font-mono text-lg font-black leading-none">
+          {days < 0 ? `${Math.abs(days)} d` : `${days} d`}
+        </div>
+        <div className="mt-0.5 text-[10px] font-bold">
+          {days < 0 ? 'po termínu' : 'zbývá'}
+        </div>
+      </div>
+      <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
     </button>
   );
 }
@@ -308,6 +354,7 @@ function RevisionDetailModal({ revision, onClose, canEdit, canDelete, onLog }: {
 }) {
   const statusCfg = STATUS_CONFIG[revision.status];
   const typeCfg = TYPE_CONFIG[revision.type] || TYPE_CONFIG.other;
+  const TypeIcon = TYPE_ICON[revision.type] || Wrench;
   const days = daysUntilRevision(revision.nextRevisionDate);
   const { exportPDF } = useReports();
 
@@ -334,7 +381,9 @@ function RevisionDetailModal({ revision, onClose, canEdit, canDelete, onLog }: {
         {/* Header */}
         <div className="sticky top-0 bg-white border-b border-slate-200 p-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <span className="text-3xl">{typeCfg.icon}</span>
+            <span className={`flex h-11 w-11 items-center justify-center rounded-xl ${statusCfg.bgColor} ${statusCfg.color}`}>
+              <TypeIcon className="h-5 w-5" />
+            </span>
             <span className={`px-2 py-1 rounded-lg text-sm font-bold ${statusCfg.bgColor} ${statusCfg.color}`}>
               {statusCfg.label}
             </span>
@@ -373,7 +422,7 @@ function RevisionDetailModal({ revision, onClose, canEdit, canDelete, onLog }: {
             </div>
             <div className="vik-card-soft p-3">
               <div className="text-xs text-slate-500 mb-1">Typ</div>
-              <div className="font-medium text-sm">{typeCfg.icon} {typeCfg.label}</div>
+              <div className="font-medium text-sm flex items-center gap-1.5"><TypeIcon className="h-4 w-4 text-slate-500" /> {typeCfg.label}</div>
             </div>
           </div>
 
