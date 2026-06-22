@@ -41,15 +41,15 @@ const STATUS_DOT: Record<string, string> = {
   stopped:     'bg-slate-400',
 };
 
-// ── Entity type → color mapping (for root cards) ─────────────────
+// ── Entity type → color mapping (for root cards) — klidná paleta ─────────────────
 const ENTITY_COLORS: Record<string, string> = {
-  'Budova':    '#6366f1',
-  'Areál':     '#8b5cf6',
-  'Hala':      '#f97316',
-  'Linka':     '#10b981',
-  'Dílna':     '#0ea5e9',
-  'Sklad':     '#eab308',
-  'Kancelář':  '#a855f7',
+  'Budova':    '#1a6b4f',
+  'Areál':     '#3d4a43',
+  'Hala':      '#2f77b5',
+  'Linka':     '#1f7355',
+  'Dílna':     '#5c6b61',
+  'Sklad':     '#d07e1e',
+  'Kancelář':  '#7047a4',
 };
 
 function safeText(value: unknown): string {
@@ -57,7 +57,7 @@ function safeText(value: unknown): string {
 }
 
 function getEntityColor(entityType: string | undefined): string {
-  return ENTITY_COLORS[entityType || ''] || '#3b82f6';
+  return ENTITY_COLORS[entityType || ''] || '#2f77b5';
 }
 
 // ── Helpers ──────────────────────────────────────────────────────
@@ -375,87 +375,81 @@ function TreeNode({ asset, allAssets, depth, expanded, onToggle, onDetail, onAdd
 
   return (
     <div className={`k-tree-node ${asset.virtualKind ? `is-${asset.virtualKind}` : 'is-asset'}`}>
-      {/* Row */}
       <div
-        className="k-tree-row"
-        style={{ paddingLeft: `${depth * 24 + 12}px` }}
+        className="flex items-center gap-2 rounded-xl border border-transparent px-2 py-1.5 cursor-pointer transition hover:border-emerald-200 hover:bg-[#fbf9f4]"
+        style={{ marginLeft: `${depth * 18}px` }}
         onClick={() => hasChildren ? onToggle(asset.id) : onDetail(asset)}
       >
-        {/* Expand/collapse button */}
         {hasChildren ? (
-          <button className="k-tree-expand" onClick={(e) => { e.stopPropagation(); onToggle(asset.id); }}>
+          <button
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100"
+            onClick={(e) => { e.stopPropagation(); onToggle(asset.id); }}
+            aria-label={isExpanded ? 'Sbalit' : 'Rozbalit'}
+          >
             {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
           </button>
         ) : (
-          <span className="k-tree-expand-placeholder" />
+          <span className="h-6 w-6 shrink-0" />
         )}
 
-        {/* Status dot */}
-        <span className="k-tree-dot" style={{ backgroundColor: statusColor }} />
+        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: statusColor }} />
 
-        {/* Asset name */}
-        <span className="k-tree-name">{safeText(asset.name) || 'Bez názvu'}</span>
+        <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-slate-800">
+          {safeText(asset.name) || 'Bez názvu'}
+        </span>
 
-        {/* Descendant issue counts */}
-        {hasChildren && (desc.broken > 0 || desc.maintenance > 0) && (
-          <span className="k-tree-issues">
-            {desc.broken > 0 && <span style={{ color: '#ef4444' }}>{desc.broken}✕</span>}
-            {desc.maintenance > 0 && <span style={{ color: '#eab308' }}>{desc.maintenance}⚠</span>}
-          </span>
-        )}
-
-        {/* Child count */}
-        {hasChildren && (
-          <span className="k-tree-childcount">{children.length}</span>
-        )}
-
-        <span className="k-tree-stats-inline">
-          <span className="k-tree-stat">{desc.total} položek</span>
+        <span className="hidden shrink-0 items-center gap-2 text-[11px] font-semibold text-slate-500 sm:flex">
+          <span className="font-mono">{desc.total}</span>
           {desc.operational > 0 && (
-            <span className="k-tree-stat"><span style={{ color: '#22c55e' }}>●</span> {desc.operational}</span>
+            <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /><span className="font-mono">{desc.operational}</span></span>
           )}
           {desc.maintenance > 0 && (
-            <span className="k-tree-stat"><span style={{ color: '#eab308' }}>●</span> {desc.maintenance}</span>
+            <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-amber-500" /><span className="font-mono">{desc.maintenance}</span></span>
           )}
           {desc.broken > 0 && (
-            <span className="k-tree-stat is-alert"><span style={{ color: '#ef4444' }}>●</span> {desc.broken}</span>
+            <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-red-500" /><span className="font-mono">{desc.broken}</span></span>
           )}
           {desc.stopped > 0 && (
-            <span className="k-tree-stat"><span style={{ color: '#6b7280' }}>●</span> {desc.stopped}</span>
+            <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-slate-400" /><span className="font-mono">{desc.stopped}</span></span>
           )}
         </span>
 
-        {/* Akce — stejné menu jako u budovy (Rodný list / Přidat / Smazat) */}
+        {hasChildren && (
+          <span className="shrink-0 rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] font-bold text-slate-600">{children.length}</span>
+        )}
+
         <button
-          className="k-tree-action k-tree-action-detail"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-emerald-700 hover:bg-slate-50"
           onClick={(e) => { e.stopPropagation(); onDetail(asset); }}
           title="Otevřít rodný list"
+          aria-label="Rodný list"
         >
-          <FileText size={14} /> Rodný list
+          <FileText size={15} />
         </button>
 
         {canCreateAsset && (
           <button
-            className="k-tree-action k-tree-action-add"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-sky-600 hover:bg-slate-50"
             onClick={(e) => { e.stopPropagation(); onAddChild(asset.id); }}
             title="Přidat potomka"
+            aria-label="Přidat"
           >
-            <Plus size={14} /> Přidat
+            <Plus size={15} />
           </button>
         )}
 
         <button
-          className="k-tree-action k-tree-action-delete"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-red-600 hover:bg-red-50"
           onClick={(e) => { e.stopPropagation(); onDelete(asset); }}
           title="Smazat"
+          aria-label="Smazat"
         >
-          <Trash2 size={14} /> Smazat
+          <Trash2 size={15} />
         </button>
       </div>
 
-      {/* Children (recursive) */}
       {isExpanded && hasChildren && (
-        <div className="k-tree-children">
+        <div className="mt-1 space-y-1">
           {children.map((child) => (
             <TreeNode
               key={child.id}
@@ -503,26 +497,17 @@ function RootCard({ asset, allAssets, expanded, onToggle, onDetail, onAddChild, 
 
   return (
     <div className={`k-root-wrapper ${isExpanded ? 'is-expanded' : ''}`}>
-      {/* Card */}
-      <div
-        className="k-root-card"
-        style={{
-          background: '#ffffff',
-          borderColor: '#e7dfd2',
-          boxShadow: `inset 4px 0 0 ${color}cc`,
-        }}
-      >
-        {/* Status dot (top-right) */}
-        <div className={`k-root-status-dot ${dotClass}`} />
-
-        {/* Top row: icon + název(rozbalit) + Rodný list + akce */}
-        <div className="k-root-top">
-          {/* Icon box */}
-          <div
-            className="k-root-icon"
-            style={{ background: `${color}18`, color, border: `1px solid ${color}35` }}
-          >
-            {rootIconLabel(asset)}
+      <div className="vik-card overflow-hidden" style={{ borderLeft: `4px solid ${color}` }}>
+        <div className="flex items-center gap-3 p-3.5">
+          {/* Icon + status dot */}
+          <div className="relative shrink-0">
+            <div
+              className="flex h-11 w-11 items-center justify-center rounded-xl"
+              style={{ background: `${color}1f`, color }}
+            >
+              {rootIconLabel(asset)}
+            </div>
+            <span className={`absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-white ${dotClass}`} />
           </div>
 
           {/* Název = rozbalit/sbalit větev (jinak otevře rodný list) */}
@@ -534,125 +519,75 @@ function RootCard({ asset, allAssets, expanded, onToggle, onDetail, onAddChild, 
               else onDetail(asset);
             }}
             title={hasChildren ? (isExpanded ? 'Sbalit' : 'Rozbalit') : 'Otevřít rodný list'}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              background: 'transparent', border: 'none', padding: 0,
-              cursor: 'pointer', color: 'inherit', textAlign: 'left', minWidth: 0,
-            }}
+            className="flex min-w-0 flex-1 items-center gap-2 text-left"
           >
             {hasChildren && (
-              <span style={{ color: '#64748b', display: 'flex' }}>
+              <span className="shrink-0 text-slate-400">
                 {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
               </span>
             )}
-            <span className="k-root-info">
-              <span className="k-root-name">
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[15px] font-black text-slate-950">
                 {safeText(asset.name) || 'Bez názvu'}
                 {hasChildren && (
-                  <span style={{ color: '#94a3b8', fontWeight: 600 }}> ({children.length})</span>
+                  <span className="font-mono font-bold text-slate-400"> ({children.length})</span>
                 )}
               </span>
-              <span className="k-root-type">{safeText(asset.entityType) || 'Položka'}</span>
-              {asset.code && (
-                <span className="k-root-code">{asset.code}</span>
-              )}
+              <span className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] font-semibold text-slate-500">
+                <span className="font-bold uppercase tracking-wide text-slate-400">{safeText(asset.entityType) || 'Položka'}</span>
+                {asset.code && <span className="font-mono text-slate-400">{asset.code}</span>}
+                <span className="font-mono">{desc.total} pol.</span>
+                {desc.operational > 0 && (
+                  <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /><span className="font-mono">{desc.operational}</span></span>
+                )}
+                {desc.maintenance > 0 && (
+                  <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-amber-500" /><span className="font-mono">{desc.maintenance}</span></span>
+                )}
+                {desc.broken > 0 && (
+                  <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-red-500" /><span className="font-mono">{desc.broken}</span></span>
+                )}
+                {desc.stopped > 0 && (
+                  <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-slate-400" /><span className="font-mono">{desc.stopped}</span></span>
+                )}
+              </span>
             </span>
           </button>
 
-          {/* Rodný list — hned vedle názvu */}
-          <div className="k-root-stats k-root-stats-inline">
-            <span className="k-root-stat">
-              {desc.total} položek
-            </span>
-            {desc.operational > 0 && (
-              <span className="k-root-stat">
-                <span style={{ color: '#22c55e' }}>●</span> {desc.operational}
-              </span>
-            )}
-            {desc.maintenance > 0 && (
-              <span className="k-root-stat">
-                <span style={{ color: '#eab308' }}>●</span> {desc.maintenance}
-              </span>
-            )}
-            {desc.broken > 0 && (
-              <span className="k-root-stat k-root-stat-alert">
-                <span style={{ color: '#ef4444' }}>●</span> {desc.broken}
-              </span>
-            )}
-            {desc.stopped > 0 && (
-              <span className="k-root-stat">
-                <span style={{ color: '#6b7280' }}>●</span> {desc.stopped}
-              </span>
-            )}
-          </div>
-
-          <button
-            className="k-root-action-btn"
-            onClick={(e) => { e.stopPropagation(); onDetail(asset); }}
-            title="Otevřít rodný list"
-            style={{ color: '#3b82f6', borderColor: '#3b82f630' }}
-          >
-            <FileText size={16} />
-            <span className="k-action-label">Rodný list</span>
-          </button>
-
-          {/* Akce — vpravo */}
-          <div className="k-root-actions" style={{ marginLeft: 'auto' }}>
+          {/* Akce — vpravo (ikon-only) */}
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-[#f8f4ec] text-emerald-700 hover:bg-slate-50"
+              onClick={(e) => { e.stopPropagation(); onDetail(asset); }}
+              title="Otevřít rodný list"
+              aria-label="Rodný list"
+            >
+              <FileText size={16} />
+            </button>
             {canCreateAsset && (
               <button
-                className="k-root-action-btn"
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-[#f8f4ec] text-sky-600 hover:bg-slate-50"
                 onClick={(e) => { e.stopPropagation(); onAddChild(asset.id); }}
                 title="Přidat potomka"
-                style={{ color: '#38bdf8', borderColor: '#38bdf830' }}
+                aria-label="Přidat"
               >
                 <Plus size={16} />
-                <span className="k-action-label">Přidat</span>
               </button>
             )}
             <button
-              className="k-root-action-btn"
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-[#f8f4ec] text-red-600 hover:bg-red-50"
               onClick={(e) => { e.stopPropagation(); onDelete(asset); }}
               title="Smazat"
-              style={{ color: '#ef4444', borderColor: '#ef444430' }}
+              aria-label="Smazat"
             >
               <Trash2 size={16} />
-              <span className="k-action-label">Smazat</span>
             </button>
           </div>
         </div>
-
-        {/* Bottom stats row */}
-        <div className="k-root-stats">
-          <span className="k-root-stat">
-            {desc.total} položek
-          </span>
-          {desc.operational > 0 && (
-            <span className="k-root-stat">
-              <span style={{ color: '#22c55e' }}>●</span> {desc.operational}
-            </span>
-          )}
-          {desc.maintenance > 0 && (
-            <span className="k-root-stat">
-              <span style={{ color: '#eab308' }}>●</span> {desc.maintenance}
-            </span>
-          )}
-          {desc.broken > 0 && (
-            <span className="k-root-stat k-root-stat-alert">
-              <span style={{ color: '#ef4444' }}>●</span> {desc.broken}
-            </span>
-          )}
-          {desc.stopped > 0 && (
-            <span className="k-root-stat">
-              <span style={{ color: '#6b7280' }}>●</span> {desc.stopped}
-            </span>
-          )}
-        </div>
-
       </div>
 
       {/* Expanded children list */}
       {isExpanded && hasChildren && (
-        <div className="k-root-children">
+        <div className="mt-1.5 space-y-1 pl-3">
           {children.map((child) => (
             <TreeNode
               key={child.id}
@@ -701,51 +636,50 @@ function TileCard({ asset, allAssets, onDetail, onAddChild, onDelete, canCreateA
     .join(' · ');
 
   return (
-    <article className="k-tile-card" style={{ boxShadow: `inset 4px 0 0 ${color}cc` }}>
-      <div className={`k-root-status-dot ${dotClass}`} />
-      <button type="button" className="k-tile-main" onClick={() => onDetail(asset)}>
-        <span
-          className="k-tile-icon"
-          style={{ background: `${color}18`, color, borderColor: `${color}35` }}
-        >
-          {rootIconLabel(asset)}
+    <article className="vik-card overflow-hidden" style={{ borderLeft: `4px solid ${color}` }}>
+      <button type="button" className="flex w-full items-center gap-3 p-3 text-left" onClick={() => onDetail(asset)}>
+        <span className="relative shrink-0">
+          <span
+            className="flex h-11 w-11 items-center justify-center rounded-xl"
+            style={{ background: `${color}1f`, color }}
+          >
+            {rootIconLabel(asset)}
+          </span>
+          <span className={`absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-white ${dotClass}`} />
         </span>
-        <span className="k-tile-copy">
-          <span className="k-tile-name">{safeText(asset.name) || 'Bez názvu'}</span>
-          <span className="k-tile-type">{safeText(asset.entityType) || 'Položka'} · {statusLabel}</span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[15px] font-black text-slate-950">{safeText(asset.name) || 'Bez názvu'}</span>
+          <span className="block truncate text-[11px] font-bold uppercase tracking-wide text-slate-400">{safeText(asset.entityType) || 'Položka'} · {statusLabel}</span>
         </span>
       </button>
 
-      <div className="k-tile-meta">
-        {asset.code && <span>{asset.code}</span>}
-        {location && <span>{location}</span>}
-        {parentPath && <span>{parentPath}</span>}
+      <div className="space-y-0.5 px-3 pb-1 font-mono text-[11px] text-slate-400">
+        {asset.code && <div className="truncate">{asset.code}</div>}
+        {location && <div className="truncate">{location}</div>}
+        {parentPath && <div className="truncate">{parentPath}</div>}
       </div>
 
       {desc.total > 0 && (
-        <div className="k-tile-stats">
-          <span>{desc.total} položek</span>
-          {desc.operational > 0 && <span><span style={{ color: '#22c55e' }}>●</span> {desc.operational}</span>}
-          {desc.maintenance > 0 && <span><span style={{ color: '#eab308' }}>●</span> {desc.maintenance}</span>}
-          {desc.broken > 0 && <span className="is-alert"><span style={{ color: '#ef4444' }}>●</span> {desc.broken}</span>}
-          {desc.stopped > 0 && <span><span style={{ color: '#6b7280' }}>●</span> {desc.stopped}</span>}
+        <div className="flex flex-wrap items-center gap-2 px-3 pb-2 text-[11px] font-semibold text-slate-500">
+          <span className="font-mono">{desc.total} pol.</span>
+          {desc.operational > 0 && <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /><span className="font-mono">{desc.operational}</span></span>}
+          {desc.maintenance > 0 && <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-amber-500" /><span className="font-mono">{desc.maintenance}</span></span>}
+          {desc.broken > 0 && <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-red-500" /><span className="font-mono">{desc.broken}</span></span>}
+          {desc.stopped > 0 && <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-slate-400" /><span className="font-mono">{desc.stopped}</span></span>}
         </div>
       )}
 
-      <div className="k-tile-actions">
-        <button type="button" className="k-root-action-btn" onClick={() => onDetail(asset)}>
-          <FileText size={16} />
-          <span className="k-action-label">Rodný list</span>
+      <div className="flex items-center gap-2 border-t border-slate-100 px-3 py-2">
+        <button type="button" className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white text-[13px] font-bold text-emerald-700 hover:bg-slate-50" onClick={() => onDetail(asset)}>
+          <FileText size={15} /> Rodný list
         </button>
         {canCreateAsset && (
-          <button type="button" className="k-root-action-btn" onClick={() => onAddChild(asset.id)}>
-            <Plus size={16} />
-            <span className="k-action-label">Přidat</span>
+          <button type="button" className="flex h-8 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-sky-600 hover:bg-slate-50" onClick={() => onAddChild(asset.id)} aria-label="Přidat">
+            <Plus size={15} />
           </button>
         )}
-        <button type="button" className="k-root-action-btn" onClick={() => onDelete(asset)}>
-          <Trash2 size={16} />
-          <span className="k-action-label">Smazat</span>
+        <button type="button" className="flex h-8 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-red-600 hover:bg-red-50" onClick={() => onDelete(asset)} aria-label="Smazat">
+          <Trash2 size={15} />
         </button>
       </div>
     </article>
