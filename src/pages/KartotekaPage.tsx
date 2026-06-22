@@ -11,7 +11,9 @@ import {
   ChevronRight, ChevronDown, FileText, Loader2, Trash2,
   ClipboardCheck, Cog, LayoutGrid, ListTree, ArrowUp, ArrowDown,
   ChevronsUp, ChevronsDown, GripVertical,
+  Archive, Layers, CheckCircle2, Wrench, Pause, AlertTriangle, List,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
 import { useBackNavigation } from '../hooks/useBackNavigation';
@@ -26,16 +28,16 @@ import './KartotekaPage.css';
 
 // ── Status colors ────────────────────────────────────────────────
 const STATUS_HEX: Record<string, string> = {
-  operational: '#22c55e',
-  maintenance: '#eab308',
-  broken:      '#ef4444',
-  stopped:     '#6b7280',
+  operational: '#2e9e74',
+  maintenance: '#e8932b',
+  broken:      '#d7503a',
+  stopped:     '#97a096',
 };
 
 const STATUS_DOT: Record<string, string> = {
-  operational: 'bg-emerald-400',
-  maintenance: 'bg-amber-400 animate-pulse',
-  broken:      'bg-red-400 animate-pulse',
+  operational: 'bg-emerald-500',
+  maintenance: 'bg-amber-500',
+  broken:      'bg-red-500',
   stopped:     'bg-slate-400',
 };
 
@@ -1601,12 +1603,12 @@ export default function KartotekaPage() {
   }, [search, filter, floorFilter, visibleAssets]);
 
   // ── Filter config ───
-  const filters: { key: FilterKey; label: string }[] = [
-    { key: 'all',         label: 'Vše' },
-    { key: 'broken',      label: '❌ Poruchy' },
-    { key: 'maintenance', label: '🔧 Údržba' },
-    { key: 'stopped',     label: '⏸️ Zastaveno' },
-    { key: 'operational', label: '✅ OK' },
+  const filters: { key: FilterKey; label: string; icon: LucideIcon }[] = [
+    { key: 'all',         label: 'Vše',       icon: List },
+    { key: 'broken',      label: 'Poruchy',   icon: AlertTriangle },
+    { key: 'maintenance', label: 'Údržba',    icon: Wrench },
+    { key: 'stopped',     label: 'Zastaveno', icon: Pause },
+    { key: 'operational', label: 'OK',        icon: CheckCircle2 },
   ];
 
   // ── Determine parent name for modal title ───
@@ -1632,84 +1634,89 @@ export default function KartotekaPage() {
   return (
     <div className="kartoteka-page">
       {/* ── Header ── */}
-      <div className="k-header">
-        <button className="k-back-btn" onClick={() => goBack()}>
-          <ArrowLeft size={20} />
-        </button>
-        <Building2 size={22} style={{ color: '#3b82f6' }} />
-        <span className="k-title">Kartotéka</span>
-
-        {/* Add root asset */}
-        {canCreateAsset && (
-          <button
-            className="k-add-btn"
-            onClick={() => openCreateModal(null)}
-            title="Přidat kořenový prvek"
-          >
-            <Plus size={18} />
+      <div className="vik-page-header sticky top-0 z-30 px-4 py-3">
+        <div className="mx-auto flex w-full max-w-[1180px] items-center gap-3">
+          <button onClick={() => goBack()} aria-label="Zpět" className="p-2 rounded-lg hover:bg-slate-100">
+            <ArrowLeft size={20} />
           </button>
-        )}
-
-        {/* Import */}
-        <button className="k-import-btn" onClick={() => setShowImport(true)}>
-          <Upload size={16} />
-          <span>Import</span>
-        </button>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl font-black flex items-center gap-2">
+              <Archive className="w-6 h-6 text-emerald-700" />
+              Kartotéka
+            </h1>
+            <p className="truncate text-sm font-semibold text-slate-600">Strom budov, místností a strojů</p>
+          </div>
+          <button onClick={() => setShowImport(true)} className="vik-button">
+            <Upload size={16} />
+            <span className="hidden sm:inline">Import</span>
+          </button>
+          {canCreateAsset && (
+            <button onClick={() => openCreateModal(null)} aria-label="Přidat kořenový prvek" className="vik-button vik-button-primary">
+              <Plus size={18} />
+              <span className="hidden sm:inline">Přidat</span>
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* ── Status summary bar ── */}
-      <div className="k-summary">
-        <span className="k-stat">
-          Celkem <span className="k-stat-count">{counts.total}</span>
-        </span>
-        <span className="k-stat">
-          <span style={{ color: '#22c55e' }}>●</span>
-          <span className="k-stat-count">{counts.operational}</span>
-        </span>
-        <span className="k-stat">
-          <span style={{ color: '#eab308' }}>●</span>
-          <span className="k-stat-count">{counts.maintenance}</span>
-        </span>
-        <span className="k-stat">
-          <span style={{ color: '#ef4444' }}>●</span>
-          <span className="k-stat-count">{counts.broken}</span>
-        </span>
-        <span className="k-stat">
-          <span style={{ color: '#6b7280' }}>●</span>
-          <span className="k-stat-count">{counts.stopped}</span>
-        </span>
+      {/* ── Semafor stavů (zároveň filtr) ── */}
+      <div className="mx-auto w-full max-w-[1180px] px-4 pt-3">
+        <div className="grid grid-cols-5 gap-2">
+          {([
+            { key: 'all' as FilterKey, icon: Layers, label: 'Celkem', value: counts.total, color: 'text-slate-700', tile: 'border-slate-200' },
+            { key: 'operational' as FilterKey, icon: CheckCircle2, label: 'OK', value: counts.operational, color: 'text-emerald-700', tile: 'border-emerald-200' },
+            { key: 'maintenance' as FilterKey, icon: Wrench, label: 'Údržba', value: counts.maintenance, color: 'text-amber-700', tile: 'border-amber-200' },
+            { key: 'stopped' as FilterKey, icon: Pause, label: 'Stop', value: counts.stopped, color: 'text-slate-600', tile: 'border-slate-200' },
+            { key: 'broken' as FilterKey, icon: AlertTriangle, label: 'Porucha', value: counts.broken, color: 'text-red-700', tile: 'border-red-200' },
+          ]).map((s) => {
+            const Icon = s.icon;
+            return (
+              <button
+                key={s.key}
+                type="button"
+                onClick={() => setFilter(s.key === filter ? 'all' : s.key)}
+                className={`rounded-xl border ${s.tile} bg-white px-1 py-2 text-center transition active:scale-95 ${filter === s.key ? 'ring-2 ring-emerald-600/30' : ''}`}
+              >
+                <Icon className={`mx-auto h-4 w-4 ${s.color}`} />
+                <div className={`mt-0.5 font-mono text-[17px] font-black leading-none ${s.color}`}>{s.value}</div>
+                <div className="mt-0.5 text-[11px] font-semibold text-slate-500">{s.label}</div>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* ── Search ── */}
       {canCreateAsset && (
-        <div className="k-create-toolbar" aria-label="Rychle pridat polozku">
-          <span className="k-create-label">Přidat</span>
-          <button className="k-create-btn" onClick={() => openCreateModal(null, 'building')}>
+        <div className="mx-auto flex w-full max-w-[1180px] flex-wrap items-center gap-2 px-4 pt-3" aria-label="Rychle pridat polozku">
+          <span className="eyebrow">Přidat</span>
+          <button className="vik-button" onClick={() => openCreateModal(null, 'building')}>
             <Building2 size={16} /> Budova
           </button>
-          <button className="k-create-btn" onClick={() => openCreateModal(null, 'room')}>
+          <button className="vik-button" onClick={() => openCreateModal(null, 'room')}>
             <Plus size={16} /> Místnost
           </button>
-          <button className="k-create-btn" onClick={() => openCreateModal(null, 'inspection')}>
+          <button className="vik-button" onClick={() => openCreateModal(null, 'inspection')}>
             <ClipboardCheck size={16} /> Kontrola
           </button>
-          <button className="k-create-btn" onClick={() => openCreateModal(null, 'gearbox')}>
+          <button className="vik-button" onClick={() => openCreateModal(null, 'gearbox')}>
             <Cog size={16} /> Převodovka
           </button>
         </div>
       )}
 
-      <div className="k-search">
-        <div className="k-search-wrap">
-          <Search size={18} className="k-search-icon" />
+      <div className="mx-auto w-full max-w-[1180px] px-4 pt-3">
+        <div className="relative">
+          <Search size={18} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
+            className="vik-input pl-10 pr-10"
             placeholder="Hledat podle názvu, typu nebo kódu…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
           {search && (
-            <button className="k-search-clear" onClick={() => setSearch('')}>
+            <button className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-600" aria-label="Smazat" onClick={() => setSearch('')}>
               <X size={16} />
             </button>
           )}
@@ -1717,30 +1724,35 @@ export default function KartotekaPage() {
       </div>
 
       {/* ── Filter chips ── */}
-      <div className="k-filters">
-        {filters.map((f) => (
+      <div className="mx-auto w-full max-w-[1180px] px-4 pt-3">
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {filters.map((f) => {
+            const Icon = f.icon;
+            return (
+              <button
+                key={f.key}
+                className={filter === f.key ? 'vik-chip vik-chip-active' : 'vik-chip'}
+                onClick={() => setFilter(f.key === filter ? 'all' : f.key)}
+              >
+                <Icon className="h-3.5 w-3.5" /> {f.label}
+              </button>
+            );
+          })}
           <button
-            key={f.key}
-            className={`filter-chip${filter === f.key ? ' active' : ''}`}
-            onClick={() => setFilter(f.key === filter ? 'all' : f.key)}
+            className={filter === 'gearbox' ? 'vik-chip vik-chip-active' : 'vik-chip'}
+            onClick={() => setFilter(filter === 'gearbox' ? 'all' : 'gearbox')}
           >
-            {f.label}
+            <Cog className="h-3.5 w-3.5" /> Převodovky <span className="opacity-70">{counts.gearboxes}</span>
           </button>
-        ))}
-        <button
-          className={`filter-chip${filter === 'gearbox' ? ' active' : ''}`}
-          onClick={() => setFilter(filter === 'gearbox' ? 'all' : 'gearbox')}
-        >
-          Převodovky ({counts.gearboxes})
-        </button>
+        </div>
       </div>
 
       {floorOptions.length > 1 && (
-        <div className="k-floor-filters" aria-label="Filtr podle patra">
-          <span>Patro</span>
+        <div className="mx-auto flex w-full max-w-[1180px] flex-wrap items-center gap-2 px-4 pt-2" aria-label="Filtr podle patra">
+          <span className="eyebrow">Patro</span>
           <button
             type="button"
-            className={`filter-chip${floorFilter === 'all' ? ' active' : ''}`}
+            className={floorFilter === 'all' ? 'vik-chip vik-chip-active' : 'vik-chip'}
             onClick={() => setFloorFilter('all')}
           >
             Vše
@@ -1749,7 +1761,7 @@ export default function KartotekaPage() {
             <button
               key={floor}
               type="button"
-              className={`filter-chip${floorFilter === floor ? ' active' : ''}`}
+              className={floorFilter === floor ? 'vik-chip vik-chip-active' : 'vik-chip'}
               onClick={() => setFloorFilter(floorFilter === floor ? 'all' : floor)}
             >
               {getFloorLabel(floor)}
@@ -1758,38 +1770,38 @@ export default function KartotekaPage() {
         </div>
       )}
 
-      <div className={`k-tree-tools is-${viewMode}`}>
-        <div className="k-view-toggle" aria-label="Zobrazeni kartoteky">
+      <div className="mx-auto flex w-full max-w-[1180px] items-center gap-2 px-4 pt-3">
+        <div className="flex flex-1 rounded-xl border border-slate-200 bg-white p-1" aria-label="Zobrazeni kartoteky">
           <button
             type="button"
-            className={viewMode === 'tree' ? 'active' : ''}
             onClick={() => setViewMode('tree')}
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-black transition ${viewMode === 'tree' ? 'bg-emerald-600 text-white' : 'text-slate-600'}`}
           >
             <ListTree size={16} />
             Strom
           </button>
           <button
             type="button"
-            className={viewMode === 'tiles' ? 'active' : ''}
             onClick={() => setViewMode('tiles')}
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-black transition ${viewMode === 'tiles' ? 'bg-emerald-600 text-white' : 'text-slate-600'}`}
           >
             <LayoutGrid size={16} />
             Dlaždice
           </button>
           <button
             type="button"
-            className={viewMode === 'route' ? 'active' : ''}
             onClick={() => setViewMode('route')}
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-black transition ${viewMode === 'route' ? 'bg-emerald-600 text-white' : 'text-slate-600'}`}
           >
             <ClipboardCheck size={16} />
-            Trasa kontrol
+            Trasa
           </button>
         </div>
-        <button type="button" onClick={expandVisibleTree}>
-          Rozbalit vše
+        <button type="button" onClick={expandVisibleTree} aria-label="Rozbalit vše" title="Rozbalit vše" className="vik-button px-3">
+          <ChevronsDown size={18} />
         </button>
-        <button type="button" onClick={collapseTree}>
-          Sbalit vše
+        <button type="button" onClick={collapseTree} aria-label="Sbalit vše" title="Sbalit vše" className="vik-button px-3">
+          <ChevronsUp size={18} />
         </button>
       </div>
 
