@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthContext } from '../context/AuthContext';
 import { useInventory } from '../hooks/useInventory';
-import { Breadcrumb } from '../components/ui';
+import { Breadcrumb, Skeleton, SkeletonList } from '../components/ui';
 import {
   Search, Plus, QrCode, Truck, X,
   CheckCircle2, TrendingDown, TrendingUp, Loader2,
@@ -245,8 +245,14 @@ export default function InventoryPage() {
   // ─────────────────────────────────────────
   if (loading) {
     return (
-      <div className="vik-page min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-emerald-700" />
+      <div className="vik-page min-h-screen">
+        <div className="vik-page-shell px-3 py-6">
+          <div className="space-y-2 mb-5">
+            <Skeleton width="w-40" height="h-7" />
+            <Skeleton width="w-56" height="h-4" />
+          </div>
+          <SkeletonList rows={6} />
+        </div>
       </div>
     );
   }

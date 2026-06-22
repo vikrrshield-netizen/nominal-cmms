@@ -17,7 +17,7 @@ export default defineConfig({
   webServer: externalBaseUrl
     ? undefined
     : {
-        command: 'npm.cmd run dev -- --host 127.0.0.1 --port 4173',
+        command: 'npm run dev -- --host 127.0.0.1 --port 4173',
         env: {
           ...process.env,
           VITE_FIREBASE_API_KEY: '',
