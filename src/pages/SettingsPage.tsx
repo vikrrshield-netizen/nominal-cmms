@@ -38,11 +38,18 @@ const SETTINGS_TABS: SettingsTab[] = [
 function SettingsCard({ title, description, children }: { title: string; description: string; children?: React.ReactNode }) {
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-4">
-      <h3 className="text-sm font-bold text-slate-900 mb-1">{title}</h3>
+      <div className="flex items-start justify-between gap-2 mb-1">
+        <h3 className="text-sm font-bold text-slate-900">{title}</h3>
+        {!children && (
+          <span className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold uppercase tracking-wide">
+            Připravujeme
+          </span>
+        )}
+      </div>
       <p className="text-xs text-slate-500 mb-3">{description}</p>
       {children || (
-        <div className="text-xs text-slate-500 italic py-4 text-center border border-dashed border-slate-300 rounded-xl">
-          Konfigurace bude dostupná v další verzi
+        <div className="text-xs text-slate-400 py-3 px-3 text-center border border-dashed border-slate-200 rounded-xl bg-[#fbf9f4]">
+          Tuto konfiguraci dokončujeme — brzy půjde nastavit přímo tady.
         </div>
       )}
     </div>
@@ -78,7 +85,7 @@ function WarehouseSettings() {
       <SettingsCard title="Kategorie materiálu" description="Typy materiálu pro příjem a evidenci">
         <div className="flex flex-wrap gap-2">
           {['Surovina', 'Polotovar', 'Hotový výrobek', 'Obal'].map(cat => (
-            <span key={cat} className="px-3 py-1.5 bg-teal-500/15 text-teal-300 text-xs rounded-lg border border-teal-500/30">{cat}</span>
+            <span key={cat} className="px-3 py-1.5 bg-emerald-50 text-emerald-700 text-xs rounded-lg border border-emerald-200 font-medium">{cat}</span>
           ))}
         </div>
       </SettingsCard>
@@ -94,7 +101,7 @@ function ProductionSettings() {
       <SettingsCard title="Extrudéry" description="Konfigurace výrobních linek">
         <div className="flex flex-wrap gap-2">
           {['E1 — Extrudér 1', 'E2 — Extrudér 2', 'E3 — Extrudér 3'].map(m => (
-            <span key={m} className="px-3 py-1.5 bg-orange-500/15 text-orange-300 text-xs rounded-lg border border-orange-500/30">{m}</span>
+            <span key={m} className="px-3 py-1.5 bg-amber-50 text-amber-700 text-xs rounded-lg border border-amber-200 font-medium">{m}</span>
           ))}
         </div>
       </SettingsCard>
@@ -137,7 +144,7 @@ function ShiftSettings() {
       <SettingsCard title="Typy směn" description="Definice směnového režimu">
         <div className="flex flex-wrap gap-2">
           {['R — Ranní (6:00–14:00)', 'O — Odpolední (14:00–22:00)', 'N — Noční (22:00–6:00)'].map(s => (
-            <span key={s} className="px-3 py-1.5 bg-violet-500/15 text-violet-300 text-xs rounded-lg border border-violet-500/30">{s}</span>
+            <span key={s} className="px-3 py-1.5 bg-indigo-50 text-indigo-700 text-xs rounded-lg border border-indigo-200 font-medium">{s}</span>
           ))}
         </div>
       </SettingsCard>
@@ -220,7 +227,7 @@ export default function SettingsPage() {
       </div>
 
       {/* Content */}
-      <div className="max-w-2xl mx-auto px-4 py-4">
+      <div key={activeTab} className="max-w-2xl mx-auto px-4 py-4 vik-fade-in">
         <ContentComponent />
       </div>
     </div>
