@@ -36,6 +36,7 @@ import { addWorkLog, subscribeToWorkLogs } from '../services/workLogService';
 import type { WorkLog } from '../types/workLog';
 import FAB from '../components/ui/FAB';
 import EmptyState from '../components/ui/EmptyState';
+import { Skeleton } from '../components/ui';
 import BottomSheet, { FormField, FormFooter } from '../components/ui/BottomSheet';
 import MicButton from '../components/ui/MicButton';
 import { showToast } from '../components/ui/Toast';
@@ -1188,8 +1189,24 @@ export default function TasksPage() {
 
         {/* ═══ CARD GRID ═══ */}
         {loading ? (
-          <div className="flex items-center justify-center py-12 text-slate-500">
-            <Loader2 className="w-6 h-6 animate-spin mr-2" /> Načítám...
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3" role="status" aria-busy="true" aria-label="Načítám úkoly…">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="vik-card p-4 space-y-3">
+                <div className="flex items-center gap-3">
+                  <Skeleton width="w-10" height="h-10" rounded="rounded-xl" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton width="w-2/3" height="h-4" />
+                    <Skeleton width="w-1/3" height="h-3" />
+                  </div>
+                </div>
+                <Skeleton width="w-full" height="h-3" />
+                <Skeleton width="w-4/5" height="h-3" />
+                <div className="flex gap-2 pt-1">
+                  <Skeleton width="w-16" height="h-6" rounded="rounded-full" />
+                  <Skeleton width="w-12" height="h-6" rounded="rounded-full" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : filteredTasks.length === 0 ? (
           <EmptyState
@@ -1200,7 +1217,7 @@ export default function TasksPage() {
             onAction={() => setShowNewTask(true)}
           />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 vik-fade-in">
             {filteredTasks.map((task) => (
               <TaskCard key={task.id} task={task} onClick={() => setActionsTask(task)} onEdit={() => setEditingTask(task)} onAddLog={() => { setLogText(''); setLoggingTask(task); }} onTake={async () => {
                 const userName = user?.displayName || 'Uživatel';
