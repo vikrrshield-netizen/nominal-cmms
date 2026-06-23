@@ -16,6 +16,7 @@ import {
 import { parseExcelFile } from '../utils/importers/excelImporter';
 import type { ParseResult } from '../utils/importers/excelImporter';
 import { showToast } from '../components/ui/Toast';
+import BottomSheet from '../components/ui/BottomSheet';
 import { exportMigrationData, downloadMigrationJson } from '../utils/vikrr_migration';
 import { MODULE_DEFINITIONS, ROLE_PERMISSIONS } from '../types/user';
 import { KIOSK_TILES, KIOSK_TILE_IDS, KIOSK_ALWAYS_ON } from '../config/kioskTiles';
@@ -738,26 +739,8 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-3xl w-full max-w-lg max-h-[85vh] overflow-hidden shadow-2xl border border-slate-200" onClick={e => e.stopPropagation()}>
-        {/* Header */}
-        <div className={`${roleCfg.color} p-6`}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span className="text-4xl">{roleCfg.icon}</span>
-              <div>
-                <h2 className="text-xl font-bold text-slate-900">{user.displayName}</h2>
-                <p className="text-slate-900/80">{roleCfg.label}</p>
-              </div>
-            </div>
-            <button onClick={onClose} className="p-2 rounded-xl bg-slate-100 hover:bg-white/30">
-              <X className="w-5 h-5 text-slate-900" />
-            </button>
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="p-4 space-y-4 overflow-y-auto max-h-[60vh]">
+    <BottomSheet title={`${user.displayName} — ${roleCfg.label}`} isOpen onClose={onClose}>
+        <div className="space-y-4">
           {!isEditing ? (
             <>
               {/* PIN */}
@@ -970,8 +953,7 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
             </>
           )}
         </div>
-      </div>
-    </div>
+      </BottomSheet>
   );
 }
 
@@ -1378,16 +1360,8 @@ function NewUserModal({ onClose, onCreated }: {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-3xl w-full max-w-lg max-h-[85vh] overflow-hidden shadow-2xl border border-slate-200 flex flex-col" onClick={e => e.stopPropagation()}>
-        <div className="p-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
-          <h2 className="text-xl font-bold text-slate-900">Nový uživatel</h2>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100">
-            <X className="w-5 h-5 text-slate-500" />
-          </button>
-        </div>
-
-        <div className="p-4 space-y-4 overflow-y-auto flex-1 min-h-0">
+    <BottomSheet title="Nový uživatel" isOpen onClose={onClose}>
+        <div className="space-y-4">
           <div>
             <label className="text-sm text-slate-600">Jméno *</label>
             <input
@@ -1499,8 +1473,7 @@ function NewUserModal({ onClose, onCreated }: {
             </button>
           </div>
         </div>
-      </div>
-    </div>
+      </BottomSheet>
   );
 }
 
