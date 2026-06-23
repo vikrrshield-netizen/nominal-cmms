@@ -24,6 +24,7 @@ import type { Asset, AssetStatus, AssetCriticality } from '../types/asset';
 import { ASSET_STATUS_CONFIG, CRITICALITY_CONFIG } from '../types/asset';
 import { showToast } from '../components/ui/Toast';
 import ImportModal from '../components/ui/ImportModal';
+import BottomSheet, { FormFooter } from '../components/ui/BottomSheet';
 import './KartotekaPage.css';
 
 // ── Status colors ────────────────────────────────────────────────
@@ -1970,302 +1971,253 @@ export default function KartotekaPage() {
 
       {/* ── Delete Confirm Modal ── */}
       {deleteTarget && (
-        <div className="k-modal-overlay" onClick={() => setDeleteTarget(null)}>
-          <div className="k-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 380 }}>
-            <div className="k-modal-header">
-              <h2 className="k-modal-title">🗑️ Smazat položku?</h2>
-              <button className="k-modal-close" onClick={() => setDeleteTarget(null)}>
-                <X size={20} />
-              </button>
-            </div>
-            <div className="k-modal-body">
-              <p style={{ color: '#94a3b8', fontSize: '0.9rem', lineHeight: 1.5, margin: 0 }}>
-                Opravdu chcete smazat <strong style={{ color: '#f1f5f9' }}>{deleteTarget.name}</strong>?
-                Tato akce je nevratná.
-              </p>
-            </div>
-            <div className="k-modal-footer">
-              <button className="k-btn-cancel" onClick={() => setDeleteTarget(null)}>
-                Zrušit
-              </button>
-              <button
-                className="k-btn-save"
-                style={{ background: '#ef4444' }}
-                onClick={confirmDelete}
-              >
-                Smazat
-              </button>
-            </div>
-          </div>
-        </div>
+        <BottomSheet title="Smazat položku?" isOpen onClose={() => setDeleteTarget(null)}>
+          <p className="text-[15px] leading-relaxed text-slate-600">
+            Opravdu chcete smazat <strong className="font-bold text-slate-950">{deleteTarget.name}</strong>? Tato akce je nevratná.
+          </p>
+          <FormFooter
+            onCancel={() => setDeleteTarget(null)}
+            onSubmit={confirmDelete}
+            submitLabel="Smazat"
+            color="red"
+          />
+        </BottomSheet>
       )}
 
       {/* ── Create Asset Modal ── */}
       {showCreate && (
-        <div className="k-modal-overlay" onClick={() => setShowCreate(false)}>
-          <div className="k-modal" onClick={(e) => e.stopPropagation()}>
-            {/* Header */}
-            <div className="k-modal-header">
-              <h2 className="k-modal-title">
-                {createModalTitle}
-              </h2>
-              <button className="k-modal-close" onClick={() => setShowCreate(false)}>
-                <X size={20} />
+        <BottomSheet title={createModalTitle} isOpen onClose={() => setShowCreate(false)}>
+          {/* Druh */}
+          <div className="mb-4 grid grid-cols-3 gap-2 sm:grid-cols-5">
+            {([
+              ['building', 'Budova'],
+              ['room', 'Místnost'],
+              ['asset', 'Zařízení'],
+              ['gearbox', 'Převodovka'],
+              ['inspection', 'Kontrola'],
+            ] as [CreateKind, string][]).map(([kind, label]) => (
+              <button
+                key={kind}
+                type="button"
+                onClick={() => {
+                  setCreateKind(kind);
+                  setCreateForm((prev) => ({
+                    ...prev,
+                    entityType: kind === 'building' ? 'Budova' : kind === 'room' ? 'Místnost' : kind === 'gearbox' ? 'Převodovka' : kind === 'inspection' ? 'Kontrola' : 'Zařízení',
+                  }));
+                }}
+                className={`min-h-[44px] rounded-xl border py-2 text-sm font-semibold transition ${createKind === kind ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-300 bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
+              >
+                {label}
               </button>
-            </div>
+            ))}
+          </div>
 
-            {/* Form body */}
-            <div className="k-modal-body">
-              <div className="k-row">
-                {([
-                  ['building', 'Budova'],
-                  ['room', 'Místnost'],
-                  ['asset', 'Zařízení'],
-                  ['gearbox', 'Převodovka'],
-                  ['inspection', 'Kontrola'],
-                ] as [CreateKind, string][]).map(([kind, label]) => (
-                  <button
-                    key={kind}
-                    type="button"
-                    className="filter-chip"
-                    style={{
-                      background: createKind === kind ? 'rgba(59, 130, 246, 0.22)' : 'rgba(255,255,255,0.05)',
-                      borderColor: createKind === kind ? 'rgba(59, 130, 246, 0.55)' : 'rgba(255,255,255,0.08)',
-                      color: createKind === kind ? '#bfdbfe' : '#94a3b8',
-                      flex: 1,
-                    }}
-                    onClick={() => {
-                      setCreateKind(kind);
-                      setCreateForm((prev) => ({
-                        ...prev,
-                        entityType: kind === 'building' ? 'Budova' : kind === 'room' ? 'Místnost' : kind === 'gearbox' ? 'Převodovka' : kind === 'inspection' ? 'Kontrola' : 'Zařízení',
-                      }));
-                    }}
-                  >
-                    {label}
-                  </button>
+          <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+            <strong className="font-bold text-slate-900">{getCreateKindName(createKind)}</strong>: {getCreateKindHelp(createKind)}
+          </div>
+
+          <label className="mb-4 block">
+            <span className="mb-1.5 block text-sm font-medium text-slate-600">Název *</span>
+            <input
+              className="vik-input"
+              type="text"
+              placeholder="např. Výrobní hala D"
+              value={createForm.name}
+              onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
+              autoFocus
+            />
+          </label>
+
+          <label className="mb-4 block">
+            <span className="mb-1.5 block text-sm font-medium text-slate-600">Kam to patří</span>
+            <select
+              className="vik-input"
+              value={createParentChoiceId}
+              onChange={(e) => applyCreateParent(e.target.value)}
+            >
+              <option value="">Samostatně / bez nadřazené položky</option>
+              {createParentOptions.map((asset) => (
+                <option key={asset.id} value={asset.id}>
+                  {getParentOptionLabel(asset, treeAssets)}
+                </option>
+              ))}
+            </select>
+            <span className="mt-1 block text-xs text-slate-500">
+              {selectedCreateParent
+                ? `Uloží se pod: ${getParentOptionLabel(selectedCreateParent, treeAssets)}`
+                : createKind === 'building'
+                  ? 'Budova je hlavní karta, proto se nezařazuje pod jinou položku.'
+                  : 'Když vybereš místnost nebo zařízení, nová položka se uloží přímo pod ni.'}
+            </span>
+          </label>
+
+          {createKind === 'asset' && (
+            <label className="mb-4 block">
+              <span className="mb-1.5 block text-sm font-medium text-slate-600">Druh zařízení</span>
+              <input
+                className="vik-input"
+                type="text"
+                list="asset-type-options"
+                placeholder="vyber nebo napiš např. Kogenerační jednotka"
+                value={createForm.entityType}
+                onChange={(e) => setCreateForm({ ...createForm, entityType: e.target.value })}
+              />
+              <datalist id="asset-type-options">
+                {ASSET_TYPE_OPTIONS.map((option) => (
+                  <option key={option} value={option} />
                 ))}
-              </div>
+              </datalist>
+            </label>
+          )}
 
-              <div className="k-form-note">
-                <strong>{getCreateKindName(createKind)}</strong>: {getCreateKindHelp(createKind)}
-              </div>
+          {createKind === 'inspection' && (
+            <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+              Tohle není zařízení. Je to plán kontroly, který se zobrazí v modulu Kontroly.
+            </div>
+          )}
 
-              <label className="k-field">
-                <span className="k-label">Název *</span>
-                <input
-                  className="k-input"
-                  type="text"
-                  placeholder="např. Výrobní hala D"
-                  value={createForm.name}
-                  onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
-                  autoFocus
-                />
+          <label className="mb-4 block">
+            <span className="mb-1.5 block text-sm font-medium text-slate-600">Kód</span>
+            <input
+              className="vik-input"
+              type="text"
+              placeholder="např. HAL-D"
+              value={createForm.code}
+              onChange={(e) => setCreateForm({ ...createForm, code: e.target.value })}
+            />
+          </label>
+
+          <div className="mb-4 grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-medium text-slate-600">Budova</span>
+              <input
+                className="vik-input"
+                type="text"
+                placeholder="např. D"
+                value={createBuildingId}
+                onChange={(e) => setCreateBuildingId(e.target.value.toUpperCase())}
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-medium text-slate-600">Patro</span>
+              <input
+                className="vik-input"
+                type="text"
+                placeholder="např. 1.NP"
+                value={createFloor}
+                onChange={(e) => setCreateFloor(e.target.value)}
+              />
+            </label>
+          </div>
+
+          {(createKind === 'asset' || createKind === 'inspection') && (
+            <label className="mb-4 block">
+              <span className="mb-1.5 block text-sm font-medium text-slate-600">Místnost / umístění</span>
+              <input
+                className="vik-input"
+                type="text"
+                placeholder="např. Údržba, mycí centrum"
+                value={createAreaName}
+                onChange={(e) => setCreateAreaName(e.target.value)}
+              />
+            </label>
+          )}
+
+          {(createKind === 'inspection' || (createKind === 'room' && createInspection)) && (
+            <>
+              <label className="mb-4 block">
+                <span className="mb-1.5 block text-sm font-medium text-slate-600">Kategorie kontroly</span>
+                <select
+                  className="vik-input"
+                  value={createForm.category}
+                  onChange={(e) => setCreateForm({ ...createForm, category: e.target.value })}
+                >
+                  <option value="budova">Budova</option>
+                  <option value="hygiena">Hygiena</option>
+                  <option value="výroba">Výroba</option>
+                  <option value="energie">Energie</option>
+                  <option value="sklad">Sklad</option>
+                  <option value="údržba">Údržba</option>
+                </select>
               </label>
 
-              <label className="k-field">
-                <span className="k-label">Kam to patří</span>
+              <label className="mb-4 block">
+                <span className="mb-1.5 block text-sm font-medium text-slate-600">Opakování kontroly</span>
                 <select
-                  className="k-input"
-                  value={createParentChoiceId}
-                  onChange={(e) => applyCreateParent(e.target.value)}
+                  className="vik-input"
+                  value={createInspectionFrequency}
+                  onChange={(e) => setCreateInspectionFrequency(e.target.value as InspectionFrequency)}
                 >
-                  <option value="">Samostatně / bez nadřazené položky</option>
-                  {createParentOptions.map((asset) => (
-                    <option key={asset.id} value={asset.id}>
-                      {getParentOptionLabel(asset, treeAssets)}
+                  {INSPECTION_FREQUENCY_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
                     </option>
                   ))}
                 </select>
-                <span className="k-help-text">
-                  {selectedCreateParent
-                    ? `Uloží se pod: ${getParentOptionLabel(selectedCreateParent, treeAssets)}`
-                    : createKind === 'building'
-                      ? 'Budova je hlavní karta, proto se nezařazuje pod jinou položku.'
-                      : 'Když vybereš místnost nebo zařízení, nová položka se uloží přímo pod ni.'}
-                </span>
               </label>
 
-              {createKind === 'asset' && (
-                <label className="k-field">
-                  <span className="k-label">Druh zařízení</span>
-                  <input
-                    className="k-input"
-                    type="text"
-                    list="asset-type-options"
-                    placeholder="vyber nebo napiš např. Kogenerační jednotka"
-                    value={createForm.entityType}
-                    onChange={(e) => setCreateForm({ ...createForm, entityType: e.target.value })}
-                  />
-                  <datalist id="asset-type-options">
-                    {ASSET_TYPE_OPTIONS.map((option) => (
-                      <option key={option} value={option} />
-                    ))}
-                  </datalist>
-                </label>
-              )}
-
-              {createKind === 'inspection' && (
-                <div className="k-form-note">
-                  Tohle není zařízení. Je to plán kontroly, který se zobrazí v modulu Kontroly.
-                </div>
-              )}
-
-              <label className="k-field">
-                <span className="k-label">Kód</span>
-                <input
-                  className="k-input"
-                  type="text"
-                  placeholder="např. HAL-D"
-                  value={createForm.code}
-                  onChange={(e) => setCreateForm({ ...createForm, code: e.target.value })}
+              <label className="mb-4 block">
+                <span className="mb-1.5 block text-sm font-medium text-slate-600">Co kontrolovat</span>
+                <textarea
+                  className="vik-input"
+                  rows={3}
+                  placeholder="např. podlaha, dveře, světla, čistota..."
+                  value={createForm.description}
+                  onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })}
                 />
               </label>
+            </>
+          )}
 
-              <div className="k-row">
-                <label className="k-field">
-                  <span className="k-label">Budova</span>
-                  <input
-                    className="k-input"
-                    type="text"
-                    placeholder="např. D"
-                    value={createBuildingId}
-                    onChange={(e) => setCreateBuildingId(e.target.value.toUpperCase())}
-                  />
-                </label>
-                <label className="k-field">
-                  <span className="k-label">Patro</span>
-                  <input
-                    className="k-input"
-                    type="text"
-                    placeholder="např. 1.NP"
-                    value={createFloor}
-                    onChange={(e) => setCreateFloor(e.target.value)}
-                  />
-                </label>
-              </div>
+          {createKind === 'room' && (
+            <button
+              type="button"
+              onClick={() => setCreateInspection((value) => !value)}
+              className={`mb-4 flex w-full items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-sm font-semibold transition ${createInspection ? 'border-amber-400 bg-amber-50 text-amber-700' : 'border-slate-300 bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
+            >
+              <span className="font-bold">{createInspection ? '✓' : '○'}</span>
+              Rovnou založit pravidelnou kontrolu této místnosti
+            </button>
+          )}
 
-              {(createKind === 'asset' || createKind === 'inspection') && (
-                <label className="k-field">
-                  <span className="k-label">Místnost / umístění</span>
-                  <input
-                    className="k-input"
-                    type="text"
-                    placeholder="např. Údržba, mycí centrum"
-                    value={createAreaName}
-                    onChange={(e) => setCreateAreaName(e.target.value)}
-                  />
-                </label>
-              )}
-
-              {(createKind === 'inspection' || (createKind === 'room' && createInspection)) && (
-                <>
-                  <label className="k-field">
-                    <span className="k-label">Kategorie kontroly</span>
-                    <select
-                      className="k-input"
-                      value={createForm.category}
-                      onChange={(e) => setCreateForm({ ...createForm, category: e.target.value })}
-                    >
-                      <option value="budova">Budova</option>
-                      <option value="hygiena">Hygiena</option>
-                      <option value="výroba">Výroba</option>
-                      <option value="energie">Energie</option>
-                      <option value="sklad">Sklad</option>
-                      <option value="údržba">Údržba</option>
-                    </select>
-                  </label>
-
-                  <label className="k-field">
-                    <span className="k-label">Opakování kontroly</span>
-                    <select
-                      className="k-input"
-                      value={createInspectionFrequency}
-                      onChange={(e) => setCreateInspectionFrequency(e.target.value as InspectionFrequency)}
-                    >
-                      {INSPECTION_FREQUENCY_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="k-field">
-                    <span className="k-label">Co kontrolovat</span>
-                    <textarea
-                      className="k-input"
-                      rows={3}
-                      placeholder="např. podlaha, dveře, světla, čistota..."
-                      value={createForm.description}
-                      onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })}
-                    />
-                  </label>
-                </>
-              )}
-
-              {createKind === 'room' && (
-                <button
-                  type="button"
-                  className="filter-chip"
-                  style={{
-                    width: '100%',
-                    justifyContent: 'flex-start',
-                    background: createInspection ? 'rgba(245, 158, 11, 0.18)' : 'rgba(255,255,255,0.05)',
-                    borderColor: createInspection ? 'rgba(245, 158, 11, 0.45)' : 'rgba(255,255,255,0.08)',
-                    color: createInspection ? '#fde68a' : '#94a3b8',
-                  }}
-                  onClick={() => setCreateInspection((value) => !value)}
+          {createKind !== 'inspection' && (
+            <div className="mb-2 grid grid-cols-2 gap-3">
+              <label className="block">
+                <span className="mb-1.5 block text-sm font-medium text-slate-600">Stav</span>
+                <select
+                  className="vik-input"
+                  value={createForm.status}
+                  onChange={(e) => setCreateForm({ ...createForm, status: e.target.value as AssetStatus })}
                 >
-                  {createInspection ? '✓' : '○'} Rovnou založit pravidelnou kontrolu této místnosti
-                </button>
-              )}
-
-              {createKind !== 'inspection' && (
-              <div className="k-row">
-                <label className="k-field">
-                  <span className="k-label">Stav</span>
-                  <select
-                    className="k-input"
-                    value={createForm.status}
-                    onChange={(e) => setCreateForm({ ...createForm, status: e.target.value as AssetStatus })}
-                  >
-                    {(Object.keys(ASSET_STATUS_CONFIG) as AssetStatus[]).map((s) => (
-                      <option key={s} value={s}>{ASSET_STATUS_CONFIG[s].label}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="k-field">
-                  <span className="k-label">Kritičnost</span>
-                  <select
-                    className="k-input"
-                    value={createForm.criticality}
-                    onChange={(e) => setCreateForm({ ...createForm, criticality: e.target.value as AssetCriticality })}
-                  >
-                    {(Object.keys(CRITICALITY_CONFIG) as AssetCriticality[]).map((c) => (
-                      <option key={c} value={c}>{CRITICALITY_CONFIG[c].label}</option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              )}
+                  {(Object.keys(ASSET_STATUS_CONFIG) as AssetStatus[]).map((s) => (
+                    <option key={s} value={s}>{ASSET_STATUS_CONFIG[s].label}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-sm font-medium text-slate-600">Kritičnost</span>
+                <select
+                  className="vik-input"
+                  value={createForm.criticality}
+                  onChange={(e) => setCreateForm({ ...createForm, criticality: e.target.value as AssetCriticality })}
+                >
+                  {(Object.keys(CRITICALITY_CONFIG) as AssetCriticality[]).map((c) => (
+                    <option key={c} value={c}>{CRITICALITY_CONFIG[c].label}</option>
+                  ))}
+                </select>
+              </label>
             </div>
+          )}
 
-            {/* Footer */}
-            <div className="k-modal-footer">
-              <button className="k-btn-cancel" onClick={() => setShowCreate(false)}>
-                Zrušit
-              </button>
-              <button
-                className="k-btn-save"
-                onClick={handleCreate}
-                disabled={!createForm.name.trim() || createSaving}
-              >
-                {createSaving ? 'Ukládám…' : 'Vytvořit'}
-              </button>
-            </div>
-          </div>
-        </div>
+          <FormFooter
+            onCancel={() => setShowCreate(false)}
+            onSubmit={handleCreate}
+            submitLabel="Vytvořit"
+            loading={createSaving}
+            disabled={!createForm.name.trim() || createSaving}
+          />
+        </BottomSheet>
       )}
     </div>
   );
