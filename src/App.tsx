@@ -9,7 +9,7 @@ import AppCoach from './components/ui/AppCoach';
 import AppShell from './components/AppShell';
 import ToastContainer, { showToast } from './components/ui/Toast';
 import { AppErrorBoundary, AppErrorListeners, RouteErrorBoundary } from './components/AppErrorBoundary';
-import { useTenantSettings } from './hooks/useTenantSettings';
+import { useTenantSettings, TenantSettingsProvider } from './hooks/useTenantSettings';
 import { listenForForegroundPush } from './services/pushNotificationService';
 
 const LoginPage = lazy(() => import('./pages/LoginPage'));
@@ -261,13 +261,15 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppErrorListeners />
-        <ForegroundPushListener />
-        <SandboxBanner />
-        <AppErrorBoundary>
-          <ProtectedRoutes />
-        </AppErrorBoundary>
-        <ToastContainer />
+        <TenantSettingsProvider>
+          <AppErrorListeners />
+          <ForegroundPushListener />
+          <SandboxBanner />
+          <AppErrorBoundary>
+            <ProtectedRoutes />
+          </AppErrorBoundary>
+          <ToastContainer />
+        </TenantSettingsProvider>
       </AuthProvider>
     </BrowserRouter>
   );
