@@ -182,7 +182,7 @@ function ProtectedRoutes() {
         <Route path="/inventory" element={<ProtectedPage permissions={['inv.consume', 'inv.restock', 'inv.manage', 'inv.order']}><InventoryPage /></ProtectedPage>} />
         <Route path="/fleet" element={<ProtectedPage moduleId="fleet" permissions={['fleet.read', 'fleet.manage']}><FleetPage /></ProtectedPage>} />
         <Route path="/vzv" element={<ProtectedPage moduleId="fleet" permissions={['fleet.read', 'fleet.manage']}><VzvPage /></ProtectedPage>} />
-        <Route path="/hvac" element={<ProtectedPage permissions={['asset.read', 'hvac.read', 'hvac.manage']}><HvacPage /></ProtectedPage>} />
+        <Route path="/hvac" element={<ProtectedPage moduleId="hvac" permissions={['asset.read', 'hvac.read', 'hvac.manage']}><HvacPage /></ProtectedPage>} />
         <Route path="/gearboxes" element={<ProtectedPage permissions={['asset.read', 'gearbox.temperature.write', 'gearbox.manage']}><GearboxesPage /></ProtectedPage>} />
         <Route path="/dataloggers" element={<ProtectedPage permissions={['datalogger.read', 'datalogger.temperature.write', 'datalogger.manage']}><DataloggersPage /></ProtectedPage>} />
         <Route path="/revisions" element={<ProtectedPage moduleId="revisions" permissions={['asset.read']}><RevisionsPage /></ProtectedPage>} />

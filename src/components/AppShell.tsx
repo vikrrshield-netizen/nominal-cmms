@@ -6,7 +6,7 @@ import type { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, ClipboardList, Building2, ClipboardCheck, Cog,
-  Package, ShieldCheck, Calendar, BarChart3, Settings, LogOut, Gauge,
+  Package, ShieldCheck, Calendar, BarChart3, Settings, LogOut, Gauge, Wind,
 } from 'lucide-react';
 import { useAuthContext } from '../context/AuthContext';
 import BrandMark from './ui/BrandMark';
@@ -19,6 +19,7 @@ const NAV: { path: string; icon: typeof LayoutDashboard; label: string; permissi
   { path: '/stroje', icon: Gauge, label: 'Stroje', permissions: ['asset.read'] },
   { path: '/inspections', icon: ClipboardCheck, label: 'Kontroly', permissions: ['asset.read', 'weekly.modify'] },
   { path: '/gearboxes', icon: Cog, label: 'Převodovky', permissions: ['gearbox.temperature.write', 'gearbox.manage', 'asset.update', 'asset.read'] },
+  { path: '/hvac', icon: Wind, label: 'Vzduchotechnika', permissions: ['asset.read', 'hvac.read', 'hvac.manage'] },
   { path: '/inventory', icon: Package, label: 'Sklad ND', permissions: ['inv.consume', 'inv.restock', 'inv.manage', 'inv.order', 'report.read'] },
   { path: '/revisions', icon: ShieldCheck, label: 'Revize', permissions: ['asset.read'] },
   { path: '/calendar', icon: Calendar, label: 'Kalendář', permissions: ['wo.read', 'schedule.manage'] },

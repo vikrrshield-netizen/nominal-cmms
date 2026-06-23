@@ -2,12 +2,12 @@
 // VIKRR — Asset Shield — Kontrolní body budovy (měsíční checklist)
 // Digitalizace formuláře "Kontrola budovy C,D"
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, AlertTriangle,
   ChevronDown, ChevronRight, ChevronLeft, X, Loader2, ClipboardCheck, CheckCircle2, RotateCcw,
-  FileSpreadsheet, FileText, Search, Archive, Unlock, Lock, Clock, Check, MoreVertical
+  FileSpreadsheet, FileText, Search, Archive, Unlock, Lock, Clock, Check, MoreVertical, Camera
 } from 'lucide-react';
 import { useInspections } from '../hooks/useInspections';
 import type { InspectionFrequency, InspectionLog, InspectionStats } from '../hooks/useInspections';
@@ -249,6 +249,8 @@ export default function InspectionsPage() {
   const [filter, setFilter] = useState<'all' | 'pending' | 'ok' | 'defect'>('pending');
   const [showPlanningTools, setShowPlanningTools] = useState(false);
   const [modalStatus, setModalStatus] = useState<'none' | 'ok' | 'defect'>('defect');
+  const [defectPhotos, setDefectPhotos] = useState<{ id: string; url: string }[]>([]);
+  const photoSeq = useRef(0);
   const [selectedBuildings, setSelectedBuildings] = useState<string[]>([]);
   const [selectedFloors, setSelectedFloors] = useState<string[]>([]);
   const [selectedFrequencies, setSelectedFrequencies] = useState<InspectionFrequency[]>([]);
@@ -507,6 +509,36 @@ export default function InspectionsPage() {
     setSaving(false);
   };
 
+  // Fotodokumentace v okně (zatím jen náhled, neukládá se)
+  const resetDefectPhotos = () => {
+    setDefectPhotos((prev) => {
+      prev.forEach((photo) => URL.revokeObjectURL(photo.url));
+      return [];
+    });
+  };
+
+  const handleAddPhoto = (file?: File) => {
+    if (!file) return;
+    setDefectPhotos((prev) => (
+      prev.length >= 3
+        ? prev
+        : [...prev, { id: `photo-${photoSeq.current++}`, url: URL.createObjectURL(file) }]
+    ));
+  };
+
+  const handleRemovePhoto = (id: string) => {
+    setDefectPhotos((prev) => {
+      const target = prev.find((photo) => photo.id === id);
+      if (target) URL.revokeObjectURL(target.url);
+      return prev.filter((photo) => photo.id !== id);
+    });
+  };
+
+  const closeDefectModal = () => {
+    resetDefectPhotos();
+    setActiveLog(null);
+  };
+
   // Handle Defect
   const handleDefect = async () => {
     if (!activeLog || defectNote.trim().length < 3) return;
@@ -519,6 +551,7 @@ export default function InspectionsPage() {
       });
       showToast('Závada zapsána do rozpracované kontroly. Úkol vznikne při uzavření.', 'success');
       setActiveLog(null);
+      resetDefectPhotos();
       setDefectNote('');
       setTaskPriority('P2');
       setFoodSafetyRisk(false);
@@ -536,6 +569,7 @@ export default function InspectionsPage() {
       return;
     }
     setActiveLog(log);
+    resetDefectPhotos();
     setDefectNote(log.defectNote || '');
     setTaskPriority('P2');
     setFoodSafetyRisk(log.foodSafetyRisk === true);
@@ -1339,7 +1373,7 @@ export default function InspectionsPage() {
 
       {/* Modal: Provést kontrolu */}
       {activeLog && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-4" onClick={() => setActiveLog(null)}>
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-4" onClick={closeDefectModal}>
           <div
             className="flex max-h-[92vh] w-full max-w-[560px] flex-col rounded-t-3xl border border-slate-200 bg-white shadow-2xl sm:rounded-3xl"
             onClick={(e) => e.stopPropagation()}
@@ -1356,7 +1390,7 @@ export default function InspectionsPage() {
                   {[activeLog.roomCode, frequencyLabel(activeLog.frequency)].filter(Boolean).join(' · ')}
                 </div>
               </div>
-              <button onClick={() => setActiveLog(null)} aria-label="Zavřít" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200">
+              <button onClick={closeDefectModal} aria-label="Zavřít" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -1374,7 +1408,7 @@ export default function InspectionsPage() {
               <div className="grid grid-cols-2 gap-2.5">
                 <button
                   type="button"
-                  onClick={() => { if (activeLog) { void handleOk(activeLog); setActiveLog(null); } }}
+                  onClick={() => { if (activeLog) { void handleOk(activeLog); closeDefectModal(); } }}
                   disabled={saving}
                   className="flex flex-col items-center gap-1.5 rounded-2xl border-[1.5px] border-slate-200 bg-white p-4 font-black text-slate-600 transition hover:border-emerald-300 active:scale-[0.98] disabled:opacity-50"
                 >
@@ -1477,13 +1511,48 @@ export default function InspectionsPage() {
                       className="inspection-text-block mt-2 w-full resize-y rounded-xl border-[1.5px] border-slate-200 bg-white p-3 text-sm outline-none focus:border-red-500"
                     />
                   </div>
+
+                  <div>
+                    <label className="text-xs font-black uppercase tracking-wide text-red-800">Fotodokumentace</label>
+                    <div className="mt-2 flex flex-wrap gap-2.5">
+                      {defectPhotos.map((photo) => (
+                        <div
+                          key={photo.id}
+                          className="relative h-[84px] w-[84px] overflow-hidden rounded-xl border-[1.5px] border-emerald-500 bg-cover bg-center"
+                          style={{ backgroundImage: `url(${photo.url})` }}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => handleRemovePhoto(photo.id)}
+                            aria-label="Odebrat fotku"
+                            className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-lg bg-black/55 text-white transition hover:bg-black/70"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                      {defectPhotos.length < 3 && (
+                        <label className="flex h-[84px] w-[84px] cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border-[1.5px] border-dashed border-slate-300 bg-slate-50 text-slate-500 transition hover:border-emerald-400 hover:text-emerald-700">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => { handleAddPhoto(e.target.files?.[0]); e.target.value = ''; }}
+                          />
+                          <Camera className="h-5 w-5" />
+                          <span className="font-mono text-[9.5px] font-bold">Přidat</span>
+                        </label>
+                      )}
+                    </div>
+                    <p className="mt-1.5 text-[11px] font-semibold text-slate-500">Fotky se zatím jen zobrazí — ukládání doplníme později.</p>
+                  </div>
                 </div>
               )}
             </div>
 
             {/* Patička */}
             <div className="flex items-center justify-between gap-2 border-t border-stone-100 bg-slate-50 p-4">
-              <button onClick={() => setActiveLog(null)} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 transition hover:bg-slate-100">
+              <button onClick={closeDefectModal} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 transition hover:bg-slate-100">
                 Zrušit
               </button>
               {modalStatus === 'defect' ? (
@@ -1497,7 +1566,7 @@ export default function InspectionsPage() {
                 </button>
               ) : (
                 <button
-                  onClick={() => { if (activeLog) { void handleOk(activeLog); setActiveLog(null); } }}
+                  onClick={() => { if (activeLog) { void handleOk(activeLog); closeDefectModal(); } }}
                   disabled={saving}
                   className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-black text-white transition hover:bg-emerald-600 disabled:opacity-50"
                 >
