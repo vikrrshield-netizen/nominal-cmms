@@ -390,7 +390,7 @@ export default function WarehousePage() {
             {receipts.map(r => {
               const st = RECEIPT_STATUS[r.status];
               return (
-                <div key={r.id} className="bg-white rounded-2xl border border-slate-700/40 overflow-hidden">
+                <div key={r.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
                   <div className={`px-4 py-2.5 ${st.bg} flex items-center justify-between`}>
                     <div className="flex items-center gap-2">
                       <div className={`w-2.5 h-2.5 rounded-full ${st.dot}`} />
@@ -437,7 +437,7 @@ export default function WarehousePage() {
               const isLow = itemMin > 0 && s.quantity <= itemMin;
               const cat = STOCK_CATEGORIES[s.category] || STOCK_CATEGORIES.raw;
               return (
-                <div key={s.id} className={`bg-white rounded-2xl border ${isLow ? 'border-red-500/30 ring-1 ring-red-500/20' : 'border-slate-700/40'} p-4`}>
+                <div key={s.id} className={`bg-white rounded-2xl border ${isLow ? 'border-red-500/30 ring-1 ring-red-500/20' : 'border-slate-200'} p-4`}>
                   <div className="flex items-center justify-between mb-2">
                     <div>
                       <div className="text-sm font-bold text-slate-900">{s.materialName}</div>
@@ -476,7 +476,7 @@ export default function WarehousePage() {
               const st = SHIPMENT_STATUS[s.status];
               return (
                 <div key={s.id} className={`bg-white rounded-2xl border ${
-                  s.status === 'shipped' ? 'border-emerald-500/20 opacity-70' : 'border-slate-700/40'
+                  s.status === 'shipped' ? 'border-emerald-500/20 opacity-70' : 'border-slate-200'
                 } overflow-hidden`}>
                   <div className={`px-4 py-2.5 ${st.bg} flex items-center justify-between`}>
                     <div className="flex items-center gap-2">
