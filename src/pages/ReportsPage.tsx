@@ -682,7 +682,7 @@ function exportPDF(tasks: TaskRow[], inspections: InspectionLogRow[], rangeLabel
   </tr>`).join('');
   const inspRows = inspections.map(i => `<tr>
     <td>${fmtDateTime(i.timestamp)}</td><td>${i.areaLabel || i.areaId}</td>
-    <td>${i.inspectorName || '—'}</td><td>${i.status === 'ok' ? '✅ OK' : '⚠️ Závada'}</td>
+    <td>${i.inspectorName || '—'}</td><td>${i.status === 'ok' ? 'OK' : 'Závada'}</td>
     <td>${i.totalPoints || 0}</td><td>${i.okCount || 0}</td><td>${i.issueCount || 0}</td>
   </tr>`).join('');
 

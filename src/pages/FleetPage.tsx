@@ -17,7 +17,7 @@ import {
 } from '../components/EntityCard';
 import {
   ArrowLeft, X, Loader2, Car, Send, Clock, Plus,
-  AlertTriangle, CheckCircle2, Pencil, Droplets, Printer, PlusCircle, Save,
+  AlertTriangle, CheckCircle2, XCircle, Info, Pencil, Droplets, Printer, PlusCircle, Save,
   Download, Trash2, Upload,
 } from 'lucide-react';
 import { useReports } from '../hooks/useReports';
@@ -65,7 +65,10 @@ function ToastContainer({ toasts }: { toasts: ToastItem[] }) {
           t.type === 'error' ? 'bg-red-500 text-white' :
           'bg-blue-500 text-white'
         }`}>
-          {t.type === 'success' ? '✅ ' : t.type === 'error' ? '❌ ' : 'ℹ️ '}{t.text}
+          <span className="inline-flex items-center gap-2">
+            {t.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : t.type === 'error' ? <XCircle className="w-4 h-4" /> : <Info className="w-4 h-4" />}
+            {t.text}
+          </span>
         </div>
       ))}
     </div>
@@ -668,9 +671,9 @@ function HandoverForm({ entity, onSubmit, onCancel }: {
         className="w-full p-3 bg-white border border-slate-300 rounded-xl text-slate-950 placeholder-slate-400 outline-none focus:border-emerald-600 min-h-[48px]" />
       <div className="grid grid-cols-3 gap-2">
         {([
-          { id: 'ok' as const, label: 'OK ✅', c: 'bg-emerald-50 text-emerald-800 border-emerald-300' },
-          { id: 'minor' as const, label: 'Drobné ⚠️', c: 'bg-amber-50 text-amber-800 border-amber-300' },
-          { id: 'damage' as const, label: 'Poškození 🔴', c: 'bg-red-50 text-red-800 border-red-300' },
+          { id: 'ok' as const, label: 'OK', c: 'bg-emerald-50 text-emerald-800 border-emerald-300' },
+          { id: 'minor' as const, label: 'Drobné', c: 'bg-amber-50 text-amber-800 border-amber-300' },
+          { id: 'damage' as const, label: 'Poškození', c: 'bg-red-50 text-red-800 border-red-300' },
         ]).map((c) => (
           <button key={c.id} onClick={() => setCondition(c.id)}
             className={`py-2.5 rounded-xl text-xs font-medium border transition min-h-[44px] ${condition === c.id ? c.c : 'bg-white text-slate-700 border-slate-200'}`}>{c.label}</button>

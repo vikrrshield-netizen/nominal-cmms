@@ -10,7 +10,7 @@ import {
   Search, Plus, QrCode, Truck, X,
   CheckCircle2, TrendingDown, TrendingUp, Loader2,
   Download, Trash2, Upload, Cog, Printer, PackageCheck, ChevronRight,
-  Circle, Droplet, Filter, Link2, Package, Zap,
+  Circle, Droplet, Filter, Link2, Package, Zap, AlertTriangle, MapPin,
 } from 'lucide-react';
 import { useReports } from '../hooks/useReports';
 import { doc, deleteDoc } from 'firebase/firestore';
@@ -269,8 +269,8 @@ export default function InventoryPage() {
               <p className="text-sm font-medium text-slate-600">Náhradní díly</p>
             </div>
             {alertCount > 0 && (
-              <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full animate-pulse">
-                {alertCount} ⚠️
+              <span className="inline-flex items-center gap-1 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                <AlertTriangle className="w-3 h-3" /> {alertCount}
               </span>
             )}
           </div>
@@ -526,8 +526,8 @@ export default function InventoryPage() {
                         </span>
                       </div>
                       <h4 className="font-medium text-slate-950 truncate">{item.name}</h4>
-                      <div className="text-sm text-slate-600 mt-1">
-                        📍 {item.location}
+                      <div className="text-sm text-slate-600 mt-1 flex items-center gap-1">
+                        <MapPin className="w-3.5 h-3.5 text-slate-400" /> {item.location}
                       </div>
                     </div>
                     <div className={`text-right ${statusCfg.color}`}>
@@ -1004,7 +1004,7 @@ function ItemDetailModal({ item, onClose, canManage, onIssue, onReceive, assets,
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-slate-50 p-3 rounded-xl">
               <div className="text-sm text-slate-500 mb-1">Umístění</div>
-              <div className="font-medium">📍 {item.location}</div>
+              <div className="font-medium flex items-center gap-1"><MapPin className="w-3.5 h-3.5 text-slate-400" /> {item.location}</div>
             </div>
             {item.unitPrice && (
               <div className="bg-slate-50 p-3 rounded-xl">

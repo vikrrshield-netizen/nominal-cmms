@@ -299,7 +299,7 @@ export default function AIAssistantPage() {
           </button>
           
           <div className="flex items-center gap-3 flex-1">
-            <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-orange-500 rounded-2xl flex items-center justify-center shadow-lg shadow-amber-500/25">
+            <div className="w-12 h-12 bg-emerald-600 rounded-2xl flex items-center justify-center shadow-sm">
               <Sparkles className="w-6 h-6 text-white" />
             </div>
             <div>
@@ -424,7 +424,7 @@ export default function AIAssistantPage() {
 
         {isProcessing && (
           <div className="flex gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center">
               <Bot className="w-5 h-5 text-white" />
             </div>
             <div className="bg-white border border-slate-200 p-4 rounded-2xl">
@@ -491,7 +491,7 @@ export default function AIAssistantPage() {
           <button
             onClick={() => handleSend()}
             disabled={!input.trim() || isProcessing}
-            className="p-4 bg-gradient-to-r from-amber-400 to-orange-500 text-white rounded-2xl disabled:opacity-50 hover:shadow-lg transition"
+            className="p-4 bg-emerald-600 text-white rounded-2xl disabled:opacity-50 hover:shadow-lg transition"
           >
             <Send className="w-6 h-6" />
           </button>
