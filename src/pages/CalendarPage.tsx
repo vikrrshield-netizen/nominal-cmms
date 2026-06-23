@@ -13,9 +13,10 @@ import { normalizeEmployeeName, useEmployeeNames } from '../hooks/useEmployeeDir
 import {
   Calendar, ChevronLeft, ChevronRight, Plus,
   Clock, Wrench, AlertTriangle, CheckCircle2,
-  X, User, ArrowLeft, Loader2, Inbox, Users
+  X, User, ArrowLeft, Loader2, Users
 } from 'lucide-react';
 import type { VacationPlan, VacationPlanKind } from '../types/vacation';
+import BottomSheet, { FormFooter } from '../components/ui/BottomSheet';
 
 // ═══════════════════════════════════════════
 // TYPES
@@ -380,94 +381,78 @@ function BacklogPanel({
   });
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-end md:items-center justify-center" onClick={onClose}>
-      <div
-        className="bg-white rounded-t-3xl md:rounded-3xl w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-200">
-          <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-            <Inbox className="w-5 h-5 text-blue-700" />
-            Backlog ({sorted.length})
-          </h2>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Day selector */}
-        <div className="px-4 pt-3 pb-2">
-          <div className="text-xs text-slate-500 mb-2">Naplánovat na:</div>
-          <div className="flex gap-1.5">
-            {weekDays.slice(1, 6).map((day, i) => {
-              const dayIndex = i + 1;
-              const isToday = isSameDay(day, new Date());
-              return (
-                <button
-                  key={dayIndex}
-                  onClick={() => setSelectedDay(dayIndex)}
-                  className={`flex-1 py-2 rounded-lg text-xs font-semibold transition ${
-                    selectedDay === dayIndex
-                      ? 'bg-blue-600 text-white'
-                      : isToday
-                      ? 'bg-blue-500/15 text-blue-700 border border-blue-500/30'
-                      : 'bg-slate-50 text-slate-400 hover:bg-slate-100'
-                  }`}
-                >
-                  {DAY_SHORTS[day.getDay()]} {day.getDate()}.
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Task list */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-2">
-          {sorted.length === 0 ? (
-            <div className="text-center py-8 text-slate-500">
-              <CheckCircle2 className="w-10 h-10 mx-auto mb-2 text-emerald-500" />
-              <p className="text-sm">Backlog je prázdný!</p>
-            </div>
-          ) : (
-            sorted.map((task) => {
-              const pc = PRIORITY_CONFIG[task.priority] || PRIORITY_CONFIG.P3;
-              return (
-                <button
-                  key={task.id}
-                  onClick={() => onSchedule(task.id, weekDays[selectedDay])}
-                  className={`w-full p-3 rounded-xl border text-left transition active:scale-[0.97] ${pc.bg} ${pc.border} hover:ring-1 hover:ring-blue-500/50`}
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <span
-                      className="text-[10px] font-bold px-1 py-0.5 rounded"
-                      style={{ background: `${pc.color}20`, color: pc.color }}
-                    >
-                      {task.priority}
-                    </span>
-                    <span className="text-[13px] font-medium text-slate-900 truncate">{task.title}</span>
-                  </div>
-                  <div className="flex items-center gap-3 text-[10px] text-slate-500">
-                    {task.estimatedMinutes && (
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        {formatMinutes(task.estimatedMinutes)}
-                      </span>
-                    )}
-                    {task.assetName && (
-                      <span className="flex items-center gap-1">
-                        <Wrench className="w-3 h-3" />
-                        {task.assetName}
-                      </span>
-                    )}
-                  </div>
-                </button>
-              );
-            })
-          )}
+    <BottomSheet title={`Backlog (${sorted.length})`} isOpen onClose={onClose}>
+      {/* Day selector */}
+      <div className="mb-3">
+        <div className="text-xs text-slate-500 mb-2">Naplánovat na:</div>
+        <div className="flex gap-1.5">
+          {weekDays.slice(1, 6).map((day, i) => {
+            const dayIndex = i + 1;
+            const isToday = isSameDay(day, new Date());
+            return (
+              <button
+                key={dayIndex}
+                onClick={() => setSelectedDay(dayIndex)}
+                className={`flex-1 py-2 rounded-lg text-xs font-semibold transition ${
+                  selectedDay === dayIndex
+                    ? 'bg-blue-600 text-white'
+                    : isToday
+                    ? 'bg-blue-500/15 text-blue-700 border border-blue-500/30'
+                    : 'bg-slate-50 text-slate-400 hover:bg-slate-100'
+                }`}
+              >
+                {DAY_SHORTS[day.getDay()]} {day.getDate()}.
+              </button>
+            );
+          })}
         </div>
       </div>
-    </div>
+
+      {/* Task list */}
+      <div className="max-h-[55vh] space-y-2 overflow-y-auto">
+        {sorted.length === 0 ? (
+          <div className="text-center py-8 text-slate-500">
+            <CheckCircle2 className="w-10 h-10 mx-auto mb-2 text-emerald-500" />
+            <p className="text-sm">Backlog je prázdný!</p>
+          </div>
+        ) : (
+          sorted.map((task) => {
+            const pc = PRIORITY_CONFIG[task.priority] || PRIORITY_CONFIG.P3;
+            return (
+              <button
+                key={task.id}
+                onClick={() => onSchedule(task.id, weekDays[selectedDay])}
+                className={`w-full p-3 rounded-xl border text-left transition active:scale-[0.97] ${pc.bg} ${pc.border} hover:ring-1 hover:ring-blue-500/50`}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <span
+                    className="text-[10px] font-bold px-1 py-0.5 rounded"
+                    style={{ background: `${pc.color}20`, color: pc.color }}
+                  >
+                    {task.priority}
+                  </span>
+                  <span className="text-[13px] font-medium text-slate-900 truncate">{task.title}</span>
+                </div>
+                <div className="flex items-center gap-3 text-[10px] text-slate-500">
+                  {task.estimatedMinutes && (
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {formatMinutes(task.estimatedMinutes)}
+                    </span>
+                  )}
+                  {task.assetName && (
+                    <span className="flex items-center gap-1">
+                      <Wrench className="w-3 h-3" />
+                      {task.assetName}
+                    </span>
+                  )}
+                </div>
+              </button>
+            );
+          })
+        )}
+      </div>
+    </BottomSheet>
   );
 }
 
@@ -554,125 +539,103 @@ function VacationModal({
     .slice(0, 8);
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-end md:items-center justify-center" onClick={onClose}>
-      <div
-        className="bg-white rounded-t-3xl md:rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between p-4 border-b border-slate-200">
-          <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-            <Users className="w-5 h-5 text-emerald-300" />
-            Naplánovat dovolenou
-          </h2>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="p-4 space-y-3">
-          <label className="block relative">
-            <span className="text-xs font-bold text-slate-400">Kdo bude pryč</span>
-            <input
-              value={workerName}
-              onChange={(e) => {
-                setWorkerName(e.target.value);
-                setShowEmployeeOptions(true);
-              }}
-              onFocus={() => setShowEmployeeOptions(true)}
-              placeholder="např. Jan Novák"
-              className="mt-1 w-full rounded-xl bg-[#fbf9f4] border border-slate-200 px-3 py-3 text-slate-900 outline-none focus:border-emerald-400"
-            />
-            {showEmployeeOptions && filteredEmployees.length > 0 && (
-              <div className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
-                {filteredEmployees.map((name) => (
-                  <button
-                    key={name}
-                    type="button"
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => {
-                      setWorkerName(name);
-                      setShowEmployeeOptions(false);
-                    }}
-                    className="block w-full px-3 py-2 text-left text-sm font-semibold text-slate-100 hover:bg-emerald-500/15"
-                  >
-                    {name}
-                  </button>
-                ))}
-              </div>
-            )}
-            {workerName.trim() && !matchedEmployee && (
-              <div className="mt-1 text-xs text-amber-300">
-                Vyber zaměstnance z administrace. Nové jméno se zakládá jen v Administraci.
-              </div>
-            )}
-          </label>
-
-          <label className="block">
-            <span className="text-xs font-bold text-slate-400">Typ absence</span>
-            <select
-              value={kind}
-              onChange={(e) => setKind(e.target.value as VacationPlanKind)}
-              className="mt-1 w-full rounded-xl bg-[#fbf9f4] border border-slate-200 px-3 py-3 text-slate-900 outline-none focus:border-emerald-400"
-            >
-              {ABSENCE_KIND_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
+    <BottomSheet title="Naplánovat dovolenou" isOpen onClose={onClose}>
+      <div className="space-y-3">
+        <label className="block relative">
+          <span className="text-xs font-bold text-slate-500">Kdo bude pryč</span>
+          <input
+            value={workerName}
+            onChange={(e) => {
+              setWorkerName(e.target.value);
+              setShowEmployeeOptions(true);
+            }}
+            onFocus={() => setShowEmployeeOptions(true)}
+            placeholder="např. Jan Novák"
+            className="vik-input mt-1"
+          />
+          {showEmployeeOptions && filteredEmployees.length > 0 && (
+            <div className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+              {filteredEmployees.map((name) => (
+                <button
+                  key={name}
+                  type="button"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => {
+                    setWorkerName(name);
+                    setShowEmployeeOptions(false);
+                  }}
+                  className="block w-full px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-emerald-50"
+                >
+                  {name}
+                </button>
               ))}
-            </select>
-          </label>
+            </div>
+          )}
+          {workerName.trim() && !matchedEmployee && (
+            <div className="mt-1 text-xs text-amber-600">
+              Vyber zaměstnance z administrace. Nové jméno se zakládá jen v Administraci.
+            </div>
+          )}
+        </label>
 
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block">
-              <span className="text-xs font-bold text-slate-400">Od</span>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => {
-                  setStartDate(e.target.value);
-                  if (endDate < e.target.value) setEndDate(e.target.value);
-                }}
-                className="mt-1 w-full rounded-xl bg-[#fbf9f4] border border-slate-200 px-3 py-3 text-slate-900 outline-none focus:border-emerald-400"
-              />
-            </label>
-            <label className="block">
-              <span className="text-xs font-bold text-slate-400">Do</span>
-              <input
-                type="date"
-                value={endDate}
-                min={startDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="mt-1 w-full rounded-xl bg-[#fbf9f4] border border-slate-200 px-3 py-3 text-slate-900 outline-none focus:border-emerald-400"
-              />
-            </label>
-          </div>
+        <label className="block">
+          <span className="text-xs font-bold text-slate-500">Typ absence</span>
+          <select
+            value={kind}
+            onChange={(e) => setKind(e.target.value as VacationPlanKind)}
+            className="vik-input mt-1"
+          >
+            {ABSENCE_KIND_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+        </label>
 
+        <div className="grid grid-cols-2 gap-3">
           <label className="block">
-            <span className="text-xs font-bold text-slate-400">Poznámka</span>
-            <textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              rows={3}
-              placeholder="např. náhrada, směna, poznámka pro výrobu..."
-              className="mt-1 w-full rounded-xl bg-[#fbf9f4] border border-slate-200 px-3 py-3 text-slate-900 outline-none focus:border-emerald-400"
+            <span className="text-xs font-bold text-slate-500">Od</span>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => {
+                setStartDate(e.target.value);
+                if (endDate < e.target.value) setEndDate(e.target.value);
+              }}
+              className="vik-input mt-1"
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs font-bold text-slate-500">Do</span>
+            <input
+              type="date"
+              value={endDate}
+              min={startDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="vik-input mt-1"
             />
           </label>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 p-4 border-t border-slate-200">
-          <button type="button" onClick={onClose} className="min-h-12 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 font-bold">
-            Zrušit
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={!canSave}
-            className="min-h-12 rounded-xl bg-emerald-500 text-white font-bold disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
-            Uložit
-          </button>
-        </div>
+        <label className="block">
+          <span className="text-xs font-bold text-slate-500">Poznámka</span>
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            rows={3}
+            placeholder="např. náhrada, směna, poznámka pro výrobu..."
+            className="vik-input mt-1"
+          />
+        </label>
       </div>
-    </div>
+
+      <FormFooter
+        onCancel={onClose}
+        onSubmit={handleSave}
+        submitLabel="Uložit"
+        loading={saving}
+        disabled={!canSave}
+      />
+    </BottomSheet>
   );
 }
 
