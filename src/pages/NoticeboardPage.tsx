@@ -10,10 +10,11 @@ import {
 import { db } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
 import {
-  ArrowLeft, Pin, Send, Loader2, Trash2, X,
+  ArrowLeft, Pin, Send, Loader2, Trash2,
   MessageSquare, Shield, User, Users, Clock,
   RefreshCw, AlertTriangle,
 } from 'lucide-react';
+import BottomSheet, { FormFooter } from '../components/ui/BottomSheet';
 import { showToast } from '../components/ui/Toast';
 import MicButton from '../components/ui/MicButton';
 
@@ -458,183 +459,152 @@ export default function NoticeboardPage() {
 
       {/* ═══ NEW POST MODAL ═══ */}
       {showNew && (
-        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-end sm:items-center justify-center" onClick={() => setShowNew(false)}>
-          <div
-            className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-slate-200"
-            onClick={e => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-200">
-              <h2 className="text-xl font-bold text-slate-900">Nová zpráva</h2>
-              <button onClick={() => setShowNew(false)} className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-700 transition">
-                <X className="w-5 h-5" />
-              </button>
+        <BottomSheet title="Nová zpráva" isOpen onClose={() => setShowNew(false)}>
+          <div className="space-y-4">
+            {/* Category chips */}
+            <div>
+              <label className="block text-sm text-slate-600 font-medium mb-2">Kategorie</label>
+              <div className="grid grid-cols-4 gap-2">
+                {(Object.entries(CATEGORY_CONFIG) as [PostCategory, typeof CATEGORY_CONFIG[PostCategory]][]).map(([cat, cfg]) => (
+                  <button
+                    key={cat}
+                    onClick={() => setCategory(cat)}
+                    className={`py-2.5 rounded-xl text-xs font-semibold transition border flex flex-col items-center gap-1 ${
+                      category === cat
+                        ? `${cfg.bg} ${cfg.color} ${cfg.border}`
+                        : 'bg-white border border-slate-200 text-slate-500'
+                    }`}
+                  >
+                    <cfg.icon className="w-4 h-4" />
+                    {cfg.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div className="px-6 py-5 space-y-4">
-              {/* Category chips */}
-              <div>
-                <label className="block text-sm text-slate-400 font-medium mb-2">Kategorie</label>
-                <div className="grid grid-cols-4 gap-2">
-                  {(Object.entries(CATEGORY_CONFIG) as [PostCategory, typeof CATEGORY_CONFIG[PostCategory]][]).map(([cat, cfg]) => (
-                    <button
-                      key={cat}
-                      onClick={() => setCategory(cat)}
-                      className={`py-2.5 rounded-xl text-xs font-semibold transition border flex flex-col items-center gap-1 ${
-                        category === cat
-                          ? `${cfg.bg} ${cfg.color} ${cfg.border}`
-                          : 'bg-white border border-slate-200 text-slate-500'
-                      }`}
-                    >
-                      <cfg.icon className="w-4 h-4" />
-                      {cfg.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Recipient */}
-              <div>
-                <label className="block text-sm text-slate-400 font-medium mb-1.5">Pro koho</label>
-                <select
-                  value={recipientId}
-                  onChange={e => setRecipientId(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-[#fbf9f4] border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-emerald-600 transition"
-                  style={{ appearance: 'auto' }}
-                >
-                  <option value="all" className="bg-white">Všichni</option>
-                  {allUsers.filter(u => u.id !== uid).map(u => (
-                    <option key={u.id} value={u.id} className="bg-white">{u.displayName}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Content + Mic */}
-              <div>
-                <label className="block text-sm text-slate-400 font-medium mb-1.5">Zpráva</label>
-                <div className="flex gap-2 items-start">
-                  <textarea
-                    value={content}
-                    onChange={e => setContent(e.target.value)}
-                    placeholder="Napište zprávu pro tým..."
-                    rows={4}
-                    autoFocus
-                    className="flex-1 px-4 py-3 rounded-xl bg-[#fbf9f4] border border-slate-200 text-slate-900 text-sm placeholder-slate-400 focus:outline-none focus:border-emerald-600 transition resize-none"
-                  />
-                  <div className="pt-2">
-                    <MicButton onTranscript={t => setContent(prev => prev ? prev + ' ' + t : t)} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Submit */}
-              <button
-                onClick={handleSubmit}
-                disabled={!content.trim() || saving}
-                className="w-full py-3.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-2xl font-bold hover:from-blue-400 hover:to-blue-500 disabled:opacity-50 flex items-center justify-center gap-2 transition active:scale-[0.98]"
+            {/* Recipient */}
+            <div>
+              <label className="block text-sm text-slate-600 font-medium mb-1.5">Pro koho</label>
+              <select
+                value={recipientId}
+                onChange={e => setRecipientId(e.target.value)}
+                className="vik-input"
+                style={{ appearance: 'auto' }}
               >
-                {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
-                {saving ? 'Odesílám...' : 'Publikovat'}
-              </button>
+                <option value="all">Všichni</option>
+                {allUsers.filter(u => u.id !== uid).map(u => (
+                  <option key={u.id} value={u.id}>{u.displayName}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Content + Mic */}
+            <div>
+              <label className="block text-sm text-slate-600 font-medium mb-1.5">Zpráva</label>
+              <div className="flex gap-2 items-start">
+                <textarea
+                  value={content}
+                  onChange={e => setContent(e.target.value)}
+                  placeholder="Napište zprávu pro tým..."
+                  rows={4}
+                  autoFocus
+                  className="vik-input resize-none"
+                />
+                <div className="pt-2">
+                  <MicButton onTranscript={t => setContent(prev => prev ? prev + ' ' + t : t)} />
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+
+          <FormFooter
+            onCancel={() => setShowNew(false)}
+            onSubmit={handleSubmit}
+            submitLabel="Publikovat"
+            loading={saving}
+            disabled={!content.trim() || saving}
+            color="blue"
+          />
+        </BottomSheet>
       )}
 
       {/* ═══ SHIFT HANDOVER MODAL ═══ */}
       {showShift && (
-        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-end sm:items-center justify-center" onClick={() => setShowShift(false)}>
-          <div
-            className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-slate-200"
-            onClick={e => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-200">
-              <div className="flex items-center gap-2">
-                <RefreshCw className="w-5 h-5 text-amber-400" />
-                <h2 className="text-xl font-bold text-slate-900">Předat směnu</h2>
+        <BottomSheet title="Předat směnu" isOpen onClose={() => setShowShift(false)}>
+          <div className="space-y-4">
+            {/* Shift preset */}
+            <div>
+              <label className="block text-sm text-slate-600 font-medium mb-2">Typ předání</label>
+              <div className="grid grid-cols-3 gap-2">
+                {SHIFT_PRESETS.map((preset, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setShiftPreset(i)}
+                    className={`py-3 rounded-xl text-xs font-semibold transition border text-center ${
+                      shiftPreset === i
+                        ? 'bg-amber-50 border-amber-300 text-amber-700'
+                        : 'bg-white border border-slate-200 text-slate-500'
+                    }`}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
               </div>
-              <button onClick={() => setShowShift(false)} className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-700 transition">
-                <X className="w-5 h-5" />
-              </button>
             </div>
 
-            <div className="px-6 py-5 space-y-4">
-              {/* Shift preset */}
-              <div>
-                <label className="block text-sm text-slate-400 font-medium mb-2">Typ předání</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {SHIFT_PRESETS.map((preset, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setShiftPreset(i)}
-                      className={`py-3 rounded-xl text-xs font-semibold transition border text-center ${
-                        shiftPreset === i
-                          ? 'bg-amber-500/20 border-amber-500/30 text-amber-400'
-                          : 'bg-white border border-slate-200 text-slate-500'
-                      }`}
-                    >
-                      {preset.label}
-                    </button>
+            {/* P1 summary — auto-fetched */}
+            <div>
+              <label className="block text-sm text-slate-600 font-medium mb-2 flex items-center gap-1.5">
+                <AlertTriangle className="w-4 h-4 text-red-600" />
+                P1 úkoly dokončené dnes
+              </label>
+              {shiftLoading ? (
+                <div className="flex items-center gap-2 py-4 text-slate-500 text-sm">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Načítám P1 úkoly...
+                </div>
+              ) : shiftP1.length === 0 ? (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-sm text-emerald-700">
+                  Žádné P1 havárie za tuto směnu
+                </div>
+              ) : (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-3 space-y-1.5">
+                  {shiftP1.map((task, i) => (
+                    <div key={i} className="flex items-center gap-2 text-sm">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" />
+                      <span className="text-red-700">{task}</span>
+                    </div>
                   ))}
                 </div>
-              </div>
+              )}
+            </div>
 
-              {/* P1 summary — auto-fetched */}
-              <div>
-                <label className="block text-sm text-slate-400 font-medium mb-2 flex items-center gap-1.5">
-                  <AlertTriangle className="w-4 h-4 text-red-400" />
-                  P1 úkoly dokončené dnes
-                </label>
-                {shiftLoading ? (
-                  <div className="flex items-center gap-2 py-4 text-slate-500 text-sm">
-                    <Loader2 className="w-4 h-4 animate-spin" /> Načítám P1 úkoly...
-                  </div>
-                ) : shiftP1.length === 0 ? (
-                  <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 text-sm text-emerald-400">
-                    Žádné P1 havárie za tuto směnu
-                  </div>
-                ) : (
-                  <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 space-y-1.5">
-                    {shiftP1.map((task, i) => (
-                      <div key={i} className="flex items-center gap-2 text-sm">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0" />
-                        <span className="text-red-300">{task}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Notes + Mic */}
-              <div>
-                <label className="block text-sm text-slate-400 font-medium mb-1.5">Poznámky k předání</label>
-                <div className="flex gap-2 items-start">
-                  <textarea
-                    value={shiftNotes}
-                    onChange={e => setShiftNotes(e.target.value)}
-                    placeholder="Co je potřeba vědět pro další směnu..."
-                    rows={4}
-                    className="flex-1 px-4 py-3 rounded-xl bg-[#fbf9f4] border border-slate-200 text-slate-900 text-sm placeholder-slate-400 focus:outline-none focus:border-emerald-600 transition resize-none"
-                  />
-                  <div className="pt-2">
-                    <MicButton onTranscript={t => setShiftNotes(prev => prev ? prev + ' ' + t : t)} />
-                  </div>
+            {/* Notes + Mic */}
+            <div>
+              <label className="block text-sm text-slate-600 font-medium mb-1.5">Poznámky k předání</label>
+              <div className="flex gap-2 items-start">
+                <textarea
+                  value={shiftNotes}
+                  onChange={e => setShiftNotes(e.target.value)}
+                  placeholder="Co je potřeba vědět pro další směnu..."
+                  rows={4}
+                  className="vik-input resize-none"
+                />
+                <div className="pt-2">
+                  <MicButton onTranscript={t => setShiftNotes(prev => prev ? prev + ' ' + t : t)} />
                 </div>
               </div>
-
-              {/* Submit */}
-              <button
-                onClick={handleShiftSubmit}
-                disabled={shiftSaving || shiftLoading}
-                className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-2xl font-bold hover:from-amber-400 hover:to-orange-400 disabled:opacity-50 flex items-center justify-center gap-2 transition active:scale-[0.98]"
-              >
-                {shiftSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <RefreshCw className="w-5 h-5" />}
-                {shiftSaving ? 'Ukládám...' : `Předat: ${SHIFT_PRESETS[shiftPreset].label}`}
-              </button>
             </div>
           </div>
-        </div>
+
+          <FormFooter
+            onCancel={() => setShowShift(false)}
+            onSubmit={handleShiftSubmit}
+            submitLabel={`Předat: ${SHIFT_PRESETS[shiftPreset].label}`}
+            loading={shiftSaving}
+            disabled={shiftSaving || shiftLoading}
+            color="orange"
+          />
+        </BottomSheet>
       )}
     </div>
   );
