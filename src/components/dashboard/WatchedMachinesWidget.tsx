@@ -9,18 +9,12 @@ import { useAuthContext } from '../../context/AuthContext';
 import { assetService } from '../../services/assetService';
 import type { Asset } from '../../types/asset';
 import {
-  type MonitoringStatus,
+  STATUS_TONE as TONE,
   machineMonitoringStatus,
   machineCondition,
   conditionTone,
 } from '../../types/monitoring';
 import { useWatchedAssets } from '../../hooks/useWatchedAssets';
-
-const TONE: Record<MonitoringStatus, { dot: string; text: string; soft: string }> = {
-  ok: { dot: '#22c55e', text: '#16a34a', soft: '#f0fdf4' },
-  warn: { dot: '#eab308', text: '#d97706', soft: '#fffbeb' },
-  crit: { dot: '#ef4444', text: '#dc2626', soft: '#fef2f2' },
-};
 
 export default function WatchedMachinesWidget({ onNavigate }: { onNavigate: (path: string) => void }) {
   const { user } = useAuthContext();

@@ -47,7 +47,14 @@ export const MONITORING_STATUS_CONFIG: Record<
   crit: { label: 'Mimo limit', tone: 'crit' },
 };
 
-const RANK: Record<MonitoringStatus, number> = { ok: 0, warn: 1, crit: 2 };
+// Sdílené barevné tóny stavů pro celé UI monitoringu (skladba, velín, linky, dashboard).
+export const STATUS_TONE: Record<MonitoringStatus, { dot: string; text: string; soft: string }> = {
+  ok: { dot: '#22c55e', text: '#16a34a', soft: '#dcfce7' },
+  warn: { dot: '#eab308', text: '#d97706', soft: '#fef3c7' },
+  crit: { dot: '#ef4444', text: '#dc2626', soft: '#fee2e2' },
+};
+
+export const RANK: Record<MonitoringStatus, number> = { ok: 0, warn: 1, crit: 2 };
 
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 
@@ -109,6 +116,16 @@ export function conditionTone(condition: number): MonitoringStatus {
   if (condition >= 85) return 'ok';
   if (condition >= 60) return 'warn';
   return 'crit';
+}
+
+// Dní bez poruchy = dní od poslední položky v servisním logu (repairLog). Bez záznamu → null.
+export function daysSinceLastRepair(repairLog?: { date?: string }[]): number | null {
+  const dates = (repairLog ?? []).map((r) => r.date).filter(Boolean).sort();
+  if (!dates.length) return null;
+  const last = new Date(dates[dates.length - 1] as string);
+  if (Number.isNaN(last.getTime())) return null;
+  const diff = Math.floor((Date.now() - last.getTime()) / 86400000);
+  return diff >= 0 ? diff : null;
 }
 
 // Počty veličin podle stavu (pro KPI / souhrnný pruh).

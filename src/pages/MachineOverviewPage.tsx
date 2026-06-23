@@ -11,9 +11,13 @@ import type { Asset } from '../types/asset';
 import {
   MONITORING_STATUS_CONFIG,
   type MonitoringStatus,
+  STATUS_TONE as TONE,
+  RANK,
   machineMonitoringStatus,
   machineCondition,
   conditionTone,
+  componentStatus,
+  daysSinceLastRepair,
   allParams,
   paramStatus,
 } from '../types/monitoring';
@@ -21,26 +25,10 @@ import { isLineAsset } from '../lib/lines';
 import StrojeLinkyTabs from '../components/StrojeLinkyTabs';
 import { useWatchedAssets } from '../hooks/useWatchedAssets';
 
-const TONE: Record<MonitoringStatus, { dot: string; text: string; soft: string; border: string }> = {
-  ok: { dot: '#22c55e', text: '#16a34a', soft: '#f0fdf4', border: '#bbf7d0' },
-  warn: { dot: '#eab308', text: '#d97706', soft: '#fffbeb', border: '#fde68a' },
-  crit: { dot: '#ef4444', text: '#dc2626', soft: '#fef2f2', border: '#fecaca' },
-};
-const RANK: Record<MonitoringStatus, number> = { ok: 0, warn: 1, crit: 2 };
-
 const fmt = (v: number): string => {
   const r = Math.round(v * 100) / 100;
   return Number.isInteger(r) ? String(r) : String(r).replace('.', ',');
 };
-
-function daysSinceLastRepair(a: Asset): number | null {
-  const dates = (a.repairLog ?? []).map((r) => r.date).filter(Boolean).sort();
-  if (!dates.length) return null;
-  const last = new Date(dates[dates.length - 1]);
-  if (Number.isNaN(last.getTime())) return null;
-  const diff = Math.floor((Date.now() - last.getTime()) / 86400000);
-  return diff >= 0 ? diff : null;
-}
 
 const STATUS_KPI: { key: MonitoringStatus; label: string; hint: string }[] = [
   { key: 'ok', label: 'V provozu', hint: 'stabilní, v limitu' },
@@ -141,7 +129,7 @@ export default function MachineOverviewPage() {
             const status = machineMonitoringStatus(m.components);
             const cond = machineCondition(m.components);
             const condTone = conditionTone(cond);
-            const days = daysSinceLastRepair(m);
+            const days = daysSinceLastRepair(m.repairLog);
             const measured = allParams(m.components)
               .filter((p) => p.value != null)
               .sort((a, b) => RANK[paramStatus(b)] - RANK[paramStatus(a)]);
@@ -213,10 +201,7 @@ export default function MachineOverviewPage() {
                 {(m.components?.length ?? 0) > 0 && (
                   <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 pt-3 border-t border-slate-100">
                     {(m.components ?? []).map((comp) => {
-                      const cs = allParams([comp]).reduce<MonitoringStatus>((acc, p) => {
-                        const s = paramStatus(p);
-                        return RANK[s] > RANK[acc] ? s : acc;
-                      }, 'ok');
+                      const cs = componentStatus(comp);
                       return (
                         <span key={comp.id} className="inline-flex items-center gap-1.5 text-[12px] text-slate-600">
                           <span style={{ width: 7, height: 7, borderRadius: '50%', background: TONE[cs].dot }} />

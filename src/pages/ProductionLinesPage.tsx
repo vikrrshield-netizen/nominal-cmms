@@ -11,19 +11,14 @@ import type { Asset } from '../types/asset';
 import {
   MONITORING_STATUS_CONFIG,
   type MonitoringStatus,
+  STATUS_TONE as TONE,
   machineMonitoringStatus,
+  worstStatus,
 } from '../types/monitoring';
 import { LINE_ENTITY_TYPE, isLineAsset, isLineMachineCandidate } from '../lib/lines';
 import BottomSheet, { FormField, FormFooter } from '../components/ui/BottomSheet';
 import { showToast } from '../components/ui/Toast';
 import StrojeLinkyTabs from '../components/StrojeLinkyTabs';
-
-const TONE: Record<MonitoringStatus, { dot: string; text: string; soft: string }> = {
-  ok: { dot: '#22c55e', text: '#16a34a', soft: '#f0fdf4' },
-  warn: { dot: '#eab308', text: '#d97706', soft: '#fffbeb' },
-  crit: { dot: '#ef4444', text: '#dc2626', soft: '#fef2f2' },
-};
-const RANK: Record<MonitoringStatus, number> = { ok: 0, warn: 1, crit: 2 };
 
 const INPUT_CLASS =
   'w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-300 text-slate-950 text-[15px] placeholder-slate-400 focus:outline-none focus:border-emerald-600 focus:bg-white focus:ring-2 focus:ring-emerald-600/15 transition min-h-[48px]';
@@ -74,16 +69,13 @@ export default function ProductionLinesPage() {
     [assets],
   );
 
-  const lineStatus = (line: Asset): MonitoringStatus => {
-    let worst: MonitoringStatus = 'ok';
-    for (const id of line.lineMachineIds ?? []) {
-      const m = byId.get(id);
-      if (!m) continue;
-      const s = machineMonitoringStatus(m.components);
-      if (RANK[s] > RANK[worst]) worst = s;
-    }
-    return worst;
-  };
+  const lineStatus = (line: Asset): MonitoringStatus =>
+    worstStatus(
+      (line.lineMachineIds ?? [])
+        .map((id) => byId.get(id))
+        .filter((m): m is Asset => !!m)
+        .map((m) => machineMonitoringStatus(m.components)),
+    );
 
   const counts = useMemo(() => {
     const c: Record<MonitoringStatus, number> = { ok: 0, warn: 0, crit: 0 };

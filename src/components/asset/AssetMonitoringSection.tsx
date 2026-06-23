@@ -15,7 +15,6 @@ import { showToast } from '../ui/Toast';
 import {
   type AssetComponent,
   type MonitoredParam,
-  type MonitoringStatus,
   type ParamDirection,
   type ParamSource,
   type MeasurementInterval,
@@ -28,6 +27,8 @@ import {
   machineMonitoringStatus,
   machineCondition,
   conditionTone,
+  daysSinceLastRepair,
+  STATUS_TONE as TONE,
   componentFromPreset,
   newMonitoringId,
   upsertComponent,
@@ -46,12 +47,6 @@ interface Props {
   onReportFault?: () => void;
   onCreateTask?: () => void;
 }
-
-const TONE: Record<MonitoringStatus, { dot: string; text: string; soft: string }> = {
-  ok: { dot: '#22c55e', text: '#16a34a', soft: '#dcfce7' },
-  warn: { dot: '#eab308', text: '#d97706', soft: '#fef3c7' },
-  crit: { dot: '#ef4444', text: '#dc2626', soft: '#fee2e2' },
-};
 
 const parseNum = (s: string): number | null => {
   const n = Number(String(s).replace(',', '.'));
@@ -118,14 +113,7 @@ export default function AssetMonitoringSection({ asset, tenantId, canEdit, onCha
   const condTone = conditionTone(cond);
   const mStatus = machineMonitoringStatus(components);
 
-  const daysSinceLastRepair = (() => {
-    const dates = (asset.repairLog ?? []).map((r) => r.date).filter(Boolean).sort();
-    if (!dates.length) return null;
-    const last = new Date(dates[dates.length - 1]);
-    if (Number.isNaN(last.getTime())) return null;
-    const diff = Math.floor((Date.now() - last.getTime()) / 86400000);
-    return diff >= 0 ? diff : null;
-  })();
+  const repairDays = daysSinceLastRepair(asset.repairLog);
 
   const serviceTrail = [...(asset.repairLog ?? [])]
     .filter((r) => r.date || r.description)
@@ -192,13 +180,19 @@ export default function AssetMonitoringSection({ asset, tenantId, canEdit, onCha
     const comp = components.find((c) => c.id === paramSheet.componentId);
     if (!comp) return;
     const prev = paramSheet.id ? comp.params.find((p) => p.id === paramSheet.id) : null;
+    const warnN = parseNum(paramSheet.warn);
+    const critN = parseNum(paramSheet.crit);
+    if (warnN != null && critN != null && ((paramSheet.dir === 'high' && warnN > critN) || (paramSheet.dir === 'low' && warnN < critN))) {
+      showToast(paramSheet.dir === 'high' ? 'Práh „sledovat" musí být nižší než „mimo limit".' : 'Práh „sledovat" musí být vyšší než „mimo limit".', 'error');
+      return;
+    }
     let param: MonitoredParam = {
       id: prev?.id ?? newMonitoringId('par'),
       label,
       unit: paramSheet.unit.trim(),
       value: prev?.value ?? null,
-      warn: parseNum(paramSheet.warn),
-      crit: parseNum(paramSheet.crit),
+      warn: warnN,
+      crit: critN,
       dir: paramSheet.dir,
       source: paramSheet.source,
       interval: paramSheet.source === 'manual' ? ((paramSheet.interval as MeasurementInterval) || null) : null,
@@ -266,20 +260,22 @@ export default function AssetMonitoringSection({ asset, tenantId, canEdit, onCha
 
   const openPicker = async () => {
     setPickerOpen(true);
-    if (pickerAssets.length === 0) {
-      setPickerLoading(true);
-      try {
-        setPickerAssets(await assetService.getAll(tenantId));
-      } catch (err) {
-        console.error('[Monitoring] picker load error:', err);
-      } finally {
-        setPickerLoading(false);
-      }
+    setPickerLoading(true);
+    try {
+      setPickerAssets(await assetService.getAll(tenantId));
+    } catch (err) {
+      console.error('[Monitoring] picker load error:', err);
+    } finally {
+      setPickerLoading(false);
     }
   };
 
   // Připojí EXISTUJÍCÍ asset z kartotéky jako komponentu (odkaz, ne kopie).
   const createFromAsset = async (a: Asset) => {
+    if (components.some((c) => c.linkedAssetId === a.id)) {
+      showToast('Tohle zařízení už je připojené', 'error');
+      return;
+    }
     const preset = isGearboxAsset(a) ? COMPONENT_TYPE_PRESETS.find((p) => p.id === 'gearbox') : undefined;
     const base: AssetComponent = preset
       ? componentFromPreset(preset, a.name)
@@ -287,9 +283,9 @@ export default function AssetMonitoringSection({ asset, tenantId, canEdit, onCha
     const created: AssetComponent = {
       ...base,
       name: a.name,
-      code: a.code || undefined,
-      maker: a.manufacturer || undefined,
-      serial: a.serialNumber || undefined,
+      code: a.code?.trim() || undefined,
+      maker: a.manufacturer?.trim() || undefined,
+      serial: a.serialNumber?.trim() || undefined,
       linkedAssetId: a.id,
       linkedAssetName: a.name,
     };
@@ -433,8 +429,8 @@ export default function AssetMonitoringSection({ asset, tenantId, canEdit, onCha
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: TONE[mStatus].dot }} />
               {MONITORING_STATUS_CONFIG[mStatus].label}
             </div>
-            {daysSinceLastRepair != null && (
-              <div style={{ fontSize: 12, color: '#64748b', marginTop: 6 }}>{daysSinceLastRepair} dní bez poruchy</div>
+            {repairDays != null && (
+              <div style={{ fontSize: 12, color: '#64748b', marginTop: 6 }}>{repairDays} dní bez poruchy</div>
             )}
           </div>
 
