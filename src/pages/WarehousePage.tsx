@@ -9,6 +9,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
+import { useTenantSettings } from '../hooks/useTenantSettings';
 import {
   ArrowLeft, Loader2, Plus, X, Package, TruckIcon,
   Warehouse, CheckCircle2, ArrowDownToLine, Boxes, ArrowUpFromLine,
@@ -177,6 +178,12 @@ export default function WarehousePage() {
   const canView = hasPermission('warehouse.view') || hasPermission('warehouse.manage');
   const canManage = hasPermission('warehouse.manage');
 
+  // Záložní minimum z nastavení modulu (Nastavení → Sklad výroby). Použije se
+  // u položek, které nemají vlastní minimum (minQuantity = 0), aby se hlídaly taky.
+  const { tenants } = useTenantSettings();
+  const defaultMin = (tenants.find((t) => t.id === user?.tenantId) ?? tenants[0])?.moduleConfig?.warehouse?.lowStockThreshold ?? 0;
+  const effectiveMin = (minQuantity: number) => (minQuantity > 0 ? minQuantity : defaultMin);
+
   const [activeTab, setActiveTab] = useState<WarehouseTab>('zasoby');
 
   // Data
@@ -199,9 +206,10 @@ export default function WarehousePage() {
   const stockStats = useMemo(() => ({
     totalRaw: stock.filter(s => s.category === 'raw').reduce((a, s) => a + s.quantity, 0),
     totalFinished: stock.filter(s => s.category === 'finished').reduce((a, s) => a + s.quantity, 0),
-    lowStock: stock.filter(s => s.quantity <= s.minQuantity && s.minQuantity > 0).length,
+    lowStock: stock.filter(s => { const m = effectiveMin(s.minQuantity); return m > 0 && s.quantity <= m; }).length,
     pendingReceipts: receipts.filter(r => r.status === 'pending').length,
-  }), [stock, receipts]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [stock, receipts, defaultMin]);
 
   if (!canView) {
     return (
@@ -424,7 +432,9 @@ export default function WarehousePage() {
           <>
             {stock.length === 0 && <EmptyState icon={<Boxes className="w-14 h-14 text-slate-600" />} text="Žádné zásoby" sub="Přidejte položky skladu" />}
             {stock.map(s => {
-              const isLow = s.minQuantity > 0 && s.quantity <= s.minQuantity;
+              const itemMin = effectiveMin(s.minQuantity);
+              const usesDefaultMin = s.minQuantity <= 0 && defaultMin > 0;
+              const isLow = itemMin > 0 && s.quantity <= itemMin;
               const cat = STOCK_CATEGORIES[s.category] || STOCK_CATEGORIES.raw;
               return (
                 <div key={s.id} className={`bg-white rounded-2xl border ${isLow ? 'border-red-500/30 ring-1 ring-red-500/20' : 'border-slate-700/40'} p-4`}>
@@ -435,8 +445,10 @@ export default function WarehousePage() {
                     </div>
                     <div className="text-right">
                       <div className={`text-lg font-bold ${isLow ? 'text-red-700' : 'text-slate-900'}`}>{s.quantity} {s.unit}</div>
-                      {s.minQuantity > 0 && (
-                        <div className="text-[10px] text-slate-500">min: {s.minQuantity} {s.unit}</div>
+                      {itemMin > 0 && (
+                        <div className="text-[10px] text-slate-500">
+                          min: {itemMin} {s.unit}{usesDefaultMin && <span className="text-slate-400"> (výchozí)</span>}
+                        </div>
                       )}
                     </div>
                   </div>
