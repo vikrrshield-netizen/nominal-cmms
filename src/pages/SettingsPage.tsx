@@ -1,13 +1,16 @@
 // src/pages/SettingsPage.tsx
 // Nominal CMMS — Module-specific settings (Nastavení)
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useBackNavigation } from '../hooks/useBackNavigation';
 import {
   ArrowLeft, Settings2, Package, Factory, Truck,
   ClipboardCheck, BarChart3, Users,
 } from 'lucide-react';
 import { useAuthContext } from '../context/AuthContext';
+import { useTenantSettings } from '../hooks/useTenantSettings';
+import { showToast } from '../components/ui/Toast';
+import type { TenantModuleConfig } from '../types/tenant';
 
 // ═══════════════════════════════════════════════════════
 // SETTINGS TAB DEFINITIONS
@@ -31,10 +34,17 @@ const SETTINGS_TABS: SettingsTab[] = [
   { id: 'shifts', label: 'Směny', icon: Users, color: 'text-slate-400', module: 'shifts' },
 ];
 
+interface SectionProps {
+  cfg: TenantModuleConfig;
+  canManage: boolean;
+  save: (patch: TenantModuleConfig) => Promise<void>;
+}
+
 // ═══════════════════════════════════════════════════════
 // SETTINGS CONTENT COMPONENTS
 // ═══════════════════════════════════════════════════════
 
+/** Placeholder karta pro konfiguraci, kterou teprve dokončujeme. */
 function SettingsCard({ title, description, children }: { title: string; description: string; children?: React.ReactNode }) {
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-4">
@@ -51,6 +61,77 @@ function SettingsCard({ title, description, children }: { title: string; descrip
         <div className="text-xs text-slate-400 py-3 px-3 text-center border border-dashed border-slate-200 rounded-xl bg-[#fbf9f4]">
           Tuto konfiguraci dokončujeme — brzy půjde nastavit přímo tady.
         </div>
+      )}
+    </div>
+  );
+}
+
+/** Funkční číselné nastavení — uloží hodnotu do tenant_settings.moduleConfig. */
+function NumberSetting({
+  title, description, value, unit, placeholder, disabled, onSave,
+}: {
+  title: string;
+  description: string;
+  value: number | undefined;
+  unit?: string;
+  placeholder?: string;
+  disabled?: boolean;
+  onSave: (val: number) => Promise<void>;
+}) {
+  const [raw, setRaw] = useState(value != null ? String(value) : '');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { setRaw(value != null ? String(value) : ''); }, [value]);
+
+  const trimmed = raw.trim();
+  const parsed = trimmed === '' ? undefined : Number(trimmed);
+  const invalid = trimmed !== '' && (Number.isNaN(parsed) || (parsed as number) < 0);
+  const canSave = !disabled && !saving && !invalid && parsed !== undefined && parsed !== value;
+
+  const handleSave = async () => {
+    if (!canSave || parsed === undefined) return;
+    setSaving(true);
+    try {
+      await onSave(parsed);
+      showToast('Nastavení uloženo', 'success');
+    } catch {
+      showToast('Uložení se nezdařilo', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 p-4">
+      <h3 className="text-sm font-bold text-slate-900 mb-1">{title}</h3>
+      <p className="text-xs text-slate-500 mb-3">{description}</p>
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <input
+            type="number"
+            min={0}
+            inputMode="numeric"
+            value={raw}
+            placeholder={placeholder}
+            disabled={disabled || saving}
+            onChange={(e) => setRaw(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleSave(); }}
+            className="w-full px-3 py-2 bg-[#fbf9f4] border border-slate-200 rounded-lg text-slate-900 text-sm outline-none focus:border-emerald-400 disabled:opacity-60"
+          />
+          {unit && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">{unit}</span>}
+        </div>
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={!canSave}
+          className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+        >
+          {saving ? 'Ukládám…' : 'Uložit'}
+        </button>
+      </div>
+      {invalid && <p className="text-xs text-red-600 mt-1.5">Zadej nezáporné číslo.</p>}
+      {!disabled && value != null && !invalid && parsed === value && (
+        <p className="text-xs text-emerald-700 mt-1.5">Uloženo: {value}{unit ? ` ${unit}` : ''}</p>
       )}
     </div>
   );
@@ -79,7 +160,7 @@ function GeneralSettings() {
   );
 }
 
-function WarehouseSettings() {
+function WarehouseSettings({ cfg, canManage, save }: SectionProps) {
   return (
     <div className="space-y-4">
       <SettingsCard title="Kategorie materiálu" description="Typy materiálu pro příjem a evidenci">
@@ -89,7 +170,15 @@ function WarehouseSettings() {
           ))}
         </div>
       </SettingsCard>
-      <SettingsCard title="Upozornění na nízký stav" description="Práh pro automatické upozornění při nízkých zásobách" />
+      <NumberSetting
+        title="Upozornění na nízký stav"
+        description="Práh pro automatické upozornění při nízkých zásobách (v základních jednotkách)."
+        value={cfg.warehouse?.lowStockThreshold}
+        unit="ks"
+        placeholder="např. 10"
+        disabled={!canManage}
+        onSave={(v) => save({ warehouse: { lowStockThreshold: v } })}
+      />
       <SettingsCard title="Dodavatelé" description="Seznam schválených dodavatelů pro příjem materiálu" />
     </div>
   );
@@ -111,10 +200,18 @@ function ProductionSettings() {
   );
 }
 
-function FleetSettings() {
+function FleetSettings({ cfg, canManage, save }: SectionProps) {
   return (
     <div className="space-y-4">
-      <SettingsCard title="Intervaly servisu" description="Automatické upozornění na servis podle km/mth" />
+      <NumberSetting
+        title="Interval servisu"
+        description="Po kolika kilometrech upozornit na servis vozidla."
+        value={cfg.fleet?.serviceIntervalKm}
+        unit="km"
+        placeholder="např. 15000"
+        disabled={!canManage}
+        onSave={(v) => save({ fleet: { serviceIntervalKm: v } })}
+      />
       <SettingsCard title="Kategorie vozidel" description="Typy vozidel ve vozovém parku" />
     </div>
   );
@@ -129,16 +226,33 @@ function InspectionSettings() {
   );
 }
 
-function ReportSettings() {
+function ReportSettings({ cfg, canManage, save }: SectionProps) {
   return (
     <div className="space-y-4">
       <SettingsCard title="Automatické reporty" description="Nastavení pravidelných emailových reportů" />
-      <SettingsCard title="KPI prahy" description="Cílové hodnoty pro MTBF, MTTR a další metriky" />
+      <NumberSetting
+        title="Cíl MTBF"
+        description="Cílová střední doba mezi poruchami (Mean Time Between Failures)."
+        value={cfg.reports?.mtbfTargetHours}
+        unit="h"
+        placeholder="např. 720"
+        disabled={!canManage}
+        onSave={(v) => save({ reports: { mtbfTargetHours: v } })}
+      />
+      <NumberSetting
+        title="Cíl MTTR"
+        description="Cílová střední doba opravy (Mean Time To Repair)."
+        value={cfg.reports?.mttrTargetHours}
+        unit="h"
+        placeholder="např. 4"
+        disabled={!canManage}
+        onSave={(v) => save({ reports: { mttrTargetHours: v } })}
+      />
     </div>
   );
 }
 
-function ShiftSettings() {
+function ShiftSettings({ cfg, canManage, save }: SectionProps) {
   return (
     <div className="space-y-4">
       <SettingsCard title="Typy směn" description="Definice směnového režimu">
@@ -148,20 +262,18 @@ function ShiftSettings() {
           ))}
         </div>
       </SettingsCard>
-      <SettingsCard title="Minimální obsazení" description="Požadovaný počet techniků na směnu" />
+      <NumberSetting
+        title="Minimální obsazení"
+        description="Požadovaný počet techniků na jednu směnu."
+        value={cfg.shifts?.minStaffing}
+        unit="os."
+        placeholder="např. 2"
+        disabled={!canManage}
+        onSave={(v) => save({ shifts: { minStaffing: v } })}
+      />
     </div>
   );
 }
-
-const TAB_CONTENT: Record<string, () => React.ReactElement> = {
-  general: GeneralSettings,
-  warehouse: WarehouseSettings,
-  production: ProductionSettings,
-  fleet: FleetSettings,
-  inspections: InspectionSettings,
-  reports: ReportSettings,
-  shifts: ShiftSettings,
-};
 
 // ═══════════════════════════════════════════════════════
 // MAIN PAGE
@@ -169,10 +281,20 @@ const TAB_CONTENT: Record<string, () => React.ReactElement> = {
 
 export default function SettingsPage() {
   const goBack = useBackNavigation('/');
-  const { hasPermission } = useAuthContext();
+  const { hasPermission, user } = useAuthContext();
+  const { tenants, updateModuleConfig } = useTenantSettings();
   const [activeTab, setActiveTab] = useState('general');
 
   const canView = hasPermission('admin.view') || hasPermission('admin.manage');
+  const canManage = hasPermission('admin.manage');
+
+  const tenant = tenants.find((t) => t.id === user?.tenantId) ?? tenants[0];
+  const cfg: TenantModuleConfig = tenant?.moduleConfig ?? {};
+
+  const save = async (patch: TenantModuleConfig) => {
+    if (!tenant) throw new Error('Tenant není dostupný');
+    await updateModuleConfig(tenant.id, patch, user?.displayName || 'Neznámý', tenant.name);
+  };
 
   if (!canView) {
     return (
@@ -187,7 +309,19 @@ export default function SettingsPage() {
     );
   }
 
-  const ContentComponent = TAB_CONTENT[activeTab] || GeneralSettings;
+  const sectionProps: SectionProps = { cfg, canManage, save };
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'warehouse': return <WarehouseSettings {...sectionProps} />;
+      case 'production': return <ProductionSettings />;
+      case 'fleet': return <FleetSettings {...sectionProps} />;
+      case 'inspections': return <InspectionSettings />;
+      case 'reports': return <ReportSettings {...sectionProps} />;
+      case 'shifts': return <ShiftSettings {...sectionProps} />;
+      default: return <GeneralSettings />;
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#f1ece3] pb-24">
@@ -226,9 +360,18 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {/* Read-only upozornění */}
+      {!canManage && (
+        <div className="max-w-2xl mx-auto px-4 pt-4">
+          <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+            Máš jen náhled. Pro úpravy nastavení potřebuješ oprávnění správy (admin.manage).
+          </div>
+        </div>
+      )}
+
       {/* Content */}
       <div key={activeTab} className="max-w-2xl mx-auto px-4 py-4 vik-fade-in">
-        <ContentComponent />
+        {renderContent()}
       </div>
     </div>
   );

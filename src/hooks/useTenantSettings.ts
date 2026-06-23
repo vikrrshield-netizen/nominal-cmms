@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { collection, doc, onSnapshot, setDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import type { TenantSettings } from '../types/tenant';
+import type { TenantSettings, TenantModuleConfig } from '../types/tenant';
 import { MODULE_DEFINITIONS } from '../types/user';
 import appConfig from '../appConfig';
 
@@ -27,6 +27,7 @@ export function useTenantSettings() {
             logoUrl: data.logoUrl || '',
             logoLetter: data.logoLetter || '',
             activeModules: data.activeModules || ALL_MODULE_IDS,
+            moduleConfig: data.moduleConfig || {},
             updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(),
             updatedByName: data.updatedByName || '',
           } as TenantSettings;
@@ -88,5 +89,22 @@ export function useTenantSettings() {
     }, { merge: true });
   };
 
-  return { tenants, loading, updateModules, updateBrand };
+  // Uloží per-modulovou konfiguraci. Díky merge:true se vnořené mapy
+  // (moduleConfig.warehouse, .shifts, …) hloubkově prolnou, ostatní klíče
+  // zůstanou zachované.
+  const updateModuleConfig = async (
+    tenantId: string,
+    patch: TenantModuleConfig,
+    userName: string,
+    tenantName?: string,
+  ) => {
+    await setDoc(doc(db, 'tenant_settings', tenantId), {
+      name: tenantName || tenantId,
+      moduleConfig: patch,
+      updatedAt: serverTimestamp(),
+      updatedByName: userName,
+    }, { merge: true });
+  };
+
+  return { tenants, loading, updateModules, updateBrand, updateModuleConfig };
 }
