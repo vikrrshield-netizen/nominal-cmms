@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import ExcelJS from 'exceljs';
 import { collection, deleteDoc, doc, limit, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, writeBatch, type Timestamp } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -1269,6 +1268,7 @@ export default function MasterDataPage() {
 
   const exportXlsx = async () => {
     const { headers, rows } = getExportData();
+    const ExcelJS = await import('exceljs');
     const workbook = new ExcelJS.Workbook();
     workbook.creator = appConfig.APP_NAME;
     workbook.created = new Date();
