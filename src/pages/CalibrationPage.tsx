@@ -12,6 +12,7 @@ import { assetService } from '../services/assetService';
 import { showToast } from '../components/ui/Toast';
 import { addWorkLog } from '../services/workLogService';
 import LogWorkSheet, { type WorkEntry } from '../components/audit/LogWorkSheet';
+import { useLastWorkLog, logDateCz } from '../components/audit/useLastWorkLog';
 import type { Asset, AssetEvent } from '../types/asset';
 
 type Tone = 'ok' | 'warn' | 'crit' | 'none';
@@ -79,6 +80,7 @@ export default function CalibrationPage() {
   const tenantId = user?.tenantId ?? 'main_firm';
   const canEdit = hasPermission('asset.update');
   const navigate = useNavigate();
+  const lastLog = useLastWorkLog();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
@@ -205,6 +207,7 @@ export default function CalibrationPage() {
           {units.map((unit) => {
             const ev = calibEvent(unit);
             const tone = calibTone(ev);
+            const lastCal = ev ? lastLog(unit.id, 'Kalibrace') : undefined;
             const place = [unit.buildingId ? `Budova ${unit.buildingId}` : '', unit.areaName || unit.location, unit.code]
               .filter(Boolean)
               .join(' · ');
@@ -217,6 +220,12 @@ export default function CalibrationPage() {
                   <span className="text-[11px] font-bold px-2 py-0.5 rounded-md" style={{ background: TONE[tone].soft, color: TONE[tone].text }}>{calibLabel(ev)}</span>
                   {ev && <span className="text-[11px] text-slate-400 flex items-center gap-1 ml-auto"><Paperclip size={12} /> certifikát</span>}
                 </div>
+
+                {lastCal && (
+                  <button type="button" onClick={() => navigate(`/asset/${unit.id}`)} className="mt-2 text-left text-[11px] text-slate-400 hover:text-emerald-700">
+                    naposledy {logDateCz(lastCal)} · {lastCal.userName} →
+                  </button>
+                )}
 
                 {canEdit && (
                   ev ? (

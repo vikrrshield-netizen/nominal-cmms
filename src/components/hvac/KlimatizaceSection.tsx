@@ -11,6 +11,7 @@ import { assetService } from '../../services/assetService';
 import { showToast } from '../ui/Toast';
 import { addWorkLog } from '../../services/workLogService';
 import LogWorkSheet, { type WorkEntry } from '../audit/LogWorkSheet';
+import { useLastWorkLog, logDateCz } from '../audit/useLastWorkLog';
 import type { Asset, AssetEvent } from '../../types/asset';
 
 type Tone = 'ok' | 'warn' | 'crit' | 'none';
@@ -76,6 +77,7 @@ export default function KlimatizaceSection() {
   const tenantId = user?.tenantId ?? 'main_firm';
   const canEdit = hasPermission('hvac.manage') || hasPermission('asset.update');
   const navigate = useNavigate();
+  const lastLog = useLastWorkLog();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
@@ -207,17 +209,25 @@ export default function KlimatizaceSection() {
                     {events.map((ev) => {
                       const tone = eventTone(ev);
                       const Icon = eventIcon(ev.name || '');
+                      const l = lastLog(unit.id, ev.name);
                       return (
-                        <div key={ev.id} className="flex items-center gap-2 py-2 border-t border-slate-100">
-                          <Icon size={16} className="text-slate-500 flex-shrink-0" />
-                          <span className="flex-1 min-w-0 text-[13px] text-slate-800 truncate">
-                            {ev.name}
-                            {ev.frequencyDays ? <span className="text-slate-400"> · á {ev.frequencyDays >= 365 ? `${Math.round(ev.frequencyDays / 365)} r.` : `${Math.round(ev.frequencyDays / 30)} měs.`}</span> : null}
-                          </span>
-                          <span className="text-[11px] font-bold flex-shrink-0 px-2 py-0.5 rounded-md" style={{ background: TONE[tone].soft, color: TONE[tone].text }}>{eventLabel(ev)}</span>
-                          {canEdit && (
-                            <button type="button" disabled={saving === unit.id} onClick={() => markDone(unit, ev)} title="Zapsat jako provedené" className="flex-shrink-0 w-7 h-7 rounded-lg bg-slate-100 hover:bg-emerald-100 text-slate-500 hover:text-emerald-700 flex items-center justify-center disabled:opacity-50">
-                              <Check size={15} />
+                        <div key={ev.id} className="py-2 border-t border-slate-100">
+                          <div className="flex items-center gap-2">
+                            <Icon size={16} className="text-slate-500 flex-shrink-0" />
+                            <span className="flex-1 min-w-0 text-[13px] text-slate-800 truncate">
+                              {ev.name}
+                              {ev.frequencyDays ? <span className="text-slate-400"> · á {ev.frequencyDays >= 365 ? `${Math.round(ev.frequencyDays / 365)} r.` : `${Math.round(ev.frequencyDays / 30)} měs.`}</span> : null}
+                            </span>
+                            <span className="text-[11px] font-bold flex-shrink-0 px-2 py-0.5 rounded-md" style={{ background: TONE[tone].soft, color: TONE[tone].text }}>{eventLabel(ev)}</span>
+                            {canEdit && (
+                              <button type="button" disabled={saving === unit.id} onClick={() => markDone(unit, ev)} title="Zapsat jako provedené" className="flex-shrink-0 w-7 h-7 rounded-lg bg-slate-100 hover:bg-emerald-100 text-slate-500 hover:text-emerald-700 flex items-center justify-center disabled:opacity-50">
+                                <Check size={15} />
+                              </button>
+                            )}
+                          </div>
+                          {l && (
+                            <button type="button" onClick={() => navigate(`/asset/${unit.id}`)} className="mt-1 text-left text-[11px] text-slate-400 hover:text-emerald-700">
+                              naposledy {logDateCz(l)} · {l.userName} →
                             </button>
                           )}
                         </div>

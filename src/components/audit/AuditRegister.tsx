@@ -14,6 +14,7 @@ import { assetService } from '../../services/assetService';
 import { addWorkLog } from '../../services/workLogService';
 import { showToast } from '../ui/Toast';
 import LogWorkSheet, { type WorkEntry } from './LogWorkSheet';
+import { useLastWorkLog, logDateCz } from './useLastWorkLog';
 import type { Asset, AssetEvent } from '../../types/asset';
 
 export interface RegisterEventDef { name: string; eventType: string; frequencyDays: number }
@@ -87,6 +88,7 @@ export default function AuditRegister({ config, detect }: { config: AuditRegiste
   const [saving, setSaving] = useState<string | null>(null);
   const [pending, setPending] = useState<{ asset: Asset; ev: AssetEvent } | null>(null);
 
+  const lastLog = useLastWorkLog();
   const configNames = useMemo(() => config.events.map((e) => auditNorm(e.name)), [config.events]);
   const configTypes = useMemo(() => config.events.map((e) => auditNorm(e.eventType)), [config.events]);
 
@@ -241,16 +243,24 @@ export default function AuditRegister({ config, detect }: { config: AuditRegiste
                   <div>
                     {evs.map((ev) => {
                       const tone = eventTone(ev);
+                      const l = lastLog(unit.id, ev.name);
                       return (
-                        <div key={ev.id} className="flex items-center gap-2 py-2 border-t border-slate-100">
-                          <span className="flex-1 min-w-0 text-[13px] text-slate-800 truncate">
-                            {ev.name}
-                            {ev.frequencyDays ? <span className="text-slate-400"> · {intervalLabel(ev.frequencyDays)}</span> : null}
-                          </span>
-                          <span className="text-[11px] font-bold flex-shrink-0 px-2 py-0.5 rounded-md" style={{ background: TONE[tone].soft, color: TONE[tone].text }}>{eventLabel(ev)}</span>
-                          {canEdit && (
-                            <button type="button" disabled={saving === unit.id} onClick={() => markDone(unit, ev)} title={doneLabel} className="flex-shrink-0 w-8 h-8 rounded-lg bg-slate-100 hover:bg-emerald-100 text-slate-500 hover:text-emerald-700 flex items-center justify-center disabled:opacity-50">
-                              <Check size={15} />
+                        <div key={ev.id} className="py-2 border-t border-slate-100">
+                          <div className="flex items-center gap-2">
+                            <span className="flex-1 min-w-0 text-[13px] text-slate-800 truncate">
+                              {ev.name}
+                              {ev.frequencyDays ? <span className="text-slate-400"> · {intervalLabel(ev.frequencyDays)}</span> : null}
+                            </span>
+                            <span className="text-[11px] font-bold flex-shrink-0 px-2 py-0.5 rounded-md" style={{ background: TONE[tone].soft, color: TONE[tone].text }}>{eventLabel(ev)}</span>
+                            {canEdit && (
+                              <button type="button" disabled={saving === unit.id} onClick={() => markDone(unit, ev)} title={doneLabel} className="flex-shrink-0 w-8 h-8 rounded-lg bg-slate-100 hover:bg-emerald-100 text-slate-500 hover:text-emerald-700 flex items-center justify-center disabled:opacity-50">
+                                <Check size={15} />
+                              </button>
+                            )}
+                          </div>
+                          {l && (
+                            <button type="button" onClick={() => navigate(`/asset/${unit.id}`)} className="mt-1 text-left text-[11px] text-slate-400 hover:text-emerald-700">
+                              naposledy {logDateCz(l)} · {l.userName} →
                             </button>
                           )}
                         </div>
