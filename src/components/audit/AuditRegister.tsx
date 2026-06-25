@@ -11,7 +11,9 @@ import { ArrowLeft, Loader2, Check, Plus } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuthContext } from '../../context/AuthContext';
 import { assetService } from '../../services/assetService';
+import { addWorkLog } from '../../services/workLogService';
 import { showToast } from '../ui/Toast';
+import LogWorkSheet, { type WorkEntry } from './LogWorkSheet';
 import type { Asset, AssetEvent } from '../../types/asset';
 
 export interface RegisterEventDef { name: string; eventType: string; frequencyDays: number }
@@ -38,7 +40,6 @@ const newId = (): string => {
   const g = globalThis as { crypto?: { randomUUID?: () => string } };
   return 'evt_' + (g.crypto?.randomUUID ? g.crypto.randomUUID() : Math.random().toString(36).slice(2));
 };
-const todayIso = () => new Date().toISOString().slice(0, 10);
 const addDaysIso = (days: number) => {
   const d = new Date();
   d.setDate(d.getDate() + days);
@@ -84,6 +85,7 @@ export default function AuditRegister({ config, detect }: { config: AuditRegiste
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
+  const [pending, setPending] = useState<{ asset: Asset; ev: AssetEvent } | null>(null);
 
   const configNames = useMemo(() => config.events.map((e) => auditNorm(e.name)), [config.events]);
   const configTypes = useMemo(() => config.events.map((e) => auditNorm(e.eventType)), [config.events]);
@@ -132,11 +134,42 @@ export default function AuditRegister({ config, detect }: { config: AuditRegiste
     }
   };
 
-  const markDone = (asset: Asset, ev: AssetEvent) => {
+  const markDone = (asset: Asset, ev: AssetEvent) => setPending({ asset, ev });
+
+  const confirmLog = async (entry: WorkEntry) => {
+    if (!pending) return;
+    const { asset, ev } = pending;
     const def = config.events.find((d) => auditNorm(d.eventType) === auditNorm(ev.eventType) || auditNorm(d.name) === auditNorm(ev.name));
     const freq = ev.frequencyDays || def?.frequencyDays || 365;
-    const events = (asset.events ?? []).map((e) => (e.id === ev.id ? { ...e, lastDate: todayIso(), nextDate: addDaysIso(freq) } : e));
-    persist(asset, events, `${ev.name}: zapsáno`);
+    const performed = new Date(entry.performedAt);
+    const next = new Date(performed);
+    next.setDate(next.getDate() + freq);
+    setSaving(asset.id);
+    try {
+      await addWorkLog({
+        userId: user?.id || user?.uid || 'unknown',
+        userName: user?.displayName || 'Neznámý',
+        workerNames: entry.worker ? [entry.worker] : undefined,
+        type: 'inspection',
+        workType: ev.name,
+        content: entry.content || `${ev.name} – provedeno`,
+        assetId: asset.id,
+        assetName: asset.name,
+        location: [asset.buildingId ? `Budova ${asset.buildingId}` : '', asset.areaName || asset.location].filter(Boolean).join(' · ') || undefined,
+        performedAt: performed,
+        auditReady: true,
+      });
+      const events = (asset.events ?? []).map((e) => (e.id === ev.id ? { ...e, lastDate: entry.performedAt, nextDate: next.toISOString().slice(0, 10) } : e));
+      await assetService.update(tenantId, asset.id, { events });
+      load();
+      showToast('Zapsáno do deníku', 'success');
+      setPending(null);
+    } catch (err) {
+      console.error('[AuditRegister] log error:', err);
+      showToast('Uložení selhalo', 'error');
+    } finally {
+      setSaving(null);
+    }
   };
 
   const setupEvents = (asset: Asset) => {
@@ -231,7 +264,17 @@ export default function AuditRegister({ config, detect }: { config: AuditRegiste
         </div>
       )}
 
-      <p className="mt-5 text-[12px] text-slate-400">Stav: zelená = v pořádku, oranžová = blíží se termín, červená = po termínu (auditor uvidí). „{doneLabel}" posune termín o interval dál.</p>
+      <p className="mt-5 text-[12px] text-slate-400">Stav: zelená = v pořádku, oranžová = blíží se termín, červená = po termínu (auditor uvidí). „{doneLabel}" zapíše práci do deníku a posune termín o interval dál.</p>
+
+      {pending && (
+        <LogWorkSheet
+          subtitle={`${pending.ev.name} · ${pending.asset.name}`}
+          defaultWorker={user?.displayName || ''}
+          saving={saving === pending.asset.id}
+          onClose={() => setPending(null)}
+          onSubmit={confirmLog}
+        />
+      )}
     </div>
   );
 }

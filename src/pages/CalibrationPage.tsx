@@ -10,6 +10,8 @@ import { ArrowLeft, Ruler, Loader2, Check, Plus, Paperclip } from 'lucide-react'
 import { useAuthContext } from '../context/AuthContext';
 import { assetService } from '../services/assetService';
 import { showToast } from '../components/ui/Toast';
+import { addWorkLog } from '../services/workLogService';
+import LogWorkSheet, { type WorkEntry } from '../components/audit/LogWorkSheet';
 import type { Asset, AssetEvent } from '../types/asset';
 
 type Tone = 'ok' | 'warn' | 'crit' | 'none';
@@ -26,7 +28,6 @@ const newId = (): string => {
   const g = globalThis as { crypto?: { randomUUID?: () => string } };
   return 'evt_' + (g.crypto?.randomUUID ? g.crypto.randomUUID() : Math.random().toString(36).slice(2));
 };
-const todayIso = () => new Date().toISOString().slice(0, 10);
 const addDaysIso = (days: number) => {
   const d = new Date();
   d.setDate(d.getDate() + days);
@@ -81,6 +82,7 @@ export default function CalibrationPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
+  const [pending, setPending] = useState<{ asset: Asset; ev: AssetEvent } | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -116,13 +118,41 @@ export default function CalibrationPage() {
     }
   };
 
-  const markCalibrated = (asset: Asset, ev: AssetEvent) => {
-    const events = (asset.events ?? []).map((e) =>
-      e.id === ev.id
-        ? { ...e, lastDate: todayIso(), nextDate: addDaysIso(e.frequencyDays || CALIB_INTERVAL_DAYS) }
-        : e,
-    );
-    persist(asset, events, 'Kalibrace zapsána');
+  const markCalibrated = (asset: Asset, ev: AssetEvent) => setPending({ asset, ev });
+
+  const confirmLog = async (entry: WorkEntry) => {
+    if (!pending) return;
+    const { asset, ev } = pending;
+    const freq = ev.frequencyDays || CALIB_INTERVAL_DAYS;
+    const performed = new Date(entry.performedAt);
+    const next = new Date(performed);
+    next.setDate(next.getDate() + freq);
+    setSaving(asset.id);
+    try {
+      await addWorkLog({
+        userId: user?.id || user?.uid || 'unknown',
+        userName: user?.displayName || 'Neznámý',
+        workerNames: entry.worker ? [entry.worker] : undefined,
+        type: 'maintenance',
+        workType: 'Kalibrace',
+        content: entry.content || 'Kalibrace provedena',
+        assetId: asset.id,
+        assetName: asset.name,
+        location: [asset.buildingId ? `Budova ${asset.buildingId}` : '', asset.areaName || asset.location].filter(Boolean).join(' · ') || undefined,
+        performedAt: performed,
+        auditReady: true,
+      });
+      const events = (asset.events ?? []).map((e) => (e.id === ev.id ? { ...e, lastDate: entry.performedAt, nextDate: next.toISOString().slice(0, 10) } : e));
+      await assetService.update(tenantId, asset.id, { events });
+      load();
+      showToast('Zapsáno do deníku', 'success');
+      setPending(null);
+    } catch (err) {
+      console.error('[Kalibrace] log error:', err);
+      showToast('Uložení selhalo', 'error');
+    } finally {
+      setSaving(null);
+    }
   };
 
   const setupCalibration = (asset: Asset) => {
@@ -206,6 +236,16 @@ export default function CalibrationPage() {
       )}
 
       <p className="mt-5 text-[12px] text-slate-400">Další krok: nahrát ke kalibraci certifikát (PDF/foto). Zatím se hlídá interval a platnost.</p>
+
+      {pending && (
+        <LogWorkSheet
+          subtitle={`Kalibrace · ${pending.asset.name}`}
+          defaultWorker={user?.displayName || ''}
+          saving={saving === pending.asset.id}
+          onClose={() => setPending(null)}
+          onSubmit={confirmLog}
+        />
+      )}
     </div>
   );
 }
