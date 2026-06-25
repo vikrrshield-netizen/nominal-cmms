@@ -11,7 +11,7 @@ import {
   ChevronRight, ChevronDown, FileText, Loader2, Trash2,
   ClipboardCheck, Cog, LayoutGrid, ListTree, ArrowUp, ArrowDown,
   ChevronsUp, ChevronsDown, GripVertical,
-  Archive, Layers, CheckCircle2, Wrench, Pause, AlertTriangle, List, SlidersHorizontal,
+  Archive, Layers, CheckCircle2, Wrench, Pause, AlertTriangle, List, SlidersHorizontal, HelpCircle,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { db } from '../lib/firebase';
@@ -25,6 +25,8 @@ import { ASSET_STATUS_CONFIG, CRITICALITY_CONFIG } from '../types/asset';
 import { showToast } from '../components/ui/Toast';
 import ImportModal from '../components/ui/ImportModal';
 import BottomSheet, { FormFooter } from '../components/ui/BottomSheet';
+import HowToSheet from '../components/help/HowToSheet';
+import { guideById } from '../data/guides';
 import './KartotekaPage.css';
 
 // ── Status colors ────────────────────────────────────────────────
@@ -718,6 +720,8 @@ export default function KartotekaPage() {
   const [floorFilter, setFloorFilter] = useState('all');
   const [addSheetOpen, setAddSheetOpen] = useState(false);
   const [filtersSheetOpen, setFiltersSheetOpen] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
+  const addDeviceGuide = guideById('add-device');
 
   // ── Delete state ───
   const [deleteTarget, setDeleteTarget] = useState<DisplayAsset | null>(null);
@@ -2205,6 +2209,9 @@ export default function KartotekaPage() {
               <span className="text-[11px] text-slate-500">speciální karta (teplota)</span>
             </button>
           </div>
+          <button type="button" onClick={() => { setAddSheetOpen(false); setGuideOpen(true); }} className="mt-3 flex w-full items-center justify-center gap-2 text-[13px] font-bold text-emerald-700">
+            <HelpCircle size={16} /> Jak na to?
+          </button>
         </BottomSheet>
       )}
 
@@ -2248,6 +2255,10 @@ export default function KartotekaPage() {
             </div>
           </div>
         </BottomSheet>
+      )}
+
+      {guideOpen && addDeviceGuide && (
+        <HowToSheet guide={addDeviceGuide} onClose={() => setGuideOpen(false)} />
       )}
     </div>
   );
