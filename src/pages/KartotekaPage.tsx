@@ -11,7 +11,7 @@ import {
   ChevronRight, ChevronDown, FileText, Loader2, Trash2,
   ClipboardCheck, Cog, LayoutGrid, ListTree, ArrowUp, ArrowDown,
   ChevronsUp, ChevronsDown, GripVertical,
-  Archive, Layers, CheckCircle2, Wrench, Pause, AlertTriangle, List,
+  Archive, Layers, CheckCircle2, Wrench, Pause, AlertTriangle, List, SlidersHorizontal,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { db } from '../lib/firebase';
@@ -716,6 +716,8 @@ export default function KartotekaPage() {
     return saved === 'tiles' || saved === 'route' ? saved : 'tree';
   });
   const [floorFilter, setFloorFilter] = useState('all');
+  const [addSheetOpen, setAddSheetOpen] = useState(false);
+  const [filtersSheetOpen, setFiltersSheetOpen] = useState(false);
 
   // ── Delete state ───
   const [deleteTarget, setDeleteTarget] = useState<DisplayAsset | null>(null);
@@ -1623,19 +1625,9 @@ export default function KartotekaPage() {
 
       {/* ── Search ── */}
       {canCreateAsset && (
-        <div className="mx-auto flex w-full max-w-[1180px] flex-wrap items-center gap-2 px-4 pt-3" aria-label="Rychle pridat polozku">
-          <span className="eyebrow">Přidat</span>
-          <button className="vik-button" onClick={() => openCreateModal(null, 'building')}>
-            <Building2 size={16} /> Budova
-          </button>
-          <button className="vik-button" onClick={() => openCreateModal(null, 'room')}>
-            <Plus size={16} /> Místnost
-          </button>
-          <button className="vik-button" onClick={() => openCreateModal(null, 'inspection')}>
-            <ClipboardCheck size={16} /> Kontrola
-          </button>
-          <button className="vik-button" onClick={() => openCreateModal(null, 'gearbox')}>
-            <Cog size={16} /> Převodovka
+        <div className="mx-auto flex w-full max-w-[1180px] items-center gap-2 px-4 pt-3" aria-label="Pridat polozku">
+          <button className="vik-button" onClick={() => setAddSheetOpen(true)}>
+            <Plus size={16} /> Přidat
           </button>
         </div>
       )}
@@ -1658,52 +1650,7 @@ export default function KartotekaPage() {
         </div>
       </div>
 
-      {/* ── Filter chips ── */}
-      <div className="mx-auto w-full max-w-[1180px] px-4 pt-3">
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {filters.map((f) => {
-            const Icon = f.icon;
-            return (
-              <button
-                key={f.key}
-                className={filter === f.key ? 'vik-chip vik-chip-active' : 'vik-chip'}
-                onClick={() => setFilter(f.key === filter ? 'all' : f.key)}
-              >
-                <Icon className="h-3.5 w-3.5" /> {f.label}
-              </button>
-            );
-          })}
-          <button
-            className={filter === 'gearbox' ? 'vik-chip vik-chip-active' : 'vik-chip'}
-            onClick={() => setFilter(filter === 'gearbox' ? 'all' : 'gearbox')}
-          >
-            <Cog className="h-3.5 w-3.5" /> Převodovky <span className="opacity-70">{counts.gearboxes}</span>
-          </button>
-        </div>
-      </div>
-
-      {floorOptions.length > 1 && (
-        <div className="mx-auto flex w-full max-w-[1180px] flex-wrap items-center gap-2 px-4 pt-2" aria-label="Filtr podle patra">
-          <span className="eyebrow">Patro</span>
-          <button
-            type="button"
-            className={floorFilter === 'all' ? 'vik-chip vik-chip-active' : 'vik-chip'}
-            onClick={() => setFloorFilter('all')}
-          >
-            Vše
-          </button>
-          {floorOptions.map((floor) => (
-            <button
-              key={floor}
-              type="button"
-              className={floorFilter === floor ? 'vik-chip vik-chip-active' : 'vik-chip'}
-              onClick={() => setFloorFilter(floorFilter === floor ? 'all' : floor)}
-            >
-              {getFloorLabel(floor)}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Filtry (stav) a Patro jsou v panelu „Filtry" — viz tlačítko v liště zobrazení níže. */}
 
       <div className="mx-auto flex w-full max-w-[1180px] items-center gap-2 px-4 pt-3">
         <div className="flex flex-1 rounded-xl border border-slate-200 bg-white p-1" aria-label="Zobrazeni kartoteky">
@@ -1732,12 +1679,22 @@ export default function KartotekaPage() {
             Trasa
           </button>
         </div>
-        <button type="button" onClick={expandVisibleTree} aria-label="Rozbalit vše" title="Rozbalit vše" className="vik-button px-3">
-          <ChevronsDown size={18} />
+        <button type="button" onClick={() => setFiltersSheetOpen(true)} aria-label="Filtry" title="Filtry" className="vik-button relative px-3">
+          <SlidersHorizontal size={18} />
+          {(filter !== 'all' || floorFilter !== 'all') && (
+            <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-600 px-1 text-[10px] font-bold text-white">{(filter !== 'all' ? 1 : 0) + (floorFilter !== 'all' ? 1 : 0)}</span>
+          )}
         </button>
-        <button type="button" onClick={collapseTree} aria-label="Sbalit vše" title="Sbalit vše" className="vik-button px-3">
-          <ChevronsUp size={18} />
-        </button>
+        {viewMode === 'tree' && (
+          <>
+            <button type="button" onClick={expandVisibleTree} aria-label="Rozbalit vše" title="Rozbalit vše" className="vik-button px-3">
+              <ChevronsDown size={18} />
+            </button>
+            <button type="button" onClick={collapseTree} aria-label="Sbalit vše" title="Sbalit vše" className="vik-button px-3">
+              <ChevronsUp size={18} />
+            </button>
+          </>
+        )}
       </div>
 
       {/* ── Loading state ── */}
@@ -2217,6 +2174,68 @@ export default function KartotekaPage() {
             loading={createSaving}
             disabled={!createForm.name.trim() || createSaving}
           />
+        </BottomSheet>
+      )}
+
+      {/* ── Přidat (výběr typu) ── */}
+      {addSheetOpen && (
+        <BottomSheet title="Přidat do kartotéky" isOpen onClose={() => setAddSheetOpen(false)}>
+          <div className="grid grid-cols-2 gap-2 p-1">
+            <button type="button" className="flex min-h-16 flex-col items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 hover:border-emerald-400 hover:bg-emerald-50" onClick={() => { setAddSheetOpen(false); openCreateModal(null, 'building'); }}>
+              <Building2 size={22} className="text-emerald-700" /> Budova
+            </button>
+            <button type="button" className="flex min-h-16 flex-col items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 hover:border-emerald-400 hover:bg-emerald-50" onClick={() => { setAddSheetOpen(false); openCreateModal(null, 'room'); }}>
+              <Plus size={22} className="text-emerald-700" /> Místnost
+            </button>
+            <button type="button" className="flex min-h-16 flex-col items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 hover:border-emerald-400 hover:bg-emerald-50" onClick={() => { setAddSheetOpen(false); openCreateModal(null, 'inspection'); }}>
+              <ClipboardCheck size={22} className="text-emerald-700" /> Kontrola
+            </button>
+            <button type="button" className="flex min-h-16 flex-col items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 hover:border-emerald-400 hover:bg-emerald-50" onClick={() => { setAddSheetOpen(false); openCreateModal(null, 'gearbox'); }}>
+              <Cog size={22} className="text-emerald-700" /> Převodovka
+            </button>
+          </div>
+        </BottomSheet>
+      )}
+
+      {/* ── Filtry ── */}
+      {filtersSheetOpen && (
+        <BottomSheet title="Filtry" isOpen onClose={() => setFiltersSheetOpen(false)}>
+          <div className="space-y-4 p-1">
+            <div>
+              <span className="eyebrow mb-2 block">Stav</span>
+              <div className="flex flex-wrap gap-2">
+                <button className={filter === 'all' ? 'vik-chip vik-chip-active' : 'vik-chip'} onClick={() => setFilter('all')}>Vše</button>
+                {filters.map((f) => {
+                  const Icon = f.icon;
+                  return (
+                    <button key={f.key} className={filter === f.key ? 'vik-chip vik-chip-active' : 'vik-chip'} onClick={() => setFilter(f.key === filter ? 'all' : f.key)}>
+                      <Icon className="h-3.5 w-3.5" /> {f.label}
+                    </button>
+                  );
+                })}
+                <button className={filter === 'gearbox' ? 'vik-chip vik-chip-active' : 'vik-chip'} onClick={() => setFilter(filter === 'gearbox' ? 'all' : 'gearbox')}>
+                  <Cog className="h-3.5 w-3.5" /> Převodovky <span className="opacity-70">{counts.gearboxes}</span>
+                </button>
+              </div>
+            </div>
+            {floorOptions.length > 1 && (
+              <div>
+                <span className="eyebrow mb-2 block">Patro</span>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" className={floorFilter === 'all' ? 'vik-chip vik-chip-active' : 'vik-chip'} onClick={() => setFloorFilter('all')}>Vše</button>
+                  {floorOptions.map((floor) => (
+                    <button key={floor} type="button" className={floorFilter === floor ? 'vik-chip vik-chip-active' : 'vik-chip'} onClick={() => setFloorFilter(floorFilter === floor ? 'all' : floor)}>
+                      {getFloorLabel(floor)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="flex gap-2 pt-2">
+              <button type="button" className="vik-button flex-1" onClick={() => { setFilter('all'); setFloorFilter('all'); }}>Zrušit filtry</button>
+              <button type="button" className="flex-1 rounded-xl bg-emerald-600 py-2.5 font-bold text-white" onClick={() => setFiltersSheetOpen(false)}>Hotovo</button>
+            </div>
+          </div>
         </BottomSheet>
       )}
     </div>
