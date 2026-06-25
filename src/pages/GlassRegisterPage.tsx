@@ -6,7 +6,7 @@ import { GlassWater } from 'lucide-react';
 import AuditRegister, { auditNorm } from '../components/audit/AuditRegister';
 import type { Asset } from '../types/asset';
 
-const GLASS_RE = /(sklo|sklen|krehk|keramik|zariv|plexi|polykarbon|pruzor|sledov)/;
+const GLASS_RE = /(\bsklo\b|\bskla\b|sklenen|sklick|sklenic|krehk|keramik|zariv|plexi|polykarbon|pruzor)/;
 const detect = (a: Asset): boolean =>
   GLASS_RE.test(auditNorm(`${a.name} ${a.entityType} ${a.category} ${a.code}`)) ||
   (a.events ?? []).some((e) => auditNorm(e.name).includes('celistvost'));

@@ -30,10 +30,26 @@ type AssetUpdate = Partial<Omit<Asset, NullableAssetFields>> & {
 const assetsCol = () => collection(db, 'assets');
 const assetDoc = (assetId: string) => doc(db, 'assets', assetId);
 
+// Firestore neumí uložit `undefined` ani vnořené v polích/objektech (např. events[].nextDate).
+// Hloubkově odstraní undefined; Timestamp/Date a jiné instance tříd nechá beze změny.
+const deepStrip = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(deepStrip);
+  if (
+    value && typeof value === 'object'
+    && !(value instanceof Timestamp) && !(value instanceof Date)
+    && (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null)
+  ) {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([, v]) => v !== undefined)
+        .map(([k, v]) => [k, deepStrip(v)]),
+    );
+  }
+  return value;
+};
+
 const withoutUndefined = <T extends Record<string, unknown>>(data: T): Partial<T> =>
-  Object.fromEntries(
-    Object.entries(data).filter(([, value]) => value !== undefined)
-  ) as Partial<T>;
+  deepStrip(data) as Partial<T>;
 
 const toIso = (value: unknown) => {
   if (value && typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') {

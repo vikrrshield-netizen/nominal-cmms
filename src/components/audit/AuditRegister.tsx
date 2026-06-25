@@ -86,6 +86,7 @@ export default function AuditRegister({ config, detect }: { config: AuditRegiste
   const [saving, setSaving] = useState<string | null>(null);
 
   const configNames = useMemo(() => config.events.map((e) => auditNorm(e.name)), [config.events]);
+  const configTypes = useMemo(() => config.events.map((e) => auditNorm(e.eventType)), [config.events]);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -99,8 +100,9 @@ export default function AuditRegister({ config, detect }: { config: AuditRegiste
 
   const units = useMemo(() => assets.filter(detect), [assets, detect]);
   const registerEvents = useCallback(
-    (a: Asset): AssetEvent[] => (a.events ?? []).filter((e) => configNames.includes(auditNorm(e.name))),
-    [configNames],
+    (a: Asset): AssetEvent[] =>
+      (a.events ?? []).filter((e) => configTypes.includes(auditNorm(e.eventType)) || configNames.includes(auditNorm(e.name))),
+    [configTypes, configNames],
   );
   const unitTone = useCallback(
     (a: Asset): Tone => registerEvents(a).reduce<Tone>((acc, e) => (RANK[eventTone(e)] > RANK[acc] ? eventTone(e) : acc), 'none'),
@@ -131,7 +133,7 @@ export default function AuditRegister({ config, detect }: { config: AuditRegiste
   };
 
   const markDone = (asset: Asset, ev: AssetEvent) => {
-    const def = config.events.find((d) => auditNorm(d.name) === auditNorm(ev.name));
+    const def = config.events.find((d) => auditNorm(d.eventType) === auditNorm(ev.eventType) || auditNorm(d.name) === auditNorm(ev.name));
     const freq = ev.frequencyDays || def?.frequencyDays || 365;
     const events = (asset.events ?? []).map((e) => (e.id === ev.id ? { ...e, lastDate: todayIso(), nextDate: addDaysIso(freq) } : e));
     persist(asset, events, `${ev.name}: zapsáno`);
@@ -140,7 +142,7 @@ export default function AuditRegister({ config, detect }: { config: AuditRegiste
   const setupEvents = (asset: Asset) => {
     const existing = asset.events ?? [];
     const toAdd: AssetEvent[] = config.events
-      .filter((d) => !existing.some((e) => auditNorm(e.name) === auditNorm(d.name)))
+      .filter((d) => !existing.some((e) => auditNorm(e.eventType) === auditNorm(d.eventType) || auditNorm(e.name) === auditNorm(d.name)))
       .map((d) => ({ id: newId(), name: d.name, eventType: d.eventType, frequencyDays: d.frequencyDays, nextDate: addDaysIso(d.frequencyDays) }));
     persist(asset, [...existing, ...toAdd], 'Hlídání nastaveno');
   };

@@ -6,10 +6,13 @@ import { ScanLine } from 'lucide-react';
 import AuditRegister, { auditNorm } from '../components/audit/AuditRegister';
 import type { Asset } from '../types/asset';
 
-const DETECTOR_RE = /(detektor|rtg|rentgen|\bsito|magnet|x-?ray|metal ?detect)/;
+const DETECTOR_RE = /(detektor|rtg|rentgen|\bsito|magnet(ic\w*)? ?separ|x-?ray|metal ?detect)/;
 const detect = (a: Asset): boolean =>
   DETECTOR_RE.test(auditNorm(`${a.name} ${a.entityType} ${a.category} ${a.code}`)) ||
-  (a.events ?? []).some((e) => auditNorm(e.eventType).includes('detector'));
+  (a.events ?? []).some((e) => {
+    const t = auditNorm(`${e.eventType} ${e.name}`);
+    return t.includes('detector') || t.includes('detektor');
+  });
 
 export default function DetectorsPage() {
   return (

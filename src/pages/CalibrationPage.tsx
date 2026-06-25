@@ -46,7 +46,7 @@ const fmtCz = (iso?: string): string => {
 const norm = (s: unknown) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 // Měřidla poznáme podle běžných názvů/typů, nebo když už mají kalibrační akci.
-const INSTRUMENT_RE = /(meridl|kalibr|teplom|vlhkom|manometr|tlakom|posuvn|mikrometr|\bvah|luxmet|ph[ -]?met|hlukom|zavaz)/;
+const INSTRUMENT_RE = /(meridl|kalibr|teplom|vlhkom|manometr|tlakom|posuvn\w* ?(meritk|mer)|mikrometr|\bvah|luxmet|ph[ -]?met|hlukom|zavazi)/;
 const calibEvent = (a: Asset): AssetEvent | undefined =>
   (a.events ?? []).find((e) => e.eventType === 'calibration' || norm(e.name).includes('kalibr'));
 const isInstrument = (a: Asset): boolean =>
