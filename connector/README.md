@@ -29,7 +29,7 @@ npx @modelcontextprotocol/inspector
 → připoj `http://localhost:8080/mcp` (Streamable HTTP).
 
 ## Nasazení (Cloud Run) — až s tvým OK
-Build kontejneru z `Dockerfile`, deploy do projektu `vikrr-asset-shield`. Server poběží jako service account (žádný klíč v kódu).
+Build kontejneru z `Dockerfile`, deploy do projektu `nominal-cmms` (hosting webu se jmenuje `vikrr-asset-shield`). Server poběží jako service account (žádný klíč v kódu).
 
 ## Bezpečnost
 - Fáze 1 server **fyzicky neumí zapisovat**.

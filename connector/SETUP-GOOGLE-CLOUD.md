@@ -5,7 +5,7 @@ Cílem je vytvořit „robotí účet" (service account), kterým server **čte*
 ## A) Vytvoř service account (robotí účet)
 
 1. Otevři **console.cloud.google.com** a přihlas se (stejný účet jako appka).
-2. Úplně nahoře vyber projekt **vikrr-asset-shield**.
+2. Úplně nahoře vyber projekt **nominal-cmms**. (Pozn.: „vikrr-asset-shield" je jen název webu/hostingu, ne projektu.)
 3. Vlevo nahoře **☰ menu → IAM & Admin → Service Accounts**.
 4. Klikni **+ CREATE SERVICE ACCOUNT** (Vytvořit servisní účet).
 5. **Name (název):** napiš `cmms-connector`. Klikni **CREATE AND CONTINUE**.
