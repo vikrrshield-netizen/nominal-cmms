@@ -15,6 +15,10 @@ const text = (s: string) => ({ content: [{ type: 'text' as const, text: s.slice(
 const place = (a: Asset) => [a.buildingId ? `Budova ${a.buildingId}` : '', a.areaName || a.location, a.code].filter(Boolean).join(' · ');
 const czDate = (ts?: { toDate?: () => Date }) => { const d = ts?.toDate?.(); return d ? d.toLocaleDateString('cs-CZ') : '?'; };
 
+const STATUS_CZ: Record<string, string> = { operational: 'běží', maintenance: 'údržba', broken: 'PORUCHA', stopped: 'stop', idle: 'nečinný' };
+const statusLabel = (s?: string) => STATUS_CZ[(s || '').toLowerCase()] ?? (s || '?');
+const isProblem = (s?: string) => /broken|stopped|fault|out_of_service|porucha/i.test(s || '');
+
 const AUDIT_RE = /kalibr|celistvost|detector|detektor|kontrol|revize|udrzba|údržba|servis|chladiv|plyn/i;
 
 export function registerTools(server: McpServer): void {
@@ -25,8 +29,8 @@ export function registerTools(server: McpServer): void {
     async ({ onlyProblems, query }) => {
       let assets = await getAssets();
       if (query) { const q = query.toLowerCase(); assets = assets.filter((a) => `${a.name ?? ''} ${a.code ?? ''}`.toLowerCase().includes(q)); }
-      if (onlyProblems) assets = assets.filter((a) => /porucha|fault|stop|broken|vyrazen/i.test(a.status ?? ''));
-      const lines = assets.slice(0, 150).map((a) => `• ${a.name ?? a.id} — ${a.status ?? '?'}${place(a) ? ` (${place(a)})` : ''}`);
+      if (onlyProblems) assets = assets.filter((a) => isProblem(a.status));
+      const lines = assets.slice(0, 150).map((a) => `• ${a.name ?? a.id} — ${statusLabel(a.status)}${place(a) ? ` (${place(a)})` : ''}`);
       return text(`Zařízení: ${assets.length}\n${lines.join('\n') || '—'}`);
     },
   );
@@ -111,7 +115,7 @@ export function registerTools(server: McpServer): void {
       const logs = await getWorkLogs({ assetId: asset.id, limit: 5 });
       const logLines = logs.map((l) => `   • ${czDate(l.performedAt ?? l.createdAt)}: ${l.workType ?? l.type ?? ''} ${l.content ?? ''}`);
       return text([
-        `${asset.name} — ${asset.status ?? '?'}`,
+        `${asset.name} — ${statusLabel(asset.status)}`,
         place(asset),
         'Termíny:',
         ...(events.length ? events : ['   —']),
