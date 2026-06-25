@@ -60,14 +60,14 @@ service firebase.storage {
     match /fault_photos/{allPaths=**} {
       allow read: if isSignedIn();
       allow create, update: if isSignedIn() && isSafeImageUpload(10 * 1024 * 1024);
-      allow delete: if isSignedIn();
+      allow delete: if isSignedIn() && request.auth.token.role in ['SUPERADMIN', 'VEDENI', 'UDRZBA'];
     }
 
     // Gearbox temperature / camera checks
     match /gearbox_checks/{gearboxId}/{allPaths=**} {
       allow read: if isSignedIn();
       allow create, update: if isSignedIn() && isSafeImageUpload(10 * 1024 * 1024);
-      allow delete: if isSignedIn();
+      allow delete: if isSignedIn() && request.auth.token.role in ['SUPERADMIN', 'VEDENI', 'UDRZBA'];
     }
 
     // Production master data documents: materials/products card attachments
@@ -84,6 +84,15 @@ service firebase.storage {
     // Temporary uploads
     match /temp/{userId}/{allPaths=**} {
       allow read, write: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Facility floor plans (půdorysy areálu) — CHRÁNĚNÉ: čtení i zápis jen vedení/údržba.
+    match /facility_plans/{allPaths=**} {
+      allow read: if isSignedIn() && request.auth.token.role in ['SUPERADMIN', 'VEDENI', 'UDRZBA'];
+      allow create, update: if isSignedIn()
+        && isSafeImageUpload(10 * 1024 * 1024)
+        && request.auth.token.role in ['SUPERADMIN', 'VEDENI', 'UDRZBA'];
+      allow delete: if isSignedIn() && request.auth.token.role in ['SUPERADMIN', 'VEDENI', 'UDRZBA'];
     }
 
     // Deny everything else

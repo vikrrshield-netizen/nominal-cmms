@@ -730,8 +730,7 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
       onSaved();
     } catch (err) {
       const msg = (err as Error).message || 'Neznámá chyba';
-      console.error('[AdminPage] handleSave FAILED:', err);
-      console.error('[AdminPage] User ID:', user.id, '| Payload:', JSON.stringify(formData));
+      console.error('[AdminPage] handleSave FAILED for user:', user.id, err);
       showToast(`Chyba ukládání: ${msg}`, 'error');
       window.alert('DB Error: ' + msg);
     }

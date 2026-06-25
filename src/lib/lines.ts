@@ -24,7 +24,7 @@ export function isLineAsset(a?: Partial<Asset> | null): boolean {
 // Budova / místnost (kontejner) — replikuje logiku z AssetCardPage, aby se chovala stejně.
 const ROOM_RE = /\b(mistnost|room|area|hala|prostor|sekce|stredisko|oddeleni|pracoviste|stanoviste|balirna|expedice|extrudovna|vyroba|louparna|satny)\b/;
 
-function isContainerAsset(a: Partial<Asset>): boolean {
+export function isContainerAsset(a: Partial<Asset>): boolean {
   const t = norm(`${a.name || ''} ${a.entityType || ''} ${a.category || ''}`);
   return ROOM_RE.test(t) || t.includes('budova') || t.includes('building');
 }

@@ -45,6 +45,7 @@ const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const KartotekaPage = lazy(() => import('./pages/KartotekaPage'));
 const MachineOverviewPage = lazy(() => import('./pages/MachineOverviewPage'));
 const ProductionLinesPage = lazy(() => import('./pages/ProductionLinesPage'));
+const MapaArealuPage = lazy(() => import('./pages/MapaArealuPage'));
 const PreviewPage = lazy(() => import('./pages/PreviewPage'));
 
 // ═══════════════════════════════════════════════════════════════════
@@ -189,6 +190,7 @@ function ProtectedRoutes() {
         <Route path="/asset/:assetId" element={<ProtectedPage permissions={['asset.read']}><AssetCardPage /></ProtectedPage>} />
         <Route path="/stroje" element={<ProtectedPage permissions={['asset.read']}><MachineOverviewPage /></ProtectedPage>} />
         <Route path="/linky" element={<ProtectedPage permissions={['asset.read']}><ProductionLinesPage /></ProtectedPage>} />
+        <Route path="/mapa" element={<ProtectedPage permissions={['asset.read']}><MapaArealuPage /></ProtectedPage>} />
         <Route path="/calendar" element={<ProtectedPage moduleId="calendar" permissions={['wo.read', 'schedule.manage']}><CalendarPage /></ProtectedPage>} />
         <Route path="/waste" element={<Navigate to="/" replace />} />
         <Route path="/trustbox" element={<ProtectedPage permissions={['secretbox.view']}><TrustBoxPage /></ProtectedPage>} />
