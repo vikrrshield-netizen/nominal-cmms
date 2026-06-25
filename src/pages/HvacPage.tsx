@@ -21,6 +21,7 @@ import { useAuthContext } from '../context/AuthContext';
 import { useEmployeeNames, MAINTENANCE_EMPLOYEE_ROLES } from '../hooks/useEmployeeDirectory';
 import { addWorkLog, subscribeToRecentWorkLogs } from '../services/workLogService';
 import { showToast } from '../components/ui/Toast';
+import KlimatizaceSection from '../components/hvac/KlimatizaceSection';
 import type { Asset, CustomField } from '../types/asset';
 import type { InventoryItem } from '../types/inventory';
 import type { WorkLog } from '../types/workLog';
@@ -190,6 +191,7 @@ export default function HvacPage() {
   const [exchangeNote, setExchangeNote] = useState('');
   const [savingExchange, setSavingExchange] = useState(false);
   const [showPrefilters, setShowPrefilters] = useState(false);
+  const [view, setView] = useState<'vzt' | 'klimatizace'>('vzt');
   const canWriteHvacExchange = hasPermission('hvac.manage') || hasPermission('wo.create') || hasPermission('wo.update');
 
   useEffect(() => {
@@ -451,6 +453,12 @@ export default function HvacPage() {
       </header>
 
       <main className="mx-auto max-w-6xl space-y-4 px-4 py-4">
+        <div className="flex gap-2">
+          <button type="button" onClick={() => setView('vzt')} className={`px-4 py-2 rounded-xl text-sm font-bold transition ${view === 'vzt' ? 'bg-emerald-600 text-white' : 'bg-white border border-slate-200 text-slate-600'}`}>Filtry / VZT</button>
+          <button type="button" onClick={() => setView('klimatizace')} className={`px-4 py-2 rounded-xl text-sm font-bold transition ${view === 'klimatizace' ? 'bg-emerald-600 text-white' : 'bg-white border border-slate-200 text-slate-600'}`}>Klimatizace</button>
+        </div>
+        {view === 'klimatizace' && <KlimatizaceSection />}
+        {view === 'vzt' && (<>
         <section className="grid grid-cols-3 gap-2">
           <div className="card-b p-3">
             <div className="text-xl font-black text-slate-900">{hvacAssets.length}</div>
@@ -579,6 +587,7 @@ export default function HvacPage() {
             </div>
           </aside>
         </section>
+        </>)}
       </main>
 
       {selectedAsset && (
