@@ -13,7 +13,7 @@ import { useInspections } from '../hooks/useInspections';
 import { useDashboardConfig } from '../hooks/useDashboardConfig';
 import {
   Settings, AlertTriangle, Bell, LogOut, Loader2, ClipboardCheck,
-  Sparkles, Wrench, BarChart3, Ruler,
+  Sparkles, Wrench, BarChart3, Ruler, GlassWater, ScanLine,
   Clock, FileText, PlusCircle, Search, ShieldCheck, X, User, MapPin,
   Calendar, Building2, Package, Wind, Cog, Thermometer, Monitor, Factory, FlaskConical, Users,
   ChevronUp, ChevronDown,
@@ -276,6 +276,8 @@ function ModuleShortcuts({ onNavigate, showHeader = true, counts }: { onNavigate
     { label: 'Kontroly', detail: 'plány a závady', path: '/inspections', icon: ClipboardCheck, tone: 'text-cyan-600', permissions: ['asset.read', 'weekly.modify'] },
     { label: 'Reporty', detail: 'audit a historie', path: '/reports', icon: BarChart3, tone: 'text-violet-600', permissions: ['report.read', 'audit.read'] },
     { label: 'Kalibrace', detail: 'měřidla a platnost', path: '/kalibrace', icon: Ruler, tone: 'text-cyan-700', permissions: ['asset.read'] },
+    { label: 'Sklo a plast', detail: 'celistvost a kontroly', path: '/registr-skla', icon: GlassWater, tone: 'text-sky-700', permissions: ['asset.read'] },
+    { label: 'Detektory', detail: 'cizí tělesa, test 1×/rok', path: '/detektory', icon: ScanLine, tone: 'text-rose-700', permissions: ['asset.read'] },
     { label: 'Kalendář', detail: 'plán a dovolené', path: '/calendar', icon: Calendar, tone: 'text-indigo-600', permissions: ['wo.read', 'schedule.manage'] },
     { label: 'Sklad ND', detail: 'díly a převodovky', path: '/inventory', icon: Package, tone: 'text-orange-600', permissions: ['inv.consume', 'inv.restock', 'inv.manage', 'inv.order', 'report.read'] },
     { label: 'Převodovky', detail: 'umístění a teploty', path: '/gearboxes', icon: Cog, tone: 'text-violet-600', permissions: ['gearbox.temperature.write', 'gearbox.manage', 'asset.update', 'asset.read'] },
