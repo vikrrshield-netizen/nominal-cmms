@@ -2179,19 +2179,30 @@ export default function KartotekaPage() {
 
       {/* ── Přidat (výběr typu) ── */}
       {addSheetOpen && (
-        <BottomSheet title="Přidat do kartotéky" isOpen onClose={() => setAddSheetOpen(false)}>
+        <BottomSheet title="Co chceš přidat?" isOpen onClose={() => setAddSheetOpen(false)}>
           <div className="grid grid-cols-2 gap-2 p-1">
-            <button type="button" className="flex min-h-16 flex-col items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 hover:border-emerald-400 hover:bg-emerald-50" onClick={() => { setAddSheetOpen(false); openCreateModal(null, 'building'); }}>
-              <Building2 size={22} className="text-emerald-700" /> Budova
+            <button type="button" className="col-span-2 flex items-center gap-3 rounded-xl border-2 border-emerald-200 bg-emerald-50 p-3 text-left hover:border-emerald-400" onClick={() => { setAddSheetOpen(false); openCreateModal(null, 'asset'); }}>
+              <Wrench size={24} className="shrink-0 text-emerald-700" />
+              <span className="min-w-0">
+                <span className="block text-sm font-black text-slate-900">Zařízení</span>
+                <span className="block text-[12px] text-slate-500">stroj, klimatizace, čerpadlo, motor…</span>
+              </span>
             </button>
-            <button type="button" className="flex min-h-16 flex-col items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 hover:border-emerald-400 hover:bg-emerald-50" onClick={() => { setAddSheetOpen(false); openCreateModal(null, 'room'); }}>
-              <Plus size={22} className="text-emerald-700" /> Místnost
+            <button type="button" className="flex flex-col items-start gap-0.5 rounded-xl border border-slate-200 bg-white p-3 text-left hover:border-emerald-400 hover:bg-emerald-50" onClick={() => { setAddSheetOpen(false); openCreateModal(null, 'building'); }}>
+              <span className="flex items-center gap-2 text-sm font-bold text-slate-800"><Building2 size={18} className="text-emerald-700" /> Budova</span>
+              <span className="text-[11px] text-slate-500">hala, objekt</span>
             </button>
-            <button type="button" className="flex min-h-16 flex-col items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 hover:border-emerald-400 hover:bg-emerald-50" onClick={() => { setAddSheetOpen(false); openCreateModal(null, 'inspection'); }}>
-              <ClipboardCheck size={22} className="text-emerald-700" /> Kontrola
+            <button type="button" className="flex flex-col items-start gap-0.5 rounded-xl border border-slate-200 bg-white p-3 text-left hover:border-emerald-400 hover:bg-emerald-50" onClick={() => { setAddSheetOpen(false); openCreateModal(null, 'room'); }}>
+              <span className="flex items-center gap-2 text-sm font-bold text-slate-800"><Plus size={18} className="text-emerald-700" /> Místnost</span>
+              <span className="text-[11px] text-slate-500">místo uvnitř budovy</span>
             </button>
-            <button type="button" className="flex min-h-16 flex-col items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 hover:border-emerald-400 hover:bg-emerald-50" onClick={() => { setAddSheetOpen(false); openCreateModal(null, 'gearbox'); }}>
-              <Cog size={22} className="text-emerald-700" /> Převodovka
+            <button type="button" className="flex flex-col items-start gap-0.5 rounded-xl border border-slate-200 bg-white p-3 text-left hover:border-emerald-400 hover:bg-emerald-50" onClick={() => { setAddSheetOpen(false); openCreateModal(null, 'inspection'); }}>
+              <span className="flex items-center gap-2 text-sm font-bold text-slate-800"><ClipboardCheck size={18} className="text-emerald-700" /> Kontrola</span>
+              <span className="text-[11px] text-slate-500">pravidelná obchůzka</span>
+            </button>
+            <button type="button" className="flex flex-col items-start gap-0.5 rounded-xl border border-slate-200 bg-white p-3 text-left hover:border-emerald-400 hover:bg-emerald-50" onClick={() => { setAddSheetOpen(false); openCreateModal(null, 'gearbox'); }}>
+              <span className="flex items-center gap-2 text-sm font-bold text-slate-800"><Cog size={18} className="text-emerald-700" /> Převodovka</span>
+              <span className="text-[11px] text-slate-500">speciální karta (teplota)</span>
             </button>
           </div>
         </BottomSheet>
