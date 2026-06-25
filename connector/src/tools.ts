@@ -3,7 +3,7 @@
 
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { getAssets, getAssetById, getWorkLogs, getOpenTasks, type Asset } from './firestore.js';
+import { getAssets, getAssetById, getWorkLogs, getOpenTasks, findAssetByName, addWorkLogEntry, createTaskEntry, createAssetEntry, type Asset } from './firestore.js';
 
 const daysUntil = (iso?: string): number | null => {
   if (!iso) return null;
@@ -122,6 +122,47 @@ export function registerTools(server: McpServer): void {
         'Poslední práce:',
         ...(logLines.length ? logLines : ['   —']),
       ].join('\n'));
+    },
+  );
+
+  // Zápisové nástroje (Fáze 2) — jen když je MCP_ALLOW_WRITE=true.
+  if (process.env.MCP_ALLOW_WRITE === 'true') registerWriteTools(server);
+}
+
+function registerWriteTools(server: McpServer): void {
+  server.tool(
+    'add_worklog',
+    'Zapíše záznam práce do Deníku (co bylo uděláno, na čem, kým). Použij JEN na výslovný pokyn uživatele.',
+    { content: z.string().describe('co bylo uděláno / výsledek'), asset: z.string().optional().describe('název zařízení, kterého se to týká'), workType: z.string().optional().describe('druh práce, např. Údržba / Oprava / Čištění'), worker: z.string().optional().describe('kdo práci udělal') },
+    async ({ content, asset, workType, worker }) => {
+      let assetId: string | undefined;
+      let assetName: string | undefined;
+      if (asset) { const a = await findAssetByName(asset); if (a) { assetId = a.id; assetName = a.name; } else assetName = asset; }
+      await addWorkLogEntry({ assetId, assetName, content, workType, worker });
+      return text(`✅ Zapsáno do Deníku — ${assetName ?? 'bez zařízení'}: ${content}${worker ? ` (${worker})` : ''}`);
+    },
+  );
+
+  server.tool(
+    'create_task',
+    'Založí nový úkol / pracovní příkaz. Použij JEN na výslovný pokyn uživatele.',
+    { title: z.string().describe('název úkolu'), description: z.string().optional(), priority: z.enum(['P1', 'P2', 'P3', 'P4']).optional().describe('P1 = havárie … P4 = nízká (default P3)'), asset: z.string().optional().describe('název zařízení') },
+    async ({ title, description, priority, asset }) => {
+      let assetId: string | undefined;
+      let assetName: string | undefined;
+      if (asset) { const a = await findAssetByName(asset); if (a) { assetId = a.id; assetName = a.name; } else assetName = asset; }
+      const { code } = await createTaskEntry({ title, description, priority, assetId, assetName });
+      return text(`✅ Úkol založen — ${code}: ${title}${assetName ? ` (${assetName})` : ''} [${priority ?? 'P3'}]`);
+    },
+  );
+
+  server.tool(
+    'create_asset',
+    'Založí nové zařízení v kartotéce. Použij JEN na výslovný pokyn uživatele.',
+    { name: z.string().describe('název zařízení, např. „Klimatizace velín"'), location: z.string().optional().describe('umístění textem'), category: z.string().optional() },
+    async ({ name, location, category }) => {
+      await createAssetEntry({ name, location, category });
+      return text(`✅ Zařízení založeno — ${name}${location ? ` (${location})` : ''}. Najdeš ho v Kartotéce (Bez budovy).`);
     },
   );
 }

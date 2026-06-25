@@ -3,4 +3,6 @@ dist/
 .env
 *serviceAccount*.json
 *service-account*.json
+*adminsdk*.json
+*-firebase-adminsdk-*.json
 *.key.json

@@ -9,6 +9,7 @@ import { registerTools } from './tools.js';
 
 const PORT = Number(process.env.PORT) || 8080;
 const CONNECTOR_TOKEN = process.env.CONNECTOR_TOKEN || '';
+const ALLOW_NO_AUTH = process.env.MCP_ALLOW_NO_AUTH === 'true';
 
 function buildServer(): McpServer {
   const server = new McpServer({ name: 'nominal-cmms-connector', version: '0.1.0' });
@@ -25,9 +26,13 @@ app.get('/', (_req, res) => res.json({ ok: true, name: 'nominal-cmms-connector',
 // Jednoduchá ochrana tokenem — pro testování přes MCP Inspector.
 // POZOR: claude.ai vyžaduje OAuth; tu vrstvu přidáme PŘED připojením v Claude (Fáze 1b).
 app.use('/mcp', (req, res, next) => {
-  if (!CONNECTOR_TOKEN) return next(); // bez nastaveného tokenu = jen lokální vývoj
-  if (req.header('authorization') === `Bearer ${CONNECTOR_TOKEN}`) return next();
-  res.status(401).json({ error: 'unauthorized' });
+  if (CONNECTOR_TOKEN) {
+    if (req.header('authorization') === `Bearer ${CONNECTOR_TOKEN}`) return next();
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  // Žádný token nastaven = fail-CLOSED. Bez ověření pustíme jen s explicitním lokálním/dev flagem.
+  if (ALLOW_NO_AUTH) return next();
+  return res.status(401).json({ error: 'unauthorized', hint: 'Nastav CONNECTOR_TOKEN (nebo MCP_ALLOW_NO_AUTH=true jen pro lokalni vyvoj).' });
 });
 
 app.post('/mcp', async (req, res) => {
@@ -38,7 +43,7 @@ app.post('/mcp', async (req, res) => {
     await server.connect(transport);
     await transport.handleRequest(req, res, req.body);
   } catch (err) {
-    console.error('[mcp] error:', err);
+    console.error('[mcp] error:', (err as Error)?.message ?? 'unknown');
     if (!res.headersSent) res.status(500).json({ error: 'internal_error' });
   }
 });
