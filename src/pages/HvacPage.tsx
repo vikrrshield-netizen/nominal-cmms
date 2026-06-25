@@ -459,18 +459,18 @@ export default function HvacPage() {
         </div>
         {view === 'klimatizace' && <KlimatizaceSection />}
         {view === 'vzt' && (<>
-        <section className="grid grid-cols-3 gap-2">
+        <section className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           <div className="card-b p-3">
             <div className="text-xl font-black text-slate-900">{hvacAssets.length}</div>
-            <div className="text-sm font-bold uppercase text-slate-500">Karty VZT</div>
+            <div className="text-sm font-bold text-slate-500">Karty VZT</div>
           </div>
           <div className="rounded-2xl border border-blue-100 bg-blue-50 p-3">
             <div className="text-xl font-black text-blue-700">{filterItems.length}</div>
-            <div className="text-sm font-bold uppercase text-blue-700">Filtry ve skladu</div>
+            <div className="text-sm font-bold text-blue-700">Filtry sklad</div>
           </div>
           <div className="rounded-2xl border border-amber-100 bg-amber-50 p-3">
             <div className="text-xl font-black text-amber-700">{lowFilterItems.length}</div>
-            <div className="text-sm font-bold uppercase text-amber-700">Pod limitem</div>
+            <div className="text-sm font-bold text-amber-700">Pod limitem</div>
           </div>
         </section>
 
