@@ -21,6 +21,7 @@ const InventoryPage = lazy(() => import('./pages/InventoryPage'));
 const FleetPage = lazy(() => import('./pages/FleetPage'));
 const VzvPage = lazy(() => import('./pages/VzvPage'));
 const HvacPage = lazy(() => import('./pages/HvacPage'));
+const CalibrationPage = lazy(() => import('./pages/CalibrationPage'));
 const GearboxesPage = lazy(() => import('./pages/GearboxesPage'));
 const DataloggersPage = lazy(() => import('./pages/DataloggersPage'));
 const RevisionsPage = lazy(() => import('./pages/RevisionsPage'));
@@ -189,6 +190,7 @@ function ProtectedRoutes() {
         <Route path="/revisions" element={<ProtectedPage moduleId="revisions" permissions={['asset.read']}><RevisionsPage /></ProtectedPage>} />
         <Route path="/asset/:assetId" element={<ProtectedPage permissions={['asset.read']}><AssetCardPage /></ProtectedPage>} />
         <Route path="/stroje" element={<ProtectedPage permissions={['asset.read']}><MachineOverviewPage /></ProtectedPage>} />
+        <Route path="/kalibrace" element={<ProtectedPage permissions={['asset.read']}><CalibrationPage /></ProtectedPage>} />
         <Route path="/linky" element={<ProtectedPage permissions={['asset.read']}><ProductionLinesPage /></ProtectedPage>} />
         <Route path="/mapa" element={<ProtectedPage permissions={['asset.read']}><MapaArealuPage /></ProtectedPage>} />
         <Route path="/calendar" element={<ProtectedPage moduleId="calendar" permissions={['wo.read', 'schedule.manage']}><CalendarPage /></ProtectedPage>} />
