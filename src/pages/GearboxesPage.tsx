@@ -28,6 +28,7 @@ import type { Asset } from '../types/asset';
 import type { GearboxStatus, GearboxTemperatureLog } from '../types/gearbox';
 import type { WorkLog } from '../types/workLog';
 import { showToast } from '../components/ui/Toast';
+import { Skeleton } from '../components/ui';
 import GearboxRepairModal from '../components/gearbox/GearboxRepairModal';
 import GearboxProblemModal from '../components/gearbox/GearboxProblemModal';
 
@@ -399,9 +400,20 @@ export default function GearboxesPage() {
         </section>
 
         {loading && (
-          <div className="flex items-center gap-2 text-sm font-bold text-slate-500">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Načítám převodovky...
+          <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3" role="status" aria-busy="true" aria-label="Načítám převodovky…">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className={`${PANEL} p-4 space-y-3`}>
+                <div className="flex items-center gap-3">
+                  <Skeleton width="w-12" height="h-12" rounded="rounded-2xl" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton width="w-2/3" height="h-5" />
+                    <Skeleton width="w-1/2" height="h-4" />
+                  </div>
+                </div>
+                <Skeleton height="h-16" rounded="rounded-xl" />
+                <Skeleton height="h-8" rounded="rounded-xl" />
+              </div>
+            ))}
           </div>
         )}
 

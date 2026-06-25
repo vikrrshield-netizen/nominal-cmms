@@ -25,6 +25,7 @@ import {
   subscribeDataloggerTemperatureLogs,
 } from '../services/dataloggerService';
 import { showToast } from '../components/ui/Toast';
+import { Skeleton } from '../components/ui';
 import type { Asset, CustomField } from '../types/asset';
 import type { DataloggerTemperatureLevel, DataloggerTemperatureLog } from '../types/datalogger';
 
@@ -357,9 +358,23 @@ export default function DataloggersPage() {
         </section>
 
         {loading && (
-          <div className="vik-card flex items-center gap-2 p-4 text-sm font-bold text-slate-600">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Načítám datalogery...
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3" role="status" aria-busy="true" aria-label="Načítám datalogery…">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="vik-card space-y-3 p-4">
+                <div className="flex items-center gap-3">
+                  <Skeleton width="w-11" height="h-11" rounded="rounded-2xl" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton width="w-2/3" height="h-5" />
+                    <Skeleton width="w-1/2" height="h-4" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Skeleton height="h-20" rounded="rounded-xl" />
+                  <Skeleton height="h-20" rounded="rounded-xl" />
+                </div>
+                <Skeleton height="h-11" rounded="rounded-xl" />
+              </div>
+            ))}
           </div>
         )}
 

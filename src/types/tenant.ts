@@ -6,6 +6,15 @@
 // TENANT SETTINGS — active modules per tenant
 // ═══════════════════════════════════════════════════════
 
+/** Per-modulová konfigurace ukládaná do tenant_settings.moduleConfig.
+ *  Vše volitelné — nenastavené pole = výchozí chování. */
+export interface TenantModuleConfig {
+  warehouse?: { lowStockThreshold?: number };
+  shifts?: { minStaffing?: number };
+  fleet?: { serviceIntervalKm?: number };
+  reports?: { mtbfTargetHours?: number; mttrTargetHours?: number };
+}
+
 export interface TenantSettings {
   id: string;           // tenantId e.g. 'main_firm'
   name: string;         // Display name e.g. 'Nominal s.r.o.'
@@ -13,6 +22,7 @@ export interface TenantSettings {
   logoUrl?: string;
   logoLetter?: string;
   activeModules: string[]; // Module IDs from MODULE_DEFINITIONS
+  moduleConfig?: TenantModuleConfig; // Konfigurace jednotlivých modulů
   updatedAt: Date;
   updatedByName: string;
 }

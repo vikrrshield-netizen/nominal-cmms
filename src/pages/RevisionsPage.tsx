@@ -9,11 +9,11 @@ import {
   formatRevisionDate, daysUntilRevision,
 } from '../hooks/useRevisions';
 import type { Revision, RevisionType, RevisionStatus } from '../hooks/useRevisions';
-import { Breadcrumb } from '../components/ui';
+import { Breadcrumb, Skeleton, SkeletonList } from '../components/ui';
 import { useReports } from '../hooks/useReports';
 import {
   Shield, AlertTriangle, CheckCircle2,
-  Loader2, Calendar, Search, X, Download, Edit2, Trash2,
+  Calendar, Search, X, Download, Edit2, Trash2,
 } from 'lucide-react';
 import { doc, deleteDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -63,8 +63,21 @@ export default function RevisionsPage() {
   // ─────────────────────────────────────────
   if (loading) {
     return (
-      <div className="vik-page flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      <div className="vik-page pb-24">
+        <div className="vik-page-header px-4 py-4">
+          <div className="vik-page-shell space-y-2">
+            <Skeleton width="w-48" height="h-7" />
+          </div>
+        </div>
+        <div className="vik-page-shell p-4 space-y-4">
+          <div className="grid grid-cols-4 gap-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} height="h-20" rounded="rounded-2xl" />
+            ))}
+          </div>
+          <Skeleton height="h-12" rounded="rounded-xl" />
+          <SkeletonList rows={6} />
+        </div>
       </div>
     );
   }

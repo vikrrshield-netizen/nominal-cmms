@@ -9,11 +9,13 @@ import {
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
+import { useTenantSettings } from '../hooks/useTenantSettings';
 import {
   ArrowLeft, Loader2, Plus, X, Package, TruckIcon,
   Warehouse, CheckCircle2, ArrowDownToLine, Boxes, ArrowUpFromLine,
 } from 'lucide-react';
 import { showToast } from '../components/ui/Toast';
+import { Skeleton, SkeletonList } from '../components/ui';
 
 // ═══════════════════════════════════════════════════════════════════
 // TYPES
@@ -176,6 +178,12 @@ export default function WarehousePage() {
   const canView = hasPermission('warehouse.view') || hasPermission('warehouse.manage');
   const canManage = hasPermission('warehouse.manage');
 
+  // Záložní minimum z nastavení modulu (Nastavení → Sklad výroby). Použije se
+  // u položek, které nemají vlastní minimum (minQuantity = 0), aby se hlídaly taky.
+  const { tenants } = useTenantSettings();
+  const defaultMin = (tenants.find((t) => t.id === user?.tenantId) ?? tenants[0])?.moduleConfig?.warehouse?.lowStockThreshold ?? 0;
+  const effectiveMin = (minQuantity: number) => (minQuantity > 0 ? minQuantity : defaultMin);
+
   const [activeTab, setActiveTab] = useState<WarehouseTab>('zasoby');
 
   // Data
@@ -198,9 +206,10 @@ export default function WarehousePage() {
   const stockStats = useMemo(() => ({
     totalRaw: stock.filter(s => s.category === 'raw').reduce((a, s) => a + s.quantity, 0),
     totalFinished: stock.filter(s => s.category === 'finished').reduce((a, s) => a + s.quantity, 0),
-    lowStock: stock.filter(s => s.quantity <= s.minQuantity && s.minQuantity > 0).length,
+    lowStock: stock.filter(s => { const m = effectiveMin(s.minQuantity); return m > 0 && s.quantity <= m; }).length,
     pendingReceipts: receipts.filter(r => r.status === 'pending').length,
-  }), [stock, receipts]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [stock, receipts, defaultMin]);
 
   if (!canView) {
     return (
@@ -368,8 +377,9 @@ export default function WarehousePage() {
       {/* Content */}
       <div className="max-w-2xl mx-auto px-4 space-y-3">
         {loading && (
-          <div className="flex items-center justify-center py-16 text-slate-500">
-            <Loader2 className="w-6 h-6 animate-spin mr-2" /> Načítám...
+          <div className="space-y-3">
+            <Skeleton width="w-32" height="h-5" />
+            <SkeletonList rows={6} />
           </div>
         )}
 
@@ -380,7 +390,7 @@ export default function WarehousePage() {
             {receipts.map(r => {
               const st = RECEIPT_STATUS[r.status];
               return (
-                <div key={r.id} className="bg-white rounded-2xl border border-slate-700/40 overflow-hidden">
+                <div key={r.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
                   <div className={`px-4 py-2.5 ${st.bg} flex items-center justify-between`}>
                     <div className="flex items-center gap-2">
                       <div className={`w-2.5 h-2.5 rounded-full ${st.dot}`} />
@@ -422,10 +432,12 @@ export default function WarehousePage() {
           <>
             {stock.length === 0 && <EmptyState icon={<Boxes className="w-14 h-14 text-slate-600" />} text="Žádné zásoby" sub="Přidejte položky skladu" />}
             {stock.map(s => {
-              const isLow = s.minQuantity > 0 && s.quantity <= s.minQuantity;
+              const itemMin = effectiveMin(s.minQuantity);
+              const usesDefaultMin = s.minQuantity <= 0 && defaultMin > 0;
+              const isLow = itemMin > 0 && s.quantity <= itemMin;
               const cat = STOCK_CATEGORIES[s.category] || STOCK_CATEGORIES.raw;
               return (
-                <div key={s.id} className={`bg-white rounded-2xl border ${isLow ? 'border-red-500/30 ring-1 ring-red-500/20' : 'border-slate-700/40'} p-4`}>
+                <div key={s.id} className={`bg-white rounded-2xl border ${isLow ? 'border-red-500/30 ring-1 ring-red-500/20' : 'border-slate-200'} p-4`}>
                   <div className="flex items-center justify-between mb-2">
                     <div>
                       <div className="text-sm font-bold text-slate-900">{s.materialName}</div>
@@ -433,8 +445,10 @@ export default function WarehousePage() {
                     </div>
                     <div className="text-right">
                       <div className={`text-lg font-bold ${isLow ? 'text-red-700' : 'text-slate-900'}`}>{s.quantity} {s.unit}</div>
-                      {s.minQuantity > 0 && (
-                        <div className="text-[10px] text-slate-500">min: {s.minQuantity} {s.unit}</div>
+                      {itemMin > 0 && (
+                        <div className="text-[10px] text-slate-500">
+                          min: {itemMin} {s.unit}{usesDefaultMin && <span className="text-slate-400"> (výchozí)</span>}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -462,7 +476,7 @@ export default function WarehousePage() {
               const st = SHIPMENT_STATUS[s.status];
               return (
                 <div key={s.id} className={`bg-white rounded-2xl border ${
-                  s.status === 'shipped' ? 'border-emerald-500/20 opacity-70' : 'border-slate-700/40'
+                  s.status === 'shipped' ? 'border-emerald-500/20 opacity-70' : 'border-slate-200'
                 } overflow-hidden`}>
                   <div className={`px-4 py-2.5 ${st.bg} flex items-center justify-between`}>
                     <div className="flex items-center gap-2">

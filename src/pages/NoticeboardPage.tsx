@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { showToast } from '../components/ui/Toast';
 import MicButton from '../components/ui/MicButton';
+import { SkeletonList } from '../components/ui';
 
 // ═══════════════════════════════════════════════════════════════════
 // TYPES
@@ -358,11 +359,7 @@ export default function NoticeboardPage() {
 
       {/* Feed */}
       <div className="max-w-2xl mx-auto px-4 py-4 space-y-3">
-        {loading && (
-          <div className="flex items-center justify-center py-12 text-slate-500">
-            <Loader2 className="w-6 h-6 animate-spin mr-2" /> Načítám...
-          </div>
-        )}
+        {loading && <SkeletonList rows={6} />}
 
         {!loading && filteredPosts.length === 0 && (
           <div className="text-center py-16">

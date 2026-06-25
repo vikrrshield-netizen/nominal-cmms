@@ -17,6 +17,7 @@ import {
   Clock, ChevronRight, Settings, X, Loader2, Smartphone,
 } from 'lucide-react';
 import { enablePushNotifications } from '../services/pushNotificationService';
+import { SkeletonList } from '../components/ui';
 
 // ═══════════════════════════════════════════════════════════════════
 // TYPES
@@ -448,12 +449,7 @@ export default function NotificationsPage() {
           </div>
 
           {/* Loading */}
-          {loading && (
-            <div className="text-center py-16">
-              <Loader2 className="w-8 h-8 text-emerald-700 animate-spin mx-auto mb-3" />
-              <p className="text-slate-500 text-sm">Načítám notifikace...</p>
-            </div>
-          )}
+          {loading && <SkeletonList rows={6} />}
 
           {/* Empty */}
           {!loading && filteredNotifications.length === 0 && (

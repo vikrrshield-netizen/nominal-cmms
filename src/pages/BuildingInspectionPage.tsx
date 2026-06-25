@@ -29,6 +29,7 @@ import {
 import FAB from '../components/ui/FAB';
 import EmptyState from '../components/ui/EmptyState';
 import BottomSheet, { FormField, SubmitButton } from '../components/ui/BottomSheet';
+import { Skeleton } from '../components/ui';
 
 // ═══════════════════════════════════════════════════
 // TYPES
@@ -848,8 +849,14 @@ export default function BuildingInspectionPage() {
 
         {/* Cards grid */}
         {loading ? (
-          <div className="flex items-center justify-center py-16 text-slate-500">
-            <Loader2 className="w-6 h-6 animate-spin mr-2" /> Načítám...
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="vik-card p-4 space-y-3">
+                <Skeleton height="h-5" width="w-2/3" />
+                <Skeleton height="h-4" />
+                <Skeleton height="h-4" width="w-1/2" />
+              </div>
+            ))}
           </div>
         ) : filtered.length === 0 ? (
           <EmptyState

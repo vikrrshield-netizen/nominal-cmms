@@ -2,14 +2,14 @@
 // VIKRR — Asset Shield — Hlavní aplikace s routingem
 
 import { lazy, Suspense, useEffect, type ReactNode } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuthContext } from './context/AuthContext';
 import { LoadingSpinner } from './components/ui';
 import AppCoach from './components/ui/AppCoach';
 import AppShell from './components/AppShell';
 import ToastContainer, { showToast } from './components/ui/Toast';
-import { AppErrorBoundary, AppErrorListeners } from './components/AppErrorBoundary';
-import { useTenantSettings } from './hooks/useTenantSettings';
+import { AppErrorBoundary, AppErrorListeners, RouteErrorBoundary } from './components/AppErrorBoundary';
+import { useTenantSettings, TenantSettingsProvider } from './hooks/useTenantSettings';
 import { listenForForegroundPush } from './services/pushNotificationService';
 
 const LoginPage = lazy(() => import('./pages/LoginPage'));
@@ -139,40 +139,11 @@ function ProtectedPage({
   );
 }
 
-function ProtectedRoutes() {
-  const { isAuthenticated, isLoading, isKiosk } = useAuthContext();
-
-  // Loading state
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#f1ece3] flex items-center justify-center">
-        <LoadingSpinner size="lg" text="Načítám..." />
-      </div>
-    );
-  }
-
-  // Not authenticated → Login
-  if (!isAuthenticated) {
-    return (
-      <Suspense fallback={<PageLoading />}>
-        <LoginPage />
-      </Suspense>
-    );
-  }
-
-  // Kiosk mode → dedicated page
-  if (isKiosk) {
-    return (
-      <Suspense fallback={<PageLoading />}>
-        <KioskPage />
-      </Suspense>
-    );
-  }
-
-  // Normal app routes — na PC obaleno boční lištou (AppShell), na mobilu beze změny
+function RoutedContent() {
+  const location = useLocation();
   return (
-    <Suspense fallback={<PageLoading />}>
-      <AppShell>
+    <RouteErrorBoundary key={location.pathname}>
+      <div className="vik-fade-in">
       <Routes>
         <Route path="/" element={<DashboardPage />} />
         <Route path="/inspection" element={<ProtectedPage moduleId="inspections" permissions={['asset.read', 'weekly.modify']}><BuildingInspectionPage /></ProtectedPage>} />
@@ -219,6 +190,46 @@ function ProtectedRoutes() {
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </div>
+    </RouteErrorBoundary>
+  );
+}
+
+function ProtectedRoutes() {
+  const { isAuthenticated, isLoading, isKiosk } = useAuthContext();
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#f1ece3] flex items-center justify-center">
+        <LoadingSpinner size="lg" text="Načítám..." />
+      </div>
+    );
+  }
+
+  // Not authenticated → Login
+  if (!isAuthenticated) {
+    return (
+      <Suspense fallback={<PageLoading />}>
+        <LoginPage />
+      </Suspense>
+    );
+  }
+
+  // Kiosk mode → dedicated page
+  if (isKiosk) {
+    return (
+      <Suspense fallback={<PageLoading />}>
+        <KioskPage />
+      </Suspense>
+    );
+  }
+
+  // Normal app routes — na PC obaleno boční lištou (AppShell), na mobilu beze změny
+  return (
+    <Suspense fallback={<PageLoading />}>
+      <AppShell>
+        <RoutedContent />
       </AppShell>
       <AppCoach />
     </Suspense>
@@ -250,13 +261,15 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppErrorListeners />
-        <ForegroundPushListener />
-        <SandboxBanner />
-        <AppErrorBoundary>
-          <ProtectedRoutes />
-        </AppErrorBoundary>
-        <ToastContainer />
+        <TenantSettingsProvider>
+          <AppErrorListeners />
+          <ForegroundPushListener />
+          <SandboxBanner />
+          <AppErrorBoundary>
+            <ProtectedRoutes />
+          </AppErrorBoundary>
+          <ToastContainer />
+        </TenantSettingsProvider>
       </AuthProvider>
     </BrowserRouter>
   );
