@@ -99,6 +99,26 @@ který v remote prostředí spustí `npm install`. Lokální nastavení (permiss
 PostToolUse lint) je v `.claude/settings.local.json`. Pozn.: stažení Playwright
 prohlížeče vyžaduje `cdn.playwright.dev` v egress allowlistu prostředí.
 
+### Projektové skilly (`.claude/commands/`)
+
+Opakované postupy jsou zabalené do slash commandů — používej je místo
+vymýšlení od nuly: `/page`, `/service`, `/skeleton`, `/wire-setting`
+(funkční nastavení modulu), `/ship` (commit+push), `/deploy`, `/fix-ci`,
+`/audit`, `/revize` (revize diffu proti konvencím).
+
+### Šetři Claude limity
+
+- **Ověřování nech na CI.** GitHub Actions (`.github/workflows/ci.yml`) pouští
+  lint + typecheck + build na každý PR/push. Nespouštěj `npm run build` opakovaně
+  ručně, pokud stačí kouknout na výsledek CI; lokálně buildi jen když potřebuješ
+  rychlou zpětnou vazbu k rozdělané změně.
+- **Model tiering.** Mechanickou práci (kostry, přejmenování, hromadné drobné
+  edity, vyhledávání) deleguj na levnější model (Haiku/Sonnet) nebo na subagenty;
+  Opus si šetři na těžké přemýšlení (architektura, záludné bugy, review). Velké
+  mechanické dávky paralelizuj přes subagenty, ať nezahltí hlavní kontext.
+- **Míň osahávání kódu.** Než budeš číst kód, koukni do `docs/` a tohoto souboru;
+  čti cíleně (konkrétní rozsahy), ne celé velké soubory.
+
 ## Firebase Config
 
 Environment variables in `.env.local` (see `.env.example`). `VITE_USE_EMULATORS` flag switches to local emulators. Firestore security rules in `firestore.rules` enforce role-based access with helper functions (`isSignedIn()`, `getUserRole()`, `hasRole()`, `isAdmin()`).
