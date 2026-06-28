@@ -25,7 +25,8 @@ konkrétního projektu (stack, vzory, theme) — pro nový projekt si napiš vla
 ## Jiné nástroje a chaty
 - **OpenAI Codex** (a další agenti): čtou `AGENTS.md` v kořeni repa (společný
   zdroj pravdy, ukazuje na `CLAUDE.md`). Obecné skilly z `commands/` jdou
-  zkopírovat do `~/.codex/prompts/` (stejný markdown).
+  zkopírovat do `~/.codex/prompts/` (stejný markdown). Kickoff prompt pro
+  Codex session je v `codex-kickoff.md`.
 - **Klasické chaty na claude.ai**: `.md` skilly nevidí — principy a styl vlož
   do **Project → Custom instructions** (hotový text v `claude-project-instructions.md`),
   doménu nahraj do **Project knowledge**.
