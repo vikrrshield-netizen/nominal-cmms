@@ -106,6 +106,10 @@ vymýšlení od nuly: `/page`, `/service`, `/skeleton`, `/wire-setting`
 (funkční nastavení modulu), `/ship` (commit+push), `/deploy`, `/fix-ci`,
 `/audit`, `/revize` (revize diffu proti konvencím).
 
+Přenosné, projektově nezávislé kousky (obecné skilly, CI šablona, snippet
+do CLAUDE.md) jsou v `.claude/starter-kit/` — viz jeho `README.md` pro
+nasazení do nového repa.
+
 ### Šetři Claude limity
 
 - **Ověřování nech na CI.** GitHub Actions (`.github/workflows/ci.yml`) pouští
