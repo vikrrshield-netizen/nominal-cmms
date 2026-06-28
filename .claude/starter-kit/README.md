@@ -22,6 +22,14 @@ Zkopíruj do nového repa a doplň konvence daného projektu.
 Skilly typu `/page`, `/service`, `/skeleton`, `/wire-setting` kódují konvence
 konkrétního projektu (stack, vzory, theme) — pro nový projekt si napiš vlastní.
 
+## Jiné nástroje a chaty
+- **OpenAI Codex** (a další agenti): čtou `AGENTS.md` v kořeni repa (společný
+  zdroj pravdy, ukazuje na `CLAUDE.md`). Obecné skilly z `commands/` jdou
+  zkopírovat do `~/.codex/prompts/` (stejný markdown).
+- **Klasické chaty na claude.ai**: `.md` skilly nevidí — principy a styl vlož
+  do **Project → Custom instructions** (hotový text v `claude-project-instructions.md`),
+  doménu nahraj do **Project knowledge**.
+
 ## Princip „šetři limity"
 - **Stroj > agent**: ověřování (lint/typecheck/build) nech na CI a hocích.
 - **Skill > přemýšlení**: opakovaný postup zabal do `.md`, ať se nevymýšlí znovu.
