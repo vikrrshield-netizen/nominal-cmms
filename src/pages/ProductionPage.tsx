@@ -14,6 +14,7 @@ import {
   Package, Cog, CheckCircle2, AlertTriangle,
 } from 'lucide-react';
 import { showToast } from '../components/ui/Toast';
+import { SkeletonList } from '../components/ui';
 import MicButton from '../components/ui/MicButton';
 import { formatCounter, nextCounterValue } from '../services/counterService';
 import { isExtruderAsset, normalizeGearboxText } from '../services/gearboxService';
@@ -1116,11 +1117,7 @@ export default function ProductionPage() {
 
       {/* Content */}
       <div className="max-w-2xl mx-auto px-4 space-y-3">
-        {loading && (
-          <div className="flex items-center justify-center py-16 text-slate-500">
-            <Loader2 className="w-6 h-6 animate-spin mr-2" /> Načítám...
-          </div>
-        )}
+        {loading && <SkeletonList rows={6} />}
 
         {/* ═══ EXTRUSION TAB ═══ */}
         {activeTab === 'extrusion' && !loadingBatches && (() => {

@@ -48,6 +48,7 @@ import DashboardBuilder from '../components/dashboard/DashboardBuilder';
 import MiniChart from '../components/ui/MiniChart';
 import { useEmployeeDirectory } from '../hooks/useEmployeeDirectory';
 import { TYPE_CONFIG as REVISION_TYPE_CONFIG } from '../hooks/useRevisions';
+import { useConfirm } from '../hooks/useConfirm';
 
 function asDate(value: any): Date | null {
   if (!value) return null;
@@ -980,6 +981,7 @@ function SecondaryModules({
 }) {
   const [editing, setEditing] = useState(false);
   const dragIndex = useRef<number | null>(null);
+  const { ask } = useConfirm();
 
   const primaryIds = new Set(['fault', 'tasks', 'map', 'inspections', 'reports']);
   const fullWidthIds = new Set(['semaphore', 'top5', 'lemon']);
@@ -1024,7 +1026,7 @@ function SecondaryModules({
             {editing && onReset && (
               <button
                 type="button"
-                onClick={() => { if (window.confirm('Obnovit výchozí rozložení dlaždic?')) onReset(); }}
+                onClick={async () => { if (await ask({ message: 'Obnovit výchozí rozložení dlaždic?', danger: true })) onReset(); }}
                 className="rounded-full border border-stone-200 bg-stone-50 px-2.5 py-1 text-xs font-bold text-slate-600 hover:bg-white transition"
               >
                 Obnovit

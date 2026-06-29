@@ -21,9 +21,11 @@ import {
   Download, Trash2, Upload,
 } from 'lucide-react';
 import { useReports } from '../hooks/useReports';
+import { useConfirm } from '../hooks/useConfirm';
 import ImportModal from '../components/ui/ImportModal';
 import BottomSheet, { FormField, FormFooter } from '../components/ui/BottomSheet';
 import MicButton from '../components/ui/MicButton';
+import { Skeleton } from '../components/ui';
 
 // ═══════════════════════════════════════════
 // TOAST SYSTEM
@@ -198,6 +200,7 @@ function SemaphorePanel({ entities, blueprint }: { entities: Entity[]; blueprint
 
 function AddVehicleModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (name: string) => void }) {
   const { user, hasPermission, isReadOnly } = useAuthContext();
+  const { notify } = useConfirm();
   const canManageFleet = hasPermission('fleet.manage') && !isReadOnly;
   const [name, setName] = useState('');
   const [spz, setSpz] = useState('');
@@ -259,7 +262,7 @@ function AddVehicleModal({ onClose, onSuccess }: { onClose: () => void; onSucces
 
       onSuccess(vehicleName);
     } catch (err: unknown) {
-      alert('Chyba: ' + ((err as Error).message || err));
+      notify('Chyba: ' + ((err as Error).message || err));
     }
     setSaving(false);
   };
@@ -303,6 +306,7 @@ function VehicleDetailModal({ entity, blueprint, onClose, toast }: {
 }) {
   const navigate = useNavigate();
   const { user, hasPermission, isReadOnly } = useAuthContext();
+  const { ask } = useConfirm();
   const canManageFleet = hasPermission('fleet.manage') && !isReadOnly;
   const { logs, loading: logsLoading, addLog } = useEntityLogs(entity.id);
   const [showHandover, setShowHandover] = useState(false);
@@ -628,7 +632,7 @@ function VehicleDetailModal({ entity, blueprint, onClose, toast }: {
           <button
             onClick={async () => {
               if (!canManageFleet) return;
-              if (window.confirm(`Opravdu smazat ${entity.name}?`)) {
+              if (await ask({ message: `Opravdu smazat ${entity.name}?`, danger: true })) {
                 await updateDoc(doc(db, 'entities', entity.id), {
                   isDeleted: true,
                   deletedAt: serverTimestamp(),
@@ -701,6 +705,7 @@ function HandoverForm({ entity, onSubmit, onCancel }: {
 export default function FleetPage() {
   const goBack = useBackNavigation('/');
   const { user, hasPermission, isReadOnly } = useAuthContext();
+  const { ask } = useConfirm();
   const canManageFleet = hasPermission('fleet.manage') && !isReadOnly;
   const { entities, loading } = useEntities('vehicle');
   const blueprint = useBlueprint('blueprint_vehicle');
@@ -723,7 +728,31 @@ export default function FleetPage() {
   }, [entities, blueprint]);
 
   if (loading) {
-    return <div className="vik-page min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-emerald-700" /></div>;
+    return (
+      <div className="vik-page min-h-screen pb-24">
+        <div className="vik-page-header px-4 py-4">
+          <div className="max-w-5xl mx-auto flex items-center gap-3">
+            <Skeleton width="w-11" height="h-11" rounded="rounded-xl" />
+            <div className="space-y-2">
+              <Skeleton width="w-40" height="h-6" />
+              <Skeleton width="w-24" height="h-4" />
+            </div>
+          </div>
+        </div>
+        <div className="max-w-5xl mx-auto px-4 pt-4 space-y-4">
+          <Skeleton width="w-full" height="h-32" rounded="rounded-2xl" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="vik-card p-4 space-y-3">
+                <Skeleton height="h-5" width="w-2/3" />
+                <Skeleton height="h-4" />
+                <Skeleton height="h-4" width="w-1/2" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -785,10 +814,10 @@ export default function FleetPage() {
                     Upravit
                   </button>
                   <button
-                    onClick={(e) => {
+                    onClick={async (e) => {
                       e.stopPropagation();
                       if (!canManageFleet) return;
-                      if (window.confirm(`Opravdu smazat ${entity.name}?`)) {
+                      if (await ask({ message: `Opravdu smazat ${entity.name}?`, danger: true })) {
                         updateDoc(doc(db, 'entities', entity.id), {
                           isDeleted: true,
                           deletedAt: serverTimestamp(),

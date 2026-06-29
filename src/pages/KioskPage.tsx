@@ -35,6 +35,7 @@ import {
 import { db } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
 import { useEmployeeNames } from '../hooks/useEmployeeDirectory';
+import { useConfirm } from '../hooks/useConfirm';
 import { createTask } from '../services/taskService';
 import { addWorkLog } from '../services/workLogService';
 import { addGearboxTemperatureLog, isGearboxAsset } from '../services/gearboxService';
@@ -353,6 +354,7 @@ const ENABLE_KIOSK_PRODUCTION_PLAN = false;
 export default function KioskPage() {
   const navigate = useNavigate();
   const { user, logout, canSeeBuilding, hasPermission } = useAuthContext();
+  const { ask } = useConfirm();
   const handoverRecipients = useEmployeeNames({ tenantId: user?.tenantId });
   const canUseGearboxKiosk = hasPermission('gearbox.temperature.write') || hasPermission('gearbox.manage') || hasPermission('asset.update');
   const canUsePrefilterKiosk = canUseGearboxKiosk;
@@ -1461,7 +1463,7 @@ export default function KioskPage() {
   };
 
   const handleHandoverDelete = async (note: ShiftNote) => {
-    if (!window.confirm('Smazat tento zápis z předání směny?')) return;
+    if (!(await ask({ message: 'Smazat tento zápis z předání směny?', danger: true }))) return;
     try {
       await deleteDoc(doc(db, 'shiftNotes', note.id));
     } catch (err) {

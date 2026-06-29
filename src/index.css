@@ -381,6 +381,94 @@ button {
   user-select: none;
 }
 
+/* ─────────────────────────────────────────────────────────────
+   Motion baseline
+   Principy: timing 200–300 ms, animovat jen transform + opacity
+   (levné vlastnosti → plynulé i na továrních tabletech v kiosku),
+   plný respekt k prefers-reduced-motion.
+   ───────────────────────────────────────────────────────────── */
+:root {
+  --dur-fast: 140ms;
+  --dur-base: 220ms;
+  --dur-slow: 300ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes vik-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes vik-slide-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes vik-scale-in {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes vik-shimmer {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
+.vik-fade-in {
+  animation: vik-fade-in var(--dur-base) var(--ease-out) both;
+}
+
+.vik-slide-up {
+  animation: vik-slide-up var(--dur-base) var(--ease-out) both;
+}
+
+.vik-scale-in {
+  animation: vik-scale-in var(--dur-base) var(--ease-out) both;
+}
+
+/* Postupné (staggered) naskakování řádků v seznamech.
+   Použití: na kontejner třídu .vik-stagger, položky dostanou zpoždění
+   přes inline --i (style={{ '--i': index }}). Strop kvůli dlouhým seznamům. */
+.vik-stagger > * {
+  animation: vik-slide-up var(--dur-base) var(--ease-out) both;
+  animation-delay: calc(min(var(--i, 0) * 35ms, 350ms));
+}
+
+/* Skeleton placeholder se shimmer efektem (jen transform → plynulé). */
+.vik-skeleton {
+  position: relative;
+  overflow: hidden;
+  background: #e7e0d4;
+  border-radius: 10px;
+}
+
+.vik-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.55) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: vik-shimmer 1.4s ease-in-out infinite;
+}
+
+/* Bezbariérovost: kdo má v systému omezený pohyb, dostane statické UI. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 @media print {
   html, body, #root { background: #fff !important; color: #000 !important; }
 

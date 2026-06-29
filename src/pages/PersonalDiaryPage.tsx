@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useBackNavigation } from '../hooks/useBackNavigation';
+import { useConfirm } from '../hooks/useConfirm';
 import { useAuthContext } from '../context/AuthContext';
 import {
   collection, query, where, orderBy, onSnapshot,
@@ -14,6 +15,7 @@ import VoiceMemoRecorder from '../components/ui/VoiceMemoRecorder';
 import {
   ArrowLeft, Plus, Trash2, BookOpen, Mic, FileText, Loader2, X,
 } from 'lucide-react';
+import { SkeletonList } from '../components/ui';
 
 // ═══════════════════════════════════════════
 // TYPES
@@ -33,6 +35,7 @@ interface UserNote {
 
 export default function PersonalDiaryPage() {
   const goBack = useBackNavigation('/');
+  const { ask } = useConfirm();
   const { user } = useAuthContext();
   const uid = user?.uid || '';
 
@@ -82,7 +85,7 @@ export default function PersonalDiaryPage() {
 
   // ── Delete note ──
   const handleDelete = async (noteId: string) => {
-    if (!window.confirm('Smazat poznámku?')) return;
+    if (!await ask({ message: 'Smazat poznámku?', danger: true })) return;
     await deleteDoc(doc(db, 'user_notes', noteId));
   };
 
@@ -169,12 +172,7 @@ export default function PersonalDiaryPage() {
         )}
 
         {/* Loading */}
-        {loading && (
-          <div className="text-center py-16">
-            <Loader2 className="w-8 h-8 text-violet-400 animate-spin mx-auto mb-3" />
-            <p className="text-slate-500 text-sm">Načítám poznámky...</p>
-          </div>
-        )}
+        {loading && <SkeletonList rows={6} />}
 
         {/* Empty state */}
         {!loading && notes.length === 0 && !showNew && (

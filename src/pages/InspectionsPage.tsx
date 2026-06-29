@@ -17,6 +17,7 @@ import { showToast } from '../components/ui/Toast';
 import { exportInspectionPDF, exportInspectionXLSX } from '../utils/exportInspectionReport';
 import { exportInspectionRunPDF, exportInspectionRunXLSX } from '../utils/exportInspectionRunReport';
 import { useAuthContext } from '../context/AuthContext';
+import { useConfirm } from '../hooks/useConfirm';
 import { assetService } from '../services/assetService';
 import type { Asset } from '../types/asset';
 
@@ -208,6 +209,7 @@ const DONUT_C = 2 * Math.PI * DONUT_R;
 export default function InspectionsPage() {
   const navigate = useNavigate();
   const { user } = useAuthContext();
+  const { ask } = useConfirm();
   const tenantId = user?.tenantId ?? 'main_firm';
   const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
   const {
@@ -696,7 +698,7 @@ export default function InspectionsPage() {
 
   const handleCloseRun = async () => {
     if (!draftRun) return;
-    if (!window.confirm('Uzavřít kontrolu? Ze závad se založí úkoly.')) return;
+    if (!(await ask({ message: 'Uzavřít kontrolu? Ze závad se založí úkoly.', danger: false }))) return;
     setClosingRun(true);
     try {
       await closeInspectionRun(draftRun.id);

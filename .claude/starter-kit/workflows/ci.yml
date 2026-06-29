@@ -1,0 +1,27 @@
+name: CI
+
+# Šetří limity: ověřování dělá GitHub, ne agent. Uprav kroky dle package.json.
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      # tsc je obvykle součástí build skriptu; jinak přidej: npx tsc --noEmit
+      - run: npm run build
+      # Volitelně testy:
+      # - run: npm test

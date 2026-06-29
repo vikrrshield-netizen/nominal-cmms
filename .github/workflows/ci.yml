@@ -1,0 +1,29 @@
+name: CI
+
+# Šetří Claude limity: ověřování (lint + typecheck + build) dělá GitHub,
+# ne agent. Na PR i na push do master.
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+# Zruší rozběhnutý běh, když přijde nový push na stejnou větev (šetří minuty).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Build (tsc -b && vite build)
+        run: npm run build

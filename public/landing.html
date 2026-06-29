@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Nominal CMMS — údržba výroby pod kontrolou</title>
+<meta name="description" content="Nominal CMMS — systém údržby pro potravinářskou výrobu. Hlášení poruch z dílny, work ordery, revize, sklad a role na pár kliknutí. Česky, offline-first, na tabletu i mobilu." />
+<style>
+  /* ── Paleta z appky (béžovo-zelená) ───────────────────────────── */
+  :root {
+    --bg:#f1ece3; --bg-2:#fbf9f4; --line:#e7e0d4;
+    --ink:#1b2620; --ink-soft:#3d4a43; --muted:#5c6b61;
+    --primary:#1a6b4f; --primary-600:#1f7355; --primary-700:#134e3a;
+    --accent:#2e9e74; --accent-soft:#d8efe4;
+    --amber:#c98a1a; --red:#c0492f;
+    --shadow:0 18px 40px -22px rgba(19,78,58,.45);
+    --dur:.6s; --ease:cubic-bezier(.22,.61,.36,1);
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html { scroll-behavior:smooth; }
+  body {
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--ink); background:var(--bg); line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  a { color:inherit; text-decoration:none; }
+  .wrap { width:min(1120px,92vw); margin:0 auto; }
+  .eyebrow {
+    display:inline-block; font-size:.78rem; font-weight:700; letter-spacing:.12em;
+    text-transform:uppercase; color:var(--primary); background:var(--accent-soft);
+    padding:.35rem .8rem; border-radius:999px;
+  }
+  .btn {
+    display:inline-flex; align-items:center; gap:.5rem; font-weight:700; font-size:1rem;
+    padding:.85rem 1.5rem; border-radius:14px; border:1px solid transparent; cursor:pointer;
+    transition:transform .15s var(--ease), box-shadow .2s var(--ease), background .2s;
+  }
+  .btn-primary { background:var(--primary); color:#fff; box-shadow:var(--shadow); }
+  .btn-primary:hover { background:var(--primary-600); transform:translateY(-2px); }
+  .btn-ghost { background:transparent; color:var(--primary); border-color:var(--line); }
+  .btn-ghost:hover { background:var(--bg-2); transform:translateY(-2px); }
+
+  /* ── Reveal on scroll ─────────────────────────────────────────── */
+  .reveal { opacity:0; transform:translateY(24px); transition:opacity var(--dur) var(--ease), transform var(--dur) var(--ease); }
+  .reveal.in { opacity:1; transform:none; }
+  .reveal[data-d="1"]{ transition-delay:.08s } .reveal[data-d="2"]{ transition-delay:.16s }
+  .reveal[data-d="3"]{ transition-delay:.24s } .reveal[data-d="4"]{ transition-delay:.32s }
+  @media (prefers-reduced-motion:reduce){ .reveal{opacity:1;transform:none;transition:none} html{scroll-behavior:auto} }
+
+  /* ── Nav ──────────────────────────────────────────────────────── */
+  header.nav {
+    position:sticky; top:0; z-index:50; backdrop-filter:blur(10px);
+    background:rgba(241,236,227,.82); border-bottom:1px solid transparent;
+    transition:border-color .3s, box-shadow .3s;
+  }
+  header.nav.stuck { border-color:var(--line); box-shadow:0 6px 20px -16px rgba(19,78,58,.5); }
+  .nav-inner { display:flex; align-items:center; justify-content:space-between; padding:.9rem 0; }
+  .logo { display:flex; align-items:center; gap:.6rem; font-weight:800; font-size:1.15rem; letter-spacing:-.01em; }
+  .logo .mark {
+    width:34px; height:34px; border-radius:10px; display:grid; place-items:center;
+    background:linear-gradient(135deg,var(--primary),var(--accent)); color:#fff; font-size:1rem;
+    box-shadow:var(--shadow);
+  }
+  .nav-links { display:flex; gap:1.6rem; align-items:center; font-weight:600; color:var(--ink-soft); }
+  .nav-links a:hover { color:var(--primary); }
+  .nav-links .lnk { font-size:.95rem; }
+  @media (max-width:780px){ .nav-links .lnk { display:none; } }
+
+  /* ── Hero ─────────────────────────────────────────────────────── */
+  .hero { position:relative; overflow:hidden; padding:5.5rem 0 4rem; }
+  .hero::before {
+    content:""; position:absolute; inset:0; z-index:0;
+    background:
+      radial-gradient(60% 50% at 80% 0%, rgba(46,158,116,.18), transparent 60%),
+      radial-gradient(45% 40% at 0% 30%, rgba(26,107,79,.12), transparent 60%);
+  }
+  .hero .wrap { position:relative; z-index:1; display:grid; grid-template-columns:1.05fr .95fr; gap:3rem; align-items:center; }
+  @media (max-width:880px){ .hero .wrap { grid-template-columns:1fr; gap:2.5rem; } }
+  .hero h1 { font-size:clamp(2.1rem,5vw,3.4rem); line-height:1.08; letter-spacing:-.02em; margin:1rem 0 1rem; }
+  .hero h1 .hl { color:var(--primary); position:relative; }
+  .hero p.lead { font-size:1.15rem; color:var(--ink-soft); max-width:34ch; }
+  .hero .cta { display:flex; gap:.8rem; margin-top:1.8rem; flex-wrap:wrap; }
+  .hero .trust { margin-top:1.6rem; font-size:.85rem; color:var(--muted); display:flex; gap:1.2rem; flex-wrap:wrap; }
+  .hero .trust b { color:var(--ink); }
+
+  /* ── Device mock ──────────────────────────────────────────────── */
+  .mock {
+    background:var(--bg-2); border:1px solid var(--line); border-radius:22px; padding:1rem;
+    box-shadow:var(--shadow); transform:perspective(1200px) rotateY(-6deg) rotateX(2deg);
+    transition:transform .5s var(--ease);
+  }
+  .mock:hover { transform:perspective(1200px) rotateY(0) rotateX(0); }
+  .mock-bar { display:flex; gap:.4rem; margin-bottom:.8rem; }
+  .mock-bar i { width:11px; height:11px; border-radius:50%; background:var(--line); display:inline-block; }
+  .mock-grid { display:grid; grid-template-columns:1fr 1fr; gap:.7rem; }
+  .tile { border-radius:14px; padding:.9rem; color:#fff; min-height:96px; display:flex; flex-direction:column; justify-content:space-between; }
+  .tile.green { background:linear-gradient(135deg,var(--primary),var(--accent)); }
+  .tile.amber { background:linear-gradient(135deg,#d99a2b,#c98a1a); }
+  .tile.red   { background:linear-gradient(135deg,#d4593c,#c0492f); }
+  .tile.dark  { background:linear-gradient(135deg,#2f3b34,#1b2620); }
+  .tile .n { font-size:1.7rem; font-weight:800; line-height:1; }
+  .tile .t { font-size:.8rem; opacity:.92; }
+  .tile .pulse { width:8px;height:8px;border-radius:50%;background:#fff;opacity:.9;animation:pulse 1.6s infinite; }
+  @keyframes pulse { 0%,100%{opacity:.35;transform:scale(.8)} 50%{opacity:1;transform:scale(1.3)} }
+
+  /* ── Sections ─────────────────────────────────────────────────── */
+  section { padding:4.5rem 0; }
+  .sec-head { text-align:center; max-width:60ch; margin:0 auto 2.6rem; }
+  .sec-head h2 { font-size:clamp(1.6rem,3.5vw,2.3rem); letter-spacing:-.02em; margin:.7rem 0 .6rem; }
+  .sec-head p { color:var(--ink-soft); font-size:1.05rem; }
+
+  /* Problem strip */
+  .problems { display:grid; grid-template-columns:repeat(3,1fr); gap:1.2rem; }
+  @media (max-width:780px){ .problems { grid-template-columns:1fr; } }
+  .prob { background:var(--bg-2); border:1px solid var(--line); border-radius:18px; padding:1.4rem; }
+  .prob .ic { font-size:1.6rem; }
+  .prob h3 { font-size:1.05rem; margin:.5rem 0 .3rem; }
+  .prob p { color:var(--muted); font-size:.95rem; }
+
+  /* Features */
+  .features { display:grid; grid-template-columns:repeat(3,1fr); gap:1.2rem; }
+  @media (max-width:980px){ .features { grid-template-columns:repeat(2,1fr); } }
+  @media (max-width:620px){ .features { grid-template-columns:1fr; } }
+  .feat {
+    background:var(--bg-2); border:1px solid var(--line); border-radius:18px; padding:1.5rem;
+    transition:transform .2s var(--ease), box-shadow .25s var(--ease), border-color .2s;
+  }
+  .feat:hover { transform:translateY(-4px); box-shadow:var(--shadow); border-color:var(--accent); }
+  .feat .ic { width:46px; height:46px; border-radius:12px; display:grid; place-items:center;
+    background:var(--accent-soft); color:var(--primary); font-size:1.4rem; margin-bottom:.9rem; }
+  .feat h3 { font-size:1.12rem; margin-bottom:.4rem; }
+  .feat p { color:var(--muted); font-size:.95rem; }
+
+  /* Stats */
+  .stats { background:linear-gradient(135deg,var(--primary-700),var(--primary)); color:#fff; border-radius:26px; padding:2.6rem 1.5rem; }
+  .stats-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:1.2rem; text-align:center; }
+  @media (max-width:720px){ .stats-grid { grid-template-columns:repeat(2,1fr); gap:1.8rem; } }
+  .stat .n { font-size:clamp(2rem,5vw,2.8rem); font-weight:800; line-height:1; }
+  .stat .t { opacity:.85; font-size:.95rem; margin-top:.4rem; }
+
+  /* Steps */
+  .steps { display:grid; grid-template-columns:repeat(3,1fr); gap:1.5rem; counter-reset:s; }
+  @media (max-width:780px){ .steps { grid-template-columns:1fr; } }
+  .step { position:relative; padding-left:3.4rem; }
+  .step::before {
+    counter-increment:s; content:counter(s); position:absolute; left:0; top:0;
+    width:2.4rem; height:2.4rem; border-radius:12px; display:grid; place-items:center;
+    background:var(--primary); color:#fff; font-weight:800;
+  }
+  .step h3 { font-size:1.1rem; margin-bottom:.3rem; }
+  .step p { color:var(--muted); font-size:.95rem; }
+
+  /* Roles */
+  .roles { display:flex; flex-wrap:wrap; gap:.7rem; justify-content:center; }
+  .role { display:inline-flex; align-items:center; gap:.5rem; background:var(--bg-2);
+    border:1px solid var(--line); border-radius:999px; padding:.6rem 1.1rem; font-weight:600; }
+  .role .e { font-size:1.1rem; }
+
+  /* CTA */
+  .cta-band { background:var(--bg-2); border:1px solid var(--line); border-radius:26px; padding:3rem 1.5rem; text-align:center; }
+  .cta-band h2 { font-size:clamp(1.6rem,3.5vw,2.2rem); margin-bottom:.6rem; letter-spacing:-.02em; }
+  .cta-band p { color:var(--ink-soft); max-width:50ch; margin:0 auto 1.6rem; }
+
+  footer { padding:2.5rem 0 3rem; color:var(--muted); font-size:.9rem; text-align:center; border-top:1px solid var(--line); margin-top:3rem; }
+  footer .logo { justify-content:center; margin-bottom:.6rem; color:var(--ink); }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<header class="nav" id="nav">
+  <div class="wrap nav-inner">
+    <div class="logo"><span class="mark">N</span> Nominal&nbsp;<span style="color:var(--primary)">CMMS</span></div>
+    <nav class="nav-links">
+      <a class="lnk" href="#funkce">Funkce</a>
+      <a class="lnk" href="#jak">Jak to funguje</a>
+      <a class="lnk" href="#role">Pro koho</a>
+      <a class="btn btn-primary" href="#kontakt" style="padding:.6rem 1.1rem">Chci ukázku</a>
+    </nav>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="wrap">
+    <div>
+      <span class="eyebrow reveal">Systém údržby pro výrobu</span>
+      <h1 class="reveal" data-d="1">Údržba výroby<br><span class="hl">pod kontrolou.</span></h1>
+      <p class="lead reveal" data-d="2">Od hlášení poruchy z dílny po splněný work order. Revize, sklad náhradních dílů, role i deník údržby — všechno na jednom místě. Česky, na tabletu i mobilu.</p>
+      <div class="cta reveal" data-d="3">
+        <a class="btn btn-primary" href="#kontakt">Domluvit ukázku →</a>
+        <a class="btn btn-ghost" href="#funkce">Prohlédnout funkce</a>
+      </div>
+      <div class="trust reveal" data-d="4">
+        <span><b>Offline-first</b> — funguje i bez sítě</span>
+        <span><b>PIN přihlášení</b> — bez hesel</span>
+        <span><b>Kiosk</b> pro dílnu</span>
+      </div>
+    </div>
+    <div class="reveal" data-d="2">
+      <div class="mock">
+        <div class="mock-bar"><i></i><i></i><i></i></div>
+        <div class="mock-grid">
+          <div class="tile green"><div><div class="t">Provozuschopné</div><div class="n">92&nbsp;%</div></div><div class="t">stroje OK</div></div>
+          <div class="tile amber"><div><div class="t">Naplánováno</div><div class="n">14</div></div><div class="t">work orderů</div></div>
+          <div class="tile red"><div style="display:flex;justify-content:space-between"><div class="t">Havárie P1</div><span class="pulse"></span></div><div class="n">2</div><div class="t">řeší se teď</div></div>
+          <div class="tile dark"><div><div class="t">Revize do 30 dní</div><div class="n">7</div></div><div class="t">hlídá systém</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PROBLEM -->
+<section id="problem" style="padding-top:1rem">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">Znáte to?</span>
+      <h2>Údržba na papírkách a v hlavě mistra</h2>
+      <p>Když porucha skončí na lísteček a revize v šuplíku, výroba stojí dřív, než se to vyřeší.</p>
+    </div>
+    <div class="problems">
+      <div class="prob reveal" data-d="1"><div class="ic">🗒️</div><h3>Hlášení se ztrácí</h3><p>Operátor nahlásí poruchu ústně nebo na papír — a než se dostane k údržbě, stroj stojí.</p></div>
+      <div class="prob reveal" data-d="2"><div class="ic">📅</div><h3>Revize na poslední chvíli</h3><p>Zákonné revize si nikdo nehlídá centrálně. Hrozí pokuty i odstávky.</p></div>
+      <div class="prob reveal" data-d="3"><div class="ic">🔧</div><h3>Náhradní díly nikde</h3><p>„Měli jsme to na skladě?" Bez evidence se objednává dvakrát nebo pozdě.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="funkce" style="background:var(--bg-2);border-top:1px solid var(--line);border-bottom:1px solid var(--line)">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">Co Nominal CMMS umí</span>
+      <h2>Jeden systém pro celou údržbu</h2>
+      <p>Postavený přímo pro potravinářskou výrobu — budovy, zóny (lepek / bezlepek), směny i role.</p>
+    </div>
+    <div class="features">
+      <div class="feat reveal" data-d="1"><div class="ic">📟</div><h3>Kiosk pro dílnu</h3><p>Tablet na zdi. Operátor nahlásí poruchu, objedná díl nebo výměnu filtru na pár ťuknutí.</p></div>
+      <div class="feat reveal" data-d="2"><div class="ic">📋</div><h3>Work ordery</h3><p>Od backlogu po hotovo. Priority P1–P4, plánování na týden, kdo a kdy úkol dokončil.</p></div>
+      <div class="feat reveal" data-d="3"><div class="ic">📊</div><h3>Živý dashboard</h3><p>Semafor strojů, havárie, plán i produkce — v reálném čase, na velkou obrazovku ve výrobě.</p></div>
+      <div class="feat reveal" data-d="1"><div class="ic">🛡️</div><h3>Revize a inspekce</h3><p>Systém hlídá termíny zákonných revizí a pravidelných kontrol. S foto-evidencí.</p></div>
+      <div class="feat reveal" data-d="2"><div class="ic">📦</div><h3>Sklad náhradních dílů</h3><p>Stav skladu, QR skenování, inventura a objednávky. Vždy víte, co máte a co dochází.</p></div>
+      <div class="feat reveal" data-d="3"><div class="ic">📒</div><h3>Deník údržby</h3><p>Každý zásah zapsaný a dohledatelný. Export do CSV, zpětný zápis, napojení na stroje.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- STATS -->
+<section>
+  <div class="wrap reveal">
+    <div class="stats">
+      <div class="stats-grid">
+        <div class="stat"><div class="n" data-count="32">0</div><div class="t">modulů v systému</div></div>
+        <div class="stat"><div class="n" data-count="6">0</div><div class="t">uživatelských rolí</div></div>
+        <div class="stat"><div class="n" data-count="40" data-suffix="+">0</div><div class="t">granulárních oprávnění</div></div>
+        <div class="stat"><div class="n" data-count="100" data-suffix="%">0</div><div class="t">česky</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW -->
+<section id="jak">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">Jak to funguje</span>
+      <h2>Tři kroky od poruchy k vyřešení</h2>
+    </div>
+    <div class="steps">
+      <div class="step reveal" data-d="1"><h3>Nahlásí se</h3><p>Operátor na kiosku ťukne „Porucha", vybere stroj a místnost. Hlášení je hned u údržby.</p></div>
+      <div class="step reveal" data-d="2"><h3>Naplánuje se</h3><p>Z hlášení vznikne work order s prioritou. Údržbář si ho naplánuje na týden a přiřadí lidi.</p></div>
+      <div class="step reveal" data-d="3"><h3>Vyřeší a zapíše</h3><p>Zásah se zapíše do deníku, spotřebuje se díl ze skladu, dashboard se zaktualizuje živě.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ROLES -->
+<section id="role" style="background:var(--bg-2);border-top:1px solid var(--line);border-bottom:1px solid var(--line)">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">Pro koho</span>
+      <h2>Každý vidí to svoje</h2>
+      <p>Šest rolí, přesná oprávnění. Majitel jen čte, operátor jen kiosk, údržba řeší stroje.</p>
+    </div>
+    <div class="roles reveal" data-d="1">
+      <span class="role"><span class="e">👑</span> Majitel</span>
+      <span class="role"><span class="e">🏢</span> Vedení</span>
+      <span class="role"><span class="e">🛠️</span> Superadmin</span>
+      <span class="role"><span class="e">🔧</span> Údržba</span>
+      <span class="role"><span class="e">🏭</span> Výroba</span>
+      <span class="role"><span class="e">👷</span> Operátor</span>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section id="kontakt">
+  <div class="wrap reveal">
+    <div class="cta-band">
+      <span class="eyebrow">Pojďme do toho</span>
+      <h2>Ukážeme vám Nominal CMMS na vaší výrobě</h2>
+      <p>Nezávazná ukázka na míru — projdeme vaše stroje, revize a směny a navrhneme, jak to nasadit.</p>
+      <a class="btn btn-primary" href="mailto:vikrrshield@gmail.com?subject=Z%C3%A1jem%20o%20uk%C3%A1zku%20Nominal%20CMMS">Domluvit ukázku →</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="logo"><span class="mark">N</span> Nominal CMMS</div>
+    <p>Systém údržby pro potravinářskou výrobu · Offline-first · Česky</p>
+  </div>
+</footer>
+
+<script>
+  // Sticky nav shadow
+  const nav = document.getElementById('nav');
+  const onScroll = () => nav.classList.toggle('stuck', window.scrollY > 8);
+  window.addEventListener('scroll', onScroll, { passive:true }); onScroll();
+
+  // Reveal on scroll
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold:.14 });
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+  // Count-up
+  const countEls = document.querySelectorAll('[data-count]');
+  const cio = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (!e.isIntersecting) return;
+      const el = e.target, target = +el.dataset.count, suffix = el.dataset.suffix || '';
+      const dur = 1200, t0 = performance.now();
+      const tick = (now) => {
+        const p = Math.min((now - t0) / dur, 1);
+        const eased = 1 - Math.pow(1 - p, 3);
+        el.textContent = Math.round(target * eased) + suffix;
+        if (p < 1) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick); cio.unobserve(el);
+    });
+  }, { threshold:.5 });
+  countEls.forEach(el => cio.observe(el));
+</script>
+</body>
+</html>

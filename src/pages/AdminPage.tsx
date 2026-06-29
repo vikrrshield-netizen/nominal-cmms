@@ -17,12 +17,14 @@ import { parseExcelFile } from '../utils/importers/excelImporter';
 import type { ParseResult } from '../utils/importers/excelImporter';
 import { showToast } from '../components/ui/Toast';
 import BottomSheet from '../components/ui/BottomSheet';
+import { Skeleton, SkeletonList } from '../components/ui';
 import { exportMigrationData, downloadMigrationJson } from '../utils/vikrr_migration';
 import { MODULE_DEFINITIONS, ROLE_PERMISSIONS } from '../types/user';
 import { KIOSK_TILES, KIOSK_TILE_IDS, KIOSK_ALWAYS_ON } from '../config/kioskTiles';
 import { PERMISSION_GROUPS } from '../types/tenant';
 import { useTenantSettings } from '../hooks/useTenantSettings';
 import { useTenantRoles } from '../hooks/useTenantRoles';
+import { useConfirm } from '../hooks/useConfirm';
 
 // ═══════════════════════════════════════════════════════════════════
 // TYPES
@@ -199,6 +201,7 @@ const compareUsersByRoleThenName = (a: AdminUser, b: AdminUser): number => {
 export default function AdminPage() {
   const goBack = useBackNavigation('/');
   const { hasPermission, user: authUser } = useAuthContext();
+  const { ask } = useConfirm();
 
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [usersLoading, setUsersLoading] = useState(true);
@@ -292,7 +295,7 @@ export default function AdminPage() {
   );
 
   const handleDeleteUser = useCallback(async (userId: string) => {
-    if (confirm('Opravdu deaktivovat tohoto uživatele?')) {
+    if (await ask({ message: 'Opravdu deaktivovat tohoto uživatele?', danger: false })) {
       const userName = users.find(u => u.id === userId)?.displayName || '';
       try {
         await updateDoc(doc(db, 'users', userId), {
@@ -307,7 +310,7 @@ export default function AdminPage() {
         showToast(`Chyba: ${(err as Error).message}`, 'error');
       }
     }
-  }, [users, authUser?.uid]);
+  }, [users, authUser?.uid, ask]);
 
   const handleToggleActive = useCallback(async (userId: string) => {
     const targetUser = users.find(u => u.id === userId);
@@ -416,8 +419,10 @@ export default function AdminPage() {
 
         <div className="px-6 space-y-6">
           {activeTab === 'users' && usersLoading && (
-            <div className="flex items-center gap-2 py-8 text-slate-500 justify-center">
-              <Loader2 className="w-5 h-5 animate-spin" /> Načítám uživatele...
+            <div className="space-y-2 vik-fade-in">
+              <Skeleton width="w-48" height="h-7" />
+              <Skeleton width="w-64" height="h-4" className="mb-3" />
+              <SkeletonList rows={6} />
             </div>
           )}
 
@@ -646,6 +651,7 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
   onToggleActive: () => void;
 }) {
   const { user: authUser } = useAuthContext();
+  const { notify } = useConfirm();
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
@@ -732,7 +738,7 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
       const msg = (err as Error).message || 'Neznámá chyba';
       console.error('[AdminPage] handleSave FAILED for user:', user.id, err);
       showToast(`Chyba ukládání: ${msg}`, 'error');
-      window.alert('DB Error: ' + msg);
+      notify('DB Error: ' + msg);
     }
     setSaving(false);
   };
@@ -2513,6 +2519,7 @@ function ModuleManagerTab({ canEdit }: { canEdit: boolean }) {
 
 function PositionManagerTab({ canEdit }: { canEdit: boolean }) {
   const { user } = useAuthContext();
+  const { ask } = useConfirm();
   const tenantId = (user as any)?.tenantId || 'main_firm';
   const { tenants } = useTenantSettings();
   const { roles, loading, createRole, updateRole, removeRole } = useTenantRoles(tenantId);
@@ -2552,7 +2559,7 @@ function PositionManagerTab({ canEdit }: { canEdit: boolean }) {
 
   const handleDelete = async (roleId: string) => {
     const role = roles.find(r => r.id === roleId);
-    if (confirm(`Opravdu smazat pozici "${role?.roleName}"?`)) {
+    if (await ask({ message: `Opravdu smazat pozici "${role?.roleName}"?`, danger: true })) {
       await removeRole(roleId);
       showToast(`Pozice smazána`, 'success');
     }

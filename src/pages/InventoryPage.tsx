@@ -5,7 +5,8 @@ import { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthContext } from '../context/AuthContext';
 import { useInventory } from '../hooks/useInventory';
-import { Breadcrumb } from '../components/ui';
+import { useConfirm } from '../hooks/useConfirm';
+import { Breadcrumb, Skeleton, SkeletonList } from '../components/ui';
 import {
   Search, Plus, QrCode, Truck, X,
   CheckCircle2, TrendingDown, TrendingUp, Loader2,
@@ -245,8 +246,14 @@ export default function InventoryPage() {
   // ─────────────────────────────────────────
   if (loading) {
     return (
-      <div className="vik-page min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-emerald-700" />
+      <div className="vik-page min-h-screen">
+        <div className="vik-page-shell px-3 py-6">
+          <div className="space-y-2 mb-5">
+            <Skeleton width="w-40" height="h-7" />
+            <Skeleton width="w-56" height="h-4" />
+          </div>
+          <SkeletonList rows={6} />
+        </div>
       </div>
     );
   }
@@ -621,6 +628,7 @@ function CreateItemModal({ onClose, onCreate }: {
     note: '',
   });
   const [saving, setSaving] = useState(false);
+  const { notify } = useConfirm();
 
   const update = (key: keyof typeof form, value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -633,17 +641,17 @@ function CreateItemModal({ onClose, onCreate }: {
     const quantity = Number(form.quantity);
     const minQuantity = Number(form.minQuantity);
 
-    if (!name) { alert('Zadej název položky.'); return; }
-    if (!code) { alert('Zadej kód položky.'); return; }
-    if (!form.category) { alert('Vyber kategorii.'); return; }
-    if (!unit) { alert('Zadej jednotku.'); return; }
-    if (!location) { alert('Zadej umístění.'); return; }
+    if (!name) { notify('Zadej název položky.'); return; }
+    if (!code) { notify('Zadej kód položky.'); return; }
+    if (!form.category) { notify('Vyber kategorii.'); return; }
+    if (!unit) { notify('Zadej jednotku.'); return; }
+    if (!location) { notify('Zadej umístění.'); return; }
     if (form.quantity === '' || !Number.isFinite(quantity) || quantity < 0) {
-      alert('Množství musí být číslo větší nebo rovno 0.');
+      notify('Množství musí být číslo větší nebo rovno 0.');
       return;
     }
     if (form.minQuantity === '' || !Number.isFinite(minQuantity) || minQuantity < 0) {
-      alert('Minimum musí být číslo větší nebo rovno 0.');
+      notify('Minimum musí být číslo větší nebo rovno 0.');
       return;
     }
 
@@ -651,7 +659,7 @@ function CreateItemModal({ onClose, onCreate }: {
     if (form.unitPrice.trim() !== '') {
       const parsed = Number(form.unitPrice);
       if (!Number.isFinite(parsed) || parsed < 0) {
-        alert('Cena za kus musí být číslo větší nebo rovno 0.');
+        notify('Cena za kus musí být číslo větší nebo rovno 0.');
         return;
       }
       unitPrice = parsed;
@@ -674,7 +682,7 @@ function CreateItemModal({ onClose, onCreate }: {
       });
       onClose();
     } catch (err: unknown) {
-      alert((err as Error).message || 'Položku se nepodařilo uložit.');
+      notify((err as Error).message || 'Položku se nepodařilo uložit.');
     }
     setSaving(false);
   };
@@ -874,6 +882,7 @@ function ItemDetailModal({ item, onClose, canManage, onIssue, onReceive, assets,
   const [adjustAmount, setAdjustAmount] = useState('');
   const [countedQuantity, setCountedQuantity] = useState('');
   const [saving, setSaving] = useState(false);
+  const { ask, notify } = useConfirm();
 
   const statusCfg = STATUS_CONFIG[item.status as StockStatus] || STATUS_CONFIG.ok;
   const category = CATEGORIES.find(c => c.id === item.category);
@@ -895,7 +904,7 @@ function ItemDetailModal({ item, onClose, canManage, onIssue, onReceive, assets,
       setAdjustAmount('');
       onClose();
     } catch (err: unknown) {
-      alert((err as Error).message);
+      notify((err as Error).message);
     }
     setSaving(false);
   };
@@ -904,14 +913,14 @@ function ItemDetailModal({ item, onClose, canManage, onIssue, onReceive, assets,
     if (countedQuantity === '') return;
     const actual = Number(countedQuantity);
     if (!Number.isFinite(actual) || actual < 0) {
-      alert('Zadej platný skutečný počet.');
+      notify('Zadej platný skutečný počet.');
       return;
     }
 
     const current = Number(item.quantity || 0);
     const diff = actual - current;
     if (diff === 0) {
-      alert('Skutečný počet sedí se stavem v systému.');
+      notify('Skutečný počet sedí se stavem v systému.');
       return;
     }
 
@@ -924,7 +933,7 @@ function ItemDetailModal({ item, onClose, canManage, onIssue, onReceive, assets,
       }
       setCountedQuantity('');
     } catch (err: unknown) {
-      alert((err as Error).message);
+      notify((err as Error).message);
     }
     setSaving(false);
   };
@@ -1071,7 +1080,7 @@ function ItemDetailModal({ item, onClose, canManage, onIssue, onReceive, assets,
           {canManage && (
             <button
               onClick={async () => {
-                if (window.confirm(`Opravdu smazat "${item.name}"?`)) {
+                if (await ask({ message: `Opravdu smazat "${item.name}"?`, danger: true })) {
                   await deleteDoc(doc(db, 'inventory', item.id));
                   onClose();
                 }

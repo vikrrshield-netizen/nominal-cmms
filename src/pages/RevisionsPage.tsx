@@ -10,14 +10,16 @@ import {
 } from '../hooks/useRevisions';
 import type { Revision, RevisionType, RevisionStatus } from '../hooks/useRevisions';
 import { useReports } from '../hooks/useReports';
+import { Skeleton, SkeletonList } from '../components/ui';
 import {
   Shield, AlertTriangle, CheckCircle2,
-  Loader2, Calendar, Search, X, Download, Trash2,
+  Calendar, Search, X, Download, Trash2,
   ArrowLeft, ChevronRight, Zap, Flame, Gauge, Forklift, FireExtinguisher, Wrench,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { doc, deleteDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { useConfirm } from '../hooks/useConfirm';
 
 // Typ revize → lucide ikona (klidná, místo barevných emoji v TYPE_CONFIG)
 const TYPE_ICON: Record<RevisionType, LucideIcon> = {
@@ -87,8 +89,21 @@ export default function RevisionsPage() {
   // ─────────────────────────────────────────
   if (loading) {
     return (
-      <div className="vik-page flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      <div className="vik-page pb-24">
+        <div className="vik-page-header px-4 py-4">
+          <div className="vik-page-shell space-y-2">
+            <Skeleton width="w-48" height="h-7" />
+          </div>
+        </div>
+        <div className="vik-page-shell p-4 space-y-4">
+          <div className="grid grid-cols-4 gap-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} height="h-20" rounded="rounded-2xl" />
+            ))}
+          </div>
+          <Skeleton height="h-12" rounded="rounded-xl" />
+          <SkeletonList rows={6} />
+        </div>
       </div>
     );
   }
@@ -357,6 +372,7 @@ function RevisionDetailModal({ revision, onClose, canEdit, canDelete, onLog }: {
   const TypeIcon = TYPE_ICON[revision.type] || Wrench;
   const days = daysUntilRevision(revision.nextRevisionDate);
   const { exportPDF } = useReports();
+  const { ask } = useConfirm();
 
   const [showLogForm, setShowLogForm] = useState(false);
   const [logDate, setLogDate] = useState(new Date().toISOString().split('T')[0]);
@@ -472,7 +488,7 @@ function RevisionDetailModal({ revision, onClose, canEdit, canDelete, onLog }: {
           {canDelete && (
             <button
               onClick={async () => {
-                if (window.confirm(`Opravdu smazat revizi "${revision.title}"?`)) {
+                if (await ask({ message: `Opravdu smazat revizi "${revision.title}"?`, danger: true })) {
                   await deleteDoc(doc(db, 'revisions', revision.id));
                   onClose();
                 }

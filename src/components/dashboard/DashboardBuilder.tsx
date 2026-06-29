@@ -12,6 +12,7 @@ import {
 import { SortableContext, useSortable, rectSortingStrategy, arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, X, Plus, Pencil, Check, RotateCcw } from 'lucide-react';
+import { useConfirm } from '../../hooks/useConfirm';
 
 export interface BuilderPanel {
   id: string;
@@ -85,6 +86,7 @@ function SortablePanel({
 }
 
 export default function DashboardBuilder({ panels, storageKey }: { panels: BuilderPanel[]; storageKey: string }) {
+  const { ask } = useConfirm();
   const [editing, setEditing] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
 
@@ -144,7 +146,7 @@ export default function DashboardBuilder({ panels, storageKey }: { panels: Build
     <div>
       <div className="mb-3 flex items-center justify-end gap-2">
         {editing && (
-          <button type="button" onClick={() => { if (window.confirm('Obnovit výchozí rozložení dashboardu?')) reset(); }}
+          <button type="button" onClick={async () => { if (await ask({ message: 'Obnovit výchozí rozložení dashboardu?', danger: true })) reset(); }}
             className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-stone-200 bg-white px-3 text-xs font-bold text-slate-600 transition hover:bg-stone-50">
             <RotateCcw className="h-3.5 w-3.5" /> Obnovit
           </button>

@@ -5,6 +5,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../context/AuthContext';
 import { useBackNavigation } from '../hooks/useBackNavigation';
+import { useConfirm } from '../hooks/useConfirm';
 import { showToast } from '../components/ui/Toast';
 import {
   collection, query, where, orderBy, onSnapshot,
@@ -17,6 +18,7 @@ import {
   Clock, ChevronRight, Settings, X, Loader2, Smartphone,
 } from 'lucide-react';
 import { enablePushNotifications } from '../services/pushNotificationService';
+import { SkeletonList } from '../components/ui';
 
 // ═══════════════════════════════════════════════════════════════════
 // TYPES
@@ -93,6 +95,7 @@ function inspectionIsDue(log: any, now: Date): boolean {
 export default function NotificationsPage() {
   const navigate = useNavigate();
   const goBack = useBackNavigation('/');
+  const { ask } = useConfirm();
   const { user } = useAuthContext();
   const uid = user?.uid || user?.id || '';
 
@@ -310,7 +313,7 @@ export default function NotificationsPage() {
   };
 
   const clearAll = async () => {
-    if (!confirm('Opravdu smazat všechny notifikace?')) return;
+    if (!await ask({ message: 'Opravdu smazat všechny notifikace?', danger: true })) return;
     await Promise.all(notifications.map(n => deleteDoc(doc(db, 'notifications', n.id))));
     showToast('Vše smazáno', 'success');
   };
@@ -448,12 +451,7 @@ export default function NotificationsPage() {
           </div>
 
           {/* Loading */}
-          {loading && (
-            <div className="text-center py-16">
-              <Loader2 className="w-8 h-8 text-emerald-700 animate-spin mx-auto mb-3" />
-              <p className="text-slate-500 text-sm">Načítám notifikace...</p>
-            </div>
-          )}
+          {loading && <SkeletonList rows={6} />}
 
           {/* Empty */}
           {!loading && filteredNotifications.length === 0 && (

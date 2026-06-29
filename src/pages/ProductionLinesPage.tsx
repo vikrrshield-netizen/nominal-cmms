@@ -19,6 +19,7 @@ import { LINE_ENTITY_TYPE, isLineAsset, isLineMachineCandidate } from '../lib/li
 import BottomSheet, { FormField, FormFooter } from '../components/ui/BottomSheet';
 import { showToast } from '../components/ui/Toast';
 import StrojeLinkyTabs from '../components/StrojeLinkyTabs';
+import { useConfirm } from '../hooks/useConfirm';
 
 const INPUT_CLASS =
   'w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-300 text-slate-950 text-[15px] placeholder-slate-400 focus:outline-none focus:border-emerald-600 focus:bg-white focus:ring-2 focus:ring-emerald-600/15 transition min-h-[48px]';
@@ -32,6 +33,7 @@ const STATUS_KPI: { key: MonitoringStatus; label: string; hint: string }[] = [
 ];
 
 export default function ProductionLinesPage() {
+  const { ask } = useConfirm();
   const { user, hasPermission } = useAuthContext();
   const tenantId = user?.tenantId ?? 'main_firm';
   const canEdit = hasPermission('asset.update') || hasPermission('asset.create');
@@ -149,7 +151,7 @@ export default function ProductionLinesPage() {
       setDraft(null);
       return;
     }
-    if (!window.confirm('Smazat tuto linku? Stroje zůstanou v kartotéce.')) return;
+    if (!(await ask({ message: 'Smazat tuto linku? Stroje zůstanou v kartotéce.', danger: true }))) return;
     setSaving(true);
     try {
       await assetService.delete(tenantId, draft.id);

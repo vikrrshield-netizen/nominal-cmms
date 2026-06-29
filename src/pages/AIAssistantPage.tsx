@@ -4,6 +4,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { httpsCallable } from 'firebase/functions';
 import { useBackNavigation } from '../hooks/useBackNavigation';
+import { useConfirm } from '../hooks/useConfirm';
 import { useAuthContext } from '../context/AuthContext';
 import { functions } from '../lib/firebase';
 import appConfig from '../appConfig';
@@ -80,6 +81,7 @@ const QUICK_COMMANDS = [
 
 export default function AIAssistantPage() {
   const goBack = useBackNavigation('/');
+  const { notify } = useConfirm();
   const { user } = useAuthContext();
   
   const [messages, setMessages] = useState<Message[]>([
@@ -197,7 +199,7 @@ export default function AIAssistantPage() {
 
   const toggleListening = () => {
     if (!recognitionRef.current) {
-      alert('Hlasové ovládání není podporováno ve vašem prohlížeči');
+      notify('Hlasové ovládání není podporováno ve vašem prohlížeči');
       return;
     }
 
@@ -214,12 +216,12 @@ export default function AIAssistantPage() {
     const file = e.target.files?.[0];
     if (e.target) e.target.value = '';
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { alert('Obrázek je moc velký (max 5 MB). Zkus menší / horší kvalitu.'); return; }
+    if (file.size > 5 * 1024 * 1024) { notify('Obrázek je moc velký (max 5 MB). Zkus menší / horší kvalitu.'); return; }
     try {
       const img = await fileToImage(file);
       handleSend(input.trim() || undefined, img);
     } catch {
-      alert('Foto se nepodařilo načíst.');
+      notify('Foto se nepodařilo načíst.');
     }
   };
 

@@ -12,6 +12,7 @@ import { isGearboxAsset } from '../../services/gearboxService';
 import { isLineAsset } from '../../lib/lines';
 import BottomSheet, { FormField, FormFooter } from '../ui/BottomSheet';
 import { showToast } from '../ui/Toast';
+import { useConfirm } from '../../hooks/useConfirm';
 import {
   type AssetComponent,
   type MonitoredParam,
@@ -105,6 +106,7 @@ export default function AssetMonitoringSection({ asset, tenantId, canEdit, onCha
   const [pickerLoading, setPickerLoading] = useState(false);
   const [pickerQuery, setPickerQuery] = useState('');
   const navigate = useNavigate();
+  const { ask } = useConfirm();
 
   // Nezakládat prázdnou sekci lidem bez práva editace.
   if (components.length === 0 && !canEdit) return null;
@@ -166,7 +168,7 @@ export default function AssetMonitoringSection({ asset, tenantId, canEdit, onCha
   };
 
   const deleteComponent = async (id: string) => {
-    if (!window.confirm('Smazat celou komponentu i s jejími veličinami?')) return;
+    if (!(await ask({ message: 'Smazat celou komponentu i s jejími veličinami?', danger: true }))) return;
     await persist(removeComponent(components, id), 'Komponenta smazána');
   };
 
@@ -213,7 +215,7 @@ export default function AssetMonitoringSection({ asset, tenantId, canEdit, onCha
     }
     const comp = components.find((c) => c.id === paramSheet.componentId);
     if (!comp) return;
-    if (!window.confirm('Smazat tuto veličinu?')) return;
+    if (!(await ask({ message: 'Smazat tuto veličinu?', danger: true }))) return;
     const next = upsertComponent(components, removeParam(comp, paramSheet.id));
     setParamSheet(null);
     await persist(next, 'Veličina smazána');

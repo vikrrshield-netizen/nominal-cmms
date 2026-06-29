@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import ExcelJS from 'exceljs';
 import { collection, deleteDoc, doc, limit, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, writeBatch, type Timestamp } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, ClipboardList, Download, Factory, FileText, Leaf, Package, Pencil, Plus, Printer, Save, Search, ShieldCheck, Trash2, Upload, X } from 'lucide-react';
 import { useAuthContext } from '../context/AuthContext';
+import { useConfirm } from '../hooks/useConfirm';
 import { db, storage } from '../lib/firebase';
 import { MATERIAL_SEED, PRODUCT_SEED, materialBatch, productBatch } from '../data/productionMasterSeed';
 import { showToast } from '../components/ui/Toast';
+import { Skeleton } from '../components/ui';
 import appConfig from '../appConfig';
 import type { GearboxTemperatureLog } from '../types/gearbox';
 
@@ -1153,6 +1154,7 @@ export default function MasterDataPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, hasPermission } = useAuthContext();
+  const { ask } = useConfirm();
   const canManage = hasPermission('production.manage');
   const canRead = canManage || hasPermission('report.read') || hasPermission('production.read');
   const initialTab: Tab = location.pathname.includes('products') ? 'products' : 'materials';
@@ -1233,7 +1235,7 @@ export default function MasterDataPage() {
 
   const deleteItem = async (item: MaterialDoc | ProductDoc) => {
     if (!canManage) return;
-    const ok = window.confirm(`Opravdu smazat kartu "${item.name}"?`);
+    const ok = await ask({ message: `Opravdu smazat kartu "${item.name}"?`, danger: true });
     if (!ok) return;
     await deleteDoc(doc(db, collectionForTab(tab), item.id));
     setSelectedId('');
@@ -1268,6 +1270,7 @@ export default function MasterDataPage() {
 
   const exportXlsx = async () => {
     const { headers, rows } = getExportData();
+    const ExcelJS = await import('exceljs');
     const workbook = new ExcelJS.Workbook();
     workbook.creator = appConfig.APP_NAME;
     workbook.created = new Date();
@@ -1403,7 +1406,15 @@ export default function MasterDataPage() {
             </div>
 
             {loading ? (
-              <div className="py-16 text-center text-sm font-bold text-slate-500">Načítám master data...</div>
+              <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="vik-card p-4 space-y-3">
+                    <Skeleton height="h-5" width="w-2/3" />
+                    <Skeleton height="h-4" />
+                    <Skeleton height="h-4" width="w-1/2" />
+                  </div>
+                ))}
+              </div>
             ) : (
               <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
                 {filteredItems.map((item) => (

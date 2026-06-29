@@ -231,3 +231,46 @@ export function LoadingSpinner({ size = 'md', text }: LoadingSpinnerProps) {
     </div>
   );
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// SKELETON — placeholdery pro načítání (lepší vnímaná rychlost než
+// prázdná tabulka / spinner). Shimmer řešen v index.css (.vik-skeleton).
+// ═══════════════════════════════════════════════════════════════════
+
+interface SkeletonProps {
+  /** Tailwind šířka, např. 'w-full', 'w-24'. Výchozí 'w-full'. */
+  width?: string;
+  /** Tailwind výška, např. 'h-4'. Výchozí 'h-4'. */
+  height?: string;
+  /** Tailwind border-radius, např. 'rounded-full'. */
+  rounded?: string;
+  className?: string;
+}
+
+export function Skeleton({ width = 'w-full', height = 'h-4', rounded = '', className = '' }: SkeletonProps) {
+  return <div className={`vik-skeleton ${width} ${height} ${rounded} ${className}`} aria-hidden="true" />;
+}
+
+interface SkeletonListProps {
+  /** Počet placeholder řádků. Výchozí 5. */
+  rows?: number;
+  className?: string;
+}
+
+/** Seznam karet-placeholderů — drop-in náhrada za obsah seznamu během načítání. */
+export function SkeletonList({ rows = 5, className = '' }: SkeletonListProps) {
+  return (
+    <div className={`space-y-3 ${className}`} role="status" aria-busy="true" aria-label="Načítání…">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="vik-card p-4 flex items-center gap-3">
+          <Skeleton width="w-10" height="h-10" rounded="rounded-xl" />
+          <div className="flex-1 space-y-2">
+            <Skeleton width="w-1/3" height="h-4" />
+            <Skeleton width="w-2/3" height="h-3" />
+          </div>
+          <Skeleton width="w-16" height="h-6" rounded="rounded-full" />
+        </div>
+      ))}
+    </div>
+  );
+}

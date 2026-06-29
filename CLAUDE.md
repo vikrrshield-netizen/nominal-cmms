@@ -2,6 +2,13 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Znalostní báze (`docs/`)
+
+Doménové detaily (továrna, role/oprávnění, work ordery, glosář) jsou v markdown
+vaultu `docs/` (viz `docs/README.md`). Slouží jako kontext pro Claude Code i jako
+Obsidian vault. Tento `CLAUDE.md` drž krátký a operační; doménovou encyklopedii
+piš do `docs/` a při změně doménového konceptu v kódu aktualizuj i příslušnou poznámku.
+
 ## Commands
 
 ```bash
@@ -9,11 +16,17 @@ npm run dev          # Vite dev server
 npm run build        # tsc -b && vite build → dist/
 npm run lint         # ESLint
 npm run preview      # Preview production build locally
+npm run test:smoke   # Playwright smoke testy (tests/smoke/)
+npm run seed:empty   # Seed prázdné instance
+npm run seed:demo    # Seed demo dat
 firebase deploy --only hosting   # Deploy to https://nominal-cmms.web.app
 firebase emulators:start         # Auth:9099, Firestore:8080, Storage:9199, UI:4000
 ```
 
-No test framework is configured — there are no unit/integration tests.
+Testy: pouze Playwright **smoke** testy (`tests/smoke/`, config `playwright.smoke.config.ts`).
+Vyžadují prohlížeč (`npx playwright install chromium`) a běh proti URL — buď lokální
+dev server, nebo externí přes `SMOKE_BASE_URL`. Některé scénáře potřebují přihlašovací
+PINy z env (bez nich se přeskočí). Žádné unit/integration testy nejsou.
 
 ## What This Is
 
@@ -38,7 +51,7 @@ src/
 ├── utils/          # seedInspections.ts
 ├── App.tsx         # BrowserRouter → AuthProvider → ProtectedRoutes
 ├── main.tsx        # Entry point
-└── index.css       # Global dark theme overrides with !important
+└── index.css       # Globální theme (béžový/světlý) + motion utility
 ```
 
 ## Routing & Auth Flow
@@ -67,7 +80,48 @@ Services wrap Firestore operations. Pages use `onSnapshot` for real-time updates
 
 ## Styling
 
-Dark theme is enforced globally via CSS `!important` overrides in `src/index.css`. These override Tailwind light-mode utility classes (`.bg-white`, `.bg-gray-*`, `.text-gray-*`, `.border-gray-*`, colored `-50/-100` variants). Base background: `#0f172a` (slate-900). When adding new pages, use dark-compatible Tailwind classes or rely on the existing overrides.
+Béžový/světlý theme. Barevné tokeny i Tailwindové barvy jsou v `src/index.css`
+předefinované do béžovo-zelené palety přes `@theme` (např. base background
+`#f1ece3`, primary `#1a6b4f`). Sdílené třídy: `.vik-card`, `.vik-button`,
+`.vik-input`, `.vik-chip`, `.btn-b`, `.eyebrow`. Při nových stránkách používej tyto
+třídy nebo Tailwind utility — barvy se mapují automaticky.
+
+**Motion:** preferuj připravené utility v `index.css` — `.vik-fade-in`,
+`.vik-slide-up`, `.vik-scale-in`, `.vik-stagger` (proměnná `--i` na položkách) a
+`.vik-skeleton` / `<Skeleton>` / `<SkeletonList>` pro načítací stavy. Animuj jen
+`transform` + `opacity` (plynulé i na továrních tabletech), timing přes proměnné
+`--dur-fast/base/slow`. `prefers-reduced-motion` je globálně respektován.
+
+## Claude Code na webu
+
+`.claude/settings.json` registruje **SessionStart hook** (`.claude/hooks/session-start.sh`),
+který v remote prostředí spustí `npm install`. Lokální nastavení (permissions,
+PostToolUse lint) je v `.claude/settings.local.json`. Pozn.: stažení Playwright
+prohlížeče vyžaduje `cdn.playwright.dev` v egress allowlistu prostředí.
+
+### Projektové skilly (`.claude/commands/`)
+
+Opakované postupy jsou zabalené do slash commandů — používej je místo
+vymýšlení od nuly: `/page`, `/service`, `/skeleton`, `/wire-setting`
+(funkční nastavení modulu), `/ship` (commit+push), `/deploy`, `/fix-ci`,
+`/audit`, `/revize` (revize diffu proti konvencím).
+
+Přenosné, projektově nezávislé kousky (obecné skilly, CI šablona, snippet
+do CLAUDE.md) jsou v `.claude/starter-kit/` — viz jeho `README.md` pro
+nasazení do nového repa.
+
+### Šetři Claude limity
+
+- **Ověřování nech na CI.** GitHub Actions (`.github/workflows/ci.yml`) pouští
+  lint + typecheck + build na každý PR/push. Nespouštěj `npm run build` opakovaně
+  ručně, pokud stačí kouknout na výsledek CI; lokálně buildi jen když potřebuješ
+  rychlou zpětnou vazbu k rozdělané změně.
+- **Model tiering.** Mechanickou práci (kostry, přejmenování, hromadné drobné
+  edity, vyhledávání) deleguj na levnější model (Haiku/Sonnet) nebo na subagenty;
+  Opus si šetři na těžké přemýšlení (architektura, záludné bugy, review). Velké
+  mechanické dávky paralelizuj přes subagenty, ať nezahltí hlavní kontext.
+- **Míň osahávání kódu.** Než budeš číst kód, koukni do `docs/` a tohoto souboru;
+  čti cíleně (konkrétní rozsahy), ne celé velké soubory.
 
 ## Firebase Config
 
