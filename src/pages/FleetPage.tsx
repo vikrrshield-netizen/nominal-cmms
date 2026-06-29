@@ -60,10 +60,10 @@ function ToastContainer({ toasts }: { toasts: ToastItem[] }) {
   return (
     <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[999] flex flex-col gap-2">
       {toasts.map((t) => (
-        <div key={t.id} className={`px-6 py-3 rounded-2xl text-sm font-bold shadow-2xl animate-bounce ${
+        <div key={t.id} className={`px-6 py-3 rounded-2xl text-sm font-bold shadow-2xl ${
           t.type === 'success' ? 'bg-emerald-500 text-white' :
           t.type === 'error' ? 'bg-red-500 text-white' :
-          'bg-blue-500 text-white'
+          'bg-emerald-500 text-white'
         }`}>
           <span className="inline-flex items-center gap-2">
             {t.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : t.type === 'error' ? <XCircle className="w-4 h-4" /> : <Info className="w-4 h-4" />}
@@ -422,7 +422,7 @@ function VehicleDetailModal({ entity, blueprint, onClose, toast }: {
         {/* Header */}
         <div className="sticky top-0 bg-white/95 border-b border-slate-200 p-4 flex items-center justify-between z-10">
           <div className="flex items-center gap-2">
-            <Car className="w-5 h-5 text-blue-400" />
+            <Car className="w-5 h-5 text-emerald-400" />
             <span className="font-bold text-slate-950">{entity.name}</span>
           </div>
           <div className="flex items-center gap-1">
@@ -438,9 +438,9 @@ function VehicleDetailModal({ entity, blueprint, onClose, toast }: {
         <div className="p-4 space-y-4">
           {/* Breadcrumbs + header */}
           <div className="flex items-center text-sm text-slate-500 gap-1">
-            <button onClick={() => { onClose(); navigate('/'); }} className="hover:text-blue-400">Dashboard</button>
+            <button onClick={() => { onClose(); navigate('/'); }} className="hover:text-emerald-400">Dashboard</button>
             <span className="text-slate-600">/</span>
-            <button onClick={onClose} className="hover:text-blue-400">Vozový park</button>
+            <button onClick={onClose} className="hover:text-emerald-400">Vozový park</button>
             <span className="text-slate-600">/</span>
             <span className="text-slate-950 font-medium">{entity.name}</span>
           </div>
@@ -448,12 +448,12 @@ function VehicleDetailModal({ entity, blueprint, onClose, toast }: {
           {/* Entity header */}
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#3b82f630' }}>
-              <Car className="w-8 h-8 text-blue-400" />
+              <Car className="w-8 h-8 text-emerald-400" />
             </div>
             <div className="flex-1">
               <h2 className="text-xl font-bold text-slate-950">{entity.name}</h2>
               <div className="text-sm text-slate-500 font-mono">{entity.code}</div>
-              {entity.data?.assigned_to && <div className="text-sm text-blue-400 mt-1">→ {entity.data.assigned_to}</div>}
+              {entity.data?.assigned_to && <div className="text-sm text-emerald-400 mt-1">→ {entity.data.assigned_to}</div>}
             </div>
           </div>
 
@@ -478,7 +478,7 @@ function VehicleDetailModal({ entity, blueprint, onClose, toast }: {
                           <span className="text-sm font-semibold text-slate-600">{f.label}</span>
                           {/* EDIT BUTTON */}
                           {canManageFleet && !isEditing && (
-                            <button onClick={() => startEdit(f.key, String(val))} className="ml-auto min-h-9 min-w-9 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 transition flex items-center justify-center" title={`Upravit ${f.label}`}>
+                            <button onClick={() => startEdit(f.key, String(val))} className="ml-auto min-h-11 min-w-11 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 transition flex items-center justify-center" title={`Upravit ${f.label}`}>
                               <Pencil className="w-4 h-4" />
                             </button>
                           )}
@@ -528,11 +528,11 @@ function VehicleDetailModal({ entity, blueprint, onClose, toast }: {
 
                 {/* CUSTOM FIELDS (lokální demo) */}
                 {customFields.map((cf, i) => (
-                  <div key={`custom-${i}`} className="bg-purple-500/10 rounded-xl p-3 border border-purple-500/20">
-                    <div className="text-xs text-purple-400 mb-1 flex items-center gap-1">
+                  <div key={`custom-${i}`} className="bg-emerald-500/10 rounded-xl p-3 border border-emerald-500/20">
+                    <div className="text-xs text-emerald-400 mb-1 flex items-center gap-1">
                       <PlusCircle className="w-3 h-3" />{cf.key}
                     </div>
-                    <div className="text-sm font-medium text-purple-300">{cf.value || '—'}</div>
+                    <div className="text-sm font-medium text-emerald-300">{cf.value || '—'}</div>
                   </div>
                 ))}
               </div>
@@ -550,7 +550,7 @@ function VehicleDetailModal({ entity, blueprint, onClose, toast }: {
             )}
             {canManageFleet && (
             <button onClick={() => setShowHandover(true)} disabled={saving}
-              className="py-3 bg-blue-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-500 transition active:scale-[0.97] min-h-[48px] disabled:opacity-50">
+              className="py-3 bg-emerald-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-500 transition active:scale-[0.97] min-h-[48px] disabled:opacity-50">
               <Send className="w-5 h-5" />
               Předat
             </button>
@@ -562,7 +562,7 @@ function VehicleDetailModal({ entity, blueprint, onClose, toast }: {
             </button>
             {canManageFleet && (
             <button onClick={() => setShowAddField(true)}
-              className="py-3 bg-purple-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-purple-500 transition active:scale-[0.97] min-h-[48px]">
+              className="py-3 bg-emerald-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-500 transition active:scale-[0.97] min-h-[48px]">
               <PlusCircle className="w-5 h-5" />
               Přidat parametr
             </button>
@@ -571,15 +571,15 @@ function VehicleDetailModal({ entity, blueprint, onClose, toast }: {
 
           {/* ADD FIELD FORM */}
           {showAddField && (
-            <div className="bg-purple-50 rounded-2xl p-4 border border-purple-200 space-y-3">
-              <h3 className="text-sm font-bold text-purple-800">Nový parametr</h3>
+            <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-200 space-y-3">
+              <h3 className="text-sm font-bold text-emerald-800">Nový parametr</h3>
               <input value={newFieldKey} onChange={(e) => setNewFieldKey(e.target.value)} placeholder="Název (např. Barva)"
                 className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-slate-950 placeholder-slate-400 outline-none focus:border-emerald-600 text-sm min-h-[44px]" autoFocus />
               <input value={newFieldValue} onChange={(e) => setNewFieldValue(e.target.value)} placeholder="Hodnota (např. Modrá metalíza)"
                 className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-slate-950 placeholder-slate-400 outline-none focus:border-emerald-600 text-sm min-h-[44px]" />
               <div className="flex gap-2">
                 <button onClick={() => setShowAddField(false)} className="flex-1 py-2.5 bg-white text-slate-700 rounded-xl text-sm min-h-[44px] border border-slate-200">Zrušit</button>
-                <button onClick={handleAddField} disabled={!newFieldKey.trim()} className="flex-1 py-2.5 bg-purple-600 text-white rounded-xl font-bold text-sm disabled:opacity-50 min-h-[44px]">Přidat</button>
+                <button onClick={handleAddField} disabled={!newFieldKey.trim()} className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-sm disabled:opacity-50 min-h-[44px]">Přidat</button>
               </div>
             </div>
           )}
@@ -607,7 +607,7 @@ function VehicleDetailModal({ entity, blueprint, onClose, toast }: {
                         <div className="w-7 h-7 rounded-full bg-slate-700 flex items-center justify-center text-[10px] text-white font-bold flex-shrink-0">{log.userInitials}</div>
                         <span className="text-xs text-slate-500">{time}</span>
                         <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                          log.type === 'handover' ? 'bg-blue-500/20 text-blue-400' :
+                          log.type === 'handover' ? 'bg-emerald-500/20 text-emerald-400' :
                           log.type === 'maintenance' ? 'bg-amber-500/20 text-amber-400' :
                           log.type === 'inspection' ? 'bg-emerald-500/20 text-emerald-400' :
                           'bg-slate-100 text-slate-600'
@@ -665,8 +665,8 @@ function HandoverForm({ entity, onSubmit, onCancel }: {
   const [note, setNote] = useState('');
 
   return (
-    <div className="bg-sky-50 rounded-2xl p-4 border border-sky-200 space-y-3">
-      <h3 className="text-sm font-bold text-sky-800">Předání vozidla</h3>
+    <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-200 space-y-3">
+      <h3 className="text-sm font-bold text-emerald-800">Předání vozidla</h3>
       <input type="number" value={tachometer} onChange={(e) => setTachometer(e.target.value)} placeholder="Tachometr / Motohodiny"
         className="w-full p-3 bg-white border border-slate-300 rounded-xl text-slate-950 placeholder-slate-400 outline-none focus:border-emerald-600 min-h-[48px]" />
       <div className="grid grid-cols-3 gap-2">
@@ -751,7 +751,7 @@ export default function FleetPage() {
             </button>
             {canManageFleet && (
             <button onClick={() => setShowImportModal(true)}
-              className="p-3 bg-sky-600 rounded-xl hover:bg-sky-700 transition min-w-[48px] min-h-[48px] flex items-center justify-center"
+              className="p-3 bg-emerald-600 rounded-xl hover:bg-emerald-700 transition min-w-[48px] min-h-[48px] flex items-center justify-center"
               title="Import z Excelu">
               <Upload className="w-5 h-5 text-white" />
             </button>
@@ -779,7 +779,7 @@ export default function FleetPage() {
                 <div className="bg-white -mt-3 pt-5 pb-2.5 px-4 rounded-b-2xl border border-t-0 border-slate-200 shadow-sm flex items-center justify-end gap-2">
                   <button
                     onClick={(e) => { e.stopPropagation(); setSelectedEntity(entity); }}
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 transition flex items-center gap-1.5 min-h-[32px]"
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 transition flex items-center gap-1.5 min-h-[44px]"
                   >
                     <Pencil className="w-3.5 h-3.5" />
                     Upravit
@@ -798,7 +798,7 @@ export default function FleetPage() {
                         toast(`${entity.name} smazáno`, 'info');
                       }
                     }}
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-500/10 text-red-400 hover:bg-red-500/20 transition flex items-center gap-1.5 min-h-[32px]"
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-500/10 text-red-400 hover:bg-red-500/20 transition flex items-center gap-1.5 min-h-[44px]"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     Smazat

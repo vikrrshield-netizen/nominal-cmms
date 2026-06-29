@@ -63,7 +63,7 @@ export default function VzvPage() {
           <button onClick={() => navigate(-1)} className="rounded-xl border border-slate-200 bg-white p-3 text-slate-700">
             <ArrowLeft className="h-5 w-5" />
           </button>
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-500/15 text-cyan-700">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/15 text-emerald-700">
             <Forklift className="h-7 w-7" />
           </div>
           <div className="min-w-0 flex-1">
@@ -95,7 +95,7 @@ export default function VzvPage() {
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Hledat VZV, kód nebo stanoviště..."
-            className="min-h-14 w-full rounded-2xl border border-slate-200 bg-white py-4 pl-12 pr-4 text-base text-slate-900 outline-none focus:border-cyan-400"
+            className="min-h-14 w-full rounded-2xl border border-slate-200 bg-white py-4 pl-12 pr-4 text-base text-slate-900 outline-none focus:border-emerald-400"
           />
         </label>
 
@@ -103,7 +103,7 @@ export default function VzvPage() {
           {vzvAssets.map((asset) => (
             <article key={asset.id} className="rounded-2xl border border-slate-200 bg-white p-4">
               <div className="flex items-start gap-3">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-cyan-500/15 text-cyan-700">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/15 text-emerald-700">
                   <Forklift className="h-6 w-6" />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -116,7 +116,7 @@ export default function VzvPage() {
                 <button
                   type="button"
                   onClick={() => navigate(`/asset/${asset.id}`, { state: { from: '/vzv', backStack: ['/vzv'] } })}
-                  className="min-h-12 rounded-xl bg-cyan-600 px-3 font-bold text-white"
+                  className="min-h-12 rounded-xl bg-emerald-600 px-3 font-bold text-white"
                 >
                   Otevřít kartu
                 </button>

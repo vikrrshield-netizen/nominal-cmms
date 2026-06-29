@@ -309,7 +309,7 @@ export default function HvacPage() {
     return (
       <article key={asset.id} className="card-b p-3">
         <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
             <Wind className="h-5 w-5" />
           </div>
           <div className="min-w-0 flex-1">
@@ -330,7 +330,7 @@ export default function HvacPage() {
         </div>
 
         <div className="mt-3 grid grid-cols-3 gap-2">
-          <button type="button" onClick={() => setSelectedAsset(asset)} className="min-h-11 rounded-xl bg-blue-600 px-2 text-sm font-bold text-white">
+          <button type="button" onClick={() => setSelectedAsset(asset)} className="min-h-11 rounded-xl bg-emerald-600 px-2 text-sm font-bold text-white">
             Detail
           </button>
           <button
@@ -354,14 +354,14 @@ export default function HvacPage() {
     const dimension = customField(asset, ['rozmer filtru', 'rozmery filtru', 'filter size', 'filtr']);
 
     return (
-      <div key={asset.id} className="grid gap-2 rounded-xl border border-blue-100 bg-blue-50 p-3 sm:grid-cols-[1fr_auto] sm:items-center">
+      <div key={asset.id} className="grid gap-2 rounded-xl border border-emerald-100 bg-emerald-50 p-3 sm:grid-cols-[1fr_auto] sm:items-center">
         <div className="min-w-0">
           <div className="truncate text-base font-black text-slate-900">{asset.name}</div>
           <div className="mt-1 grid gap-1 text-sm font-bold text-slate-600 sm:grid-cols-2">
             <span className="truncate">{asset.code || 'Bez kódu'} | {placeLabel(asset)}</span>
             <span className="truncate">Výměna: {lastExchange ? formatDate(lastExchange.performedAt || lastExchange.createdAt) : 'bez zápisu'}</span>
           </div>
-          <div className="mt-1 text-sm font-bold text-blue-700">Filtr: {dimension || 'doplnit rozměr / počet'}</div>
+          <div className="mt-1 text-sm font-bold text-emerald-700">Filtr: {dimension || 'doplnit rozměr / počet'}</div>
         </div>
         <div className="grid grid-cols-2 gap-2 sm:w-56">
           <button
@@ -442,7 +442,7 @@ export default function HvacPage() {
           <button onClick={() => navigate(-1)} className="min-h-12 min-w-12 rounded-xl border border-slate-200 bg-white p-3 text-slate-700">
             <ArrowLeft className="h-5 w-5" />
           </button>
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
             <Wind className="h-7 w-7" />
           </div>
           <div className="min-w-0 flex-1">
@@ -464,9 +464,9 @@ export default function HvacPage() {
             <div className="text-xl font-black text-slate-900">{hvacAssets.length}</div>
             <div className="text-sm font-bold text-slate-500">Karty VZT</div>
           </div>
-          <div className="rounded-2xl border border-blue-100 bg-blue-50 p-3">
-            <div className="text-xl font-black text-blue-700">{filterItems.length}</div>
-            <div className="text-sm font-bold text-blue-700">Filtry sklad</div>
+          <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-3">
+            <div className="text-xl font-black text-emerald-700">{filterItems.length}</div>
+            <div className="text-sm font-bold text-emerald-700">Filtry sklad</div>
           </div>
           <div className="rounded-2xl border border-amber-100 bg-amber-50 p-3">
             <div className="text-xl font-black text-amber-700">{lowFilterItems.length}</div>
@@ -490,7 +490,7 @@ export default function HvacPage() {
               <section className="space-y-2">
                 <div className="flex items-center justify-between gap-3">
                   <h2 className="text-lg font-black text-slate-900">VZT extrudovny</h2>
-                  <span className="rounded-full bg-blue-50 px-3 py-1 text-sm font-bold text-blue-700">{extrusionHvacAssets.length}</span>
+                  <span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-bold text-emerald-700">{extrusionHvacAssets.length}</span>
                 </div>
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                   {extrusionHvacAssets.map(renderCompactCard)}
@@ -499,7 +499,7 @@ export default function HvacPage() {
             )}
 
             {prefilterAssets.length > 0 && (
-              <section className="rounded-2xl border border-blue-100 bg-blue-50 p-3">
+              <section className="rounded-2xl border border-emerald-100 bg-emerald-50 p-3">
                 <button
                   type="button"
                   onClick={() => setShowPrefilters((value) => !value)}
@@ -507,9 +507,9 @@ export default function HvacPage() {
                 >
                   <span>
                     <span className="block text-lg font-black text-slate-900">Předfiltry extruderů</span>
-                    <span className="block text-sm font-bold text-blue-700">{prefilterAssets.length} karet v jednom bloku</span>
+                    <span className="block text-sm font-bold text-emerald-700">{prefilterAssets.length} karet v jednom bloku</span>
                   </span>
-                  {showPrefilters ? <ChevronUp className="h-5 w-5 text-blue-700" /> : <ChevronDown className="h-5 w-5 text-blue-700" />}
+                  {showPrefilters ? <ChevronUp className="h-5 w-5 text-emerald-700" /> : <ChevronDown className="h-5 w-5 text-emerald-700" />}
                 </button>
                 {showPrefilters && (
                   <div className="mt-3 space-y-2">
@@ -557,7 +557,7 @@ export default function HvacPage() {
 
             <div className="card-b p-4">
               <div className="mb-3 flex items-center gap-2">
-                <ClipboardList className="h-5 w-5 text-blue-700" />
+                <ClipboardList className="h-5 w-5 text-emerald-700" />
                 <h2 className="font-black text-slate-900">Poslední výměny</h2>
               </div>
               <div className="space-y-2">
@@ -688,7 +688,7 @@ function HvacDetailModal({
       <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-t-3xl border border-slate-200 bg-white p-4 shadow-2xl sm:rounded-3xl">
         <div className="mb-4 flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-black uppercase text-blue-700">
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-black uppercase text-emerald-700">
               <Wind className="h-4 w-4" /> Detail VZT
             </div>
             <h2 className="truncate text-2xl font-black text-slate-900">{asset.name}</h2>

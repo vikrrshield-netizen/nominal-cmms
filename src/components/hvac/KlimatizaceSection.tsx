@@ -188,7 +188,7 @@ export default function KlimatizaceSection() {
             return (
               <div key={unit.id} className="rounded-2xl border border-slate-200 bg-white p-4" style={{ borderLeft: `3px solid ${TONE[worst].dot}` }}>
                 <div className="flex items-center gap-2 mb-2">
-                  <Snowflake className="text-sky-600 flex-shrink-0" size={20} />
+                  <Snowflake className="text-emerald-600 flex-shrink-0" size={20} />
                   <div className="min-w-0">
                     <button type="button" onClick={() => navigate(`/asset/${unit.id}`)} className="block text-left text-[15px] font-black text-slate-900 truncate hover:text-emerald-700">{unit.name}</button>
                     {place && <div className="text-xs text-slate-500 truncate">{place}</div>}

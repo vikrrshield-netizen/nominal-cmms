@@ -2,14 +2,16 @@
 // VIKRR — Asset Shield — Search & VIKRR AI
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { httpsCallable } from 'firebase/functions';
 import { useBackNavigation } from '../hooks/useBackNavigation';
 import { useAuthContext } from '../context/AuthContext';
+import { functions } from '../lib/firebase';
 import appConfig from '../appConfig';
 import VoiceMemoRecorder from '../components/ui/VoiceMemoRecorder';
 import {
   Sparkles, Mic, MicOff, Send, ArrowLeft, Bot, User,
   AlertTriangle, Package, Calendar, FileText,
-  Volume2, VolumeX, Loader2, Camera, X, Save, CheckCircle2,
+  Volume2, VolumeX, Loader2, Camera,
 } from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════════════════
@@ -20,122 +22,49 @@ interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  image?: string;       // data URL pro zobrazení v bublině
   timestamp: Date;
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// GEMINI AI INTEGRATION
+// CLAUDE AI INTEGRATION — přes bezpečný backend (Cloud Function assistantChat).
+// API klíč žije na serveru, ne v prohlížeči. Asistent umí číst data systému
+// (stav strojů, úkoly, termíny, Deník) a — podle role — i zapisovat.
 // ═══════════════════════════════════════════════════════════════════
 
-const GEMINI_API_KEY = undefined as string | undefined;
+type AssistantReply = { reply: string; toolsUsed?: string[] };
 
-const SYSTEM_PROMPT = `Jsi AI asistent ${appConfig.APP_NAME} — systému pro správu údržby potravinářského závodu (${appConfig.COMPANY_NAME}, ${appConfig.COMPANY_ADDRESS}).
-Odpovídej VŽDY česky. Buď stručný a profesionální.
-
-MODULY SYSTÉMU:
-- Úkoly (Work Orders): P1 Havárie, P2 Urgentní, P3 Běžná, P4 Nápad. Stavy: backlog → planned → in_progress → paused → completed.
-- Mapa strojů: Interaktivní mapa budov → místností → strojů. Přidání strojů přes [+] tlačítko.
-- Sklad ND: Skladové položky s minimem, automatické notifikace. Kategorie: ložiska, řemeny, těsnění, oleje, filtry, elektro.
-- Revize: Hasicí přístroje, elektro, tlakové nádoby, výtahy, plyn, kalibrace. Termíny a zodpovědné osoby.
-- Vozidla: VZV, traktory, nakladače, osobní. STK, pojistka, servisní intervaly.
-- Odpady: Kontejnery s plněním (zelená/žlutá/červená), harmonogram svozů.
-- Loupárna: Specializovaná sekce pro loupání koření.
-- Kontroly budov: Inspekce místností s foto-dokumentací, automatické P1 úkoly při závadě.
-
-BUDOVY: A (Administrativa), B (Spojovací krček), C (Zázemí & Vedení), D (Výrobní hala), E (Dílna & Sklad ND), L (Loupárna).
-
-STROJE: Extrudery (EXT-xxx), Míchačky, Balicí linky, Pece, Dopravníky, VZV, Kompresory, Chladicí jednotky, Loupačky.
-
-ROLE UŽIVATELŮ: Majitel (read-only), Vedení (schvalování, finance), Superadmin (technika), Údržba (stroje, sklad), Výroba (zóny, plánování), Operátor (kiosk).
-
-Pomáhej s: hlášením poruch, kontrolou skladu, přehledem revizí, statistikami, plánováním údržby, exportem dat.
-Pokud uživatel chce nahlásit poruchu, pomoz mu identifikovat stroj (kód + budova) a popis problému.
-Pokud se ptá na stav, uveď konkrétní čísla pokud je máš (jinak řekni že je potřeba zkontrolovat v systému).`;
-
-async function callGeminiAPI(userMessage: string, history: Message[]): Promise<string> {
-  if (!GEMINI_API_KEY) {
-    return getFallbackResponse(userMessage);
-  }
-
-  try {
-    const contents = [
-      { role: 'user', parts: [{ text: SYSTEM_PROMPT }] },
-      { role: 'model', parts: [{ text: `Rozumím, jsem AI asistent ${appConfig.APP_NAME}. Jak vám mohu pomoci?` }] },
-      ...history.slice(-10).map(m => ({
-        role: m.role === 'user' ? 'user' : 'model',
-        parts: [{ text: m.content }],
-      })),
-      { role: 'user', parts: [{ text: userMessage }] },
-    ];
-
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents,
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 500,
-          },
-        }),
-      }
-    );
-
-    if (!res.ok) {
-      console.error('[AI] Gemini API error:', res.status);
-      return getFallbackResponse(userMessage);
-    }
-
-    const data = await res.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    return text || getFallbackResponse(userMessage);
-  } catch (err) {
-    console.error('[AI] Gemini fetch error:', err);
-    return getFallbackResponse(userMessage);
-  }
+// Načte obrázek jako base64 (bez prefixu) + media type + data URL pro náhled.
+function fileToImage(file: File): Promise<{ imageData: string; imageType: string; dataUrl: string }> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result || '');
+      const imageData = dataUrl.split(',')[1] || '';
+      resolve({ imageData, imageType: file.type || 'image/jpeg', dataUrl });
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 
-function getFallbackResponse(userMessage: string): string {
-  const lm = userMessage.toLowerCase();
-  if (lm.includes('porucha') || lm.includes('nefunguje') || lm.includes('rozbil'))
-    return 'Rozumím, chcete nahlásit poruchu. Na kterém stroji je problém? Můžete říct název nebo kód stroje.';
-  if (lm.includes('sklad') || lm.includes('díl') || lm.includes('objednat'))
-    return 'Stav skladu: 3 položky v kritickém stavu, 5 s nízkým stavem. Chcete zobrazit detail nebo vytvořit objednávku?';
-  if (lm.includes('revize') || lm.includes('kalibrace'))
-    return 'Máte 2 kritické revize: Hasicí přístroje a Kalibrace vah. Chcete zobrazit detail?';
-  if (lm.includes('report') || lm.includes('statistik'))
-    return 'Tento měsíc: 47 dokončených úkolů, průměrná doba opravy 2.4h, 87% dokončeno včas. Chcete exportovat?';
-  if (lm.includes('help') || lm.includes('pomoc'))
-    return 'Můžu pomoct s:\n• Nahlášení poruchy\n• Kontrola skladu\n• Přehled revizí\n• Statistiky a reporty\n• Plánování úkolů\n\nŘekněte co potřebujete!';
-  return 'Nerozuměl jsem. Zkuste to prosím jinak nebo řekněte "help" pro seznam příkazů.';
-}
+async function callAssistant(
+  userMessage: string,
+  history: Message[],
+  image?: { imageData: string; imageType: string },
+): Promise<string> {
+  const callable = httpsCallable<
+    { message: string; history: { role: string; content: string }[]; imageData?: string; imageType?: string },
+    AssistantReply
+  >(functions, 'assistantChat');
 
-// ═══════════════════════════════════════════════════════════════════
-// OCR STUB — Handwritten Notes Processing
-// ═══════════════════════════════════════════════════════════════════
+  const res = await callable({
+    message: userMessage,
+    history: history.map((m) => ({ role: m.role, content: m.content })),
+    ...(image ? { imageData: image.imageData, imageType: image.imageType } : {}),
+  });
 
-interface OcrResult {
-  rawText: string;
-  assetName: string | null;
-  task: string | null;
-  technician: string | null;
-}
-
-async function processHandwrittenNotes(image: File): Promise<OcrResult> {
-  // Stub: simulate OCR processing delay
-  await new Promise((r) => setTimeout(r, 1500));
-
-  // Demo extraction based on filename or random data
-  const demoResults: OcrResult[] = [
-    { rawText: 'Výměna ložiska na EXT-001, vibrace odstraněny. Technik: Zdeněk M.', assetName: 'Extruder 1 (EXT-001)', task: 'Výměna ložiska — vibrace odstraněny', technician: 'Zdeněk Mička' },
-    { rawText: 'Balička Karel — ucpaná dýza, vyčištěno. Volf P.', assetName: 'Balička Karel', task: 'Ucpaná dýza — vyčištěno', technician: 'Petr Volf' },
-    { rawText: 'Kompresor 2 — netěsnost hadice, vyměněno těsnění. Novák F.', assetName: 'Kompresor 2', task: 'Netěsnost hadice — výměna těsnění', technician: 'Filip Novák' },
-  ];
-  const idx = Math.floor(Math.random() * demoResults.length);
-  console.log('[OCR] Processing image:', image.name, '→', demoResults[idx].rawText);
-  return demoResults[idx];
+  return res.data?.reply || 'Promiň, nepřišla žádná odpověď.';
 }
 
 const QUICK_COMMANDS = [
@@ -164,35 +93,61 @@ export default function AIAssistantPage() {
   const [input, setInput] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isSpeaking] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [voiceOn, setVoiceOn] = useState<boolean>(() => {
+    try { return localStorage.getItem('ai-voice') === '1'; } catch { return false; }
+  });
 
-  // OCR state
-  const [showOcr, setShowOcr] = useState(false);
-  const [ocrProcessing, setOcrProcessing] = useState(false);
-  const [ocrResult, setOcrResult] = useState<OcrResult | null>(null);
-  const [ocrSaved, setOcrSaved] = useState(false);
-  const ocrInputRef = useRef<HTMLInputElement>(null);
+  // Foto pro AI
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
    
   const recognitionRef = useRef<any>(null);
 
+  // Číst odpověď nahlas (česky)
+  const speak = useCallback((text: string) => {
+    try {
+      const synth = window.speechSynthesis;
+      if (!synth) return;
+      synth.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'cs-CZ';
+      u.onstart = () => setIsSpeaking(true);
+      u.onend = () => setIsSpeaking(false);
+      u.onerror = () => setIsSpeaking(false);
+      synth.speak(u);
+    } catch { /* ignore */ }
+  }, []);
+
   // handleSend — must be declared before useEffect that uses it
-  const handleSend = useCallback(async (messageText?: string) => {
-    const text = messageText || input;
-    if (!text.trim()) return;
+  const handleSend = useCallback(async (messageText?: string, image?: { imageData: string; imageType: string; dataUrl: string }) => {
+    const text = (messageText ?? input).trim();
+    if (!text && !image) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
-      content: text,
+      content: text || (image ? '📷 Foto' : ''),
+      image: image?.dataUrl,
       timestamp: new Date(),
     };
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsProcessing(true);
 
-    const response = await callGeminiAPI(text, messages);
+    let response: string;
+    try {
+      response = await callAssistant(
+        text || 'Popiš, co je na fotce, a poraď nebo zapiš, co je potřeba.',
+        messages,
+        image ? { imageData: image.imageData, imageType: image.imageType } : undefined,
+      );
+    } catch (err) {
+      console.error('[AI] assistantChat error:', err);
+      const e = err as { message?: string };
+      response = e?.message || 'AI asistent je teď nedostupný. Zkus to prosím za chvíli.';
+    }
 
     const assistantMessage: Message = {
       id: (Date.now() + 1).toString(),
@@ -202,7 +157,8 @@ export default function AIAssistantPage() {
     };
     setMessages(prev => [...prev, assistantMessage]);
     setIsProcessing(false);
-  }, [input, messages]);
+    if (voiceOn) speak(response);
+  }, [input, messages, voiceOn, speak]);
 
   // Scroll to bottom
   useEffect(() => {
@@ -253,31 +209,18 @@ export default function AIAssistantPage() {
     }
   };
 
-  // OCR handlers
-  const handleOcrImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Foto → AI (Claude obrázek přečte a popíše / zapíše)
+  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    if (e.target) e.target.value = '';
     if (!file) return;
-    setOcrProcessing(true);
-    setOcrResult(null);
-    setOcrSaved(false);
+    if (file.size > 5 * 1024 * 1024) { alert('Obrázek je moc velký (max 5 MB). Zkus menší / horší kvalitu.'); return; }
     try {
-      const result = await processHandwrittenNotes(file);
-      setOcrResult(result);
+      const img = await fileToImage(file);
+      handleSend(input.trim() || undefined, img);
     } catch {
-      setOcrResult({ rawText: 'Chyba při zpracování obrázku', assetName: null, task: null, technician: null });
+      alert('Foto se nepodařilo načíst.');
     }
-    setOcrProcessing(false);
-    // Reset file input
-    if (ocrInputRef.current) ocrInputRef.current.value = '';
-  };
-
-  const handleOcrSave = () => {
-    if (!ocrResult) return;
-    setOcrSaved(true);
-    // Send extracted data as message to AI
-    const msg = `📋 OCR Import — Zařízení: ${ocrResult.assetName || '?'}, Úkol: ${ocrResult.task || '?'}, Technik: ${ocrResult.technician || '?'}`;
-    handleSend(msg);
-    setTimeout(() => { setShowOcr(false); setOcrResult(null); setOcrSaved(false); }, 800);
   };
 
   return (
@@ -310,88 +253,29 @@ export default function AIAssistantPage() {
             </div>
           </div>
 
+          <input ref={photoInputRef} type="file" accept="image/*" capture="environment" onChange={handlePhotoSelect} className="hidden" />
           <button
-            onClick={() => setShowOcr(!showOcr)}
-            title="Skenovat papírový deník"
-            className={`p-2 rounded-xl transition ${showOcr ? 'bg-violet-500 text-white' : 'bg-white border border-slate-200 hover:bg-slate-50 text-slate-500'}`}
+            onClick={() => photoInputRef.current?.click()}
+            title="Vyfotit závadu → AI ji popíše a poradí"
+            className="p-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-500 transition"
           >
             <Camera className="w-5 h-5" />
           </button>
 
           <button
-            onClick={() => isSpeaking ? speechSynthesis.cancel() : null}
-            className="p-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 transition"
+            onClick={() => {
+              const next = !voiceOn;
+              setVoiceOn(next);
+              try { localStorage.setItem('ai-voice', next ? '1' : '0'); } catch { /* ignore */ }
+              if (!next) { try { window.speechSynthesis.cancel(); } catch { /* ignore */ } setIsSpeaking(false); }
+            }}
+            title={voiceOn ? 'Hlas zapnutý — čte odpovědi nahlas' : 'Hlas vypnutý'}
+            className={`p-2 rounded-xl border transition ${voiceOn ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-500'}`}
           >
-            {isSpeaking ? <VolumeX className="w-5 h-5 text-amber-400" /> : <Volume2 className="w-5 h-5 text-slate-400" />}
+            {isSpeaking ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
           </button>
         </div>
       </header>
-
-      {/* OCR Panel */}
-      {showOcr && (
-        <div className="relative z-10 mx-4 mt-3 bg-violet-50 border border-violet-200 rounded-2xl p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-violet-700 flex items-center gap-2">
-              <Camera className="w-4 h-4" /> Skenovat papírový deník
-            </h3>
-            <button onClick={() => { setShowOcr(false); setOcrResult(null); }} className="p-1 rounded-lg bg-slate-100 text-slate-500 hover:text-slate-700 transition">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Upload */}
-          <div>
-            <input ref={ocrInputRef} type="file" accept="image/*" capture="environment" onChange={handleOcrImageSelect} className="hidden" id="ocr-upload" />
-            <label htmlFor="ocr-upload"
-              className="w-full py-3 rounded-xl bg-slate-50 border border-dashed border-violet-300 text-violet-700 text-sm font-semibold hover:bg-slate-100 transition flex items-center justify-center gap-2 cursor-pointer min-h-[48px]">
-              <Camera className="w-4 h-4" />
-              {ocrProcessing ? 'Zpracovávám...' : 'Vyfotit nebo nahrát obrázek'}
-            </label>
-          </div>
-
-          {/* Processing */}
-          {ocrProcessing && (
-            <div className="flex items-center gap-3 text-violet-700 text-sm">
-              <Loader2 className="w-4 h-4 animate-spin" /> Rozpoznávám text z obrázku...
-            </div>
-          )}
-
-          {/* Result preview */}
-          {ocrResult && !ocrProcessing && (
-            <div className="bg-slate-50 rounded-xl p-3 space-y-2">
-              <div className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">Rozpoznaná data</div>
-              <div className="text-xs text-slate-600 italic bg-white border border-slate-200 rounded-lg p-2">&ldquo;{ocrResult.rawText}&rdquo;</div>
-              <div className="grid grid-cols-1 gap-1.5 mt-2">
-                {ocrResult.assetName && (
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="text-slate-500 w-16">Zařízení:</span>
-                    <span className="text-slate-900 font-medium">{ocrResult.assetName}</span>
-                  </div>
-                )}
-                {ocrResult.task && (
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="text-slate-500 w-16">Úkol:</span>
-                    <span className="text-slate-900 font-medium">{ocrResult.task}</span>
-                  </div>
-                )}
-                {ocrResult.technician && (
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="text-slate-500 w-16">Technik:</span>
-                    <span className="text-slate-900 font-medium">{ocrResult.technician}</span>
-                  </div>
-                )}
-              </div>
-              <button
-                onClick={handleOcrSave}
-                disabled={ocrSaved}
-                className="w-full mt-2 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-bold hover:bg-violet-500 disabled:opacity-50 transition flex items-center justify-center gap-2 min-h-[44px]"
-              >
-                {ocrSaved ? <><CheckCircle2 className="w-4 h-4" /> Uloženo</> : <><Save className="w-4 h-4" /> Uložit do systému</>}
-              </button>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Messages */}
       <div className="relative z-10 flex-1 overflow-y-auto p-4 space-y-4">
@@ -410,9 +294,12 @@ export default function AIAssistantPage() {
             
             <div className={`max-w-[80%] p-4 rounded-2xl ${
               message.role === 'user' 
-                ? 'bg-blue-500 text-white' 
+                ? 'bg-blue-500 text-white'
                 : 'bg-white border border-slate-200 text-slate-900'
             }`}>
+              {message.image && (
+                <img src={message.image} alt="foto" className="mb-2 max-h-48 w-auto rounded-lg border border-black/10" />
+              )}
               <p className="whitespace-pre-wrap">{message.content}</p>
 
               <p className="text-xs opacity-60 mt-2">
@@ -498,7 +385,7 @@ export default function AIAssistantPage() {
         </div>
 
         <p className="text-xs text-slate-500 text-center mt-2">
-          {GEMINI_API_KEY ? '✨ Powered by Gemini 1.5 Flash' : '💡 Tip: Řekněte "help" pro seznam příkazů'}
+          ✨ Powered by Claude
         </p>
       </div>
     </div>

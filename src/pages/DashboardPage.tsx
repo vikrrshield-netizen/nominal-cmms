@@ -196,7 +196,7 @@ function AiTipCard({ stats }: { stats: { criticalTasks: number; breakdownAssets:
 // FIREBASE HOOKS (LIVE DATA)
 // ═══════════════════════════════════════════════════════
 
-function QuickActions({ onNavigate }: { onNavigate: (path: string) => void }) {
+function QuickActions({ onNavigate, canUseAi }: { onNavigate: (path: string) => void; canUseAi?: boolean }) {
   const actions = [
     { label: 'Zapsat práci', detail: 'deník údržby', path: '/work-diary?new=1', icon: FileText, tone: 'text-slate-900', primaryClass: 'bg-emerald-700 border-emerald-700 hover:bg-emerald-600', iconClass: 'bg-emerald-900/35 border-emerald-300/40', primary: true },
     { label: 'Nahlásit poruchu', detail: 'rychlá závada', path: 'fault', icon: AlertTriangle, tone: 'text-red-700', primaryClass: 'bg-white border-red-200 hover:bg-red-50 text-slate-950', iconClass: 'bg-red-50 border-red-100', primary: true },
@@ -208,6 +208,7 @@ function QuickActions({ onNavigate }: { onNavigate: (path: string) => void }) {
   const primaryActions = actions.filter((action) => action.primary);
   const secondaryActions = [
     { label: 'Kiosk', detail: 'režim pro obsluhu', path: '/kiosk', icon: Monitor, tone: 'text-emerald-700' },
+    ...(canUseAi ? [{ label: 'Zeptat se AI', detail: 'asistent údržby', path: '/ai', icon: Sparkles, tone: 'text-pink-600' }] : []),
     ...actions.filter((action) => !action.primary),
   ];
 
@@ -2333,8 +2334,19 @@ function FullDashboard() {
         )}
 
         <DashboardBuilder
-          storageKey="vikrr-dash-builder-v3"
+          storageKey="vikrr-dash-builder-v4"
           panels={[
+            {
+              id: 'rychle-akce',
+              title: 'Moje zkratky',
+              defaultSpan: 3,
+              node: (
+                <QuickActions canUseAi={hasPermission('ai.use')} onNavigate={(path) => {
+                  if (path === 'fault') { setActiveModal('fault'); return; }
+                  navigate(path);
+                }} />
+              ),
+            },
             {
               id: 'prehled',
               title: 'Přehled (KPI, fronta, stav)',
@@ -2362,17 +2374,6 @@ function FullDashboard() {
                     onNavigate={navigate}
                     onResolveAlarm={() => navigate('/tasks')}
                   />
-              ),
-            },
-            {
-              id: 'rychle-akce',
-              title: 'Moje zkratky',
-              defaultSpan: 3,
-              node: (
-                <QuickActions onNavigate={(path) => {
-                  if (path === 'fault') { setActiveModal('fault'); return; }
-                  navigate(path);
-                }} />
               ),
             },
             {

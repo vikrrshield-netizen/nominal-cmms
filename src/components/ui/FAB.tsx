@@ -18,7 +18,7 @@ const COLORS = {
   blue:   'bg-blue-500 shadow-blue-500/40',
 };
 
-export default function FAB({ icon, label, color = 'orange', onClick }: FABProps) {
+export default function FAB({ icon, label, color = 'green', onClick }: FABProps) {
   return (
     <button
       onClick={onClick}

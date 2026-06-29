@@ -300,7 +300,7 @@ export default function WarehousePage() {
   return (
     <div className="min-h-screen bg-[#f1ece3] pb-24">
       {/* Header */}
-      <div className="bg-white border-b border-slate-700/50 px-4 py-4 sticky top-0 z-20">
+      <div className="bg-white border-b border-slate-200 px-4 py-4 sticky top-0 z-20">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
             <button onClick={() => goBack()} className="p-2 rounded-xl bg-slate-50 border border-slate-200 hover:bg-slate-100 transition">
@@ -380,7 +380,7 @@ export default function WarehousePage() {
             {receipts.map(r => {
               const st = RECEIPT_STATUS[r.status];
               return (
-                <div key={r.id} className="bg-white rounded-2xl border border-slate-700/40 overflow-hidden">
+                <div key={r.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
                   <div className={`px-4 py-2.5 ${st.bg} flex items-center justify-between`}>
                     <div className="flex items-center gap-2">
                       <div className={`w-2.5 h-2.5 rounded-full ${st.dot}`} />
@@ -425,7 +425,7 @@ export default function WarehousePage() {
               const isLow = s.minQuantity > 0 && s.quantity <= s.minQuantity;
               const cat = STOCK_CATEGORIES[s.category] || STOCK_CATEGORIES.raw;
               return (
-                <div key={s.id} className={`bg-white rounded-2xl border ${isLow ? 'border-red-500/30 ring-1 ring-red-500/20' : 'border-slate-700/40'} p-4`}>
+                <div key={s.id} className={`bg-white rounded-2xl border ${isLow ? 'border-red-500/30 ring-1 ring-red-500/20' : 'border-slate-200'} p-4`}>
                   <div className="flex items-center justify-between mb-2">
                     <div>
                       <div className="text-sm font-bold text-slate-900">{s.materialName}</div>
@@ -462,7 +462,7 @@ export default function WarehousePage() {
               const st = SHIPMENT_STATUS[s.status];
               return (
                 <div key={s.id} className={`bg-white rounded-2xl border ${
-                  s.status === 'shipped' ? 'border-emerald-500/20 opacity-70' : 'border-slate-700/40'
+                  s.status === 'shipped' ? 'border-emerald-500/20 opacity-70' : 'border-slate-200'
                 } overflow-hidden`}>
                   <div className={`px-4 py-2.5 ${st.bg} flex items-center justify-between`}>
                     <div className="flex items-center gap-2">

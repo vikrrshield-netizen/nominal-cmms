@@ -18,6 +18,10 @@ export {
   migrateAuthEmails,
 } from './auth';
 
+// AI asistent v aplikaci (Claude) — bezpečný backend, API klíč jako secret
+// + týdenní AI souhrn (plánovaná funkce)
+export { assistantChat, weeklyAiSummary } from './assistant';
+
 const OPEN_TASK_STATUSES = new Set(['backlog', 'planned', 'in_progress', 'paused']);
 const PUSH_TARGET_ROLES = new Set(['SUPERADMIN', 'VEDENI', 'UDRZBA']);
 const GEARBOX_NOTIFICATION_ROLES = new Set(['SUPERADMIN', 'VEDENI', 'UDRZBA', 'VYROBA']);

@@ -253,7 +253,7 @@ export default function AuditRegister({ config, detect }: { config: AuditRegiste
                             </span>
                             <span className="text-[11px] font-bold flex-shrink-0 px-2 py-0.5 rounded-md" style={{ background: TONE[tone].soft, color: TONE[tone].text }}>{eventLabel(ev)}</span>
                             {canEdit && (
-                              <button type="button" disabled={saving === unit.id} onClick={() => markDone(unit, ev)} title={doneLabel} className="flex-shrink-0 w-8 h-8 rounded-lg bg-slate-100 hover:bg-emerald-100 text-slate-500 hover:text-emerald-700 flex items-center justify-center disabled:opacity-50">
+                              <button type="button" disabled={saving === unit.id} onClick={() => markDone(unit, ev)} title={doneLabel} className="flex-shrink-0 w-11 h-11 rounded-lg bg-slate-100 hover:bg-emerald-100 text-slate-500 hover:text-emerald-700 flex items-center justify-center disabled:opacity-50">
                                 <Check size={15} />
                               </button>
                             )}

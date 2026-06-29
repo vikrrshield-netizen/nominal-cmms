@@ -844,7 +844,7 @@ function CreateItemModal({ onClose, onCreate }: {
               type="button"
               onClick={handleSubmit}
               disabled={saving}
-              className="flex-1 min-h-12 py-3 bg-emerald-600 text-white rounded-xl font-bold disabled:opacity-50 flex items-center justify-center gap-2 hover:bg-blue-700"
+              className="flex-1 min-h-12 py-3 bg-emerald-600 text-white rounded-xl font-bold disabled:opacity-50 flex items-center justify-center gap-2 hover:bg-emerald-700"
             >
               {saving && <Loader2 className="w-4 h-4 animate-spin" />}
               Vytvořit položku

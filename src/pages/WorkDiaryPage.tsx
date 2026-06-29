@@ -1354,10 +1354,10 @@ export default function WorkDiaryPage() {
                 </div>
               )}
               {selectedAsset && isGearboxAsset(selectedAsset) && selectedGearboxExtruderName && (
-                <div className="mt-2 rounded-xl border border-violet-200 bg-violet-50 px-3 py-3 text-sm text-violet-900">
+                <div className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-900">
                   <div className="text-base font-black">Převodovka je namontovaná na extruderu</div>
                   <div className="mt-1 font-semibold">{selectedGearboxExtruderName}</div>
-                  <div className="mt-1 text-sm font-semibold text-violet-800">
+                  <div className="mt-1 text-sm font-semibold text-emerald-800">
                     Zápis se uloží do historie převodovky i do historie tohoto extruderu.
                   </div>
                 </div>

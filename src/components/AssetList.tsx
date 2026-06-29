@@ -59,7 +59,7 @@ export const AssetList = ({ filterRoomId, filterBuildingId, onAssetSelect }: Ass
           placeholder="Hledat stroj..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full bg-white border border-slate-700 rounded-xl px-4 py-3 pl-10 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-green-500"
+          className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 pl-10 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-green-500"
         />
         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">🔍</span>
       </div>
@@ -107,7 +107,7 @@ export const AssetList = ({ filterRoomId, filterBuildingId, onAssetSelect }: Ass
               <button
                 key={asset.id}
                 onClick={() => onAssetSelect?.(asset)}
-                className="w-full bg-white border border-slate-700 rounded-xl p-4 text-left hover:border-slate-600 transition-all active:scale-98"
+                className="w-full bg-white border border-slate-200 rounded-xl p-4 text-left hover:border-slate-300 transition-all active:scale-98"
               >
                 <div className="flex items-start gap-3">
                   <div className="text-2xl">{categoryConfig.icon}</div>

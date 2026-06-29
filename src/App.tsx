@@ -214,7 +214,7 @@ function ProtectedRoutes() {
             </RequirePermission>
           )}
         />
-        <Route path="/ai" element={<ProtectedPage moduleId="ai" permissions={['ai.use']}><AIAssistantPage /></ProtectedPage>} />
+        <Route path="/ai" element={<ProtectedPage permissions={['ai.use']}><AIAssistantPage /></ProtectedPage>} />
         <Route path="/notifications" element={<ProtectedPage><NotificationsPage /></ProtectedPage>} />
         <Route path="/louparna" element={<Navigate to="/" replace />} />
         <Route path="/kiosk" element={<KioskPage />} />

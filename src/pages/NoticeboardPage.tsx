@@ -423,7 +423,7 @@ export default function NoticeboardPage() {
 
               {/* Content */}
               <div className="px-4 py-3">
-                <p className="text-slate-200 text-sm whitespace-pre-wrap leading-relaxed">{post.content}</p>
+                <p className="text-slate-800 text-sm whitespace-pre-wrap leading-relaxed">{post.content}</p>
               </div>
 
               {/* Footer */}
