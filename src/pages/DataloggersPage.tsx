@@ -156,11 +156,13 @@ function logsForAsset(asset: Asset, logs: DataloggerTemperatureLog[], count = 8)
 }
 
 function temperatureLevel(asset: Asset, log: DataloggerTemperatureLog | null): DataloggerTemperatureLevel {
-  if (isWeekend() && !(log && isToday(log.measuredAt))) return 'not_required';
-  if (!log) return 'missing';
+  // Překročení limitu má PŘEDNOST i o víkendu — jinak by se přes víkend skryl alarm
+  // (poslední páteční hodnota nad limitem) a food-safety riziko by zůstalo neviditelné.
   const min = customFieldNumber(asset, ['min', 'minimum', 'min teplota', 'dolni limit']);
   const max = customFieldNumber(asset, ['max', 'maximum', 'max teplota', 'horni limit']);
-  if ((min !== null && log.temperatureC < min) || (max !== null && log.temperatureC > max)) return 'critical';
+  if (log && ((min !== null && log.temperatureC < min) || (max !== null && log.temperatureC > max))) return 'critical';
+  if (isWeekend() && !(log && isToday(log.measuredAt))) return 'not_required';
+  if (!log) return 'missing';
   if (!isToday(log.measuredAt)) return 'warning';
   return 'ok';
 }

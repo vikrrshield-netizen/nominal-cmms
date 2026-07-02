@@ -26,6 +26,7 @@ import {
   Send,
   Settings,
   Shield,
+  Sparkles,
   ShieldCheck,
   Thermometer,
   Trash2,
@@ -44,8 +45,9 @@ import type { Asset } from '../types/asset';
 import type { DataloggerTemperatureLog } from '../types/datalogger';
 import type { GearboxTemperatureLog } from '../types/gearbox';
 import { materialBatch, productBatch } from '../data/productionMasterSeed';
+import KioskAssistant from '../components/kiosk/KioskAssistant';
 
-type ViewState = 'MENU' | 'BREAKDOWN' | 'ORDER' | 'IDEA' | 'MESSAGE' | 'PREFILTER' | 'GEARBOX_TEMP' | 'DATALOGGER_TEMP' | 'ASSISTANT' | 'HANDOVER' | 'PROFILE';
+type ViewState = 'MENU' | 'BREAKDOWN' | 'ORDER' | 'IDEA' | 'MESSAGE' | 'PREFILTER' | 'GEARBOX_TEMP' | 'DATALOGGER_TEMP' | 'ASSISTANT' | 'AI' | 'HANDOVER' | 'PROFILE';
 
 interface QuickOption {
   id: string;
@@ -1375,12 +1377,15 @@ export default function KioskPage() {
     setIsSubmitting(true);
     setSubmitError('');
     try {
+      // Anonymita: ukládáme jen DEN, ne přesný čas — přesný timestamp by v malém provozu
+      // (známé směny/kamery) prozradil odesílatele. Firestore převede Date na Timestamp.
+      const daySubmitted = new Date(new Date().setHours(0, 0, 0, 0));
       await addDoc(collection(db, 'trustbox'), {
         message: message.trim(),
         category,
         status: 'new',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        createdAt: daySubmitted,
+        updatedAt: daySubmitted,
       });
       showSuccessAndReset('Zpráva odeslána');
     } catch (err) {
@@ -1945,6 +1950,7 @@ export default function KioskPage() {
   // Definice dlaždic MENU — sdílí je mřížka i okno „Nastavení modulů".
   const menuDefs = [
     { id: 'breakdown', icon: <AlertTriangle className="w-8 h-8" />, label: 'Nahlásit poruchu', tone: 'red', primary: true, onClick: () => setActiveView('BREAKDOWN'), show: true },
+    { id: 'ai', icon: <Sparkles className="w-8 h-8" />, label: 'Zeptat se AI', tone: 'emerald', onClick: () => setActiveView('AI'), show: true },
     { id: 'order', icon: <Package className="w-8 h-8" />, label: 'Požadavek na díl', tone: 'blue', onClick: () => setActiveView('ORDER'), show: true },
     { id: 'handover', icon: <ClipboardList className="w-8 h-8" />, label: 'Předání směny', tone: 'indigo', onClick: () => setActiveView('HANDOVER'), show: true },
     { id: 'datalogger', icon: <Thermometer className="w-8 h-8" />, label: 'Datalogery', tone: 'teal', onClick: () => setActiveView('DATALOGGER_TEMP'), badge: dataloggerAlerts.missing.length, show: canUseDataloggerKiosk },
@@ -2818,6 +2824,12 @@ export default function KioskPage() {
     </FormWrapper>
   );
 
+  const renderAI = () => (
+    <FormWrapper title="Zeptat se AI" onCancel={handleCancel}>
+      <KioskAssistant />
+    </FormWrapper>
+  );
+
   const renderProfile = () => (
     <FormWrapper title="Profil terminálu" onCancel={handleCancel}>
       <div className="flex flex-col items-center text-center py-4">
@@ -2985,6 +2997,7 @@ export default function KioskPage() {
       {activeView === 'IDEA' && renderIdea()}
       {activeView === 'MESSAGE' && renderMessage()}
       {activeView === 'ASSISTANT' && renderAssistant()}
+      {activeView === 'AI' && renderAI()}
       {activeView === 'HANDOVER' && renderHandover()}
       {activeView === 'PROFILE' && renderProfile()}
     </div>

@@ -795,6 +795,11 @@ export default function ProductionPage() {
 
   const createBatch = async () => {
     if ((!batchForm.rawMaterial && !selectedMaterial) || !batchForm.targetWeight) return;
+    const targetWeightNum = Number(batchForm.targetWeight);
+    if (!Number.isFinite(targetWeightNum) || targetWeightNum <= 0) {
+      showToast('Zadej kladnou cílovou hmotnost (kg).', 'error');
+      return;
+    }
     const selectedLines = batchForm.extruderIds
       .map((id) => extrusionLineOptions.find((line) => line.id === id))
       .filter((line): line is ProductionExtruderOption => Boolean(line));
@@ -825,7 +830,7 @@ export default function ProductionPage() {
         mixingRecipeSnapshot,
         mixingNote: batchForm.mixingNote.trim(),
         targetMotorLoadAmps: selectedProduct?.targetMotorLoadAmps ?? null,
-        targetWeight: Number(batchForm.targetWeight),
+        targetWeight: targetWeightNum,
         machineId: machineIds[0] || '',
         machineName: machineNames[0] || '',
         machineIds,
@@ -885,13 +890,18 @@ export default function ProductionPage() {
   // ── Packaging actions ──
   const createOrder = async () => {
     if (!orderForm.packagingType || !orderForm.palletCount) return;
+    const pallets = Number(orderForm.palletCount);
+    if (!Number.isFinite(pallets) || pallets <= 0) {
+      showToast('Zadej kladný počet palet.', 'error');
+      return;
+    }
     setOrderSaving(true);
     try {
       const productId = await generateProductId(orderForm.lineId || orderForm.lineName || orderForm.packagingType);
       await addDoc(collection(db, 'production_packaging'), {
         productId,
         packagingType: orderForm.packagingType,
-        palletCount: Number(orderForm.palletCount),
+        palletCount: pallets,
         lineId: orderForm.lineId,
         lineName: orderForm.lineName,
         deadline: orderForm.deadline,

@@ -131,6 +131,18 @@ export const adminSetUserPin = async (userId: string, pin: string): Promise<void
   await callable({ userId, pin });
 };
 
+/** Aktivace/deaktivace uživatele — server zároveň vypne/zapne Auth účet a zneplatní session. */
+export const adminSetUserActive = async (userId: string, active: boolean): Promise<void> => {
+  const callable = httpsCallable<{ userId: string; active: boolean }, { ok: boolean; active: boolean }>(functions, 'adminSetUserActive');
+  await callable({ userId, active });
+};
+
+/** Úprava uživatele (jméno/role/práva/scope/kiosk) přes server — rules by klientský update odmítly. */
+export const adminUpdateUser = async (userId: string, updates: Record<string, unknown>): Promise<void> => {
+  const callable = httpsCallable<{ userId: string; updates: Record<string, unknown> }, { ok: boolean }>(functions, 'adminUpdateUser');
+  await callable({ userId, updates });
+};
+
 export const adminBackfillPinHashes = async (): Promise<{ updated: number; skipped: number }> => {
   const callable = httpsCallable<Record<string, never>, { updated: number; skipped: number }>(functions, 'backfillPinHashes');
   const res = await callable({});

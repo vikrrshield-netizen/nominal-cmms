@@ -2,8 +2,8 @@
 // VIKRR — Asset Shield — Administrace uživatelů a nastavení
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { collection, doc, addDoc, updateDoc, onSnapshot, serverTimestamp, Timestamp, query, orderBy, limit, writeBatch } from 'firebase/firestore';
-import { db, adminCreateUser, adminSetUserPin, adminBackfillPinHashes, adminDisableLegacyLogin, adminMigrateAuthEmails } from '../lib/firebase';
+import { collection, addDoc, onSnapshot, serverTimestamp, Timestamp, query, orderBy, limit } from 'firebase/firestore';
+import { db, adminCreateUser, adminSetUserPin, adminSetUserActive, adminUpdateUser, adminBackfillPinHashes, adminDisableLegacyLogin, adminMigrateAuthEmails } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
 import { useBackNavigation } from '../hooks/useBackNavigation';
 import appConfig from '../appConfig';
@@ -200,7 +200,7 @@ const compareUsersByRoleThenName = (a: AdminUser, b: AdminUser): number => {
 
 export default function AdminPage() {
   const goBack = useBackNavigation('/');
-  const { hasPermission, user: authUser } = useAuthContext();
+  const { hasPermission } = useAuthContext();
   const { ask } = useConfirm();
 
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -295,38 +295,29 @@ export default function AdminPage() {
   );
 
   const handleDeleteUser = useCallback(async (userId: string) => {
-    if (await ask({ message: 'Opravdu deaktivovat tohoto uživatele?', danger: false })) {
+    if (await ask({ message: 'Opravdu deaktivovat tohoto uživatele? Ztratí přístup do aplikace.', danger: false })) {
       const userName = users.find(u => u.id === userId)?.displayName || '';
       try {
-        await updateDoc(doc(db, 'users', userId), {
-          active: false,
-          isActive: false,
-          updatedAt: serverTimestamp(),
-          updatedBy: authUser?.uid || '',
-        });
+        // Přes server: deaktivace zároveň vypne Auth účet a odhlásí i otevřenou session.
+        await adminSetUserActive(userId, false);
         setSelectedUser(null);
         showToast(`Uživatel "${userName}" deaktivován`, 'success');
       } catch (err) {
         showToast(`Chyba: ${(err as Error).message}`, 'error');
       }
     }
-  }, [users, authUser?.uid, ask]);
+  }, [users, ask]);
 
   const handleToggleActive = useCallback(async (userId: string) => {
     const targetUser = users.find(u => u.id === userId);
     if (!targetUser) return;
     try {
-      await updateDoc(doc(db, 'users', userId), {
-        active: !targetUser.active,
-        isActive: !targetUser.active,
-        updatedAt: serverTimestamp(),
-        updatedBy: authUser?.uid || '',
-      });
+      await adminSetUserActive(userId, !targetUser.active);
       showToast(`${targetUser.displayName}: ${targetUser.active ? 'Deaktivován' : 'Aktivován'}`, 'success');
     } catch (err) {
       showToast(`Chyba: ${(err as Error).message}`, 'error');
     }
-  }, [users, authUser?.uid]);
+  }, [users]);
 
   if (!canView) {
     return (
@@ -690,9 +681,8 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
       const beforePermissions = normalizeCustomPermissions(user.customPermissions);
       const afterPermissions = normalizeCustomPermissions(formData.customPermissions);
       const permissionChanges = diffCustomPermissions(beforePermissions, afterPermissions);
-      const batch = writeBatch(db);
-
-      batch.update(doc(db, 'users', user.id), {
+      // Přes server (Admin SDK) — klientský update by role/scope/kioskButtons odmítly firestore.rules.
+      await adminUpdateUser(user.id, {
         displayName: formData.displayName.trim(),
         role: formData.role,
         email: formData.email.trim() || '',
@@ -701,15 +691,11 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
         customPermissions: afterPermissions,
         scope: formData.scope,
         kioskButtons: Array.from(new Set([KIOSK_ALWAYS_ON, ...formData.kioskButtons])),
-        active: user.active,
-        isActive: user.active,
-        updatedAt: serverTimestamp(),
-        updatedBy: authUser?.uid || '',
       });
 
       if (hasPermissionDiff(permissionChanges)) {
         const now = Timestamp.now();
-        batch.set(doc(collection(db, 'audit_logs')), {
+        await addDoc(collection(db, 'audit_logs'), {
           action: 'PERMISSION_CHANGE',
           documentId: user.id,
           targetUserName: formData.displayName.trim() || user.displayName,
@@ -720,8 +706,6 @@ function UserDetailModal({ user, canEdit, onClose, onSaved, onDelete, onToggleAc
           createdAt: now,
         });
       }
-
-      await batch.commit();
 
       if (nextPin) {
         try {

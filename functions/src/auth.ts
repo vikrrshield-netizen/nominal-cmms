@@ -8,7 +8,14 @@ const DEVICE_LOCK_MS = 5 * 60 * 1000;
 const IP_MAX_FAILS = 40;
 const IP_WINDOW_MS = 15 * 60 * 1000;
 const IP_LOCK_MS = 15 * 60 * 1000;
-const PIN_RE = /^\d{4,6}$/;
+// Globální strop napříč celým systémem — backstop proti hromadnému hádání PINu
+// i při rotaci IP / podvrhávání deviceId (útočník obchází per-IP a per-device limit).
+const GLOBAL_MAX_FAILS = 300;
+const GLOBAL_WINDOW_MS = 15 * 60 * 1000;
+const GLOBAL_LOCK_MS = 5 * 60 * 1000;
+const GLOBAL_ATTEMPT_KEY = '__global__';
+const PIN_RE = /^\d{4,6}$/; // LOGIN: snese i stávající 4místné PINy (jinak by se nikdo nepřihlásil)
+const PIN_SET_RE = /^\d{6}$/; // NOVÉ / MĚNĚNÉ PINy: povinně 6 číslic (silnější, stávající nechává být)
 const DEVICE_ID_RE = /^[A-Za-z0-9_-]{16,80}$/;
 const LEGACY_AUTH_EMAIL_RE = /^pin_\d{4,6}@nominal\.local$/i;
 const SECRET_OPTS: functions.RuntimeOptions = { secrets: ['LOGIN_PEPPER'] };
@@ -202,11 +209,14 @@ export const loginWithPin = functions
     const now = Date.now();
     const ipAttemptRef = db().doc(`login_attempts/${ipAttemptKey(context)}`);
     const deviceAttemptRef = deviceId ? db().doc(`login_attempts/${deviceAttemptKey(deviceId)}`) : null;
+    const globalAttemptRef = db().doc(`login_attempts/${GLOBAL_ATTEMPT_KEY}`);
     const ipAttempt = await readAttempt(ipAttemptRef);
     const deviceAttempt = deviceAttemptRef ? await readAttempt(deviceAttemptRef) : {};
+    const globalAttempt = await readAttempt(globalAttemptRef);
 
     assertNotLocked(ipAttempt, now);
     assertNotLocked(deviceAttempt, now);
+    assertNotLocked(globalAttempt, now); // hromadné hádání zablokuje login krátce pro všechny
 
     const pinHash = hashPin(pin);
     const secretSnap = await db().collection('user_secrets').where('pinHash', '==', pinHash).limit(1).get();
@@ -221,14 +231,14 @@ export const loginWithPin = functions
     }
 
     if (!userId) {
+      const fails: Promise<void>[] = [
+        recordFailedAttempt(ipAttemptRef, ipAttempt, now, IP_MAX_FAILS, IP_WINDOW_MS, IP_LOCK_MS),
+        recordFailedAttempt(globalAttemptRef, globalAttempt, now, GLOBAL_MAX_FAILS, GLOBAL_WINDOW_MS, GLOBAL_LOCK_MS),
+      ];
       if (deviceAttemptRef) {
-        await Promise.all([
-          recordFailedAttempt(deviceAttemptRef, deviceAttempt, now, DEVICE_MAX_FAILS, DEVICE_WINDOW_MS, DEVICE_LOCK_MS),
-          recordFailedAttempt(ipAttemptRef, ipAttempt, now, IP_MAX_FAILS, IP_WINDOW_MS, IP_LOCK_MS),
-        ]);
-      } else {
-        await recordFailedAttempt(ipAttemptRef, ipAttempt, now, IP_MAX_FAILS, IP_WINDOW_MS, IP_LOCK_MS);
+        fails.push(recordFailedAttempt(deviceAttemptRef, deviceAttempt, now, DEVICE_MAX_FAILS, DEVICE_WINDOW_MS, DEVICE_LOCK_MS));
       }
+      await Promise.all(fails);
       throw new functions.https.HttpsError('unauthenticated', 'Nespravny PIN.');
     }
 
@@ -250,7 +260,7 @@ export const adminSetUserPin = functions
     const userId = String(data?.userId || '').trim();
     const pin = String(data?.pin || '').trim();
     if (!userId) throw new functions.https.HttpsError('invalid-argument', 'Chybi userId.');
-    if (!PIN_RE.test(pin)) throw new functions.https.HttpsError('invalid-argument', 'PIN musi mit 4 az 6 cislic.');
+    if (!PIN_SET_RE.test(pin)) throw new functions.https.HttpsError('invalid-argument', 'PIN musi mit 6 cislic.');
 
     const pinHash = hashPin(pin);
     const dup = await db().collection('user_secrets').where('pinHash', '==', pinHash).limit(1).get();
@@ -291,7 +301,7 @@ export const adminCreateUser = functions
     const pin = String(data?.pin || '').trim();
     const role = safeRole(data?.role);
     if (!displayName) throw new functions.https.HttpsError('invalid-argument', 'Chybi jmeno.');
-    if (!PIN_RE.test(pin)) throw new functions.https.HttpsError('invalid-argument', 'PIN musi mit 4 az 6 cislic.');
+    if (!PIN_SET_RE.test(pin)) throw new functions.https.HttpsError('invalid-argument', 'PIN musi mit 6 cislic.');
 
     const pinHash = hashPin(pin);
     const dup = await db().collection('user_secrets').where('pinHash', '==', pinHash).limit(1).get();
@@ -348,6 +358,86 @@ export const adminCreateUser = functions
 
     const clearedAttempts = await clearLoginAttempts();
     return { uid, email, clearedAttempts };
+  });
+
+// Aktivace / DEAKTIVACE uživatele — deaktivace teď opravdu vyřadí přístup:
+// vypne Auth účet (disabled:true) a zneplatní obnovovací tokeny, takže i otevřená
+// session propadne (ID token nejde obnovit). Bez toho byl active:false bezzubý.
+export const adminSetUserActive = functions
+  .runWith(SECRET_OPTS)
+  .https.onCall(async (data: any, context: functions.https.CallableContext) => {
+    await assertAdmin(context);
+    const userId = String(data?.userId || '').trim();
+    const active = data?.active !== false; // default true, false = deaktivace
+    if (!userId) throw new functions.https.HttpsError('invalid-argument', 'Chybi userId.');
+    if (userId === context.auth?.uid && !active) {
+      throw new functions.https.HttpsError('failed-precondition', 'Nemuzes deaktivovat sam sebe.');
+    }
+
+    await db().doc(`users/${userId}`).set(
+      {
+        active,
+        isActive: active,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedBy: context.auth?.uid || '',
+      },
+      { merge: true },
+    );
+
+    await admin.auth().updateUser(userId, { disabled: !active }).catch(() => undefined);
+    if (!active) {
+      await admin.auth().revokeRefreshTokens(userId).catch(() => undefined);
+    }
+
+    return { ok: true, active };
+  });
+
+// Úprava existujícího uživatele (přes Admin SDK — klientský update role/scope/kioskButtons rules odmítají).
+// Základní pole smí kterýkoli admin; role/práva/scope jen SUPERADMIN/admin.manage (proti self-escalaci).
+export const adminUpdateUser = functions
+  .runWith(SECRET_OPTS)
+  .https.onCall(async (data: any, context: functions.https.CallableContext) => {
+    await assertAdmin(context);
+    const userId = String(data?.userId || '').trim();
+    if (!userId) throw new functions.https.HttpsError('invalid-argument', 'Chybi userId.');
+    const u = (data?.updates && typeof data.updates === 'object') ? data.updates : {};
+
+    const callerSnap = await db().doc(`users/${context.auth!.uid}`).get();
+    const callerData = callerSnap.data() || {};
+    const canManageRoles = String(callerData.role || '') === 'SUPERADMIN'
+      || uniqueStrings(callerData.customPermissions?.granted).includes('admin.manage');
+
+    const out: admin.firestore.UpdateData<admin.firestore.DocumentData> = {
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedBy: context.auth?.uid || '',
+    };
+    for (const k of ['displayName', 'phone', 'email', 'buildingId', 'color', 'positionId', 'nickname', 'kioskButtons', 'workwear', 'workwearSizes']) {
+      if (k in u) out[k] = u[k];
+    }
+    if (canManageRoles) {
+      if ('role' in u) {
+        const role = safeRole(u.role);
+        const roleId = ROLE_ID_BY_ROLE[role] || ROLE_ID_BY_ROLE.OPERATOR;
+        out.role = role;
+        out.roleIds = [roleId];
+        out.primaryRoleId = roleId;
+      }
+      if ('customPermissions' in u) out.customPermissions = u.customPermissions;
+      if ('scope' in u) out.scope = u.scope;
+    }
+
+    await db().doc(`users/${userId}`).set(out, { merge: true });
+
+    // Sladit token claims (role/práva) — projeví se po dalším loginu/refreshi.
+    if (canManageRoles && ('role' in u || 'customPermissions' in u)) {
+      try {
+        const fresh = (await db().doc(`users/${userId}`).get()).data() || {};
+        await admin.auth().setCustomUserClaims(userId, await buildTokenClaims(fresh));
+      } catch (err) {
+        console.warn('[adminUpdateUser] setCustomUserClaims failed', err);
+      }
+    }
+    return { ok: true, sensitiveApplied: canManageRoles };
   });
 
 export const backfillPinHashes = functions

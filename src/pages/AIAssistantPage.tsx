@@ -1,7 +1,7 @@
 // src/pages/AIAssistantPage.tsx
 // VIKRR — Asset Shield — Search & VIKRR AI
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { httpsCallable } from 'firebase/functions';
 import { useBackNavigation } from '../hooks/useBackNavigation';
 import { useConfirm } from '../hooks/useConfirm';
@@ -12,7 +12,7 @@ import VoiceMemoRecorder from '../components/ui/VoiceMemoRecorder';
 import {
   Sparkles, Mic, MicOff, Send, ArrowLeft, Bot, User,
   AlertTriangle, Package, Calendar, FileText,
-  Volume2, VolumeX, Loader2, Camera,
+  Volume2, VolumeX, Loader2, Camera, SquarePen, Bell, ScanLine, ClipboardList,
 } from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════════════════
@@ -33,7 +33,9 @@ interface Message {
 // (stav strojů, úkoly, termíny, Deník) a — podle role — i zapisovat.
 // ═══════════════════════════════════════════════════════════════════
 
-type AssistantReply = { reply: string; toolsUsed?: string[] };
+// Návrh akce (uložený na serveru) — klient potvrzuje jen přes id.
+type PendingAction = { id: string; type: string; summary: string; danger?: boolean };
+type AssistantReply = { reply: string; toolsUsed?: string[]; pendingActions?: PendingAction[] };
 
 // Načte obrázek jako base64 (bez prefixu) + media type + data URL pro náhled.
 function fileToImage(file: File): Promise<{ imageData: string; imageType: string; dataUrl: string }> {
@@ -53,7 +55,7 @@ async function callAssistant(
   userMessage: string,
   history: Message[],
   image?: { imageData: string; imageType: string },
-): Promise<string> {
+): Promise<{ reply: string; pendingActions: PendingAction[] }> {
   const callable = httpsCallable<
     { message: string; history: { role: string; content: string }[]; imageData?: string; imageType?: string },
     AssistantReply
@@ -65,15 +67,63 @@ async function callAssistant(
     ...(image ? { imageData: image.imageData, imageType: image.imageType } : {}),
   });
 
-  return res.data?.reply || 'Promiň, nepřišla žádná odpověď.';
+  return {
+    reply: res.data?.reply || 'Promiň, nepřišla žádná odpověď.',
+    pendingActions: Array.isArray(res.data?.pendingActions) ? res.data.pendingActions : [],
+  };
 }
 
 const QUICK_COMMANDS = [
-  { label: 'Nahlásit poruchu', icon: AlertTriangle, color: 'bg-red-500', keyword: 'porucha' },
+  { label: 'Nahlásit poruchu', icon: AlertTriangle, color: 'bg-red-500', keyword: 'Chci nahlásit poruchu.' },
   { label: 'Stav skladu', icon: Package, color: 'bg-emerald-500', keyword: 'sklad' },
   { label: 'Revize', icon: Calendar, color: 'bg-amber-500', keyword: 'revize' },
   { label: 'Report', icon: FileText, color: 'bg-blue-500', keyword: 'report' },
 ];
+
+// ── Lokální rozpoznání jednoduchých dotazů → odpověď z dat (bez volání Claude) ──
+function localNorm(s: string): string {
+  return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9\s]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+const SKLAD_STOP = new Set(['kolik', 'mame', 'mam', 'ma', 'je', 'jsou', 'na', 've', 'v', 'sklade', 'skladu', 'sklad', 'zbyva', 'zbyle', 'jeste', 'tam', 'tech', 'kusu', 'ks', 'stav', 'co', 'dochazi', 'chybi', 'nam', 'a', 'i', 'k', 'o', 'nejake', 'nejaky']);
+function extractPart(words: string[]): string {
+  return words.filter((w) => w.length > 1 && !SKLAD_STOP.has(w)).join(' ').trim();
+}
+// Vrátí { kind, query? } když jde o jednoduchý dotaz na data, jinak null (→ pošle se Claude).
+function detectLocalIntent(raw: string): { kind: string; query?: string } | null {
+  const t = localNorm(raw);
+  if (!t) return null;
+  // Zápis / akce / učení → VŽDY Claude (musí to rozumět a zapsat).
+  if (/\b(zapis|zaloz|vytvor|pridej|nahlas|udel|proved|smaz|vymaz|oprav|zmen|nastav|pamatuj|zapamatuj|zapomen|napis|posli|uprav)\w*/.test(t)) return null;
+
+  if (/\b(co (ted )?hori|co je noveho|co mam hlidat|situace|co se deje|co je dnes|shrnuti)/.test(t) || t === 'stav' || t === 'prehled') return { kind: 'overview' };
+  if (/\b(co je (v )?poruse|jake jsou poruchy|co je rozbit|co nefunguje|poruchy stroju|rozbite stroje|v poruch)/.test(t)) return { kind: 'faults' };
+  if (/\b(reviz|co propada|propadl|terminy reviz)/.test(t)) return { kind: 'revisions' };
+  if (/\b(report|statistik|prehled provozu|mttr|nejporuchov|kolik ukolu)/.test(t)) return { kind: 'stats' };
+  if (/\b(otevrene ukoly|co se resi|seznam ukolu|jake ukoly|ukoly co)/.test(t)) return { kind: 'tasks' };
+  if (/\b(stav stroju|jak jsou na tom stroje|bezi vsechno|prehled stroju|stav zarizen)/.test(t)) return { kind: 'machines' };
+  if (/\b(audit|ifs|brc|tesco|auditni pripravenost|pripraveni na audit)/.test(t)) return { kind: 'audit' };
+  if (/\b(struktura|kartotek|budov|jake mistnost|kolik stroju|stroje v|extrudovn|michar|balirn|louparn|kotelna|expedic|dilna)/.test(t)) {
+    // Celý dotaz pošli serveru — ten z něj vytáhne budovu / místnost (řeší i skloňování a plnící slova).
+    return { kind: 'structure', query: t };
+  }
+  if (/\b(kdo delal|co se delalo|denik|zaznamy prace|kdo zapsal|historie prace)/.test(t)) {
+    const q = t.replace(/\b(kdo|delal|delala|co|se|delalo|denik|zaznamy|prace|zapsal|historie|na|u)\b/g, ' ').replace(/\s+/g, ' ').trim();
+    return { kind: 'worklogs', query: q || undefined };
+  }
+
+  if (/\bsklad/.test(t)) {
+    const q = extractPart(t.split(' '));
+    return { kind: 'inventory', query: q || undefined };
+  }
+  if (/^(kolik|mame|je tam|zbyva)\b/.test(t)) {
+    const q = extractPart(t.split(' '));
+    if (q && q.length >= 3) return { kind: 'inventory', query: q };
+  }
+  const findM = t.match(/^(najdi|vyhledej|kde je|kde stoji|karta)\s+(.{2,})$/);
+  if (findM) return { kind: 'find', query: findM[2].trim() };
+
+  return null;
+}
 
 // ═══════════════════════════════════════════════════════════════════
 // COMPONENT
@@ -81,17 +131,27 @@ const QUICK_COMMANDS = [
 
 export default function AIAssistantPage() {
   const goBack = useBackNavigation('/');
-  const { notify } = useConfirm();
+  const { ask, notify } = useConfirm();
   const { user } = useAuthContext();
   
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '0',
-      role: 'assistant',
-      content: `Ahoj ${user?.displayName || 'uživateli'}! 👋 Jsem AI asistent pro ${appConfig.APP_NAME}. Můžu vám pomoct s hlášením poruch, kontrolou skladu, přehledem revizí a dalšími úkoly. Co potřebujete?`,
-      timestamp: new Date(),
-    }
-  ]);
+  const greeting = (): Message => ({
+    id: '0',
+    role: 'assistant',
+    content: `Ahoj ${user?.displayName || 'uživateli'}! 👋 Jsem AI asistent pro ${appConfig.APP_NAME}. Můžu vám pomoct s hlášením poruch, kontrolou skladu, přehledem revizí a dalšími úkoly. Co potřebujete?`,
+    timestamp: new Date(),
+  });
+  const [messages, setMessages] = useState<Message[]>(() => {
+    try {
+      const raw = localStorage.getItem('ai-chat-v1');
+      if (raw) {
+        const arr = JSON.parse(raw) as Message[];
+        if (Array.isArray(arr) && arr.length > 0) {
+          return arr.map((m) => ({ ...m, timestamp: new Date(m.timestamp) }));
+        }
+      }
+    } catch { /* ignore */ }
+    return [greeting()];
+  });
   const [input, setInput] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -102,6 +162,9 @@ export default function AIAssistantPage() {
 
   // Foto pro AI
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const photoCaptionRef = useRef<string | undefined>(undefined);
+  const [photoMenuOpen, setPhotoMenuOpen] = useState(false);
+  const briefedRef = useRef(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
    
@@ -122,6 +185,58 @@ export default function AIAssistantPage() {
     } catch { /* ignore */ }
   }, []);
 
+  // Rychlá odpověď Z DAT (bez Claude). Vrátí text, nebo null když se má radši zeptat Claude.
+  const factsCallable = useMemo(
+    () => httpsCallable<{ kind: string; query?: string }, { reply: string; count?: number }>(functions, 'assistantFacts'),
+    [],
+  );
+  const tryFacts = useCallback(async (intent: { kind: string; query?: string }): Promise<string | null> => {
+    try {
+      const res = await factsCallable({ kind: intent.kind, query: intent.query });
+      const reply = res.data?.reply?.trim();
+      const count = res.data?.count;
+      // U konkrétního hledání (sklad s dotazem / stroj): když 0 nálezů, radši Claude (mohli jsme špatně uhodnout slovo).
+      if (((intent.kind === 'inventory' && intent.query) || intent.kind === 'find') && count === 0) return null;
+      return reply || null;
+    } catch (err) {
+      console.error('[AI] assistantFacts error:', err);
+      return null; // chyba → spadneme na Claude
+    }
+  }, [factsCallable]);
+
+  // Potvrzení akce (Ano/Ne) → teprve po Ano se přes assistantConfirmAction opravdu zapíše.
+  const confirmActionCallable = useMemo(
+    () => httpsCallable<{ pendingId: string }, { reply: string }>(functions, 'assistantConfirmAction'),
+    [],
+  );
+  const runPendingActions = useCallback(async (actions: PendingAction[]) => {
+    for (const action of actions) {
+      const okConfirm = await ask({
+        title: 'Potvrdit akci',
+        message: action.summary || 'Provést tuto akci?',
+        confirmText: 'Ano, provést',
+        cancelText: 'Ne',
+        danger: !!action.danger,
+      });
+      if (!okConfirm) {
+        setMessages((prev) => [...prev, { id: `skip-${Date.now()}`, role: 'assistant', content: 'Dobře, nic jsem neprovedl. 👍', timestamp: new Date() }]);
+        continue;
+      }
+      setIsProcessing(true);
+      let reply = '✅ Hotovo.';
+      try {
+        const res = await confirmActionCallable({ pendingId: action.id });
+        reply = res.data?.reply || reply;
+      } catch (err) {
+        console.error('[AI] assistantConfirmAction error:', err);
+        reply = 'Akci se nepodařilo provést. Zkus to prosím znovu.';
+      }
+      setMessages((prev) => [...prev, { id: `done-${Date.now()}`, role: 'assistant', content: reply, timestamp: new Date() }]);
+      setIsProcessing(false);
+      if (voiceOn) speak(reply);
+    }
+  }, [ask, confirmActionCallable, voiceOn, speak]);
+
   // handleSend — must be declared before useEffect that uses it
   const handleSend = useCallback(async (messageText?: string, image?: { imageData: string; imageType: string; dataUrl: string }) => {
     const text = (messageText ?? input).trim();
@@ -138,17 +253,30 @@ export default function AIAssistantPage() {
     setInput('');
     setIsProcessing(true);
 
-    let response: string;
-    try {
-      response = await callAssistant(
-        text || 'Popiš, co je na fotce, a poraď nebo zapiš, co je potřeba.',
-        messages,
-        image ? { imageData: image.imageData, imageType: image.imageType } : undefined,
-      );
-    } catch (err) {
-      console.error('[AI] assistantChat error:', err);
-      const e = err as { message?: string };
-      response = e?.message || 'AI asistent je teď nedostupný. Zkus to prosím za chvíli.';
+    let response: string | null = null;
+    let pendingActions: PendingAction[] = [];
+
+    // 1) Zkus odpovědět Z DAT (bez Claude), když jde o jednoduchý dotaz a není to foto.
+    const intent = image ? null : detectLocalIntent(text);
+    if (intent) {
+      response = await tryFacts(intent);
+    }
+
+    // 2) Jinak (nebo když data nestačila) → Claude.
+    if (response === null) {
+      try {
+        const r = await callAssistant(
+          text || 'Popiš, co je na fotce, a poraď nebo zapiš, co je potřeba.',
+          messages,
+          image ? { imageData: image.imageData, imageType: image.imageType } : undefined,
+        );
+        response = r.reply;
+        pendingActions = r.pendingActions;
+      } catch (err) {
+        console.error('[AI] assistantChat error:', err);
+        const e = err as { message?: string };
+        response = e?.message || 'AI asistent je teď nedostupný. Zkus to prosím za chvíli.';
+      }
     }
 
     const assistantMessage: Message = {
@@ -160,12 +288,70 @@ export default function AIAssistantPage() {
     setMessages(prev => [...prev, assistantMessage]);
     setIsProcessing(false);
     if (voiceOn) speak(response);
-  }, [input, messages, voiceOn, speak]);
+
+    // 3) Když AI připravila návrh(y) zápisu → ukaž Ano/Ne a po potvrzení proveď.
+    if (pendingActions.length) {
+      await runPendingActions(pendingActions);
+    }
+  }, [input, messages, voiceOn, speak, tryFacts, runPendingActions]);
 
   // Scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Uložit konverzaci — přežije odchod ze stránky i refresh (fotky se neukládají kvůli velikosti)
+  useEffect(() => {
+    try {
+      const slim = messages.slice(-40).map((m) => ({
+        id: m.id,
+        role: m.role,
+        content: m.content,
+        timestamp: (m.timestamp instanceof Date ? m.timestamp : new Date(m.timestamp)).toISOString(),
+      }));
+      localStorage.setItem('ai-chat-v1', JSON.stringify(slim));
+    } catch { /* quota / ignore */ }
+  }, [messages]);
+
+  const newChat = async () => {
+    if (!(await ask({ message: 'Začít novou konverzaci? Tahle se smaže.', danger: true }))) return;
+    try { localStorage.removeItem('ai-chat-v1'); } catch { /* ignore */ }
+    briefedRef.current = false;
+    setMessages([greeting()]);
+  };
+
+  // Proaktivní hlášení — AI sama řekne, co teď hoří (poruchy, propadlé termíny). Bez ptaní.
+  const briefingCallable = useMemo(
+    () => httpsCallable<Record<string, never>, { reply: string; hasAlerts?: boolean }>(functions, 'assistantBriefing'),
+    [],
+  );
+  const runBriefing = useCallback(async (manual: boolean) => {
+    setIsProcessing(true);
+    try {
+      const res = await briefingCallable({});
+      const reply = res.data?.reply?.trim();
+      if (reply) {
+        setMessages((prev) => [...prev, { id: `brief-${Date.now()}`, role: 'assistant', content: reply, timestamp: new Date() }]);
+      } else if (manual) {
+        notify('Aktuální stav se teď nepodařilo načíst.');
+      }
+    } catch (err) {
+      console.error('[AI] assistantBriefing error:', err);
+      if (manual) notify('Aktuální stav se teď nepodařilo načíst. Zkus to prosím za chvíli.');
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [briefingCallable, notify]);
+
+  // Při otevření čerstvé konverzace ať AI rovnou hlásí, co hoří (jednou).
+  useEffect(() => {
+    if (briefedRef.current) return;
+    briefedRef.current = true;
+    if (messages.length === 1 && messages[0].id === '0') {
+      void runBriefing(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Initialize speech recognition
   useEffect(() => {
@@ -211,15 +397,24 @@ export default function AIAssistantPage() {
     }
   };
 
-  // Foto → AI (Claude obrázek přečte a popíše / zapíše)
+  // Otevře fotoaparát s konkrétním záměrem (popsat závadu / úkol z fotky / štítek stroje).
+  const choosePhoto = (caption?: string) => {
+    setPhotoMenuOpen(false);
+    photoCaptionRef.current = caption;
+    photoInputRef.current?.click();
+  };
+
+  // Foto → AI (Claude obrázek přečte a podle záměru popíše / navrhne úkol / najde stroj)
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (e.target) e.target.value = '';
+    const caption = photoCaptionRef.current;
+    photoCaptionRef.current = undefined;
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) { notify('Obrázek je moc velký (max 5 MB). Zkus menší / horší kvalitu.'); return; }
     try {
       const img = await fileToImage(file);
-      handleSend(input.trim() || undefined, img);
+      handleSend(caption ?? (input.trim() || undefined), img);
     } catch {
       notify('Foto se nepodařilo načíst.');
     }
@@ -255,14 +450,40 @@ export default function AIAssistantPage() {
             </div>
           </div>
 
-          <input ref={photoInputRef} type="file" accept="image/*" capture="environment" onChange={handlePhotoSelect} className="hidden" />
           <button
-            onClick={() => photoInputRef.current?.click()}
-            title="Vyfotit závadu → AI ji popíše a poradí"
+            onClick={() => runBriefing(true)}
+            title="Aktuální stav — co teď hoří (poruchy, propadlé termíny)"
             className="p-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-500 transition"
           >
-            <Camera className="w-5 h-5" />
+            <Bell className="w-5 h-5" />
           </button>
+
+          <input ref={photoInputRef} type="file" accept="image/*" capture="environment" onChange={handlePhotoSelect} className="hidden" />
+          <div className="relative">
+            <button
+              onClick={() => setPhotoMenuOpen((o) => !o)}
+              title="Vyfotit — popsat závadu, založit úkol nebo načíst štítek stroje"
+              className="p-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-500 transition"
+            >
+              <Camera className="w-5 h-5" />
+            </button>
+            {photoMenuOpen && (
+              <>
+                <div className="fixed inset-0 z-20" onClick={() => setPhotoMenuOpen(false)} />
+                <div className="absolute right-0 mt-2 z-30 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+                  <button onClick={() => choosePhoto(undefined)} className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-slate-700 hover:bg-slate-50">
+                    <Camera className="w-4 h-4 text-slate-500" /> Popsat závadu / poradit
+                  </button>
+                  <button onClick={() => choosePhoto('Z téhle fotky závady navrhni úkol na opravu — najdi stroj v Kartotéce a urči prioritu.')} className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-slate-700 hover:bg-slate-50 border-t border-slate-100">
+                    <ClipboardList className="w-4 h-4 text-slate-500" /> Založit úkol z fotky
+                  </button>
+                  <button onClick={() => choosePhoto('Načti výrobní štítek stroje a najdi ho v Kartotéce — když tam není, nabídni založení.')} className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-slate-700 hover:bg-slate-50 border-t border-slate-100">
+                    <ScanLine className="w-4 h-4 text-slate-500" /> Načíst štítek stroje
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
 
           <button
             onClick={() => {
@@ -275,6 +496,14 @@ export default function AIAssistantPage() {
             className={`p-2 rounded-xl border transition ${voiceOn ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-500'}`}
           >
             {isSpeaking ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+          </button>
+
+          <button
+            onClick={newChat}
+            title="Nová konverzace (smaže tuhle)"
+            className="p-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-500 transition"
+          >
+            <SquarePen className="w-5 h-5" />
           </button>
         </div>
       </header>

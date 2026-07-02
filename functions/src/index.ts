@@ -11,6 +11,8 @@ const db = admin.firestore();
 export {
   loginWithPin,
   adminSetUserPin,
+  adminSetUserActive,
+  adminUpdateUser,
   adminCreateUser,
   backfillPinHashes,
   deletePlaintextPins,
@@ -20,7 +22,7 @@ export {
 
 // AI asistent v aplikaci (Claude) — bezpečný backend, API klíč jako secret
 // + týdenní AI souhrn (plánovaná funkce)
-export { assistantChat, weeklyAiSummary } from './assistant';
+export { assistantChat, assistantConfirmAction, assistantBriefing, assistantFacts, weeklyAiSummary, monthlyExecReport } from './assistant';
 
 const OPEN_TASK_STATUSES = new Set(['backlog', 'planned', 'in_progress', 'paused']);
 const PUSH_TARGET_ROLES = new Set(['SUPERADMIN', 'VEDENI', 'UDRZBA']);
@@ -245,6 +247,17 @@ export const aggregateTaskStats = functions.firestore
   .document('tasks/{taskId}')
   .onWrite(async (_change: functions.Change<admin.firestore.DocumentSnapshot>, _context: functions.EventContext) => {
     try {
+      // Throttle: přepočet čte CELOU kolekci tasks, takže při dávce zápisů (import, hromadná
+      // změna, rychlé přechody stavů) je drahý. Když se přepočítalo před méně než THROTTLE_MS,
+      // přeskoč — jednotlivé úpravy jsou spaced-out (přepočítají se), jen rychlé dávky se sloučí.
+      const THROTTLE_MS = 30000;
+      const globalRef = db.doc('stats_aggregates/global');
+      const prevGlobal = await globalRef.get();
+      const lastMs = prevGlobal.exists ? (prevGlobal.data()?.updatedAt?.toMillis?.() ?? 0) : 0;
+      if (lastMs && Date.now() - lastMs < THROTTLE_MS) {
+        return;
+      }
+
       const tasksSnap = await db.collection('tasks').get();
       const tasks = tasksSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
 

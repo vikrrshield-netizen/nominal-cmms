@@ -37,17 +37,24 @@ service firebase.storage {
         && request.resource.size <= maxSizeBytes
         && request.resource.contentType.matches('image/.*');
     }
-    
-    // Revision documents
+
+    // Jen limit velikosti (bez omezení typu — revize můžou být PDF certifikáty).
+    function isUnderSize(maxSizeBytes) {
+      return request.resource != null && request.resource.size <= maxSizeBytes;
+    }
+
+    // Revision documents (obrázky i PDF) — limit 20 MB proti abuse úložiště.
     match /revisions/{revisionId}/{allPaths=**} {
       allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow write: if isAdmin() && isUnderSize(20 * 1024 * 1024);
     }
-    
-    // Asset images
+
+    // Asset images — limit 20 MB.
     match /assets/{assetId}/{allPaths=**} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn() && request.auth.token.role in ['SUPERADMIN', 'VEDENI', 'UDRZBA'];
+      allow write: if isSignedIn()
+        && request.auth.token.role in ['SUPERADMIN', 'VEDENI', 'UDRZBA']
+        && isUnderSize(20 * 1024 * 1024);
     }
     
     // User avatars

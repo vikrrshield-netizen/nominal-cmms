@@ -12,7 +12,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   collection, onSnapshot, doc, addDoc, updateDoc,
-  writeBatch, increment, Timestamp, serverTimestamp,
+  runTransaction, Timestamp, serverTimestamp,
   /* query, where, orderBy, limit — reserved for future filters */
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -77,68 +77,78 @@ export function useInventory() {
       opts?: { taskId?: string; taskTitle?: string; orderId?: string; note?: string }
     ) => {
       if (!user) throw new Error('Nepřihlášen');
+      // Validace množství — jen kladné konečné číslo (brání záporům/NaN, které obracely směr odpisu).
+      if (!Number.isFinite(qty) || qty <= 0) {
+        throw new Error('Zadej kladné číslo množství.');
+      }
 
       const itemRef = doc(db, 'inventory', itemId);
-      const item = items.find((i) => i.id === itemId);
-      if (!item) throw new Error(`Položka ${itemId} nenalezena`);
 
-      // Výpočet
-      const delta = type === 'issue' ? -qty : qty;
-      const newQuantity = item.quantity + delta;
+      // Atomický odpis: skutečný stav se čte UVNITŘ transakce z DB (ne ze zastaralého
+      // React snapshotu), takže dva souběžné výdeje nemůžou stav stáhnout pod nulu.
+      const result = await runTransaction(db, async (tx) => {
+        const snap = await tx.get(itemRef);
+        if (!snap.exists()) throw new Error(`Položka ${itemId} nenalezena`);
+        const data = snap.data() as InventoryItem;
+        const currentQty = Number(data.quantity) || 0;
+        const minQuantity = Number(data.minQuantity) || 0;
 
-      if (newQuantity < 0 && type === 'issue') {
-        throw new Error(`Nedostatek na skladu: ${item.name} (${item.quantity} ${item.unit})`);
-      }
+        const delta = type === 'issue' ? -qty : qty;
+        const newQuantity = currentQty + delta;
+        if (newQuantity < 0) {
+          throw new Error(`Nedostatek na skladu: ${data.name ?? ''} (${currentQty} ${data.unit ?? ''})`);
+        }
+        const newStatus = calcItemStatus(newQuantity, minQuantity);
 
-      const batch = writeBatch(db);
+        // 1. Zapiš SKUTEČNOU hodnotu (ne slepý increment).
+        tx.update(itemRef, {
+          quantity: newQuantity,
+          status: newStatus,
+          updatedAt: serverTimestamp(),
+        });
 
-      // 1. Update inventory item
-      const newStatus = calcItemStatus(newQuantity, item.minQuantity);
-      batch.update(itemRef, {
-        quantity: increment(delta),
-        status: newStatus,
-        updatedAt: serverTimestamp(),
+        // 2. Zapiš transakci.
+        const txRef = doc(collection(db, 'inventory_transactions'));
+        const txData: Omit<InventoryTransaction, 'id'> = {
+          itemId,
+          itemName: data.name ?? '',
+          type,
+          quantity: delta,
+          performedBy: user.uid,
+          performedByName: user.displayName,
+          performedAt: Timestamp.now(),
+          createdAt: Timestamp.now(),
+          quantityAfter: newQuantity,
+          ...(opts?.taskId && { taskId: opts.taskId }),
+          ...(opts?.taskTitle && { taskTitle: opts.taskTitle }),
+          ...(opts?.orderId && { orderId: opts.orderId }),
+          ...(opts?.note && { note: opts.note }),
+        };
+        tx.set(txRef, txData);
+
+        // 3. Notifikace pokud pod minimem.
+        if (newStatus === 'low' || newStatus === 'critical' || newStatus === 'out') {
+          const notifRef = doc(collection(db, 'notifications'));
+          tx.set(notifRef, {
+            targetType: 'role',
+            targetId: 'role_vedeni', // notifikace pro vedení/nákupčí
+            createdBy: user.uid,
+            title: `Nízký stav: ${data.name ?? ''}`,
+            body: `${data.name ?? ''}: ${newQuantity} ${data.unit ?? ''} (minimum: ${minQuantity})`,
+            type: 'inventory',
+            severity: newStatus === 'out' ? 'critical' : 'warning',
+            linkTo: `/inventory?item=${itemId}`,
+            isRead: false,
+            createdAt: serverTimestamp(),
+          });
+        }
+
+        return { newQuantity, newStatus };
       });
 
-      // 2. Zapsat transakci
-      const txRef = doc(collection(db, 'inventory_transactions'));
-      const txData: Omit<InventoryTransaction, 'id'> = {
-        itemId,
-        itemName: item.name,
-        type,
-        quantity: delta,
-        performedBy: user.uid,
-        performedByName: user.displayName,
-        performedAt: Timestamp.now(),
-        createdAt: Timestamp.now(),
-        quantityAfter: newQuantity,
-        ...(opts?.taskId && { taskId: opts.taskId }),
-        ...(opts?.taskTitle && { taskTitle: opts.taskTitle }),
-        ...(opts?.orderId && { orderId: opts.orderId }),
-        ...(opts?.note && { note: opts.note }),
-      };
-      batch.set(txRef, txData);
-
-      // 3. Notifikace pokud pod minimem
-      if (newStatus === 'low' || newStatus === 'critical' || newStatus === 'out') {
-        const notifRef = doc(collection(db, 'notifications'));
-        batch.set(notifRef, {
-          targetType: 'role',
-          targetId: 'role_vedeni', // notifikace pro vedení/nákupčí
-          title: `Nízký stav: ${item.name}`,
-          body: `${item.name}: ${newQuantity} ${item.unit} (minimum: ${item.minQuantity})`,
-          type: 'inventory',
-          severity: newStatus === 'out' ? 'critical' : 'warning',
-          linkTo: `/inventory?item=${itemId}`,
-          isRead: false,
-          createdAt: serverTimestamp(),
-        });
-      }
-
-      await batch.commit();
-      return { newQuantity, newStatus };
+      return result;
     },
-    [user, items]
+    [user]
   );
 
   // ─────────────────────────────────────────
@@ -177,86 +187,89 @@ export function useInventory() {
     ) => {
       if (!user) throw new Error('Nepřihlášen');
 
-      const batch = writeBatch(db);
+      await runTransaction(db, async (tx) => {
+        // ČTENÍ NEJDŘÍV — skutečné stavy dílů z DB (ne ze zastaralého snapshotu).
+        const partRefs = parts.map((p) => doc(db, 'inventory', p.partId));
+        const snaps = await Promise.all(partRefs.map((r) => tx.get(r)));
 
-      // 1. Dokončit task
-      const taskRef = doc(db, 'tasks', taskId);
-      batch.update(taskRef, {
-        status: 'completed',
-        completedAt: Timestamp.now(),
-        completedBy: user.displayName,
-        usedParts: parts,
-        updatedAt: serverTimestamp(),
-        updatedBy: user.uid,
-      });
-
-      // 2. Pro každý díl: odpis + transakce + kontrola minima
-      for (const part of parts) {
-        const item = items.find((i) => i.id === part.partId);
-        if (!item) continue;
-
-        const newQty = item.quantity - part.quantity;
-        const newStatus = calcItemStatus(Math.max(0, newQty), item.minQuantity);
-
-        // Odpis
-        const itemRef = doc(db, 'inventory', part.partId);
-        batch.update(itemRef, {
-          quantity: increment(-part.quantity),
-          status: newStatus,
-          updatedAt: serverTimestamp(),
-        });
-
-        // Transakce
-        const txRef = doc(collection(db, 'inventory_transactions'));
-        batch.set(txRef, {
-          itemId: part.partId,
-          itemName: part.partName,
-          type: 'issue',
-          quantity: -part.quantity,
-          taskId,
-          performedBy: user.uid,
-          performedByName: user.displayName,
-          performedAt: Timestamp.now(),
-          createdAt: Timestamp.now(),
-          quantityAfter: Math.max(0, newQty),
-        });
-
-        // Notifikace pokud pod minimem
-        if (newStatus !== 'ok') {
-          const notifRef = doc(collection(db, 'notifications'));
-          batch.set(notifRef, {
-            targetType: 'role',
-            targetId: 'role_vedeni',
-            title: `Nízký stav: ${part.partName}`,
-            body: `Spotřebováno při úkolu. Zbývá: ${Math.max(0, newQty)} ${item.unit}`,
-            type: 'inventory',
-            severity: newStatus === 'out' ? 'critical' : 'warning',
-            linkTo: `/inventory?item=${part.partId}`,
-            isRead: false,
-            createdAt: serverTimestamp(),
-          });
-        }
-      }
-
-      // 3. Audit log
-      const auditRef = doc(collection(db, 'audit_logs'));
-      batch.set(auditRef, {
-        userId: user.uid,
-        userName: user.displayName,
-        userRole: user.primaryRoleId,
-        action: 'UPDATE',
-        collection: 'tasks',
-        documentId: taskId,
-        timestamp: Timestamp.now(),
-        changes: {
+        // 1. Dokončit task
+        const taskRef = doc(db, 'tasks', taskId);
+        tx.update(taskRef, {
           status: 'completed',
-          usedParts: parts.map((p) => `${p.partName} x${p.quantity}`),
-        },
-      });
+          completedAt: Timestamp.now(),
+          completedBy: user.displayName,
+          usedParts: parts,
+          updatedAt: serverTimestamp(),
+          updatedBy: user.uid,
+        });
 
-      await batch.commit();
+        // 2. Pro každý díl: atomický odpis (nikdy pod nulu) + transakce + kontrola minima
+        parts.forEach((part, idx) => {
+          const snap = snaps[idx];
+          if (!snap.exists()) return;
+          const data = snap.data() as InventoryItem;
+          const qty = Number(part.quantity);
+          if (!Number.isFinite(qty) || qty <= 0) return;
+          const currentQty = Number(data.quantity) || 0;
+          const minQuantity = Number(data.minQuantity) || 0;
+          const newQty = Math.max(0, currentQty - qty);
+          const newStatus = calcItemStatus(newQty, minQuantity);
+
+          tx.update(partRefs[idx], {
+            quantity: newQty,
+            status: newStatus,
+            updatedAt: serverTimestamp(),
+          });
+
+          const txRef = doc(collection(db, 'inventory_transactions'));
+          tx.set(txRef, {
+            itemId: part.partId,
+            itemName: part.partName,
+            type: 'issue',
+            quantity: -qty,
+            taskId,
+            performedBy: user.uid,
+            performedByName: user.displayName,
+            performedAt: Timestamp.now(),
+            createdAt: Timestamp.now(),
+            quantityAfter: newQty,
+          });
+
+          if (newStatus !== 'ok') {
+            const notifRef = doc(collection(db, 'notifications'));
+            tx.set(notifRef, {
+              targetType: 'role',
+              targetId: 'role_vedeni',
+              createdBy: user.uid,
+              title: `Nízký stav: ${part.partName}`,
+              body: `Spotřebováno při úkolu. Zbývá: ${newQty} ${data.unit ?? ''}`,
+              type: 'inventory',
+              severity: newStatus === 'out' ? 'critical' : 'warning',
+              linkTo: `/inventory?item=${part.partId}`,
+              isRead: false,
+              createdAt: serverTimestamp(),
+            });
+          }
+        });
+
+        // 3. Audit log
+        const auditRef = doc(collection(db, 'audit_logs'));
+        tx.set(auditRef, {
+          userId: user.uid,
+          userName: user.displayName,
+          userRole: user.primaryRoleId,
+          action: 'UPDATE',
+          collection: 'tasks',
+          documentId: taskId,
+          timestamp: Timestamp.now(),
+          changes: {
+            status: 'completed',
+            usedParts: parts.map((p) => `${p.partName} x${p.quantity}`),
+          },
+        });
+      });
     },
-    [user, items]
+    [user]
   );
 
   /** Ruční vytvoření nové skladové položky */
@@ -324,6 +337,7 @@ export function useInventory() {
       await addDoc(collection(db, 'notifications'), {
         targetType: 'role',
         targetId: 'role_vedeni',
+        createdBy: user.uid,
         title: `Nová objednávka: ${title}`,
         body: `${orderItems.length} položek ke schválení`,
         type: 'inventory',

@@ -150,6 +150,8 @@ service cloud.firestore {
       return canCreateNotification()
         && request.resource.data.createdAt is timestamp
         && request.resource.data.type is string
+        // Účtovatelnost: každá notifikace musí nést PRAVÉHO odesílatele (nelze podvrhnout cizí identitu).
+        && request.resource.data.createdBy == request.auth.uid
         && (
           (request.resource.data.userId is string)
           || (

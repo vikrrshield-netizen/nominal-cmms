@@ -214,6 +214,7 @@ export default function NoticeboardPage() {
       if (toUser) {
         await addDoc(collection(db, 'notifications'), {
           userId: toUser.id,
+          createdBy: user?.uid || '',
           type: 'system',
           priority: category === 'safety' ? 'high' : 'medium',
           title: `Nová zpráva od ${user?.displayName || 'Neznámý'}`,

@@ -76,7 +76,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                 {danger ? <AlertTriangle className="h-6 w-6" /> : <Info className="h-6 w-6" />}
               </div>
               {dialog.opts.title && <h3 className="text-base font-black text-slate-900">{dialog.opts.title}</h3>}
-              <p className="whitespace-pre-wrap text-sm text-slate-700">{dialog.opts.message}</p>
+              <p className="max-h-[50vh] w-full overflow-y-auto whitespace-pre-wrap text-sm text-slate-700">{dialog.opts.message}</p>
             </div>
             <div className="mt-5 flex gap-2">
               {dialog.kind === 'ask' ? (

@@ -15,7 +15,8 @@ import {
   getDocs,
   serverTimestamp,
   Timestamp,
-  writeBatch
+  writeBatch,
+  runTransaction
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { formatCounter, nextCounterValue } from './counterService';
@@ -227,15 +228,25 @@ export async function completeTask(
   resolution?: string, 
   actualMinutes?: number
 ): Promise<void> {
-  const updateData: Record<string, unknown> = {
-    status: 'completed',
-    completedAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  };
-  if (resolution !== undefined) updateData.resolution = resolution;
-  if (actualMinutes !== undefined) updateData.actualMinutes = actualMinutes;
-
-  await updateDoc(doc(db, COLLECTION, taskId), updateData);
+  // Transakce + kontrola stavu: dva souběžné „dokončit" nebo dokončení už uzavřeného
+  // úkolu by přepsaly původní completedAt/resolution. Terminální stav se nepřepisuje.
+  await runTransaction(db, async (tx) => {
+    const ref = doc(db, COLLECTION, taskId);
+    const snap = await tx.get(ref);
+    if (!snap.exists()) throw new Error('Úkol nenalezen.');
+    const status = snap.data().status;
+    if (status === 'completed' || status === 'cancelled') {
+      throw new Error('Úkol je už uzavřený.');
+    }
+    const updateData: Record<string, unknown> = {
+      status: 'completed',
+      completedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+    if (resolution !== undefined) updateData.resolution = resolution;
+    if (actualMinutes !== undefined) updateData.actualMinutes = actualMinutes;
+    tx.update(ref, updateData);
+  });
 }
 
 // Uložit seznam dílčích závad (checklist) — přepíše celé pole `defects`.
@@ -253,10 +264,19 @@ export async function setTaskDefects(taskId: string, defects: TaskDefect[]): Pro
 
 // Zrušit úkol
 export async function cancelTask(taskId: string, reason?: string): Promise<void> {
-  await updateDoc(doc(db, COLLECTION, taskId), {
-    status: 'cancelled',
-    resolution: reason,
-    updatedAt: serverTimestamp(),
+  await runTransaction(db, async (tx) => {
+    const ref = doc(db, COLLECTION, taskId);
+    const snap = await tx.get(ref);
+    if (!snap.exists()) throw new Error('Úkol nenalezen.');
+    const status = snap.data().status;
+    if (status === 'completed' || status === 'cancelled') {
+      throw new Error('Úkol je už uzavřený.');
+    }
+    tx.update(ref, {
+      status: 'cancelled',
+      resolution: reason,
+      updatedAt: serverTimestamp(),
+    });
   });
 }
 

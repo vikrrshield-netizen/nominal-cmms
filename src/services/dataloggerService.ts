@@ -184,8 +184,10 @@ async function createDataloggerLimitNotifications(input: {
     `Měřeno: ${formatMeasuredAt(input.measuredAt)}.`,
   ].filter(Boolean).join(' ');
 
+  const createdBy = userId(input.user);
   await Promise.all(recipients.map((recipient) => addDoc(collection(db, 'notifications'), {
     userId: recipient.id,
+    createdBy,
     type: 'system',
     priority: 'critical',
     severity: 'critical',

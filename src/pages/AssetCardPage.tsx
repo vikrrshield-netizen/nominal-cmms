@@ -489,7 +489,8 @@ export default function AssetCardPage() {
     const fetchAsset = async () => {
       try {
         const snap = await getDoc(doc(db, 'assets', assetId));
-        if (snap.exists()) {
+        // Smazaný (soft-delete) asset se přes přímý odkaz neotevře ani needituje.
+        if (snap.exists() && !(snap.data() as { isDeleted?: boolean }).isDeleted) {
           setAsset({ id: snap.id, ...snap.data() } as Asset);
         }
       } catch (err) {
@@ -505,6 +506,8 @@ export default function AssetCardPage() {
     if (!assetId || !tenantId) return;
     assetService.getById(tenantId, assetId)
       .then((data) => {
+        // Smazaný asset neotevírej ani neplň formuláře (přímý odkaz na soft-deleted).
+        if (!data || (data as { isDeleted?: boolean }).isDeleted) return;
         setAssetV2(data);
         // Pokud v1 asset nebyl nalezen, vyplnit z v2 dat (bridge)
         setAsset((prev) => prev ?? {

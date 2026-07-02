@@ -308,7 +308,7 @@ function buildLegacyInspectionRuns(logs: LegacyInspectionLog[], representedLogId
 async function addInspectionRunLog(
   log: InspectionLog | undefined,
   logId: string,
-  result: 'ok' | 'defect' | 'task_created',
+  result: 'ok' | 'defect' | 'task_created' | 'pending',
   performedBy: string,
   performedById: string,
   detail: Record<string, unknown> = {},
@@ -326,7 +326,7 @@ async function addInspectionRunLog(
 function buildInspectionRunLogData(
   log: InspectionLog | undefined,
   logId: string,
-  result: 'ok' | 'defect' | 'task_created',
+  result: 'ok' | 'defect' | 'task_created' | 'pending',
   performedBy: string,
   performedById: string,
   detail: Record<string, unknown> = {},
@@ -437,8 +437,9 @@ export function useInspections(month?: string) {
   const { user } = useAuthContext();
   const bootstrapStarted = useRef<Set<string>>(new Set());
 
-  // Default = aktuální měsíc
-  const currentMonth = month || new Date().toISOString().slice(0, 7);
+  // Default = aktuální měsíc (LOKÁLNÍ čas — ne UTC; na přelomu měsíce by UTC ukázal špatný měsíc).
+  const nowLocal = new Date();
+  const currentMonth = month || `${nowLocal.getFullYear()}-${String(nowLocal.getMonth() + 1).padStart(2, '0')}`;
 
   // Previous month for defect memory
   const prevMonth = useMemo(() => {
@@ -883,6 +884,9 @@ export function useInspections(month?: string) {
   // Vrátit na pending (oprava)
   async function markPending(logId: string) {
     const log = logs.find((l) => l.id === logId);
+    const performedBy = userName(user);
+    const performedById = userId(user);
+    const previousBy = log?.completedBy || '';
     await updateDoc(doc(db, 'inspection_logs', logId), {
       status: 'pending',
       defectNote: '',
@@ -899,6 +903,10 @@ export function useInspections(month?: string) {
       foodSafetyRisk: false,
       foodSafetyHazardType: '',
       foodSafetyImpact: '',
+    });
+    // Auditní stopa: vrácení na „nezkontrolováno" nesmí smazat identitu bez záznamu.
+    await addInspectionRunLog(log, logId, 'pending', performedBy, performedById, {
+      note: previousBy ? `Vráceno na nezkontrolováno (původně provedl: ${previousBy})` : 'Vráceno na nezkontrolováno',
     });
   }
 

@@ -209,7 +209,7 @@ function QuickActions({ onNavigate, canUseAi }: { onNavigate: (path: string) => 
   const primaryActions = actions.filter((action) => action.primary);
   const secondaryActions = [
     { label: 'Kiosk', detail: 'režim pro obsluhu', path: '/kiosk', icon: Monitor, tone: 'text-emerald-700' },
-    ...(canUseAi ? [{ label: 'Zeptat se AI', detail: 'asistent údržby', path: '/ai', icon: Sparkles, tone: 'text-pink-600' }] : []),
+    ...(canUseAi ? [{ label: 'AI asistent', detail: 'poradí i zapíše', path: '/ai', icon: Sparkles, tone: 'text-pink-600' }] : []),
     ...actions.filter((action) => !action.primary),
   ];
 

@@ -454,8 +454,10 @@ export default function WorkDiaryPage() {
   }, [type]);
 
   const todaySummary = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    const todayLogs = logs.filter((log) => (log.performedAt || log.createdAt).toISOString().slice(0, 10) === today);
+    // LOKÁLNÍ den (ne UTC) — jinak by kolem půlnoci „dnes" ukázalo špatný den.
+    const localKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const today = localKey(new Date());
+    const todayLogs = logs.filter((log) => localKey(log.performedAt || log.createdAt) === today);
     const hours = todayLogs.reduce((sum, log) => sum + (log.hoursWorked || 0), 0);
     return { count: todayLogs.length, hours };
   }, [logs]);

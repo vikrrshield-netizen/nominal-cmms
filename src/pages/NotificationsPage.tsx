@@ -321,6 +321,7 @@ export default function NotificationsPage() {
   const sendTestNotification = async () => {
     await addDoc(collection(db, 'notifications'), {
       userId: uid,
+      createdBy: uid,
       type: 'system',
       priority: 'medium',
       title: 'Testovací notifikace',

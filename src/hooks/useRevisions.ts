@@ -151,9 +151,13 @@ export function useRevisions(filterAssetId?: string) {
       const rev = revisions.find((r) => r.id === revisionId);
       if (!rev) throw new Error('Revize nenalezena');
 
-      // Vypočítat příští datum
+      // Vypočítat příští datum — bez přetečení konce měsíce (31.1. + 1 měsíc = 28./29.2., ne 3.3.)
       const nextDate = new Date(data.date);
+      const targetDay = nextDate.getDate();
+      nextDate.setDate(1);
       nextDate.setMonth(nextDate.getMonth() + rev.intervalMonths);
+      const lastDayOfMonth = new Date(nextDate.getFullYear(), nextDate.getMonth() + 1, 0).getDate();
+      nextDate.setDate(Math.min(targetDay, lastDayOfMonth));
 
       // Update revize
       await updateDoc(doc(db, 'revisions', revisionId), {

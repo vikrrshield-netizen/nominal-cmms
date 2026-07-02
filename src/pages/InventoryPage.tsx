@@ -892,9 +892,13 @@ function ItemDetailModal({ item, onClose, canManage, onIssue, onReceive, assets,
 
   const handleAdjust = async () => {
     if (!adjustAmount) return;
+    const amount = Number(adjustAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      notify('Zadej kladné číslo množství.');
+      return;
+    }
     setSaving(true);
     try {
-      const amount = Number(adjustAmount);
       if (adjustMode === 'add') {
         await onReceive(item.id, amount, { note: 'Ruční příjem' });
       } else {
