@@ -12,7 +12,7 @@ import {
   ClipboardCheck, Cog, LayoutGrid, ListTree, ArrowUp, ArrowDown,
   ChevronsUp, ChevronsDown, GripVertical,
   Archive, Layers, CheckCircle2, Wrench, Pause, AlertTriangle, List, SlidersHorizontal, HelpCircle,
-  CheckSquare, Square, FolderInput, Stethoscope, Info, MoreHorizontal,
+  CheckSquare, Square, FolderInput, Stethoscope, Info, MoreHorizontal, QrCode,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { db } from '../lib/firebase';
@@ -2352,6 +2352,16 @@ export default function KartotekaPage() {
             </span>
             <button type="button" className="vik-button whitespace-nowrap px-2.5 text-[13px]" onClick={selectAllVisible}>
               Vybrat vše
+            </button>
+            <button
+              type="button"
+              disabled={selectedIds.size === 0}
+              onClick={() => navigate(`/stitky?ids=${Array.from(selectedIds).join(',')}`)}
+              className="vik-button px-2.5 disabled:opacity-40"
+              title="Vytisknout QR štítky vybraných strojů"
+              aria-label="QR štítky vybraných"
+            >
+              <QrCode size={16} />
             </button>
             <button
               type="button"

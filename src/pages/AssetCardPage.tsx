@@ -28,7 +28,7 @@ import {
   ChevronRight, Settings, Building2, MapPin,
   Cog, PlusCircle, FileText, Filter, Printer, Edit3, Save, XCircle,
   Calendar, Trash2, ExternalLink, Download, Table, Search,
-  Thermometer, Camera, PackageCheck, Link2,
+  Thermometer, Camera, PackageCheck, Link2, QrCode,
 } from 'lucide-react';
 import MicButton from '../components/ui/MicButton';
 import AssetMonitoringSection from '../components/asset/AssetMonitoringSection';
@@ -1134,6 +1134,13 @@ export default function AssetCardPage() {
               Zapsat revizi
             </button>
           )}
+          <button
+            onClick={() => navigate(`/stitky?ids=${assetId}`)}
+            className="min-w-[120px] flex-1 bg-white border border-stone-200 text-slate-700 rounded-xl px-3 text-sm font-bold flex items-center justify-center gap-2 hover:bg-stone-50 transition active:scale-[0.97] min-h-11"
+          >
+            <QrCode className="w-5 h-5 text-slate-500" />
+            QR štítek
+          </button>
           {isGearbox && canEditAsset && (
             <button
               onClick={() => setShowGearboxTemperature(true)}
