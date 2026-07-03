@@ -1,7 +1,7 @@
 // src/pages/AssetCardPage.tsx
 // VIKRR — Asset Shield — Karta stroje / zařízení
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuthContext } from '../context/AuthContext';
 import { useBackNavigation } from '../hooks/useBackNavigation';
@@ -288,6 +288,9 @@ export default function AssetCardPage() {
   const [eventsForm, setEventsForm] = useState<AssetEvent[]>([]);
   const [repairLogForm, setRepairLogForm] = useState<RepairLogEntry[]>([]);
   const [documentsForm, setDocumentsForm] = useState<string[]>([]);
+  // Přesun v hierarchii (budova + místnost) — rodný list
+  const [moveBuilding, setMoveBuilding] = useState('');
+  const [moveRoom, setMoveRoom] = useState('');
   const tenantId = user?.tenantId ?? 'main_firm';
 
   const { revisions, loading: loadingRevisions, logRevision } = useRevisions(assetId);
@@ -301,6 +304,37 @@ export default function AssetCardPage() {
     code: asset.code,
     category: asset.category,
   } as Partial<AssetV2> : null);
+  // Budova položky: vlastní buildingId, jinak po řetězu rodičů nahoru.
+  const buildingOfAsset = useCallback((start: (typeof allAssetsV2)[number] | undefined): string => {
+    let cur = start;
+    const seen = new Set<string>();
+    while (cur) {
+      const bid = String((cur as { buildingId?: string }).buildingId ?? '').trim().toUpperCase();
+      if (bid) return bid;
+      const pid = (cur as { parentId?: string | null }).parentId;
+      if (!pid || seen.has(pid)) return '';
+      seen.add(pid);
+      cur = allAssetsV2.find((x) => x.id === pid);
+    }
+    return '';
+  }, [allAssetsV2]);
+
+  // Nabídka EXISTUJÍCÍCH místností — jen ze zvolené budovy (když je vybraná).
+  const roomOptions = useMemo(
+    () => Array.from(new Set(
+      allAssetsV2
+        .filter((a) => isRoomLikeAsset(a) && a.id !== assetId
+          && (!moveBuilding || buildingOfAsset(a) === moveBuilding.toUpperCase()))
+        .map((a) => String(a.name || '').trim())
+        .filter(Boolean),
+    )).sort((a, b) => a.localeCompare(b, 'cs')),
+    [allAssetsV2, assetId, moveBuilding, buildingOfAsset],
+  );
+  const startEdit = () => {
+    setMoveBuilding(asset?.buildingId || '');
+    setMoveRoom(asset?.areaName || '');
+    setIsEditing(true);
+  };
   const extruderOptions = useMemo(
     () => allAssetsV2.filter((item) => item.id !== assetId && isExtruderAsset(item)),
     [allAssetsV2, assetId]
@@ -610,6 +644,29 @@ export default function AssetCardPage() {
     if (!assetV2 || !assetId) return;
     setEditSaving(true);
     try {
+      // Přesun v hierarchii: budova+místnost (čte AI i kiosk) + dorovnání parentId na cílovou
+      // místnost/budovu kvůli stromu Kartotéky. Prázdné = přesun na „nezařazeno".
+      const tRoom = moveRoom.trim();
+      const tBuilding = moveBuilding.trim();
+      let newParentId: string | null | undefined;
+      let finalBuilding = tBuilding;
+      if (tRoom) {
+        // Při stejném názvu místnosti ve víc budovách vyber tu ve ZVOLENÉ budově.
+        const rooms = allAssetsV2.filter((a) => isRoomLikeAsset(a) && normalizeLookup(a.name) === normalizeLookup(tRoom));
+        const room = rooms.find((a) => !tBuilding || buildingOfAsset(a) === tBuilding.toUpperCase()) || (!tBuilding ? rooms[0] : undefined);
+        if (room && room.id !== assetId) {
+          newParentId = room.id;
+          if (!finalBuilding) finalBuilding = buildingOfAsset(room); // budova se dopočítá z místnosti
+        }
+      }
+      if (newParentId === undefined && finalBuilding) {
+        const bAsset = allAssetsV2.find((a) => isBuildingLikeAsset(a) && (
+          (a as { buildingId?: string }).buildingId === finalBuilding
+          || normalizeLookup(a.name).includes(`budova ${finalBuilding.toLowerCase()}`)
+        ));
+        if (bAsset && bAsset.id !== assetId) newParentId = bAsset.id;
+      }
+
       await assetService.update(tenantId, assetId, {
         name: editForm.name, code: editForm.code || null,
         entityType: editForm.entityType, status: editForm.status,
@@ -617,21 +674,24 @@ export default function AssetCardPage() {
         model: editForm.model || null, serialNumber: editForm.serialNumber || null,
         year: editForm.year ? Number(editForm.year) : null,
         location: editForm.location || null,
+        buildingId: finalBuilding || null,
+        areaName: tRoom || null,
+        ...(newParentId !== undefined ? { parentId: newParentId } : {}),
         gearboxWarningTemperatureC: editForm.gearboxWarningTemperatureC ? Number(editForm.gearboxWarningTemperatureC) : null,
         gearboxCriticalTemperatureC: editForm.gearboxCriticalTemperatureC ? Number(editForm.gearboxCriticalTemperatureC) : null,
         events: eventsForm.filter(e => e.name.trim()),
         repairLog: repairLogForm.filter(e => e.description.trim()),
         documents: documentsForm.filter(d => d.trim()),
         linkedTo: linkedToForm.filter((id) => id && id !== assetId),
-      });
+      } as Parameters<typeof assetService.update>[2]);
       const updated = await assetService.getById(tenantId, assetId);
       setAssetV2(updated);
       setAsset((prev) => prev ? {
         ...prev,
         name: updated.name,
         code: updated.code,
-        areaName: updated.areaName || prev.areaName,
-        buildingId: updated.buildingId || prev.buildingId,
+        areaName: tRoom,
+        buildingId: finalBuilding,
         category: updated.category || updated.entityType || prev.category,
         status: updated.status,
       } : prev);
@@ -1225,7 +1285,7 @@ export default function AssetCardPage() {
                 <h3 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8', margin: 0 }}>Identifikace</h3>
                 {canEditAsset && !isEditing && (
                   <button
-                    onClick={() => setIsEditing(true)}
+                    onClick={startEdit}
                     style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0' }}
                   >
                     <Edit3 size={14} /> Upravit
@@ -1573,6 +1633,36 @@ export default function AssetCardPage() {
                   <RLField label="Sériové číslo" value={editForm.serialNumber} onChange={(v) => setEditForm({ ...editForm, serialNumber: v })} />
                   <RLField label="Rok výroby" value={editForm.year} onChange={(v) => setEditForm({ ...editForm, year: v })} type="number" placeholder="2024" />
                   <RLField label="Lokace" value={editForm.location} onChange={(v) => setEditForm({ ...editForm, location: v })} placeholder="Budova D / Hala 1" />
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <div className="text-[10px] font-black uppercase tracking-wide text-slate-500 mb-1">Přesunout — Budova</div>
+                    <select
+                      value={moveBuilding}
+                      onChange={(e) => { setMoveBuilding(e.target.value); setMoveRoom(''); }}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-emerald-500"
+                    >
+                      <option value="">(nezařazeno)</option>
+                      {Object.entries(BUILDING_NAMES).map(([k, v]) => (
+                        <option key={k} value={k}>{k} — {v}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <div className="text-[10px] font-black uppercase tracking-wide text-slate-500 mb-1">Přesunout — Místnost</div>
+                    <select
+                      value={moveRoom}
+                      onChange={(e) => setMoveRoom(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-emerald-500"
+                    >
+                      <option value="">(žádná místnost)</option>
+                      {moveRoom && !roomOptions.includes(moveRoom) && (
+                        <option value={moveRoom}>{moveRoom} (aktuální)</option>
+                      )}
+                      {roomOptions.map((r) => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                    {moveBuilding && roomOptions.length === 0 && (
+                      <div className="mt-1 text-[12px] text-slate-500">V této budově zatím nejsou žádné místnosti.</div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

@@ -12,6 +12,7 @@ import {
   ClipboardCheck, Cog, LayoutGrid, ListTree, ArrowUp, ArrowDown,
   ChevronsUp, ChevronsDown, GripVertical,
   Archive, Layers, CheckCircle2, Wrench, Pause, AlertTriangle, List, SlidersHorizontal, HelpCircle,
+  CheckSquare, Square, FolderInput,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { db } from '../lib/firebase';
@@ -64,7 +65,8 @@ function getEntityColor(entityType: string | undefined): string {
 }
 
 // ── Helpers ──────────────────────────────────────────────────────
-type FilterKey = 'all' | 'broken' | 'maintenance' | 'stopped' | 'operational' | 'gearbox';
+type FilterKey = 'all' | 'broken' | 'maintenance' | 'stopped' | 'operational' | 'gearbox' | 'unassigned';
+type TypeFilterKey = 'all' | 'building' | 'room' | 'device';
 type CreateKind = 'building' | 'room' | 'asset' | 'gearbox' | 'inspection';
 type ViewMode = 'tree' | 'tiles' | 'route';
 type InspectionFrequency = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
@@ -323,6 +325,32 @@ function collectAncestorIds(assetId: string, allAssets: DisplayAsset[]): string[
   return ids;
 }
 
+// Do jaké budovy uzel patří: vlastní buildingId, jinak po řetězu rodičů nahoru.
+function getNodeBuildingId(asset: DisplayAsset, allAssets: DisplayAsset[]): string {
+  const own = safeText(asset.buildingId || asset.sourceBuildingId).trim().toUpperCase();
+  if (own) return own;
+  for (const ancestorId of collectAncestorIds(asset.id, allAssets)) {
+    const anc = allAssets.find((x) => x.id === ancestorId);
+    const bid = safeText(anc?.buildingId || anc?.sourceBuildingId).trim().toUpperCase();
+    if (bid) return bid;
+  }
+  return '';
+}
+
+function matchesTypeFilter(asset: DisplayAsset, type: TypeFilterKey): boolean {
+  if (type === 'all') return true;
+  const isB = isBuildingAsset(asset) || asset.virtualKind === 'building';
+  const isR = isRoomAsset(asset) || asset.virtualKind === 'room';
+  if (type === 'building') return isB;
+  if (type === 'room') return isR;
+  return !isB && !isR && !asset.isVirtual;
+}
+
+// Co jde vybrat pro hromadný přesun: jen skutečné stroje (ne budovy/místnosti/virtuální větve).
+function isSelectableAsset(asset: DisplayAsset): boolean {
+  return !asset.isVirtual && !isBuildingAsset(asset) && !isRoomAsset(asset);
+}
+
 /** Count descendants recursively, grouped by status */
 function countDescendants(parentId: string, allAssets: DisplayAsset[], visited = new Set<string>()) {
   let total = 0, broken = 0, maintenance = 0, operational = 0, stopped = 0;
@@ -363,9 +391,12 @@ interface TreeNodeProps {
   onDelete: (asset: DisplayAsset) => void;
   canCreateAsset: boolean;
   visited?: Set<string>;
+  selectMode?: boolean;
+  selectedIds?: Set<string>;
+  onToggleSelect?: (asset: DisplayAsset) => void;
 }
 
-function TreeNode({ asset, allAssets, depth, expanded, onToggle, onDetail, onAddChild, onDelete, canCreateAsset, visited }: TreeNodeProps) {
+function TreeNode({ asset, allAssets, depth, expanded, onToggle, onDetail, onAddChild, onDelete, canCreateAsset, visited, selectMode, selectedIds, onToggleSelect }: TreeNodeProps) {
   const currentPath = new Set(visited);
   currentPath.add(asset.id);
   const children = allAssets
@@ -375,14 +406,29 @@ function TreeNode({ asset, allAssets, depth, expanded, onToggle, onDetail, onAdd
   const isExpanded = expanded.has(asset.id);
   const statusColor = STATUS_HEX[asset.status] || '#6b7280';
   const desc = countDescendants(asset.id, allAssets);
+  const selectable = !!selectMode && !!onToggleSelect && isSelectableAsset(asset);
+  const isSelected = !!selectedIds?.has(asset.id);
 
   return (
     <div className={`k-tree-node ${asset.virtualKind ? `is-${asset.virtualKind}` : 'is-asset'}`}>
       <div
-        className="flex items-center gap-2 rounded-xl border border-transparent px-2 py-1.5 cursor-pointer transition hover:border-emerald-200 hover:bg-[#fbf9f4]"
+        className={`flex items-center gap-2 rounded-xl border px-2 py-1.5 cursor-pointer transition ${isSelected ? 'border-emerald-300 bg-emerald-50/70' : 'border-transparent hover:border-emerald-200 hover:bg-[#fbf9f4]'}`}
         style={{ marginLeft: `${depth * 18}px` }}
-        onClick={() => hasChildren ? onToggle(asset.id) : onDetail(asset)}
+        onClick={() => selectable ? onToggleSelect!(asset) : (hasChildren ? onToggle(asset.id) : onDetail(asset))}
       >
+        {selectMode && (
+          selectable ? (
+            <button
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-emerald-700"
+              onClick={(e) => { e.stopPropagation(); onToggleSelect!(asset); }}
+              aria-label={isSelected ? 'Odebrat z výběru' : 'Vybrat'}
+            >
+              {isSelected ? <CheckSquare size={18} /> : <Square size={18} className="text-slate-300" />}
+            </button>
+          ) : (
+            <span className="h-7 w-7 shrink-0" />
+          )
+        )}
         {hasChildren ? (
           <button
             className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100"
@@ -466,6 +512,9 @@ function TreeNode({ asset, allAssets, depth, expanded, onToggle, onDetail, onAdd
               onDelete={onDelete}
               canCreateAsset={canCreateAsset}
               visited={currentPath}
+              selectMode={selectMode}
+              selectedIds={selectedIds}
+              onToggleSelect={onToggleSelect}
             />
           ))}
         </div>
@@ -486,9 +535,12 @@ interface RootCardProps {
   onAddChild: (parentId: string) => void;
   onDelete: (asset: DisplayAsset) => void;
   canCreateAsset: boolean;
+  selectMode?: boolean;
+  selectedIds?: Set<string>;
+  onToggleSelect?: (asset: DisplayAsset) => void;
 }
 
-function RootCard({ asset, allAssets, expanded, onToggle, onDetail, onAddChild, onDelete, canCreateAsset }: RootCardProps) {
+function RootCard({ asset, allAssets, expanded, onToggle, onDetail, onAddChild, onDelete, canCreateAsset, selectMode, selectedIds, onToggleSelect }: RootCardProps) {
   const color = getEntityColor(asset.entityType);
   const children = allAssets
     .filter((a) => a.parentId === asset.id)
@@ -497,11 +549,26 @@ function RootCard({ asset, allAssets, expanded, onToggle, onDetail, onAddChild, 
   const isExpanded = expanded.has(asset.id);
   const desc = countDescendants(asset.id, allAssets);
   const dotClass = STATUS_DOT[asset.status] || 'bg-slate-400';
+  const selectable = !!selectMode && !!onToggleSelect && isSelectableAsset(asset);
+  const isSelected = !!selectedIds?.has(asset.id);
 
   return (
     <div className={`k-root-wrapper ${isExpanded ? 'is-expanded' : ''}`}>
-      <div className="vik-card overflow-hidden" style={{ borderLeft: `4px solid ${color}` }}>
+      <div className={`vik-card overflow-hidden ${isSelected ? 'ring-2 ring-emerald-500/50' : ''}`} style={{ borderLeft: `4px solid ${color}` }}>
         <div className="flex items-center gap-3 p-3.5">
+          {selectMode && (
+            selectable ? (
+              <button
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-emerald-700"
+                onClick={(e) => { e.stopPropagation(); onToggleSelect!(asset); }}
+                aria-label={isSelected ? 'Odebrat z výběru' : 'Vybrat'}
+              >
+                {isSelected ? <CheckSquare size={20} /> : <Square size={20} className="text-slate-300" />}
+              </button>
+            ) : (
+              <span className="w-1 shrink-0" />
+            )
+          )}
           {/* Icon + status dot */}
           <div className="relative shrink-0">
             <div
@@ -518,7 +585,8 @@ function RootCard({ asset, allAssets, expanded, onToggle, onDetail, onAddChild, 
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              if (hasChildren) onToggle(asset.id);
+              if (selectable) onToggleSelect!(asset);
+              else if (hasChildren) onToggle(asset.id);
               else onDetail(asset);
             }}
             title={hasChildren ? (isExpanded ? 'Sbalit' : 'Rozbalit') : 'Otevřít rodný list'}
@@ -604,6 +672,9 @@ function RootCard({ asset, allAssets, expanded, onToggle, onDetail, onAddChild, 
               onDelete={onDelete}
               canCreateAsset={canCreateAsset}
               visited={new Set([asset.id])}
+              selectMode={selectMode}
+              selectedIds={selectedIds}
+              onToggleSelect={onToggleSelect}
             />
           ))}
         </div>
@@ -622,11 +693,16 @@ interface TileCardProps {
   onAddChild: (parentId: string) => void;
   onDelete: (asset: DisplayAsset) => void;
   canCreateAsset: boolean;
+  selectMode?: boolean;
+  selectedIds?: Set<string>;
+  onToggleSelect?: (asset: DisplayAsset) => void;
 }
 
-function TileCard({ asset, allAssets, onDetail, onAddChild, onDelete, canCreateAsset }: TileCardProps) {
+function TileCard({ asset, allAssets, onDetail, onAddChild, onDelete, canCreateAsset, selectMode, selectedIds, onToggleSelect }: TileCardProps) {
   const color = getEntityColor(asset.entityType);
   const dotClass = STATUS_DOT[asset.status] || 'bg-slate-400';
+  const selectable = !!selectMode && !!onToggleSelect && isSelectableAsset(asset);
+  const isSelected = !!selectedIds?.has(asset.id);
   const desc = countDescendants(asset.id, allAssets);
   const parentPath = collectAncestorIds(asset.id, allAssets)
     .reverse()
@@ -639,8 +715,17 @@ function TileCard({ asset, allAssets, onDetail, onAddChild, onDelete, canCreateA
     .join(' · ');
 
   return (
-    <article className="vik-card overflow-hidden" style={{ borderLeft: `4px solid ${color}` }}>
-      <button type="button" className="flex w-full items-center gap-3 p-3 text-left" onClick={() => onDetail(asset)}>
+    <article className={`vik-card overflow-hidden ${isSelected ? 'ring-2 ring-emerald-500/50' : ''}`} style={{ borderLeft: `4px solid ${color}` }}>
+      <button type="button" className="flex w-full items-center gap-3 p-3 text-left" onClick={() => selectable ? onToggleSelect!(asset) : onDetail(asset)}>
+        {selectMode && (
+          selectable ? (
+            <span className="shrink-0 text-emerald-700">
+              {isSelected ? <CheckSquare size={20} /> : <Square size={20} className="text-slate-300" />}
+            </span>
+          ) : (
+            <span className="w-1 shrink-0" />
+          )
+        )}
         <span className="relative shrink-0">
           <span
             className="flex h-11 w-11 items-center justify-center rounded-xl"
@@ -718,8 +803,19 @@ export default function KartotekaPage() {
     return saved === 'tiles' || saved === 'route' ? saved : 'tree';
   });
   const [floorFilter, setFloorFilter] = useState('all');
+  const [buildingFilter, setBuildingFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState<TypeFilterKey>('all');
   const [addSheetOpen, setAddSheetOpen] = useState(false);
   const [filtersSheetOpen, setFiltersSheetOpen] = useState(false);
+
+  // ── Hromadný výběr + přesun ───
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [moveSheetOpen, setMoveSheetOpen] = useState(false);
+  const [bulkBuilding, setBulkBuilding] = useState('');
+  const [bulkRoomKey, setBulkRoomKey] = useState(''); // id uzlu místnosti ve stromu (reálná i virtuální)
+  const [bulkDeviceId, setBulkDeviceId] = useState(''); // volitelně: zařadit pod existující stroj
+  const [bulkSaving, setBulkSaving] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   const addDeviceGuide = guideById('add-device');
 
@@ -1245,6 +1341,17 @@ export default function KartotekaPage() {
 
   const treeAssets = useMemo(() => buildRoomTree(assets, tenantId), [assets, tenantId]);
 
+  // Nezařazené = skutečný stroj, který ani přes rodiče nespadá do žádné budovy.
+  // Počítá se NAD stromem (stejně jako filtr) — banner a filtr tak vždy ukazují totéž.
+  const unassignedIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const a of treeAssets) {
+      if (a.isVirtual || isBuildingAsset(a) || isRoomAsset(a)) continue;
+      if (!getNodeBuildingId(a, treeAssets)) ids.add(a.id);
+    }
+    return ids;
+  }, [treeAssets]);
+
   // ── Filtering (search + status) ───
   const { visibleAssets } = useMemo(() => {
     let matching = treeAssets;
@@ -1262,17 +1369,30 @@ export default function KartotekaPage() {
     }
 
     if (filter !== 'all') {
-      matching = filter === 'gearbox'
-        ? matching.filter((a) => a.isVirtual || isGearboxAsset(a))
-        : matching.filter((a) => a.isVirtual || a.status === filter);
+      if (filter === 'gearbox') {
+        matching = matching.filter((a) => a.isVirtual || isGearboxAsset(a));
+      } else if (filter === 'unassigned') {
+        // Stejná definice jako banner (unassignedIds) — jinak by banner sliboval jiná čísla než filtr.
+        matching = matching.filter((a) => unassignedIds.has(a.id));
+      } else {
+        matching = matching.filter((a) => a.isVirtual || a.status === filter);
+      }
     }
 
     if (floorFilter !== 'all') {
       matching = matching.filter((a) => a.isVirtual || getFloorValue(a) === floorFilter);
     }
 
+    if (buildingFilter !== 'all') {
+      matching = matching.filter((a) => getNodeBuildingId(a, treeAssets) === buildingFilter);
+    }
+
+    if (typeFilter !== 'all') {
+      matching = matching.filter((a) => matchesTypeFilter(a, typeFilter));
+    }
+
     // Include ancestors so tree stays intact
-    if (search.trim() || filter !== 'all' || floorFilter !== 'all') {
+    if (search.trim() || filter !== 'all' || floorFilter !== 'all' || buildingFilter !== 'all' || typeFilter !== 'all') {
       const idSet = new Set<string>();
       for (const a of matching) {
         idSet.add(a.id);
@@ -1284,7 +1404,7 @@ export default function KartotekaPage() {
     }
 
     return { visibleAssets: treeAssets };
-  }, [treeAssets, search, filter, floorFilter]);
+  }, [treeAssets, search, filter, floorFilter, buildingFilter, typeFilter, unassignedIds]);
 
   const floorOptions = useMemo(() => {
     const values = new Set<string>();
@@ -1293,6 +1413,47 @@ export default function KartotekaPage() {
     }
     return Array.from(values).sort((a, b) => getFloorLabel(a).localeCompare(getFloorLabel(b), 'cs'));
   }, [treeAssets]);
+
+  // Budovy pro filtr + přesun: [písmeno, název] (reálné i virtuální uzly budov).
+  const buildingOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const a of treeAssets) {
+      if (!(isBuildingAsset(a) || a.virtualKind === 'building')) continue;
+      const bid = safeText(a.buildingId || a.sourceBuildingId).trim().toUpperCase();
+      if (bid && !map.has(bid)) map.set(bid, safeText(a.name) || `Budova ${bid}`);
+    }
+    return Array.from(map.entries()).sort((x, y) => x[0].localeCompare(y[0], 'cs'));
+  }, [treeAssets]);
+
+  // Nabídka EXISTUJÍCÍCH místností pro hromadný přesun (jen ze zvolené budovy).
+  // Hodnota = id uzlu ve stromu → u reálné místnosti známe rovnou parentId, žádné hádání podle názvu.
+  const bulkRoomChoices = useMemo(() => {
+    return treeAssets
+      .filter((a) => (isRoomAsset(a) || a.virtualKind === 'room')
+        && (!bulkBuilding || getNodeBuildingId(a, treeAssets) === bulkBuilding))
+      .map((a) => ({ key: a.id, label: (safeText(a.name) || safeText(a.areaName)).trim() || 'Bez názvu' }))
+      .sort((x, y) => x.label.localeCompare(y.label, 'cs'));
+  }, [treeAssets, bulkBuilding]);
+
+  // Nabídka EXISTUJÍCÍCH strojů, pod které jde vybrané zařadit (podsoučásti).
+  // Vynechává přesouvané položky a celé jejich podstromy — nejde zařadit pod sebe sama.
+  const bulkDeviceChoices = useMemo(() => {
+    if (!moveSheetOpen) return [];
+    const banned = new Set<string>(selectedIds);
+    const stack = Array.from(selectedIds);
+    while (stack.length) {
+      const cur = stack.pop()!;
+      for (const ch of treeAssets.filter((a) => a.parentId === cur)) {
+        if (!banned.has(ch.id)) { banned.add(ch.id); stack.push(ch.id); }
+      }
+    }
+    return treeAssets
+      .filter((a) => isSelectableAsset(a) && !banned.has(a.id))
+      .filter((a) => !bulkBuilding || getNodeBuildingId(a, treeAssets) === bulkBuilding)
+      .filter((a) => !bulkRoomKey || a.parentId === bulkRoomKey || collectAncestorIds(a.id, treeAssets).includes(bulkRoomKey))
+      .map((a) => ({ id: a.id, label: `${safeText(a.name) || 'Bez názvu'}${a.code ? ` (${a.code})` : ''}` }))
+      .sort((x, y) => x.label.localeCompare(y.label, 'cs'));
+  }, [moveSheetOpen, treeAssets, selectedIds, bulkBuilding, bulkRoomKey]);
 
   const rootAssets = useMemo(() => {
     const visibleIds = new Set(visibleAssets.map((a) => a.id));
@@ -1310,6 +1471,111 @@ export default function KartotekaPage() {
         return aKey.localeCompare(bKey, 'cs');
       });
   }, [visibleAssets]);
+
+  // ── Hromadný výběr + přesun ───
+  const toggleSelect = useCallback((asset: DisplayAsset) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(asset.id)) next.delete(asset.id);
+      else next.add(asset.id);
+      return next;
+    });
+  }, []);
+
+  const exitSelectMode = useCallback(() => {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  }, []);
+
+  const selectAllVisible = useCallback(() => {
+    setSelectedIds(new Set(visibleAssets.filter(isSelectableAsset).map((a) => a.id)));
+  }, [visibleAssets]);
+
+  // Trasa nemá výběr — při přepnutí pohledu režim ukonči.
+  useEffect(() => {
+    if (viewMode === 'route' && selectMode) exitSelectMode();
+  }, [viewMode, selectMode, exitSelectMode]);
+
+  const handleBulkMove = async () => {
+    if (bulkSaving || selectedIds.size === 0) return;
+    if (isSandbox) { showToast('V ukázkovém režimu nelze přesouvat.', 'error'); return; }
+    setBulkSaving(true);
+    try {
+      const b = bulkBuilding.trim().toUpperCase();
+      // Cíl se vybírá ze seznamu EXISTUJÍCÍCH uzlů → známe ho přímo, žádné hádání podle názvu.
+      const roomNode = bulkRoomKey ? treeAssets.find((a) => a.id === bulkRoomKey) : undefined;
+      const deviceNode = bulkDeviceId ? treeAssets.find((a) => a.id === bulkDeviceId && !a.isVirtual) : undefined;
+      const roomLabel = roomNode ? (safeText(roomNode.name) || safeText(roomNode.areaName)).trim() : '';
+      const finalBuilding = b
+        || (roomNode ? getNodeBuildingId(roomNode, treeAssets) : '')
+        || (deviceNode ? getNodeBuildingId(deviceNode, treeAssets) : '');
+      let parentId: string | null = null;
+      if (deviceNode) parentId = deviceNode.id;
+      else if (roomNode && !roomNode.isVirtual) parentId = roomNode.id;
+      else if (finalBuilding) {
+        // Virtuální místnost není skutečný dokument → parentId míří na budovu, místnost drží areaName.
+        const bAsset = assets.find((a) => isBuildingAsset(a) && safeText(a.buildingId).trim().toUpperCase() === finalBuilding);
+        parentId = bAsset?.id ?? null;
+      }
+      // Místnost do areaName: vybraná, jinak místnost cílového stroje (podsoučást sdílí umístění).
+      let areaName = roomLabel;
+      if (!areaName && deviceNode) {
+        const anc = collectAncestorIds(deviceNode.id, treeAssets)
+          .map((id) => treeAssets.find((a) => a.id === id))
+          .find((a) => a && (isRoomAsset(a) || a.virtualKind === 'room'));
+        areaName = anc ? (safeText(anc.name) || safeText(anc.areaName)).trim() : safeText(deviceNode.areaName).trim();
+      }
+
+      // Jen položky, co pořád existují; a když je vybraný stroj i jeho podsoučást,
+      // přesouvej jen vršek — podstrom drží pohromadě přes parentId.
+      const existingIds = new Set(assets.map((a) => a.id));
+      const chosen = Array.from(selectedIds).filter((id) => existingIds.has(id) && id !== parentId);
+      const chosenSet = new Set(chosen);
+      const tops = chosen.filter((id) => !collectAncestorIds(id, treeAssets).some((aid) => chosenSet.has(aid)));
+      if (!tops.length) { showToast('Není co přesunout — vybrané položky už neexistují.', 'error'); setMoveSheetOpen(false); exitSelectMode(); return; }
+      // Pojistka proti smyčce: cíl nesmí ležet uvnitř přesouvaného podstromu.
+      if (parentId && (chosenSet.has(parentId) || collectAncestorIds(parentId, treeAssets).some((aid) => chosenSet.has(aid)))) {
+        showToast('Cíl přesunu nemůže být uvnitř přesouvaných položek.', 'error');
+        return;
+      }
+      // Podsoučástem přesunutých strojů dorovnej budovu/místnost (parentId jim zůstává = drží pod strojem).
+      const topSet = new Set(tops);
+      const cascade = new Set<string>();
+      const stack = [...tops];
+      while (stack.length) {
+        const cur = stack.pop()!;
+        for (const ch of assets.filter((a) => a.parentId === cur)) {
+          if (!cascade.has(ch.id) && !topSet.has(ch.id)) { cascade.add(ch.id); stack.push(ch.id); }
+        }
+      }
+      const results = await Promise.allSettled([
+        ...tops.map((id) => assetService.update(tenantId, id, {
+          buildingId: finalBuilding || null,
+          areaName: areaName || null,
+          parentId,
+        } as Parameters<typeof assetService.update>[2])),
+        ...Array.from(cascade).map((id) => assetService.update(tenantId, id, {
+          buildingId: finalBuilding || null,
+          areaName: areaName || null,
+        } as Parameters<typeof assetService.update>[2])),
+      ]);
+      const failed = results.filter((r) => r.status === 'rejected').length;
+      const data = await assetService.getAll(tenantId);
+      setAssets(data);
+      const targetLabel = [finalBuilding ? `Budova ${finalBuilding}` : '', areaName].filter(Boolean).join(' › ') || 'nezařazeno';
+      if (failed > 0) {
+        showToast(`Přesunuto ${results.length - failed} z ${results.length} — ${failed} se nepovedlo, zkus to znovu.`, 'error');
+      } else {
+        showToast(`Přesunuto ${tops.length} položek${cascade.size ? ` (+${cascade.size} podsoučástí)` : ''} → ${targetLabel}`, 'success');
+      }
+      setMoveSheetOpen(false);
+      exitSelectMode();
+    } catch (err) {
+      showToast(`Přesun se nepovedl: ${String(err)}`, 'error');
+    } finally {
+      setBulkSaving(false);
+    }
+  };
 
   const routeGroups = useMemo(() => {
     const groups = new Map<string, {
@@ -1537,11 +1803,11 @@ export default function KartotekaPage() {
 
   // ── Auto-expand when filtering ───
   useEffect(() => {
-    if (search.trim() || filter !== 'all' || floorFilter !== 'all') {
+    if (search.trim() || filter !== 'all' || floorFilter !== 'all' || buildingFilter !== 'all' || typeFilter !== 'all') {
       const allIds = new Set(visibleAssets.map((a) => a.id));
       setExpanded(allIds);
     }
-  }, [search, filter, floorFilter, visibleAssets]);
+  }, [search, filter, floorFilter, buildingFilter, typeFilter, visibleAssets]);
 
   // ── Filter config ───
   const filters: { key: FilterKey; label: string; icon: LucideIcon }[] = [
@@ -1627,6 +1893,34 @@ export default function KartotekaPage() {
         </div>
       </div>
 
+      {/* ── Upozornění na nezařazené položky (stroje bez budovy) — zároveň filtr ── */}
+      {unassignedIds.size > 0 && (
+        <div className="mx-auto w-full max-w-[1180px] px-4 pt-2">
+          <button
+            type="button"
+            onClick={() => {
+              const next = filter === 'unassigned' ? 'all' : 'unassigned';
+              setFilter(next);
+              // Nezařazené nemají budovu → filtr budovy/typu by dal prázdný výsledek. Vyčisti je.
+              if (next === 'unassigned') { setBuildingFilter('all'); setTypeFilter('all'); }
+            }}
+            className={`flex w-full items-center gap-2.5 rounded-xl border px-3 py-2 text-left transition active:scale-[0.99] ${
+              filter === 'unassigned'
+                ? 'border-amber-400 bg-amber-100 ring-2 ring-amber-500/30'
+                : 'border-amber-200 bg-amber-50 hover:bg-amber-100'
+            }`}
+          >
+            <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600" />
+            <span className="flex-1 text-sm font-semibold text-amber-900">
+              {unassignedIds.size} {unassignedIds.size === 1 ? 'položka není zařazená' : unassignedIds.size < 5 ? 'položky nejsou zařazené' : 'položek není zařazeno'} do budovy
+            </span>
+            <span className="rounded-lg bg-amber-600 px-2.5 py-1 text-xs font-bold text-white">
+              {filter === 'unassigned' ? 'Zobrazuji' : 'Zobrazit'}
+            </span>
+          </button>
+        </div>
+      )}
+
       {/* ── Search ── */}
       {canCreateAsset && (
         <div className="mx-auto flex w-full max-w-[1180px] items-center gap-2 px-4 pt-3" aria-label="Pridat polozku">
@@ -1653,6 +1947,32 @@ export default function KartotekaPage() {
           )}
         </div>
       </div>
+
+      {/* ── Rychlý filtr podle budovy ── */}
+      {buildingOptions.length > 1 && (
+        <div className="mx-auto w-full max-w-[1180px] px-4 pt-2">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+            <button
+              type="button"
+              className={`${buildingFilter === 'all' ? 'vik-chip vik-chip-active' : 'vik-chip'} shrink-0`}
+              onClick={() => setBuildingFilter('all')}
+            >
+              Vše
+            </button>
+            {buildingOptions.map(([bid, label]) => (
+              <button
+                key={bid}
+                type="button"
+                title={label}
+                className={`${buildingFilter === bid ? 'vik-chip vik-chip-active' : 'vik-chip'} shrink-0`}
+                onClick={() => setBuildingFilter(buildingFilter === bid ? 'all' : bid)}
+              >
+                <Building2 className="h-3.5 w-3.5" /> {bid}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Filtry (stav) a Patro jsou v panelu „Filtry" — viz tlačítko v liště zobrazení níže. */}
 
@@ -1685,10 +2005,21 @@ export default function KartotekaPage() {
         </div>
         <button type="button" onClick={() => setFiltersSheetOpen(true)} aria-label="Filtry" title="Filtry" className="vik-button relative px-3">
           <SlidersHorizontal size={18} />
-          {(filter !== 'all' || floorFilter !== 'all') && (
-            <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-600 px-1 text-[10px] font-bold text-white">{(filter !== 'all' ? 1 : 0) + (floorFilter !== 'all' ? 1 : 0)}</span>
+          {(filter !== 'all' || floorFilter !== 'all' || buildingFilter !== 'all' || typeFilter !== 'all') && (
+            <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-600 px-1 text-[10px] font-bold text-white">{(filter !== 'all' ? 1 : 0) + (floorFilter !== 'all' ? 1 : 0) + (buildingFilter !== 'all' ? 1 : 0) + (typeFilter !== 'all' ? 1 : 0)}</span>
           )}
         </button>
+        {canManageRoute && viewMode !== 'route' && (
+          <button
+            type="button"
+            onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
+            aria-label="Vybrat více položek"
+            title="Vybrat více položek k přesunu"
+            className={`vik-button px-3 ${selectMode ? 'ring-2 ring-emerald-600/40' : ''}`}
+          >
+            <CheckSquare size={18} />
+          </button>
+        )}
         {viewMode === 'tree' && (
           <>
             <button type="button" onClick={expandVisibleTree} aria-label="Rozbalit vše" title="Rozbalit vše" className="vik-button px-3">
@@ -1728,7 +2059,7 @@ export default function KartotekaPage() {
       {/* ── Main content: root card grid + tree ── */}
       {!loading && !error && assets.length > 0 && (
         <div className="k-content">
-          {currentViewCount === 0 && (search || filter !== 'all' || floorFilter !== 'all') ? (
+          {currentViewCount === 0 && (search || filter !== 'all' || floorFilter !== 'all' || buildingFilter !== 'all' || typeFilter !== 'all') ? (
             <div className="k-empty">
               <Search size={32} />
               <span>Žádné výsledky</span>
@@ -1898,6 +2229,9 @@ export default function KartotekaPage() {
                   onAddChild={openCreateModal}
                   onDelete={handleDelete}
                   canCreateAsset={canCreateAsset}
+                  selectMode={selectMode}
+                  selectedIds={selectedIds}
+                  onToggleSelect={toggleSelect}
                 />
               ))}
             </div>
@@ -1914,11 +2248,102 @@ export default function KartotekaPage() {
                   onAddChild={openCreateModal}
                   onDelete={handleDelete}
                   canCreateAsset={canCreateAsset}
+                  selectMode={selectMode}
+                  selectedIds={selectedIds}
+                  onToggleSelect={toggleSelect}
                 />
               ))}
             </div>
           )}
         </div>
+      )}
+
+      {/* ── Plovoucí panel hromadného výběru ── */}
+      {selectMode && (
+        <div className="fixed bottom-24 left-1/2 z-40 w-[calc(100%-1.5rem)] max-w-lg -translate-x-1/2 md:bottom-6">
+          <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+            <span className="min-w-0 flex-1 truncate pl-2 text-sm font-bold text-slate-700">
+              Vybráno: <span className="font-mono">{selectedIds.size}</span>
+            </span>
+            <button type="button" className="vik-button whitespace-nowrap px-2.5 text-[13px]" onClick={selectAllVisible}>
+              Vybrat vše
+            </button>
+            <button
+              type="button"
+              disabled={selectedIds.size === 0}
+              onClick={() => { setBulkBuilding(''); setBulkRoomKey(''); setBulkDeviceId(''); setMoveSheetOpen(true); }}
+              className="flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-emerald-600 px-3 py-2 text-[13px] font-bold text-white disabled:opacity-40"
+            >
+              <FolderInput size={16} /> Přesunout
+            </button>
+            <button type="button" className="vik-button px-2.5" aria-label="Zrušit výběr" onClick={exitSelectMode}>
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Hromadný přesun — kam ── */}
+      {moveSheetOpen && (
+        <BottomSheet title={`Přesunout vybrané (${selectedIds.size})`} isOpen onClose={() => !bulkSaving && setMoveSheetOpen(false)}>
+          <div className="space-y-3 p-1">
+            <p className="text-[13px] leading-relaxed text-slate-600">
+              Vybrané stroje se přesunou do zvolené budovy a místnosti. Prázdná budova = nezařazeno.
+            </p>
+            <div>
+              <label className="eyebrow mb-1 block" htmlFor="k-bulk-building">Budova</label>
+              <select
+                id="k-bulk-building"
+                className="vik-input"
+                value={bulkBuilding}
+                onChange={(e) => { setBulkBuilding(e.target.value); setBulkRoomKey(''); setBulkDeviceId(''); }}
+              >
+                <option value="">— Bez budovy (nezařazeno) —</option>
+                {buildingOptions.map(([bid, label]) => (
+                  <option key={bid} value={bid}>{label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="eyebrow mb-1 block" htmlFor="k-bulk-room">Místnost</label>
+              <select
+                id="k-bulk-room"
+                className="vik-input"
+                value={bulkRoomKey}
+                onChange={(e) => { setBulkRoomKey(e.target.value); setBulkDeviceId(''); }}
+              >
+                <option value="">— Žádná místnost (přímo do budovy) —</option>
+                {bulkRoomChoices.map((r) => (
+                  <option key={r.key} value={r.key}>{r.label}</option>
+                ))}
+              </select>
+              {bulkBuilding && bulkRoomChoices.length === 0 && (
+                <p className="mt-1 text-[12px] text-slate-500">V této budově zatím nejsou žádné místnosti.</p>
+              )}
+            </div>
+            {(bulkBuilding || bulkRoomKey) && bulkDeviceChoices.length > 0 && (
+              <div>
+                <label className="eyebrow mb-1 block" htmlFor="k-bulk-device">Zařadit pod stroj (nepovinné)</label>
+                <select
+                  id="k-bulk-device"
+                  className="vik-input"
+                  value={bulkDeviceId}
+                  onChange={(e) => setBulkDeviceId(e.target.value)}
+                >
+                  <option value="">— Ne, přímo do budovy/místnosti —</option>
+                  {bulkDeviceChoices.map((d) => (
+                    <option key={d.id} value={d.id}>{d.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <FormFooter
+              onCancel={() => !bulkSaving && setMoveSheetOpen(false)}
+              onSubmit={handleBulkMove}
+              submitLabel={bulkSaving ? 'Přesouvám…' : `Přesunout (${selectedIds.size})`}
+            />
+          </div>
+        </BottomSheet>
       )}
 
       {/* ── Excel Import Modal ── */}
@@ -2234,6 +2659,39 @@ export default function KartotekaPage() {
                 <button className={filter === 'gearbox' ? 'vik-chip vik-chip-active' : 'vik-chip'} onClick={() => setFilter(filter === 'gearbox' ? 'all' : 'gearbox')}>
                   <Cog className="h-3.5 w-3.5" /> Převodovky <span className="opacity-70">{counts.gearboxes}</span>
                 </button>
+                {unassignedIds.size > 0 && (
+                  <button className={filter === 'unassigned' ? 'vik-chip vik-chip-active' : 'vik-chip'} onClick={() => { const next = filter === 'unassigned' ? 'all' : 'unassigned'; setFilter(next); if (next === 'unassigned') { setBuildingFilter('all'); setTypeFilter('all'); } }}>
+                    <AlertTriangle className="h-3.5 w-3.5" /> Nezařazené <span className="opacity-70">{unassignedIds.size}</span>
+                  </button>
+                )}
+              </div>
+            </div>
+            {buildingOptions.length > 0 && (
+              <div>
+                <span className="eyebrow mb-2 block">Budova</span>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" className={buildingFilter === 'all' ? 'vik-chip vik-chip-active' : 'vik-chip'} onClick={() => setBuildingFilter('all')}>Vše</button>
+                  {buildingOptions.map(([bid, label]) => (
+                    <button key={bid} type="button" className={buildingFilter === bid ? 'vik-chip vik-chip-active' : 'vik-chip'} onClick={() => setBuildingFilter(buildingFilter === bid ? 'all' : bid)}>
+                      <Building2 className="h-3.5 w-3.5" /> {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div>
+              <span className="eyebrow mb-2 block">Typ položky</span>
+              <div className="flex flex-wrap gap-2">
+                {([
+                  { key: 'all' as TypeFilterKey, label: 'Vše' },
+                  { key: 'building' as TypeFilterKey, label: 'Budovy' },
+                  { key: 'room' as TypeFilterKey, label: 'Místnosti' },
+                  { key: 'device' as TypeFilterKey, label: 'Stroje' },
+                ]).map((t) => (
+                  <button key={t.key} type="button" className={typeFilter === t.key ? 'vik-chip vik-chip-active' : 'vik-chip'} onClick={() => setTypeFilter(t.key)}>
+                    {t.label}
+                  </button>
+                ))}
               </div>
             </div>
             {floorOptions.length > 1 && (
@@ -2250,7 +2708,7 @@ export default function KartotekaPage() {
               </div>
             )}
             <div className="flex gap-2 pt-2">
-              <button type="button" className="vik-button flex-1" onClick={() => { setFilter('all'); setFloorFilter('all'); }}>Zrušit filtry</button>
+              <button type="button" className="vik-button flex-1" onClick={() => { setFilter('all'); setFloorFilter('all'); setBuildingFilter('all'); setTypeFilter('all'); }}>Zrušit filtry</button>
               <button type="button" className="flex-1 rounded-xl bg-emerald-600 py-2.5 font-bold text-white" onClick={() => setFiltersSheetOpen(false)}>Hotovo</button>
             </div>
           </div>

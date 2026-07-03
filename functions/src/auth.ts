@@ -13,7 +13,9 @@ const IP_LOCK_MS = 15 * 60 * 1000;
 const GLOBAL_MAX_FAILS = 300;
 const GLOBAL_WINDOW_MS = 15 * 60 * 1000;
 const GLOBAL_LOCK_MS = 5 * 60 * 1000;
-const GLOBAL_ATTEMPT_KEY = '__global__';
+// POZOR: ID dokumentu NESMÍ začínat a končit dvojitým podtržítkem — Firestore
+// taková ID rezervuje a každý zápis/čtení spadne (rozbilo by to VŠECHNA přihlášení).
+const GLOBAL_ATTEMPT_KEY = 'all-global';
 const PIN_RE = /^\d{4,6}$/; // LOGIN: snese i stávající 4místné PINy (jinak by se nikdo nepřihlásil)
 const PIN_SET_RE = /^\d{6}$/; // NOVÉ / MĚNĚNÉ PINy: povinně 6 číslic (silnější, stávající nechává být)
 const DEVICE_ID_RE = /^[A-Za-z0-9_-]{16,80}$/;

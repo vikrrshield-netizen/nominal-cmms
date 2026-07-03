@@ -28,15 +28,23 @@ import { calcItemStatus } from '../types/inventory';
 // ═══════════════════════════════════════════
 
 export function useInventory() {
-  const { user } = useAuthContext();
+  const { user, hasAnyPermission } = useAuthContext();
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Zrcadlí firestore.rules match /inventory (canReadInventory || report.read)
+  const canRead = hasAnyPermission(['inv.consume', 'inv.restock', 'inv.manage', 'inv.order', 'report.read']);
 
   // ─────────────────────────────────────────
   // Realtime items listener
   // ─────────────────────────────────────────
   useEffect(() => {
+    if (!canRead) {
+      setItems([]);
+      setLoading(false);
+      return;
+    }
     const unsub = onSnapshot(
       collection(db, 'inventory'),
       (snap) => {
@@ -64,7 +72,7 @@ export function useInventory() {
       }
     );
     return () => unsub();
-  }, []);
+  }, [canRead]);
 
   // ─────────────────────────────────────────
   // Zapsat transakci + aktualizovat množství

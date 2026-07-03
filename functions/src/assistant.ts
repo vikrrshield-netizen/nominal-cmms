@@ -75,6 +75,8 @@ const ACTION_PERM: Record<string, string> = {
   set_machine_status: 'asset.update',
   close_task: 'wo.close',
   create_asset_tree: 'asset.create',
+  move_asset: 'asset.update',
+  update_asset: 'asset.update',
 };
 const NO_PERM_MSG = 'Na tuhle akci nemáš oprávnění — může ji udělat jen pověřená role (např. údržba/správce). Řekni to prosím uživateli.';
 
@@ -359,13 +361,13 @@ async function getGlobalStats(): Promise<any | null> {
 async function createAssetEntry(
   tenantId: string,
   actor: Actor,
-  input: { name: string; category?: string; location?: string; code?: string; manufacturer?: string; model?: string; serialNumber?: string; year?: number; notes?: string },
+  input: { name: string; category?: string; location?: string; code?: string; manufacturer?: string; model?: string; serialNumber?: string; year?: number; notes?: string; entityType?: string; buildingId?: string; areaName?: string; parentId?: string | null },
 ): Promise<string> {
   const data: Record<string, unknown> = {
     name: input.name,
-    entityType: 'Zařízení',
+    entityType: input.entityType || 'Zařízení',
     status: 'operational',
-    parentId: null,
+    parentId: input.parentId ?? null,
     tenantId,
     createdById: actor.uid,
     createdByName: actor.name,
@@ -374,7 +376,9 @@ async function createAssetEntry(
     updatedAt: FV.serverTimestamp(),
   };
   if (input.category) data.category = input.category;
-  if (input.location) { data.location = input.location; data.areaName = input.location; }
+  if (input.buildingId) data.buildingId = input.buildingId;
+  if (input.areaName) data.areaName = input.areaName;
+  if (input.location) { data.location = input.location; if (!input.areaName) data.areaName = input.location; }
   if (input.code) data.code = input.code;
   if (input.manufacturer) data.manufacturer = input.manufacturer;
   if (input.model) data.model = input.model;
@@ -495,7 +499,7 @@ async function repairWarning(tenantId: string, assetId: string): Promise<string>
 
 // Návrh zápisu, který čeká na potvrzení uživatele (Ano/Ne na klientu).
 interface PendingAction {
-  type: 'log_work' | 'create_task' | 'create_asset' | 'set_machine_status' | 'close_task' | 'create_asset_tree';
+  type: 'log_work' | 'create_task' | 'create_asset' | 'set_machine_status' | 'close_task' | 'create_asset_tree' | 'move_asset' | 'update_asset';
   summary: string;
   danger?: boolean;
   content?: string; workType?: string;
@@ -506,6 +510,9 @@ interface PendingAction {
   status?: string;
   taskId?: string; taskCode?: string;
   tree?: { buildings: any[] };
+  // zakládání s typem + umístění / přesun / úprava polí
+  entityType?: string; buildingId?: string; areaName?: string; parentId?: string | null;
+  placeLabel?: string; fields?: Record<string, unknown>;
 }
 
 // ── Logika KARTOTÉKY: hierarchie Budova → Místnost → Stroj ─────
@@ -575,6 +582,75 @@ function tokenStemHit(tok: string, text: string): boolean {
   if (!tok || !tn) return false;
   if (tn.includes(tok) || tok.includes(tn)) return true;
   return tn.split(' ').some((w) => w.length >= 4 && tok.length >= 4 && (w.startsWith(tok.slice(0, 5)) || tok.startsWith(w.slice(0, 5))));
+}
+
+// ── Umístění položky v kartotéce (pro přesun / zakládání s logikou) ──
+// Ze slovního „budova" (A–L nebo název) a „místnost" (název) vyrobí konkrétní
+// pole: buildingId, areaName a parentId (nadřazená položka, pod kterou to patří).
+interface PlaceResult { buildingId?: string; areaName?: string; parentId?: string | null; label: string; note?: string; }
+function resolvePlacement(all: any[], building?: string, room?: string): PlaceResult {
+  const out: PlaceResult = { label: '' };
+  const b = String(building ?? '').trim();
+  const r = String(room ?? '').trim();
+  let bCode = '';
+  if (/^[a-lA-L]$/.test(b)) bCode = b.toUpperCase();
+  else if (b) {
+    const bm = b.match(/\bbudov\w*\s+([a-lA-L])\b/i);
+    if (bm?.[1]) bCode = bm[1].toUpperCase();
+    else for (const [k, v] of Object.entries(BUILDING_NAMES)) {
+      if (normText(v) === normText(b) || (normText(b).length >= 3 && normText(v).includes(normText(b)))) { bCode = k; break; }
+    }
+  }
+  if (bCode) out.buildingId = bCode;
+
+  // Najdi místnost podle názvu (tolerantně ke skloňování); pokud známe budovu, upřednostni místnost v ní.
+  let roomAsset: any = null;
+  if (r) {
+    const rooms = all.filter((a) => isRoomA(a) && (tokenStemHit(normText(r), a.name) || normText(a.name) === normText(r)));
+    roomAsset = rooms.find((a) => !bCode || assetBuilding(a, all) === bCode) || rooms[0] || null;
+    if (roomAsset) { out.areaName = String(roomAsset.name ?? r); if (!bCode) { const rb = assetBuilding(roomAsset, all); if (rb) out.buildingId = rb; } }
+    else { out.areaName = r; out.note = `místnost „${r}" jsem v kartotéce nenašel — uložím ji jako text`; }
+  }
+
+  // parentId: pod místnost (když existuje), jinak pod budovu.
+  if (roomAsset) out.parentId = roomAsset.id;
+  else if (bCode) {
+    // Budovu hledej přesně: přes její buildingId, jinak přes písmeno v názvu („Budova D").
+    const buildAsset = all.find((a) => isBuildingA(a) && (
+      String(a.buildingId ?? '').toUpperCase() === bCode ||
+      (String(a.name ?? '').match(/budov\w*\s+([a-lA-L])\b/i)?.[1]?.toUpperCase() === bCode)
+    ));
+    out.parentId = buildAsset ? buildAsset.id : null;
+  }
+
+  const parts: string[] = [];
+  if (out.buildingId) parts.push(`Budova ${out.buildingId}${BUILDING_NAMES[out.buildingId] ? ` (${BUILDING_NAMES[out.buildingId]})` : ''}`);
+  if (out.areaName) parts.push(out.areaName);
+  out.label = parts.join(' › ') || '(bez umístění)';
+  return out;
+}
+
+// Přesun položky: přepíše buildingId/areaName/parentId (tenant hlídá caller).
+async function moveAssetEntry(assetId: string, place: PlaceResult, actor: Actor): Promise<void> {
+  const upd: Record<string, unknown> = {
+    buildingId: place.buildingId ?? null,
+    areaName: place.areaName ?? null,
+    updatedAt: FV.serverTimestamp(),
+    lastEditByName: actor.name,
+    lastEditById: actor.uid,
+  };
+  if (place.parentId !== undefined) upd.parentId = place.parentId;
+  await db().collection('assets').doc(assetId).update(upd);
+}
+
+// Úprava polí položky (název, kód, výrobce…); tenant hlídá caller.
+async function updateAssetFields(assetId: string, fields: Record<string, unknown>, actor: Actor): Promise<void> {
+  await db().collection('assets').doc(assetId).update({
+    ...fields,
+    updatedAt: FV.serverTimestamp(),
+    lastEditByName: actor.name,
+    lastEditById: actor.uid,
+  });
 }
 
 // ── Definice nástrojů pro Claude ───────────────────────────────
@@ -704,14 +780,17 @@ const WRITE_TOOLS: Anthropic.Tool[] = [
   },
   {
     name: 'create_asset',
-    description: 'Založí nové zařízení/stroj do Kartotéky. Použij, když to uživatel chce, nebo když z fotky výrobního štítku načteš nový stroj (nejdřív ověř find_asset, ať nevznikne duplicita). Vyplň, co víš. Po založení potvrď.',
+    description: 'Založí NOVOU položku do Kartotéky — stroj, MÍSTNOST nebo BUDOVU. Pomocí „type" řekni, co zakládáš. Umístění zadej přes „building" (A–L nebo název) a „room" (název místnosti) — položka se propojí pod správnou budovu/místnost (parentId). Použij, když to uživatel chce nebo když z fotky štítku načteš nový stroj (nejdřív ověř find_asset, ať nevznikne duplicita). Vyplň, co víš. Po založení potvrď.',
     input_schema: {
       type: 'object',
       properties: {
-        name: { type: 'string', description: 'název zařízení' },
+        name: { type: 'string', description: 'název položky (stroje / místnosti / budovy)' },
+        type: { type: 'string', enum: ['stroj', 'mistnost', 'budova'], description: 'co zakládáš: stroj (default), mistnost, nebo budova' },
+        building: { type: 'string', description: 'kam patří — budova: písmeno A–L nebo název (např. „Výrobní hala"). U type=budova nech prázdné.' },
+        room: { type: 'string', description: 'kam patří — místnost (název, např. „Míchárna"). Jen u type=stroj.' },
         code: { type: 'string', description: 'kód / typ / označení (např. ze štítku), volitelné' },
         category: { type: 'string', description: 'kategorie (volitelné)' },
-        location: { type: 'string', description: 'umístění textem (volitelné)' },
+        location: { type: 'string', description: 'umístění textem (volitelné, když neznáš budovu/místnost)' },
         manufacturer: { type: 'string', description: 'výrobce (volitelné)' },
         model: { type: 'string', description: 'model / typ (volitelné)' },
         serialNumber: { type: 'string', description: 'výrobní (sériové) číslo (volitelné)' },
@@ -719,6 +798,38 @@ const WRITE_TOOLS: Anthropic.Tool[] = [
         notes: { type: 'string', description: 'poznámka, další údaje ze štítku (volitelné)' },
       },
       required: ['name'],
+    },
+  },
+  {
+    name: 'move_asset',
+    description: 'PŘESUNE existující položku (stroj/místnost) v Kartotéce jinam — pod jinou budovu nebo místnost. Použij, když uživatel řekne, že něco je zapsané špatně / patří jinam (např. „přesuň Extruder 3 do budovy D, míchárny", „ten stroj patří do loupárny"). Zadej „asset" (co přesunout) a cíl „building" a/nebo „room". Po přesunu potvrď.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        asset: { type: 'string', description: 'název nebo kód položky, kterou přesouváš' },
+        building: { type: 'string', description: 'cílová budova: písmeno A–L nebo název (volitelné, když měníš jen místnost)' },
+        room: { type: 'string', description: 'cílová místnost (název, volitelné)' },
+      },
+      required: ['asset'],
+    },
+  },
+  {
+    name: 'update_asset',
+    description: 'UPRAVÍ údaje existující položky v Kartotéce (název, kód, výrobce, model, sériové číslo, rok, kategorie). Použij, když uživatel chce opravit/doplnit rodný list stroje (např. „u Extruderu 2 doplň výrobce Krauss", „přejmenuj to na …"). Změň JEN pole, která uživatel zmíní. Pro přesun použij move_asset, pro stav set_machine_status. Po úpravě potvrď.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        asset: { type: 'string', description: 'název nebo kód položky, kterou upravuješ' },
+        name: { type: 'string', description: 'nový název (volitelné)' },
+        code: { type: 'string', description: 'nový kód / označení (volitelné)' },
+        category: { type: 'string', description: 'nová kategorie (volitelné)' },
+        manufacturer: { type: 'string', description: 'výrobce (volitelné)' },
+        model: { type: 'string', description: 'model / typ (volitelné)' },
+        serialNumber: { type: 'string', description: 'výrobní (sériové) číslo (volitelné)' },
+        year: { type: 'number', description: 'rok výroby (volitelné)' },
+        notes: { type: 'string', description: 'poznámka (volitelné)' },
+      },
+      required: ['asset'],
     },
   },
   {
@@ -1080,19 +1191,36 @@ async function runTool(name: string, input: any, ctx: { tenantId: string; actor:
       }
       case 'create_asset': {
         if (!roleCan(role, 'asset.create')) return NO_PERM_MSG;
-        if (!input?.name) return 'Chybí název zařízení.';
-        // Ochrana proti duplicitám — když stroj podle názvu nebo kódu už v Kartotéce je, nenavrhuj zakládání.
-        let existing = (await resolveAsset(tenantId, String(input.name), cache)).match;
-        if (!existing && input?.code) existing = (await resolveAsset(tenantId, String(input.code), cache)).match;
-        if (existing) {
-          return `ℹ️ Tohle zařízení už v Kartotéce je: ${existing.name}${existing.code ? ` (${existing.code})` : ''}. Nezakládám znovu — otevři jeho kartu, nebo mi řekni, že je to jiný stroj.`;
+        if (!input?.name) return 'Chybí název položky.';
+        const kind = String(input?.type ?? 'stroj').toLowerCase();
+        const entityType = kind === 'budova' ? 'Budova' : kind === 'mistnost' ? 'Místnost' : 'Zařízení';
+        const kindLabel = kind === 'budova' ? 'budovu' : kind === 'mistnost' ? 'místnost' : 'stroj';
+        // Ochrana proti duplicitám — jen u strojů (místnost/budova se stejným názvem může legitimně být víc).
+        if (kind === 'stroj') {
+          let existing = (await resolveAsset(tenantId, String(input.name), cache)).match;
+          if (!existing && input?.code) existing = (await resolveAsset(tenantId, String(input.code), cache)).match;
+          if (existing && isDeviceA(existing)) {
+            return `ℹ️ Tohle zařízení už v Kartotéce je: ${existing.name}${existing.code ? ` (${existing.code})` : ''}. Nezakládám znovu — otevři jeho kartu, nebo mi řekni, že je to jiný stroj.`;
+          }
+        }
+        // Umístění (budova/místnost → buildingId + areaName + parentId).
+        let place: PlaceResult = { label: '(bez umístění)' };
+        if (kind === 'budova') {
+          const code = String(input?.code ?? input?.name ?? '').trim();
+          const m = code.match(/\b([a-lA-L])\b/);
+          place = m ? { buildingId: m[1].toUpperCase(), parentId: null, label: `Budova ${m[1].toUpperCase()}` } : { parentId: null, label: '(nová budova)' };
+        } else {
+          const all = await getAssets(tenantId, cache);
+          place = resolvePlacement(all, input?.building, kind === 'mistnost' ? undefined : input?.room);
         }
         const year = typeof input?.year === 'number' ? input.year : Number(input?.year);
         const extra = [input?.code, input?.manufacturer, input?.model].filter(Boolean).join(' · ');
-        const summary = `Založit nový stroj do Kartotéky:\n${input.name}${extra ? `\n${extra}` : ''}${input?.serialNumber ? `\nVýr. č.: ${input.serialNumber}` : ''}`;
+        const placeLine = place.label && place.label !== '(bez umístění)' && place.label !== '(nová budova)' ? `\nUmístění: ${place.label}` : '';
+        const summary = `Založit ${kindLabel} do Kartotéky:\n${input.name}${extra ? `\n${extra}` : ''}${input?.serialNumber ? `\nVýr. č.: ${input.serialNumber}` : ''}${placeLine}${place.note ? `\n⚠️ ${place.note}` : ''}`;
         ctx.pending?.push({
           type: 'create_asset', summary,
           name: String(input.name),
+          entityType,
           code: input?.code ? String(input.code) : undefined,
           category: input?.category ? String(input.category) : undefined,
           location: input?.location ? String(input.location) : undefined,
@@ -1101,8 +1229,55 @@ async function runTool(name: string, input: any, ctx: { tenantId: string; actor:
           serialNumber: input?.serialNumber ? String(input.serialNumber) : undefined,
           year: Number.isFinite(year) ? year : undefined,
           notes: input?.notes ? String(input.notes) : undefined,
+          buildingId: place.buildingId,
+          areaName: place.areaName,
+          parentId: place.parentId,
+          placeLabel: place.label,
         });
         return `NÁVRH připraven k potvrzení: ${summary}. Krátce uživateli řekni, co založíš, a nech ho potvrdit.`;
+      }
+      case 'move_asset': {
+        if (!roleCan(role, 'asset.update')) return NO_PERM_MSG;
+        if (!input?.asset) return 'Chybí, kterou položku přesunout.';
+        if (!input?.building && !input?.room) return 'Chybí cíl přesunu — řekni budovu (A–L nebo název) a/nebo místnost.';
+        const r = await resolveForWrite(tenantId, String(input.asset), cache);
+        if (r.block) return r.block;
+        if (!r.assetId) return `Položku „${input.asset}" jsem v Kartotéce nenašel — bez ní přesun nejde. Zkus přesný název nebo kód.`;
+        const all = await getAssets(tenantId, cache);
+        const place = resolvePlacement(all, input?.building, input?.room);
+        if (!place.buildingId && !place.areaName) return 'Cíl přesunu se mi nepodařilo přiřadit k budově/místnosti. Řekni budovu (A–L nebo název) nebo přesný název místnosti.';
+        const cur = all.find((a) => a.id === r.assetId);
+        const from = cur ? locationLabel(cur, all) : '';
+        const summary = `Přesunout ${r.assetName}:\n${from ? `${from} → ` : ''}${place.label}${place.note ? `\n⚠️ ${place.note}` : ''}`;
+        ctx.pending?.push({ type: 'move_asset', summary, assetId: r.assetId, assetName: r.assetName, buildingId: place.buildingId, areaName: place.areaName, parentId: place.parentId, placeLabel: place.label });
+        return `NÁVRH připraven k potvrzení: ${summary}. Krátce to řekni uživateli a nech ho potvrdit.`;
+      }
+      case 'update_asset': {
+        if (!roleCan(role, 'asset.update')) return NO_PERM_MSG;
+        if (!input?.asset) return 'Chybí, kterou položku upravit.';
+        const r = await resolveForWrite(tenantId, String(input.asset), cache);
+        if (r.block) return r.block;
+        if (!r.assetId) return `Položku „${input.asset}" jsem v Kartotéce nenašel — bez ní úpravu nejde udělat. Zkus přesný název nebo kód.`;
+        const fields: Record<string, unknown> = {};
+        const changed: string[] = [];
+        const setF = (key: string, label: string, val: any, isNum = false) => {
+          if (val === undefined || val === null || String(val).trim() === '') return;
+          const v = isNum ? Number(val) : String(val).trim();
+          if (isNum && !Number.isFinite(v as number)) return;
+          fields[key] = v; changed.push(`${label}: ${v}`);
+        };
+        setF('name', 'Název', input?.name);
+        setF('code', 'Kód', input?.code);
+        setF('category', 'Kategorie', input?.category);
+        setF('manufacturer', 'Výrobce', input?.manufacturer);
+        setF('model', 'Model', input?.model);
+        setF('serialNumber', 'Výr. číslo', input?.serialNumber);
+        setF('year', 'Rok', input?.year, true);
+        setF('notes', 'Poznámka', input?.notes);
+        if (!changed.length) return 'Neřekl jsi, co se má změnit. Uveď např. nový název, výrobce, kód…';
+        const summary = `Upravit ${r.assetName}:\n${changed.join('\n')}`;
+        ctx.pending?.push({ type: 'update_asset', summary, assetId: r.assetId, assetName: r.assetName, fields });
+        return `NÁVRH připraven k potvrzení: ${summary}. Krátce to řekni uživateli a nech ho potvrdit.`;
       }
       case 'set_machine_status': {
         if (!roleCan(role, 'asset.update')) return NO_PERM_MSG;
@@ -1189,7 +1364,12 @@ JAK ODPOVÍDAT:
 - ZAKLÁDÁNÍ KARTOTÉKY (hlavně nová firma): Když uživatel popisuje uspořádání firmy — budovy/haly, místnosti/úseky a stroje v nich — použij create_asset_tree a založ CELOU strukturu najednou (rozklíčuj do budov → místností → strojů). Chybějící detaily (kódy, výrobce) nech prázdné, neptej se na drobnosti; doptej se jen když je struktura nejasná. (Smí to jen vedení.)
 - Když si všimneš opakujícího se problému nebo příležitosti ke zlepšení (často se kazící stroj, propadlé termíny), stručně NAVRHNI zlepšení.
 ${canWrite
-    ? `- Umíš i AKCE: zápis do Deníku (log_work), založení úkolu (create_task), založení stroje (create_asset), změna stavu stroje (set_machine_status), uzavření úkolu (close_task). Použij je JEN když to uživatel jasně chce (např. „zapiš že jsme vyměnili ložisko na EXT-001", „extruder je v poruše", „úkol WO-2026-12 je hotový"). DŮLEŽITÉ: tyhle akce se NEprovedou hned — připraví se jako NÁVRH a uživatel je potvrdí tlačítkem Ano/Ne (ukáže se samo). Proto NEHLAŠ „zapsáno/hotovo" dopředu; jen KRÁTCE řekni, co chystáš, a nech potvrdit. Stejný nástroj nevolej dvakrát.`
+    ? `- Umíš i AKCE: zápis do Deníku (log_work), založení úkolu (create_task), uzavření úkolu (close_task), změna stavu stroje (set_machine_status) a hlavně SPRÁVA KARTOTÉKY — založení položky (create_asset), přesun (move_asset), úprava údajů (update_asset), hromadné založení struktury (create_asset_tree). Použij je JEN když to uživatel jasně chce (např. „zapiš že jsme vyměnili ložisko na EXT-001", „extruder je v poruše", „úkol WO-2026-12 je hotový", „přesuň Extruder 3 do míchárny", „u pece doplň výrobce"). DŮLEŽITÉ: tyhle akce se NEprovedou hned — připraví se jako NÁVRH a uživatel je potvrdí tlačítkem Ano/Ne (ukáže se samo). Proto NEHLAŠ „zapsáno/hotovo" dopředu; jen KRÁTCE řekni, co chystáš, a nech potvrdit. Stejný nástroj nevolej dvakrát.
+- SPRÁVA KARTOTÉKY PŘES CHAT (důležité, uživatel chce vést kartotéku přes tebe): rozuměj hierarchii BUDOVA → MÍSTNOST → STROJ a hledej v ní logiku.
+   • Zakládání: create_asset s „type" (stroj/mistnost/budova). Umístění řekni přes „building" (písmeno A–L nebo název, např. „Výrobní hala") a u stroje i „room" (název místnosti) — položka se sama propojí pod správnou budovu/místnost. Když uživatel popisuje celé uspořádání firmy naráz, použij radši create_asset_tree.
+   • Přesun (když je něco zapsané špatně / patří jinam): move_asset — zadej „asset" (co) a cíl „building" a/nebo „room".
+   • Úprava rodného listu (název, kód, výrobce, model, sériové číslo, rok, kategorie): update_asset — měň JEN pole, která uživatel zmíní.
+   • Když neznáš budovu/místnost přesně, zeptej se; nezakládej duplicitní stroj (nejdřív ověř find_asset). Pro změnu STAVU stroje použij set_machine_status, ne update_asset.`
     : `- Tvoje role je jen pro čtení — akce/zápisy nedělej, jen poraď a ukaž data.`}${teachLine}
 
 KONTEXT SYSTÉMU:
@@ -1435,14 +1615,44 @@ export const assistantConfirmAction = functions
           break;
         }
         case 'create_asset': {
-          if (!a.name) throw new functions.https.HttpsError('invalid-argument', 'Chybí název zařízení.');
+          if (!a.name) throw new functions.https.HttpsError('invalid-argument', 'Chybí název položky.');
+          // parentId (nadřazená budova/místnost) musí patřit do firmy — jinak neprovazuj.
+          let parentId: string | null | undefined = a.parentId ?? null;
+          if (parentId && !(await getAssetById(tenantId, parentId))) parentId = null;
           targetId = await createAssetEntry(tenantId, actor, {
-            name: String(a.name), code: a.code, category: a.category, location: a.location,
+            name: String(a.name), entityType: a.entityType, code: a.code, category: a.category, location: a.location,
             manufacturer: a.manufacturer, model: a.model, serialNumber: a.serialNumber,
             year: typeof a.year === 'number' ? a.year : undefined, notes: a.notes,
+            buildingId: a.buildingId, areaName: a.areaName, parentId,
           });
           const extra = [a.code, a.manufacturer, a.model].filter(Boolean).join(' · ');
-          reply = `✅ Zařízení založeno — ${a.name}${extra ? ` (${extra})` : ''}. Najdeš ho v Kartotéce.`;
+          const placeTxt = a.placeLabel && a.placeLabel !== '(bez umístění)' && a.placeLabel !== '(nová budova)' ? ` · ${a.placeLabel}` : '';
+          reply = `✅ Založeno — ${a.name}${extra ? ` (${extra})` : ''}${placeTxt}. Najdeš to v Kartotéce.`;
+          break;
+        }
+        case 'move_asset': {
+          if (!a.assetId) throw new functions.https.HttpsError('invalid-argument', 'Chybí položka k přesunu.');
+          const target = await getAssetById(tenantId, String(a.assetId));
+          if (!target) throw new functions.https.HttpsError('permission-denied', 'Tahle položka nepatří tvojí firmě nebo neexistuje.');
+          let parentId: string | null | undefined = a.parentId ?? null;
+          if (parentId && !(await getAssetById(tenantId, parentId))) parentId = null;
+          await moveAssetEntry(String(a.assetId), { buildingId: a.buildingId, areaName: a.areaName, parentId, label: a.placeLabel ?? '' }, actor);
+          reply = `✅ Přesunuto — ${a.assetName ?? target.name ?? 'položka'} → ${a.placeLabel ?? 'nové umístění'}`;
+          targetId = String(a.assetId);
+          break;
+        }
+        case 'update_asset': {
+          if (!a.assetId || !a.fields || !Object.keys(a.fields).length) throw new functions.https.HttpsError('invalid-argument', 'Chybí položka nebo změny.');
+          const target = await getAssetById(tenantId, String(a.assetId));
+          if (!target) throw new functions.https.HttpsError('permission-denied', 'Tahle položka nepatří tvojí firmě nebo neexistuje.');
+          // Bezpečná bílá listina editovatelných polí.
+          const ALLOWED = new Set(['name', 'code', 'category', 'manufacturer', 'model', 'serialNumber', 'year', 'notes']);
+          const clean: Record<string, unknown> = {};
+          for (const [k, v] of Object.entries(a.fields)) if (ALLOWED.has(k)) clean[k] = v;
+          if (!Object.keys(clean).length) throw new functions.https.HttpsError('invalid-argument', 'Žádná platná změna.');
+          await updateAssetFields(String(a.assetId), clean, actor);
+          reply = `✅ Upraveno — ${a.assetName ?? target.name ?? 'položka'}. Změny najdeš v rodném listu.`;
+          targetId = String(a.assetId);
           break;
         }
         case 'set_machine_status': {

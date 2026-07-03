@@ -68,13 +68,21 @@ export const STATUS_CONFIG: Record<VehicleStatus, { label: string; color: string
 // ═══════════════════════════════════════════
 
 export function useFleet() {
-  const { user } = useAuthContext();
+  const { user, hasAnyPermission } = useAuthContext();
   const [vehicles, setVehicles] = useState<FleetVehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Zrcadlí firestore.rules match /fleet — bez oprávnění by odběr skončil permission-denied
+  const canRead = hasAnyPermission(['fleet.read', 'fleet.manage']);
+
   // Realtime listener
   useEffect(() => {
+    if (!canRead) {
+      setVehicles([]);
+      setLoading(false);
+      return;
+    }
     const unsub = onSnapshot(
       collection(db, 'fleet'),
       (snap) => {
@@ -92,7 +100,7 @@ export function useFleet() {
       }
     );
     return () => unsub();
-  }, []);
+  }, [canRead]);
 
   // Aktualizovat Mth/Km
   const updateCounter = useCallback(
