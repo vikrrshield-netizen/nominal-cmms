@@ -12,7 +12,7 @@ import {
   ClipboardCheck, Cog, LayoutGrid, ListTree, ArrowUp, ArrowDown,
   ChevronsUp, ChevronsDown, GripVertical,
   Archive, Layers, CheckCircle2, Wrench, Pause, AlertTriangle, List, SlidersHorizontal, HelpCircle,
-  CheckSquare, Square, FolderInput,
+  CheckSquare, Square, FolderInput, Stethoscope, Info,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { db } from '../lib/firebase';
@@ -593,7 +593,13 @@ function RootCard({ asset, allAssets, expanded, onToggle, onDetail, onAddChild, 
             className="flex min-w-0 flex-1 items-center gap-2 text-left"
           >
             {hasChildren && (
-              <span className="shrink-0 text-slate-400">
+              <span
+                className="shrink-0 text-slate-400"
+                onClick={(e) => {
+                  // V režimu výběru klik na jméno vybírá — šipka ale musí pořád umět rozbalit větev.
+                  if (selectable) { e.stopPropagation(); onToggle(asset.id); }
+                }}
+              >
                 {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
               </span>
             )}
@@ -812,6 +818,7 @@ export default function KartotekaPage() {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [moveSheetOpen, setMoveSheetOpen] = useState(false);
+  const [checkOpen, setCheckOpen] = useState(false); // 🩺 kontrola kartotéky
   const [bulkBuilding, setBulkBuilding] = useState('');
   const [bulkRoomKey, setBulkRoomKey] = useState(''); // id uzlu místnosti ve stromu (reálná i virtuální)
   const [bulkDeviceId, setBulkDeviceId] = useState(''); // volitelně: zařadit pod existující stroj
@@ -1425,6 +1432,88 @@ export default function KartotekaPage() {
     return Array.from(map.entries()).sort((x, y) => x[0].localeCompare(y[0], 'cs'));
   }, [treeAssets]);
 
+  // 🩺 Kontrola kartotéky: projede všechny položky a najde nesrovnalosti v datech.
+  // Počítá se až po otevření panelu (checkOpen) — jinak zbytečná práce při každém renderu.
+  const healthReport = useMemo(() => {
+    if (!checkOpen) return null;
+    type HealthIssue = { level: 'err' | 'warn' | 'info'; text: string; asset?: Asset };
+    const issues: HealthIssue[] = [];
+    const byId = new Map(assets.map((a) => [a.id, a]));
+    // Budova položky po řetězu SKUTEČNÝCH rodičů (bez vlastního buildingId).
+    const chainBuilding = (a: Asset): string => {
+      let cur: Asset | undefined = a;
+      const seen = new Set<string>();
+      while (cur) {
+        if (cur.id !== a.id) {
+          const bid = safeText(cur.buildingId).trim().toUpperCase();
+          if (bid) return bid;
+        }
+        const pid = cur.parentId ?? undefined;
+        if (!pid || seen.has(pid)) return '';
+        seen.add(pid);
+        cur = byId.get(pid);
+      }
+      return '';
+    };
+    for (const a of assets) {
+      const name = safeText(a.name) || 'Bez názvu';
+      if (a.parentId && !byId.has(a.parentId)) {
+        issues.push({ level: 'err', text: `${name} — ukazuje na smazanou/neexistující nadřazenou položku`, asset: a });
+      }
+      let pid = a.parentId ?? undefined;
+      const seen = new Set<string>([a.id]);
+      let cycle = false;
+      while (pid) {
+        if (seen.has(pid)) { cycle = true; break; }
+        seen.add(pid);
+        pid = byId.get(pid)?.parentId ?? undefined;
+      }
+      if (cycle) issues.push({ level: 'err', text: `${name} — smyčka ve stromu (položka je nadřazená sama sobě)`, asset: a });
+      const own = safeText(a.buildingId).trim().toUpperCase();
+      const viaChain = chainBuilding(a);
+      if (own && viaChain && own !== viaChain && !cycle) {
+        issues.push({ level: 'err', text: `${name} — v kolonce budova ${own}, ale ve stromu je pod budovou ${viaChain}`, asset: a });
+      }
+      if (isRoomAsset(a) && !own && !viaChain) {
+        issues.push({ level: 'warn', text: `${name} — místnost bez budovy`, asset: a });
+      }
+      if (!isRoomAsset(a) && !isBuildingAsset(a)) {
+        const ar = safeText(a.areaName).trim();
+        if (ar && !assets.some((r) => isRoomAsset(r) && normalizeText(safeText(r.name)) === normalizeText(ar))) {
+          issues.push({ level: 'info', text: `${name} — místnost „${ar}" je jen text, neexistuje jako karta`, asset: a });
+        }
+      }
+    }
+    // Duplicitní stroje (stejný název / stejný kód).
+    const devs = assets.filter((a) => !isBuildingAsset(a) && !isRoomAsset(a));
+    const byName = new Map<string, Asset[]>();
+    const byCode = new Map<string, Asset[]>();
+    for (const d of devs) {
+      const nk = normalizeText(safeText(d.name));
+      if (nk) { const arr = byName.get(nk) || []; arr.push(d); byName.set(nk, arr); }
+      const ck = normalizeText(safeText(d.code));
+      if (ck) { const arr = byCode.get(ck) || []; arr.push(d); byCode.set(ck, arr); }
+    }
+    for (const arr of byName.values()) {
+      if (arr.length > 1) issues.push({ level: 'warn', text: `Duplicitní název: ${safeText(arr[0].name)} (${arr.length}×)`, asset: arr[0] });
+    }
+    for (const arr of byCode.values()) {
+      if (arr.length > 1) issues.push({ level: 'warn', text: `Duplicitní kód ${safeText(arr[0].code)} (${arr.length}×)`, asset: arr[0] });
+    }
+    if (unassignedIds.size > 0) {
+      issues.push({ level: 'warn', text: `${unassignedIds.size}× stroj bez budovy — klepni a ukážu je` });
+    }
+    const noCode = devs.filter((d) => !safeText(d.code).trim()).length;
+    if (noCode > 0) issues.push({ level: 'info', text: `${noCode}× stroj bez kódu (nepovinné, ale pomáhá hledání)` });
+    const order = { err: 0, warn: 1, info: 2 } as const;
+    issues.sort((x, y) => order[x.level] - order[y.level]);
+    return {
+      issues,
+      errs: issues.filter((i) => i.level === 'err').length,
+      warns: issues.filter((i) => i.level === 'warn').length,
+    };
+  }, [checkOpen, assets, unassignedIds]);
+
   // Nabídka EXISTUJÍCÍCH místností pro hromadný přesun (jen ze zvolené budovy).
   // Hodnota = id uzlu ve stromu → u reálné místnosti známe rovnou parentId, žádné hádání podle názvu.
   const bulkRoomChoices = useMemo(() => {
@@ -1853,6 +1942,10 @@ export default function KartotekaPage() {
             </h1>
             <p className="truncate text-sm font-semibold text-slate-600">Strom budov, místností a strojů</p>
           </div>
+          <button onClick={() => setCheckOpen(true)} className="vik-button" title="Kontrola kartotéky — najde nesrovnalosti v datech" aria-label="Kontrola kartotéky">
+            <Stethoscope size={16} />
+            <span className="hidden sm:inline">Kontrola</span>
+          </button>
           <button onClick={() => setShowImport(true)} className="vik-button">
             <Upload size={16} />
             <span className="hidden sm:inline">Import</span>
@@ -2256,6 +2349,49 @@ export default function KartotekaPage() {
             </div>
           )}
         </div>
+      )}
+
+      {/* ── 🩺 Kontrola kartotéky ── */}
+      {checkOpen && healthReport && (
+        <BottomSheet title="Kontrola kartotéky" isOpen onClose={() => setCheckOpen(false)}>
+          <div className="space-y-2 p-1">
+            {healthReport.issues.length === 0 ? (
+              <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm font-bold text-emerald-800">
+                <CheckCircle2 size={18} className="shrink-0" /> Vše v pořádku — kartotéka šlape jak hodinky.
+              </div>
+            ) : (
+              <>
+                <p className="text-[13px] leading-relaxed text-slate-600">
+                  {healthReport.errs > 0 ? `${healthReport.errs}× chyba` : ''}{healthReport.errs > 0 && healthReport.warns > 0 ? ' · ' : ''}{healthReport.warns > 0 ? `${healthReport.warns}× varování` : ''}
+                  {healthReport.errs + healthReport.warns > 0 ? ' — klepni na řádek a oprav to na kartě.' : 'Jen drobnosti pro info.'}
+                </p>
+                {healthReport.issues.map((iss, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => {
+                      setCheckOpen(false);
+                      if (iss.asset) handleDetail(iss.asset as DisplayAsset);
+                      else { setFilter('unassigned'); setBuildingFilter('all'); setTypeFilter('all'); }
+                    }}
+                    className={`flex w-full items-start gap-2 rounded-xl border px-3 py-2.5 text-left text-[13px] font-semibold transition active:scale-[0.99] ${
+                      iss.level === 'err'
+                        ? 'border-red-200 bg-red-50 text-red-900'
+                        : iss.level === 'warn'
+                          ? 'border-amber-200 bg-amber-50 text-amber-900'
+                          : 'border-slate-200 bg-white text-slate-600'
+                    }`}
+                  >
+                    {iss.level === 'info'
+                      ? <Info size={16} className="mt-0.5 shrink-0 text-slate-400" />
+                      : <AlertTriangle size={16} className={`mt-0.5 shrink-0 ${iss.level === 'err' ? 'text-red-600' : 'text-amber-600'}`} />}
+                    <span className="min-w-0 flex-1">{iss.text}</span>
+                  </button>
+                ))}
+              </>
+            )}
+          </div>
+        </BottomSheet>
       )}
 
       {/* ── Plovoucí panel hromadného výběru ── */}
