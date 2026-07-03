@@ -9,7 +9,7 @@
 // Identita: zápisy se ukládají pod přihlášeného uživatele (uid + jméno z users/{uid}),
 // ne pod klienta. Majitel (read-only) zápisové nástroje nedostane.
 
-import * as functions from 'firebase-functions';
+import * as functions from 'firebase-functions/v1'; // gen1 API (v6 default je v2 — viz auth.ts)
 import * as admin from 'firebase-admin';
 import Anthropic from '@anthropic-ai/sdk';
 

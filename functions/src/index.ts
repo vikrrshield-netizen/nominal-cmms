@@ -1,7 +1,7 @@
 // functions/src/index.ts
 // VIKRR — Asset Shield — Cloud Functions: Task stats aggregation
 
-import * as functions from 'firebase-functions';
+import * as functions from 'firebase-functions/v1'; // gen1 API (v6 default je v2 — viz auth.ts)
 import * as admin from 'firebase-admin';
 
 admin.initializeApp();

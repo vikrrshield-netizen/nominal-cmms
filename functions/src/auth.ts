@@ -1,4 +1,6 @@
-import * as functions from 'firebase-functions';
+// POZOR: od firebase-functions v6 je výchozí export v2 API — gen1 funkce MUSÍ importovat z '/v1',
+// jinak by se při deployi změnil typ funkcí (jiné chování callable, jiné URL) a rozbil klient.
+import * as functions from 'firebase-functions/v1';
 import * as admin from 'firebase-admin';
 import * as crypto from 'crypto';
 
