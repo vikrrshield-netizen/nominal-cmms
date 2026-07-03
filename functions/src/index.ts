@@ -24,6 +24,9 @@ export {
 // + týdenní AI souhrn (plánovaná funkce)
 export { assistantChat, assistantConfirmAction, assistantBriefing, assistantFacts, weeklyAiSummary, monthlyExecReport } from './assistant';
 
+// Preventivní údržba — denně ráno založí úkoly z propadlých periodických termínů v Kartotéce
+export { generatePreventiveTasks } from './preventive';
+
 const OPEN_TASK_STATUSES = new Set(['backlog', 'planned', 'in_progress', 'paused']);
 const PUSH_TARGET_ROLES = new Set(['SUPERADMIN', 'VEDENI', 'UDRZBA']);
 const GEARBOX_NOTIFICATION_ROLES = new Set(['SUPERADMIN', 'VEDENI', 'UDRZBA', 'VYROBA']);
