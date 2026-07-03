@@ -1,0 +1,17 @@
+{
+  "name": "PROVOZ 360 — Nominal",
+  "short_name": "PROVOZ 360",
+  "description": "Údržba a provoz výroby — úkoly, kartotéka strojů, revize, sklad ND.",
+  "lang": "cs",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f1ece3",
+  "theme_color": "#f1ece3",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
