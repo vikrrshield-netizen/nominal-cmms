@@ -28,8 +28,9 @@ export default function BottomNav() {
     item.permissions.length === 0 || item.permissions.some((permission) => hasPermission(permission))
   ));
 
+  // Kompaktní: jedna vrstva odsazení; terč = celý Link (≥48px), ne vnitřní paddingy.
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-2 py-2 flex justify-around items-center z-50" style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom))' }}>
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-2 pt-1 flex justify-around items-center z-50" style={{ paddingBottom: 'calc(0.25rem + env(safe-area-inset-bottom))' }}>
       {visibleItems.map((item) => {
         const Icon = item.icon;
         const isActive = item.path === '/'
@@ -40,13 +41,13 @@ export default function BottomNav() {
           <Link
             key={item.path}
             to={item.path}
-            className={`flex flex-col items-center px-3 py-1.5 rounded-xl transition-all min-w-[56px] ${
+            className={`flex min-h-[48px] flex-col items-center justify-center px-3 py-1 rounded-xl transition-all min-w-[56px] ${
               isActive
                 ? 'text-emerald-700'
                 : 'text-slate-400 hover:text-slate-600'
             }`}
           >
-            <div className={`p-1.5 rounded-lg transition-all ${
+            <div className={`px-2 py-0.5 rounded-lg transition-all ${
               isActive ? 'bg-emerald-50' : ''
             }`}>
               <Icon size={20} strokeWidth={isActive ? 2.5 : 1.8} />
