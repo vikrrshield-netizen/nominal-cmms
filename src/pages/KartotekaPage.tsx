@@ -12,7 +12,7 @@ import {
   ClipboardCheck, Cog, LayoutGrid, ListTree, ArrowUp, ArrowDown,
   ChevronsUp, ChevronsDown, GripVertical,
   Archive, Layers, CheckCircle2, Wrench, Pause, AlertTriangle, List, SlidersHorizontal, HelpCircle,
-  CheckSquare, Square, FolderInput, Stethoscope, Info,
+  CheckSquare, Square, FolderInput, Stethoscope, Info, MoreHorizontal,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { db } from '../lib/firebase';
@@ -45,23 +45,11 @@ const STATUS_DOT: Record<string, string> = {
   stopped:     'bg-slate-400',
 };
 
-// ── Entity type → color mapping (for root cards) — klidná paleta ─────────────────
-const ENTITY_COLORS: Record<string, string> = {
-  'Budova':    '#1a6b4f',
-  'Areál':     '#3d4a43',
-  'Hala':      '#2f77b5',
-  'Linka':     '#1f7355',
-  'Dílna':     '#5c6b61',
-  'Sklad':     '#d07e1e',
-  'Kancelář':  '#7047a4',
-};
+// Jedna klidná barva pro ikony kontejnerů (audit: barvu nese STAV, ne typ položky).
+const TILE_ICON_STYLE = { background: '#e7f3ee', color: '#1a6b4f' } as const;
 
 function safeText(value: unknown): string {
   return typeof value === 'string' ? value : '';
-}
-
-function getEntityColor(entityType: string | undefined): string {
-  return ENTITY_COLORS[entityType || ''] || '#2f77b5';
 }
 
 // ── Helpers ──────────────────────────────────────────────────────
@@ -387,16 +375,14 @@ interface TreeNodeProps {
   expanded: Set<string>;
   onToggle: (id: string) => void;
   onDetail: (asset: DisplayAsset) => void;
-  onAddChild: (parentId: string) => void;
-  onDelete: (asset: DisplayAsset) => void;
-  canCreateAsset: boolean;
+  onMore: (asset: DisplayAsset) => void;
   visited?: Set<string>;
   selectMode?: boolean;
   selectedIds?: Set<string>;
   onToggleSelect?: (asset: DisplayAsset) => void;
 }
 
-function TreeNode({ asset, allAssets, depth, expanded, onToggle, onDetail, onAddChild, onDelete, canCreateAsset, visited, selectMode, selectedIds, onToggleSelect }: TreeNodeProps) {
+function TreeNode({ asset, allAssets, depth, expanded, onToggle, onDetail, onMore, visited, selectMode, selectedIds, onToggleSelect }: TreeNodeProps) {
   const currentPath = new Set(visited);
   currentPath.add(asset.id);
   const children = allAssets
@@ -412,89 +398,68 @@ function TreeNode({ asset, allAssets, depth, expanded, onToggle, onDetail, onAdd
   return (
     <div className={`k-tree-node ${asset.virtualKind ? `is-${asset.virtualKind}` : 'is-asset'}`}>
       <div
-        className={`flex items-center gap-2 rounded-xl border px-2 py-1.5 cursor-pointer transition ${isSelected ? 'border-emerald-300 bg-emerald-50/70' : 'border-transparent hover:border-emerald-200 hover:bg-[#fbf9f4]'}`}
+        className={`flex min-h-[48px] items-center gap-2 rounded-xl border px-2 cursor-pointer transition ${isSelected ? 'border-emerald-300 bg-emerald-50/70' : 'border-[#eee9df] bg-white hover:border-emerald-300'}`}
         style={{ marginLeft: `${depth * 18}px` }}
         onClick={() => selectable ? onToggleSelect!(asset) : (hasChildren ? onToggle(asset.id) : onDetail(asset))}
       >
         {selectMode && (
           selectable ? (
             <button
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-emerald-700"
+              className="flex h-11 w-8 shrink-0 items-center justify-center rounded-md text-emerald-700"
               onClick={(e) => { e.stopPropagation(); onToggleSelect!(asset); }}
               aria-label={isSelected ? 'Odebrat z výběru' : 'Vybrat'}
             >
               {isSelected ? <CheckSquare size={18} /> : <Square size={18} className="text-slate-300" />}
             </button>
           ) : (
-            <span className="h-7 w-7 shrink-0" />
+            <span className="h-11 w-8 shrink-0" />
           )
         )}
         {hasChildren ? (
           <button
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100"
+            className="flex h-11 w-8 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100"
             onClick={(e) => { e.stopPropagation(); onToggle(asset.id); }}
             aria-label={isExpanded ? 'Sbalit' : 'Rozbalit'}
           >
-            {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+            {isExpanded ? <ChevronDown size={17} /> : <ChevronRight size={17} />}
           </button>
         ) : (
-          <span className="h-6 w-6 shrink-0" />
+          <span className="h-11 w-3 shrink-0" />
         )}
 
         <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: statusColor }} />
 
         <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-slate-800">
           {safeText(asset.name) || 'Bez názvu'}
-        </span>
-
-        <span className="hidden shrink-0 items-center gap-2 text-[11px] font-semibold text-slate-500 sm:flex">
-          <span className="font-mono">{desc.total}</span>
-          {desc.operational > 0 && (
-            <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /><span className="font-mono">{desc.operational}</span></span>
-          )}
-          {desc.maintenance > 0 && (
-            <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-amber-500" /><span className="font-mono">{desc.maintenance}</span></span>
-          )}
-          {desc.broken > 0 && (
-            <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-red-500" /><span className="font-mono">{desc.broken}</span></span>
-          )}
-          {desc.stopped > 0 && (
-            <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-slate-400" /><span className="font-mono">{desc.stopped}</span></span>
+          {!hasChildren && asset.code && (
+            <span className="ml-1.5 font-mono text-[12px] font-normal text-slate-400">{asset.code}</span>
           )}
         </span>
 
+        {hasChildren && desc.broken > 0 && (
+          <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-800">{desc.broken}× porucha</span>
+        )}
+        {hasChildren && desc.maintenance > 0 && (
+          <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">{desc.maintenance}× údržba</span>
+        )}
         {hasChildren && (
-          <span className="shrink-0 rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] font-bold text-slate-600">{children.length}</span>
+          <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">{desc.total} pol.</span>
+        )}
+        {!hasChildren && (asset.status === 'broken' || asset.status === 'maintenance' || asset.status === 'stopped') && (
+          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${asset.status === 'broken' ? 'bg-red-100 text-red-800' : asset.status === 'maintenance' ? 'bg-amber-100 text-amber-800' : 'bg-slate-200 text-slate-700'}`}>
+            {ASSET_STATUS_CONFIG[asset.status as AssetStatus]?.label || asset.status}
+          </span>
         )}
 
         <button
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-emerald-700 hover:bg-slate-50"
-          onClick={(e) => { e.stopPropagation(); onDetail(asset); }}
-          title="Otevřít rodný list"
-          aria-label="Rodný list"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
+          onClick={(e) => { e.stopPropagation(); onMore(asset); }}
+          title="Možnosti"
+          aria-label="Možnosti"
         >
-          <FileText size={15} />
+          <MoreHorizontal size={18} />
         </button>
-
-        {canCreateAsset && (
-          <button
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-sky-600 hover:bg-slate-50"
-            onClick={(e) => { e.stopPropagation(); onAddChild(asset.id); }}
-            title="Přidat potomka"
-            aria-label="Přidat"
-          >
-            <Plus size={15} />
-          </button>
-        )}
-
-        <button
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-red-600 hover:bg-red-50"
-          onClick={(e) => { e.stopPropagation(); onDelete(asset); }}
-          title="Smazat"
-          aria-label="Smazat"
-        >
-          <Trash2 size={15} />
-        </button>
+        {!hasChildren && <ChevronRight size={16} className="shrink-0 text-slate-300" />}
       </div>
 
       {isExpanded && hasChildren && (
@@ -508,9 +473,7 @@ function TreeNode({ asset, allAssets, depth, expanded, onToggle, onDetail, onAdd
               expanded={expanded}
               onToggle={onToggle}
               onDetail={onDetail}
-              onAddChild={onAddChild}
-              onDelete={onDelete}
-              canCreateAsset={canCreateAsset}
+              onMore={onMore}
               visited={currentPath}
               selectMode={selectMode}
               selectedIds={selectedIds}
@@ -532,16 +495,13 @@ interface RootCardProps {
   expanded: Set<string>;
   onToggle: (id: string) => void;
   onDetail: (asset: DisplayAsset) => void;
-  onAddChild: (parentId: string) => void;
-  onDelete: (asset: DisplayAsset) => void;
-  canCreateAsset: boolean;
+  onMore: (asset: DisplayAsset) => void;
   selectMode?: boolean;
   selectedIds?: Set<string>;
   onToggleSelect?: (asset: DisplayAsset) => void;
 }
 
-function RootCard({ asset, allAssets, expanded, onToggle, onDetail, onAddChild, onDelete, canCreateAsset, selectMode, selectedIds, onToggleSelect }: RootCardProps) {
-  const color = getEntityColor(asset.entityType);
+function RootCard({ asset, allAssets, expanded, onToggle, onDetail, onMore, selectMode, selectedIds, onToggleSelect }: RootCardProps) {
   const children = allAssets
     .filter((a) => a.parentId === asset.id)
     .sort((a, b) => safeText(a.name).localeCompare(safeText(b.name), 'cs'));
@@ -554,7 +514,7 @@ function RootCard({ asset, allAssets, expanded, onToggle, onDetail, onAddChild, 
 
   return (
     <div className={`k-root-wrapper ${isExpanded ? 'is-expanded' : ''}`}>
-      <div className={`vik-card overflow-hidden ${isSelected ? 'ring-2 ring-emerald-500/50' : ''}`} style={{ borderLeft: `4px solid ${color}` }}>
+      <div className={`vik-card overflow-hidden ${isSelected ? 'ring-2 ring-emerald-500/50' : ''}`}>
         <div className="flex items-center gap-3 p-3.5">
           {selectMode && (
             selectable ? (
@@ -573,7 +533,7 @@ function RootCard({ asset, allAssets, expanded, onToggle, onDetail, onAddChild, 
           <div className="relative shrink-0">
             <div
               className="flex h-11 w-11 items-center justify-center rounded-xl"
-              style={{ background: `${color}1f`, color }}
+              style={TILE_ICON_STYLE}
             >
               {rootIconLabel(asset)}
             </div>
@@ -610,55 +570,29 @@ function RootCard({ asset, allAssets, expanded, onToggle, onDetail, onAddChild, 
                   <span className="font-mono font-bold text-slate-400"> ({children.length})</span>
                 )}
               </span>
-              <span className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] font-semibold text-slate-500">
-                <span className="font-bold uppercase tracking-wide text-slate-400">{safeText(asset.entityType) || 'Položka'}</span>
+              <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] font-semibold text-slate-500">
+                <span>{safeText(asset.entityType) || 'Položka'}</span>
                 {asset.code && <span className="font-mono text-slate-400">{asset.code}</span>}
-                <span className="font-mono">{desc.total} pol.</span>
-                {desc.operational > 0 && (
-                  <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /><span className="font-mono">{desc.operational}</span></span>
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">{desc.total} pol.</span>
+                {desc.broken > 0 && (
+                  <span className="rounded-full bg-red-100 px-2 py-0.5 text-[11px] text-red-800">{desc.broken}× porucha</span>
                 )}
                 {desc.maintenance > 0 && (
-                  <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-amber-500" /><span className="font-mono">{desc.maintenance}</span></span>
-                )}
-                {desc.broken > 0 && (
-                  <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-red-500" /><span className="font-mono">{desc.broken}</span></span>
-                )}
-                {desc.stopped > 0 && (
-                  <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-slate-400" /><span className="font-mono">{desc.stopped}</span></span>
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] text-amber-800">{desc.maintenance}× údržba</span>
                 )}
               </span>
             </span>
           </button>
 
-          {/* Akce — vpravo (ikon-only) */}
-          <div className="flex shrink-0 items-center gap-2">
-            <button
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-[#f8f4ec] text-emerald-700 hover:bg-slate-50"
-              onClick={(e) => { e.stopPropagation(); onDetail(asset); }}
-              title="Otevřít rodný list"
-              aria-label="Rodný list"
-            >
-              <FileText size={16} />
-            </button>
-            {canCreateAsset && (
-              <button
-                className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-[#f8f4ec] text-sky-600 hover:bg-slate-50"
-                onClick={(e) => { e.stopPropagation(); onAddChild(asset.id); }}
-                title="Přidat potomka"
-                aria-label="Přidat"
-              >
-                <Plus size={16} />
-              </button>
-            )}
-            <button
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-[#f8f4ec] text-red-600 hover:bg-red-50"
-              onClick={(e) => { e.stopPropagation(); onDelete(asset); }}
-              title="Smazat"
-              aria-label="Smazat"
-            >
-              <Trash2 size={16} />
-            </button>
-          </div>
+          {/* Akce — jedno menu ⋯ (Rodný list / Přidat / Smazat jsou v něm) */}
+          <button
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100"
+            onClick={(e) => { e.stopPropagation(); onMore(asset); }}
+            title="Možnosti"
+            aria-label="Možnosti"
+          >
+            <MoreHorizontal size={19} />
+          </button>
         </div>
       </div>
 
@@ -674,9 +608,7 @@ function RootCard({ asset, allAssets, expanded, onToggle, onDetail, onAddChild, 
               expanded={expanded}
               onToggle={onToggle}
               onDetail={onDetail}
-              onAddChild={onAddChild}
-              onDelete={onDelete}
-              canCreateAsset={canCreateAsset}
+              onMore={onMore}
               visited={new Set([asset.id])}
               selectMode={selectMode}
               selectedIds={selectedIds}
@@ -696,16 +628,13 @@ interface TileCardProps {
   asset: DisplayAsset;
   allAssets: DisplayAsset[];
   onDetail: (asset: DisplayAsset) => void;
-  onAddChild: (parentId: string) => void;
-  onDelete: (asset: DisplayAsset) => void;
-  canCreateAsset: boolean;
+  onMore: (asset: DisplayAsset) => void;
   selectMode?: boolean;
   selectedIds?: Set<string>;
   onToggleSelect?: (asset: DisplayAsset) => void;
 }
 
-function TileCard({ asset, allAssets, onDetail, onAddChild, onDelete, canCreateAsset, selectMode, selectedIds, onToggleSelect }: TileCardProps) {
-  const color = getEntityColor(asset.entityType);
+function TileCard({ asset, allAssets, onDetail, onMore, selectMode, selectedIds, onToggleSelect }: TileCardProps) {
   const dotClass = STATUS_DOT[asset.status] || 'bg-slate-400';
   const selectable = !!selectMode && !!onToggleSelect && isSelectableAsset(asset);
   const isSelected = !!selectedIds?.has(asset.id);
@@ -721,8 +650,17 @@ function TileCard({ asset, allAssets, onDetail, onAddChild, onDelete, canCreateA
     .join(' · ');
 
   return (
-    <article className={`vik-card overflow-hidden ${isSelected ? 'ring-2 ring-emerald-500/50' : ''}`} style={{ borderLeft: `4px solid ${color}` }}>
-      <button type="button" className="flex w-full items-center gap-3 p-3 text-left" onClick={() => selectable ? onToggleSelect!(asset) : onDetail(asset)}>
+    <article className={`vik-card relative overflow-hidden ${isSelected ? 'ring-2 ring-emerald-500/50' : ''}`}>
+      <button
+        type="button"
+        className="absolute right-1.5 top-1.5 flex h-11 w-11 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100"
+        onClick={() => onMore(asset)}
+        title="Možnosti"
+        aria-label="Možnosti"
+      >
+        <MoreHorizontal size={18} />
+      </button>
+      <button type="button" className="flex w-full items-center gap-3 p-3 pr-14 text-left" onClick={() => selectable ? onToggleSelect!(asset) : onDetail(asset)}>
         {selectMode && (
           selectable ? (
             <span className="shrink-0 text-emerald-700">
@@ -735,46 +673,31 @@ function TileCard({ asset, allAssets, onDetail, onAddChild, onDelete, canCreateA
         <span className="relative shrink-0">
           <span
             className="flex h-11 w-11 items-center justify-center rounded-xl"
-            style={{ background: `${color}1f`, color }}
+            style={TILE_ICON_STYLE}
           >
             {rootIconLabel(asset)}
           </span>
           <span className={`absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-white ${dotClass}`} />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[15px] font-black text-slate-950">{safeText(asset.name) || 'Bez názvu'}</span>
-          <span className="block truncate text-[11px] font-bold uppercase tracking-wide text-slate-400">{safeText(asset.entityType) || 'Položka'} · {statusLabel}</span>
+          <span className="block truncate text-[15px] font-black text-slate-950">
+            {safeText(asset.name) || 'Bez názvu'}
+            {asset.code && <span className="ml-1.5 font-mono text-[12px] font-normal text-slate-400">{asset.code}</span>}
+          </span>
+          <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] font-semibold text-slate-500">
+            <span>{safeText(asset.entityType) || 'Položka'}</span>
+            {(asset.status === 'broken' || asset.status === 'maintenance' || asset.status === 'stopped') && (
+              <span className={`rounded-full px-2 py-0.5 text-[11px] ${asset.status === 'broken' ? 'bg-red-100 text-red-800' : asset.status === 'maintenance' ? 'bg-amber-100 text-amber-800' : 'bg-slate-200 text-slate-700'}`}>{statusLabel}</span>
+            )}
+            {desc.total > 0 && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">{desc.total} pol.</span>}
+            {desc.broken > 0 && <span className="rounded-full bg-red-100 px-2 py-0.5 text-[11px] text-red-800">{desc.broken}× porucha</span>}
+          </span>
         </span>
       </button>
 
-      <div className="space-y-0.5 px-3 pb-1 font-mono text-[11px] text-slate-400">
-        {asset.code && <div className="truncate">{asset.code}</div>}
+      <div className="space-y-0.5 px-3 pb-3 font-mono text-[11px] text-slate-400">
         {location && <div className="truncate">{location}</div>}
         {parentPath && <div className="truncate">{parentPath}</div>}
-      </div>
-
-      {desc.total > 0 && (
-        <div className="flex flex-wrap items-center gap-2 px-3 pb-2 text-[11px] font-semibold text-slate-500">
-          <span className="font-mono">{desc.total} pol.</span>
-          {desc.operational > 0 && <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /><span className="font-mono">{desc.operational}</span></span>}
-          {desc.maintenance > 0 && <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-amber-500" /><span className="font-mono">{desc.maintenance}</span></span>}
-          {desc.broken > 0 && <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-red-500" /><span className="font-mono">{desc.broken}</span></span>}
-          {desc.stopped > 0 && <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-slate-400" /><span className="font-mono">{desc.stopped}</span></span>}
-        </div>
-      )}
-
-      <div className="flex items-center gap-2 border-t border-slate-100 px-3 py-2">
-        <button type="button" className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white text-[13px] font-bold text-emerald-700 hover:bg-slate-50" onClick={() => onDetail(asset)}>
-          <FileText size={15} /> Rodný list
-        </button>
-        {canCreateAsset && (
-          <button type="button" className="flex h-8 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-sky-600 hover:bg-slate-50" onClick={() => onAddChild(asset.id)} aria-label="Přidat">
-            <Plus size={15} />
-          </button>
-        )}
-        <button type="button" className="flex h-8 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-red-600 hover:bg-red-50" onClick={() => onDelete(asset)} aria-label="Smazat">
-          <Trash2 size={15} />
-        </button>
       </div>
     </article>
   );
@@ -819,6 +742,7 @@ export default function KartotekaPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [moveSheetOpen, setMoveSheetOpen] = useState(false);
   const [checkOpen, setCheckOpen] = useState(false); // 🩺 kontrola kartotéky
+  const [actionTarget, setActionTarget] = useState<DisplayAsset | null>(null); // ⋯ menu položky
   const [bulkBuilding, setBulkBuilding] = useState('');
   const [bulkRoomKey, setBulkRoomKey] = useState(''); // id uzlu místnosti ve stromu (reálná i virtuální)
   const [bulkDeviceId, setBulkDeviceId] = useState(''); // volitelně: zařadit pod existující stroj
@@ -2301,9 +2225,7 @@ export default function KartotekaPage() {
                           asset={asset}
                           allAssets={visibleAssets}
                           onDetail={handleDetail}
-                          onAddChild={openCreateModal}
-                          onDelete={handleDelete}
-                          canCreateAsset={canCreateAsset}
+                          onMore={setActionTarget}
                         />
                       </div>
                     ))}
@@ -2319,9 +2241,7 @@ export default function KartotekaPage() {
                   asset={asset}
                   allAssets={visibleAssets}
                   onDetail={handleDetail}
-                  onAddChild={openCreateModal}
-                  onDelete={handleDelete}
-                  canCreateAsset={canCreateAsset}
+                  onMore={setActionTarget}
                   selectMode={selectMode}
                   selectedIds={selectedIds}
                   onToggleSelect={toggleSelect}
@@ -2338,9 +2258,7 @@ export default function KartotekaPage() {
                   expanded={expanded}
                   onToggle={handleToggle}
                   onDetail={handleDetail}
-                  onAddChild={openCreateModal}
-                  onDelete={handleDelete}
-                  canCreateAsset={canCreateAsset}
+                  onMore={setActionTarget}
                   selectMode={selectMode}
                   selectedIds={selectedIds}
                   onToggleSelect={toggleSelect}
@@ -2349,6 +2267,37 @@ export default function KartotekaPage() {
             </div>
           )}
         </div>
+      )}
+
+      {/* ── ⋯ Akce položky (Rodný list / Přidat / Smazat) ── */}
+      {actionTarget && (
+        <BottomSheet title={safeText(actionTarget.name) || 'Položka'} isOpen onClose={() => setActionTarget(null)}>
+          <div className="space-y-2 p-1">
+            <button
+              type="button"
+              className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-left text-[14px] font-bold text-slate-800 hover:bg-slate-50"
+              onClick={() => { const a = actionTarget; setActionTarget(null); handleDetail(a); }}
+            >
+              <FileText size={18} className="shrink-0 text-emerald-700" /> Otevřít rodný list
+            </button>
+            {canCreateAsset && (
+              <button
+                type="button"
+                className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-left text-[14px] font-bold text-slate-800 hover:bg-slate-50"
+                onClick={() => { const a = actionTarget; setActionTarget(null); openCreateModal(a.id); }}
+              >
+                <Plus size={18} className="shrink-0 text-sky-600" /> Přidat podřízenou položku
+              </button>
+            )}
+            <button
+              type="button"
+              className="flex w-full items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-left text-[14px] font-bold text-red-700 hover:bg-red-100"
+              onClick={() => { const a = actionTarget; setActionTarget(null); handleDelete(a); }}
+            >
+              <Trash2 size={18} className="shrink-0" /> Smazat
+            </button>
+          </div>
+        </BottomSheet>
       )}
 
       {/* ── 🩺 Kontrola kartotéky ── */}
