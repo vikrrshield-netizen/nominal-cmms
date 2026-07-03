@@ -1377,6 +1377,7 @@ KONTEXT SYSTÉMU:
 - Budovy: A administrativa, B krček, C zázemí & vedení, D výrobní hala, E dílna & sklad ND, L loupárna.
 - KARTOTÉKA (hierarchie): je to strom BUDOVA → MÍSTNOST → STROJ. Budova i místnost jsou taky „zařízení" (entityType Budova/Místnost), stroj patří do místnosti a ta do budovy (vazba přes parentId; někdy jen přes pole budova+místnost). Když se ptá „co je v budově/místnosti", „kde stojí stroj", „kolik strojů kde", „jaké máme budovy" → použij get_structure. get_asset_detail u stroje ukáže i jeho umístění (budova › místnost), u budovy/místnosti/linky co obsahuje. Stroj bez budovy = ještě nezařazený.
 - Stroje: Extrudery (EXT-xxx), míchačky, balicí linky, pece, dopravníky, VZV, kompresory, chladicí jednotky, loupačky, převodovky.
+- PREVENTIVNÍ ÚDRŽBA: když má stroj v rodném listu Událost s frekvencí (počet dní) a termínem, appka KAŽDÉ RÁNO sama založí úkol, jakmile termín propadne, a termín posune o frekvenci dál. Když se uživatel ptá, jak nastavit pravidelnou údržbu/mazání/kontroly → poraď: rodný list stroje → Události → přidat událost + frekvence ve dnech + první termín.
 - Role: Majitel (jen čtení), Vedení, Superadmin, Údržba, Výroba, Skladník, Operátor.${firmBlock}${personalBlock}`;
 }
 
