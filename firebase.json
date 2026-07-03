@@ -10,27 +10,17 @@
   "hosting": [
     {
       "target": "vikrr-asset-shield",
-      "public": "dist",
+      "public": "hosting-redirect",
       "ignore": [
         "firebase.json",
         "**/.*",
         "**/node_modules/**"
       ],
-      "rewrites": [
+      "redirects": [
         {
-          "source": "**",
-          "destination": "/index.html"
-        }
-      ],
-      "headers": [
-        {
-          "source": "**",
-          "headers": [
-            {
-              "key": "Cache-Control",
-              "value": "no-cache, no-store, must-revalidate"
-            }
-          ]
+          "source": "/:path*",
+          "destination": "https://app.vikrr.com/:path*",
+          "type": 301
         }
       ]
     },
