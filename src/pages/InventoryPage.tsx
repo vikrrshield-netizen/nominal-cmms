@@ -14,8 +14,6 @@ import {
   Circle, Droplet, Filter, Link2, Package, Zap, AlertTriangle, MapPin,
 } from 'lucide-react';
 import { useReports } from '../hooks/useReports';
-import { doc, deleteDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
 import ImportModal from '../components/ui/ImportModal';
 import { importInventory, type InventoryImportRow } from '../utils/importers/importInventory';
 import { assetService } from '../services/assetService';
@@ -171,7 +169,7 @@ export default function InventoryPage() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const { user, hasPermission } = useAuthContext();
-  const { items, loading, stats, issueItem, receiveItem, createItem } = useInventory();
+  const { items, loading, stats, issueItem, receiveItem, createItem, setAbsoluteQuantity, softDeleteItem } = useInventory();
   const { exportXLSX } = useReports();
 
   // State
@@ -558,6 +556,8 @@ export default function InventoryPage() {
           canManage={canManage}
           onIssue={issueItem}
           onReceive={receiveItem}
+          onSetQuantity={setAbsoluteQuantity}
+          onDelete={softDeleteItem}
           assets={assets}
           onOpenAsset={(assetId) => navigate(`/asset/${assetId}`, { state: { from: currentInventoryPath } })}
           inventoryMode={inventoryMode}
@@ -590,7 +590,10 @@ export default function InventoryPage() {
           onClose={() => setShowImportModal(false)}
           onImport={async (rows) => {
             const result = await importInventory(rows as unknown as InventoryImportRow[]);
-            return { imported: result.imported, failed: result.failed, errors: result.errors };
+            const errors = result.updated > 0
+              ? [`ℹ️ Aktualizováno ${result.updated} existujících položek (shodný kód).`, ...result.errors]
+              : result.errors;
+            return { imported: result.imported + result.updated, failed: result.failed, errors };
           }}
         />
       )}
@@ -600,6 +603,7 @@ export default function InventoryPage() {
         <CreateItemModal
           onClose={() => setShowCreateModal(false)}
           onCreate={createItem}
+          existingCodes={new Set(items.map((i) => String(i.code || '').trim().toUpperCase()).filter(Boolean))}
         />
       )}
     </div>
@@ -610,9 +614,10 @@ export default function InventoryPage() {
 // CREATE ITEM MODAL
 // ═══════════════════════════════════════════
 
-function CreateItemModal({ onClose, onCreate }: {
+function CreateItemModal({ onClose, onCreate, existingCodes }: {
   onClose: () => void;
   onCreate: (data: NewInventoryItemInput) => Promise<string>;
+  existingCodes: Set<string>;
 }) {
   const [form, setForm] = useState({
     name: '',
@@ -643,6 +648,7 @@ function CreateItemModal({ onClose, onCreate }: {
 
     if (!name) { notify('Zadej název položky.'); return; }
     if (!code) { notify('Zadej kód položky.'); return; }
+    if (existingCodes.has(code)) { notify(`Kód ${code} už ve skladu existuje — zvol jiný, ať nevznikne duplicita.`); return; }
     if (!form.category) { notify('Vyber kategorii.'); return; }
     if (!unit) { notify('Zadej jednotku.'); return; }
     if (!location) { notify('Zadej umístění.'); return; }
@@ -868,12 +874,14 @@ function CreateItemModal({ onClose, onCreate }: {
 // ITEM DETAIL MODAL
 // ═══════════════════════════════════════════
 
-function ItemDetailModal({ item, onClose, canManage, onIssue, onReceive, assets, onOpenAsset, inventoryMode }: {
+function ItemDetailModal({ item, onClose, canManage, onIssue, onReceive, onSetQuantity, onDelete, assets, onOpenAsset, inventoryMode }: {
   item: any;
   onClose: () => void;
   canManage: boolean;
   onIssue: (id: string, qty: number, note?: string) => Promise<any>;
   onReceive: (id: string, qty: number, opts?: any) => Promise<any>;
+  onSetQuantity: (id: string, actual: number, note?: string) => Promise<any>;
+  onDelete: (id: string, name?: string) => Promise<void>;
   assets: Asset[];
   onOpenAsset: (assetId: string) => void;
   inventoryMode: boolean;
@@ -921,19 +929,15 @@ function ItemDetailModal({ item, onClose, canManage, onIssue, onReceive, assets,
       return;
     }
 
-    const current = Number(item.quantity || 0);
-    const diff = actual - current;
-    if (diff === 0) {
-      notify('Skutečný počet sedí se stavem v systému.');
-      return;
-    }
-
     setSaving(true);
     try {
-      if (diff > 0) {
-        await onReceive(item.id, diff, { note: `Inventura: skutečný stav ${actual} ${item.unit}` });
+      // Nastav absolutní hodnotu — rozdíl se dopočítá z čerstvého DB stavu uvnitř transakce.
+      const res = await onSetQuantity(item.id, actual, `Inventura: skutečný stav ${actual} ${item.unit}`);
+      if (res && res.changed === false) {
+        notify('Skutečný počet sedí se stavem v systému.');
       } else {
-        await onIssue(item.id, Math.abs(diff), `Inventura: skutečný stav ${actual} ${item.unit}`);
+        notify(`Uloženo — nový stav ${actual} ${item.unit}.`);
+        onClose();
       }
       setCountedQuantity('');
     } catch (err: unknown) {
@@ -1080,13 +1084,17 @@ function ItemDetailModal({ item, onClose, canManage, onIssue, onReceive, assets,
             </div>
           )}
 
-          {/* Delete */}
+          {/* Delete (měkké — položka zmizí ze seznamu, ale data i historie zůstanou) */}
           {canManage && (
             <button
               onClick={async () => {
-                if (await ask({ message: `Opravdu smazat "${item.name}"?`, danger: true })) {
-                  await deleteDoc(doc(db, 'inventory', item.id));
-                  onClose();
+                if (await ask({ message: `Opravdu smazat "${item.name}"? Zmizí ze seznamu, ale historie pohybů zůstane.`, danger: true })) {
+                  try {
+                    await onDelete(item.id, item.name);
+                    onClose();
+                  } catch (err) {
+                    notify((err as Error).message || 'Smazání se nepovedlo.');
+                  }
                 }
               }}
               className="w-full min-h-12 py-3 bg-red-50 text-red-600 rounded-xl font-medium hover:bg-red-100 flex items-center justify-center gap-2 border border-red-200"
@@ -1262,13 +1270,19 @@ function OrderModal({ items, onClose }: { items: any[]; onClose: () => void }) {
     setSelected(newSet);
   };
 
+  const chosen = items.filter((i) => selected.has(i.id));
+  // Doporučené doobjednání: dorovnat na minimum (aspoň 1), zaokrouhleno nahoru.
+  const toOrder = (i: any) => Math.max(1, Math.ceil((Number(i.minQuantity) || 0) - (Number(i.quantity) || 0)));
+  const today = new Date().toLocaleDateString('cs-CZ');
+
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={onClose}>
+      <style>{`@media print { body * { visibility: hidden !important; } .ord-print, .ord-print * { visibility: visible !important; } .ord-print { position: absolute; left: 0; top: 0; width: 100%; padding: 24px; } .ord-noprint { display: none !important; } }`}</style>
       <div className="bg-white rounded-t-3xl md:rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <div className="sticky top-0 bg-white border-b p-4 flex items-center justify-between">
+        <div className="ord-noprint sticky top-0 bg-white border-b p-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Truck className="w-5 h-5 text-emerald-600" />
-            <h2 className="text-lg font-bold">Vytvořit objednávku</h2>
+            <h2 className="text-lg font-bold">Seznam k objednání</h2>
           </div>
           <button onClick={onClose} className="p-3 min-h-12 min-w-12 rounded-lg hover:bg-slate-100">
             <X className="w-5 h-5" />
@@ -1276,16 +1290,16 @@ function OrderModal({ items, onClose }: { items: any[]; onClose: () => void }) {
         </div>
         <div className="p-4 space-y-4">
           {items.length === 0 ? (
-            <div className="text-center py-8">
+            <div className="ord-noprint text-center py-8">
               <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
               <p className="text-slate-600">Všechny položky jsou na skladě!</p>
             </div>
           ) : (
             <>
-              <p className="text-sm text-slate-600">
-                Vyberte položky k objednání ({selected.size} vybráno)
+              <p className="ord-noprint text-sm text-slate-600">
+                Vyber, co doobjednat ({selected.size} vybráno). Pak vytiskni nebo ulož jako PDF.
               </p>
-              <div className="space-y-2">
+              <div className="ord-noprint space-y-2">
                 {items.map((item) => (
                   <button
                     key={item.id}
@@ -1297,25 +1311,54 @@ function OrderModal({ items, onClose }: { items: any[]; onClose: () => void }) {
                     <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
                       selected.has(item.id) ? 'border-blue-500 bg-blue-500' : 'border-slate-300'
                     }`}>
-                      {selected.has(item.id) && <CheckCircle2 className="w-4 h-4 text-slate-900" />}
+                      {selected.has(item.id) && <CheckCircle2 className="w-4 h-4 text-white" />}
                     </div>
                     <div className="flex-1">
                       <div className="font-medium">{item.name}</div>
                       <div className="text-sm text-slate-500">{item.code}</div>
                     </div>
                     <div className="text-right">
-                      <div className="text-red-600 font-bold">{item.quantity}</div>
-                      <div className="text-xs text-slate-500">min: {item.minQuantity}</div>
+                      <div className="text-red-600 font-bold">{item.quantity} {item.unit}</div>
+                      <div className="text-xs text-slate-500">min: {item.minQuantity} · objednat ~{toOrder(item)}</div>
                     </div>
                   </button>
                 ))}
               </div>
+
+              {/* Tiskový seznam (jen při tisku) */}
+              <div className="ord-print hidden print:block">
+                <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>Seznam k objednání</h1>
+                <div style={{ fontSize: 12, color: '#555', marginBottom: 16 }}>Datum: {today} · Položek: {chosen.length}</div>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr>
+                      {['Položka', 'Kód', 'Na skladě', 'Min', 'Objednat', 'Dodavatel'].map((h) => (
+                        <th key={h} style={{ textAlign: 'left', borderBottom: '2px solid #000', padding: '6px 8px' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {chosen.map((i) => (
+                      <tr key={i.id}>
+                        <td style={{ padding: '6px 8px', borderBottom: '1px solid #ccc' }}>{i.name}</td>
+                        <td style={{ padding: '6px 8px', borderBottom: '1px solid #ccc', fontFamily: 'monospace' }}>{i.code}</td>
+                        <td style={{ padding: '6px 8px', borderBottom: '1px solid #ccc' }}>{i.quantity} {i.unit}</td>
+                        <td style={{ padding: '6px 8px', borderBottom: '1px solid #ccc' }}>{i.minQuantity}</td>
+                        <td style={{ padding: '6px 8px', borderBottom: '1px solid #ccc', fontWeight: 700 }}>{toOrder(i)} {i.unit}</td>
+                        <td style={{ padding: '6px 8px', borderBottom: '1px solid #ccc' }}>{i.supplier || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
               <button
                 disabled={selected.size === 0}
-                className="w-full min-h-12 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                onClick={() => window.print()}
+                className="ord-noprint w-full min-h-12 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                <Truck className="w-5 h-5" />
-                Odeslat objednávku ({selected.size})
+                <Printer className="w-5 h-5" />
+                Vytisknout / uložit seznam ({selected.size})
               </button>
             </>
           )}

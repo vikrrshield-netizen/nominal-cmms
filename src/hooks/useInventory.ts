@@ -185,6 +185,90 @@ export function useInventory() {
   );
 
   /**
+   * Inventura: NASTAV skutečný stav na přesnou hodnotu.
+   * Rozdíl se počítá UVNITŘ transakce z aktuálního DB stavu (ne z klientského snapshotu),
+   * takže souběžný pohyb kolegy nezpůsobí špatný výsledný počet. Zapisuje typ 'adjust'.
+   */
+  const setAbsoluteQuantity = useCallback(
+    async (itemId: string, actual: number, note?: string) => {
+      if (!user) throw new Error('Nepřihlášen');
+      if (!Number.isFinite(actual) || actual < 0) throw new Error('Zadej platný skutečný počet.');
+
+      const itemRef = doc(db, 'inventory', itemId);
+      return runTransaction(db, async (tx) => {
+        const snap = await tx.get(itemRef);
+        if (!snap.exists()) throw new Error(`Položka ${itemId} nenalezena`);
+        const data = snap.data() as InventoryItem;
+        const currentQty = Number(data.quantity) || 0;
+        const minQuantity = Number(data.minQuantity) || 0;
+        const delta = actual - currentQty; // z ČERSTVÉHO stavu v DB
+        if (delta === 0) return { newQuantity: currentQty, newStatus: data.status, changed: false };
+
+        const newStatus = calcItemStatus(actual, minQuantity);
+        tx.update(itemRef, { quantity: actual, status: newStatus, updatedAt: serverTimestamp() });
+
+        const txRef = doc(collection(db, 'inventory_transactions'));
+        tx.set(txRef, {
+          itemId,
+          itemName: data.name ?? '',
+          type: 'adjust',
+          quantity: delta,
+          performedBy: user.uid,
+          performedByName: user.displayName,
+          performedAt: Timestamp.now(),
+          createdAt: Timestamp.now(),
+          quantityAfter: actual,
+          ...(note && { note }),
+        });
+
+        if (newStatus === 'low' || newStatus === 'critical' || newStatus === 'out') {
+          const notifRef = doc(collection(db, 'notifications'));
+          tx.set(notifRef, {
+            targetType: 'role',
+            targetId: 'role_vedeni',
+            createdBy: user.uid,
+            title: `Nízký stav: ${data.name ?? ''}`,
+            body: `${data.name ?? ''}: ${actual} ${data.unit ?? ''} (minimum: ${minQuantity})`,
+            type: 'inventory',
+            severity: newStatus === 'out' ? 'critical' : 'warning',
+            linkTo: `/inventory?item=${itemId}`,
+            isRead: false,
+            createdAt: serverTimestamp(),
+          });
+        }
+        return { newQuantity: actual, newStatus, changed: true };
+      });
+    },
+    [user]
+  );
+
+  /**
+   * Měkké smazání položky (isDeleted:true) — data i historie pohybů zůstanou,
+   * jen zmizí ze seznamu. Zapíše auditní stopu. (Tvrdý delete = ztráta + osiřelé transakce.)
+   */
+  const softDeleteItem = useCallback(
+    async (itemId: string, itemName?: string) => {
+      if (!user) throw new Error('Nepřihlášen');
+      await updateDoc(doc(db, 'inventory', itemId), {
+        isDeleted: true,
+        updatedAt: serverTimestamp(),
+        deletedBy: user.uid,
+        deletedByName: user.displayName,
+      });
+      await addDoc(collection(db, 'audit_logs'), {
+        userId: user.uid,
+        userName: user.displayName,
+        action: 'DELETE',
+        collection: 'inventory',
+        documentId: itemId,
+        timestamp: Timestamp.now(),
+        changes: { isDeleted: true, name: itemName ?? '' },
+      });
+    },
+    [user]
+  );
+
+  /**
    * KLÍČOVÁ FUNKCE: Dokončit úkol + automatický odpis dílů
    * Volá se z TasksPage při dokončení work orderu
    */
@@ -395,6 +479,8 @@ export function useInventory() {
     issueItem,
     receiveItem,
     adjustItem,
+    setAbsoluteQuantity,
+    softDeleteItem,
     completeTaskWithParts,
     createItem,
     createOrder,
