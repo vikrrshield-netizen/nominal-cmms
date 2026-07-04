@@ -12,7 +12,7 @@ import {
   ClipboardCheck, Cog, LayoutGrid, ListTree, ArrowUp, ArrowDown,
   ChevronsUp, ChevronsDown, GripVertical,
   Archive, Layers, CheckCircle2, Wrench, Pause, AlertTriangle, List, SlidersHorizontal, HelpCircle,
-  CheckSquare, Square, FolderInput, Stethoscope, Info, MoreHorizontal, QrCode,
+  CheckSquare, Square, FolderInput, Stethoscope, Info, MoreHorizontal, QrCode, Sparkles,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { db } from '../lib/firebase';
@@ -25,6 +25,7 @@ import type { Asset, AssetStatus, AssetCriticality } from '../types/asset';
 import { ASSET_STATUS_CONFIG, CRITICALITY_CONFIG } from '../types/asset';
 import { showToast } from '../components/ui/Toast';
 import ImportModal from '../components/ui/ImportModal';
+import AiImportSheet from '../components/kartoteka/AiImportSheet';
 import BottomSheet, { FormFooter } from '../components/ui/BottomSheet';
 import HowToSheet from '../components/help/HowToSheet';
 import { guideById } from '../data/guides';
@@ -721,6 +722,7 @@ export default function KartotekaPage() {
   const [filter, setFilter] = useState<FilterKey>('all');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [showImport, setShowImport] = useState(false);
+  const [showAiImport, setShowAiImport] = useState(false);
   const [routeSavingKey, setRouteSavingKey] = useState<string | null>(null);
   const [routeDraggingKey, setRouteDraggingKey] = useState<string | null>(null);
   const [routeDropKey, setRouteDropKey] = useState<string | null>(null);
@@ -1870,7 +1872,13 @@ export default function KartotekaPage() {
             <Stethoscope size={16} />
             <span className="hidden sm:inline">Kontrola</span>
           </button>
-          <button onClick={() => setShowImport(true)} className="vik-button">
+          {canCreateAsset && (
+            <button onClick={() => setShowAiImport(true)} className="vik-button" title="Import z Excelu přes AI — sama rozřadí do budov, místností a strojů" aria-label="Import z Excelu přes AI">
+              <Sparkles size={16} className="text-emerald-700" />
+              <span className="hidden sm:inline">AI import</span>
+            </button>
+          )}
+          <button onClick={() => setShowImport(true)} className="vik-button" title="Klasický import z Excelu (přesné sloupce)">
             <Upload size={16} />
             <span className="hidden sm:inline">Import</span>
           </button>
@@ -2449,6 +2457,15 @@ export default function KartotekaPage() {
           onImport={handleImport}
         />
       )}
+
+      {/* ── Import z Excelu přes AI (sama rozřadí budovy/místnosti/stroje) ── */}
+      <AiImportSheet
+        isOpen={showAiImport}
+        onClose={() => setShowAiImport(false)}
+        onImported={async () => {
+          try { const data = await assetService.getAll(tenantId); setAssets(data); } catch { /* refresh best-effort */ }
+        }}
+      />
 
       {/* ── Delete Confirm Modal ── */}
       {deleteTarget && (
