@@ -112,14 +112,26 @@ function getFloorLabel(value: string) {
   return value === NO_FLOOR ? 'Bez patra' : value;
 }
 
+// JEDEN ZDROJ PRAVDY pro typ položky. STEJNÁ slova drží AssetCardPage (isBuildingLikeAsset/
+// isRoomLikeAsset) i functions/src/assistant.ts (isBuildingA/isRoomA) — když měníš, změň
+// VŠECHNY TŘI, jinak se přesuny přes různé cesty rozjedou (audit 2026-07-04).
+// Rozhodnutí: „hala" = BUDOVA. Klasifikuje se JEN entityType+category (ne název).
+const BUILDING_TYPE_WORDS = ['budova', 'building', 'hala', 'areal'];
+const ROOM_TYPE_WORDS = ['mistnost', 'room', 'prostor', 'sekce', 'stredisko', 'oddeleni', 'pracoviste', 'balirna', 'expedice', 'extrudovna', 'louparna', 'satny'];
+
+function typeHay(asset: Pick<Asset, 'entityType'> & { category?: string }) {
+  return `${normalizeText(asset.entityType)} ${normalizeText(asset.category)}`;
+}
+
 function isBuildingAsset(asset: Asset) {
-  const type = normalizeText(asset.entityType);
-  return type === 'budova' || type === 'hala' || type === 'areal';
+  const hay = typeHay(asset);
+  return BUILDING_TYPE_WORDS.some((w) => hay.includes(w));
 }
 
 function isRoomAsset(asset: Asset) {
-  const type = normalizeText(asset.entityType);
-  return type === 'mistnost' || type === 'mistnosti' || type === 'prostor';
+  if (isBuildingAsset(asset)) return false;
+  const hay = typeHay(asset);
+  return ROOM_TYPE_WORDS.some((w) => hay.includes(w));
 }
 
 function inferBuildingIdFromText(...values: string[]) {
@@ -315,6 +327,8 @@ function collectAncestorIds(assetId: string, allAssets: DisplayAsset[]): string[
 }
 
 // Do jaké budovy uzel patří: vlastní buildingId, jinak po řetězu rodičů nahoru.
+// U rodiče bez buildingId zkus i písmeno z názvu „Budova X" — stejně to dělá AI
+// (assistant.ts assetBuilding), jinak by AI a Kartotéka viděly jinou budovu.
 function getNodeBuildingId(asset: DisplayAsset, allAssets: DisplayAsset[]): string {
   const own = safeText(asset.buildingId || asset.sourceBuildingId).trim().toUpperCase();
   if (own) return own;
@@ -322,6 +336,8 @@ function getNodeBuildingId(asset: DisplayAsset, allAssets: DisplayAsset[]): stri
     const anc = allAssets.find((x) => x.id === ancestorId);
     const bid = safeText(anc?.buildingId || anc?.sourceBuildingId).trim().toUpperCase();
     if (bid) return bid;
+    const m = safeText(anc?.name).match(/budova\s+([a-z0-9]+)/i);
+    if (m?.[1]) return m[1].toUpperCase();
   }
   return '';
 }

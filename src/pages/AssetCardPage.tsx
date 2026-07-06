@@ -185,14 +185,18 @@ function normalizeLookup(value: unknown): string {
     .replace(/\s+/g, ' ');
 }
 
-function isRoomLikeAsset(asset: { name?: string; entityType?: string; category?: string }): boolean {
-  const type = normalizeLookup(`${asset.name || ''} ${asset.entityType || ''} ${asset.category || ''}`);
-  return /\b(mistnost|room|area|hala|prostor|sekce|stredisko|oddeleni|pracoviste|stanoviste|balirna|expedice|extrudovna|vyroba|louparna|satny)\b/.test(type);
+// JEDEN ZDROJ PRAVDY typu — STEJNÁ slova drží KartotekaPage (isBuildingAsset/isRoomAsset)
+// i functions/src/assistant.ts (isBuildingA/isRoomA); měnit vždy VŠECHNY TŘI (audit 2026-07-04).
+// „hala" = BUDOVA. Klasifikuje se JEN entityType+category (ne název — stroj „…výroba" není místnost).
+function isBuildingLikeAsset(asset: { entityType?: string; category?: string }): boolean {
+  const type = normalizeLookup(`${asset.entityType || ''} ${asset.category || ''}`);
+  return ['budova', 'building', 'hala', 'areal'].some((w) => type.includes(w));
 }
 
-function isBuildingLikeAsset(asset: { name?: string; entityType?: string; category?: string }): boolean {
-  const type = normalizeLookup(`${asset.name || ''} ${asset.entityType || ''} ${asset.category || ''}`);
-  return type.includes('budova') || type.includes('building');
+function isRoomLikeAsset(asset: { entityType?: string; category?: string }): boolean {
+  if (isBuildingLikeAsset(asset)) return false;
+  const type = normalizeLookup(`${asset.entityType || ''} ${asset.category || ''}`);
+  return ['mistnost', 'room', 'prostor', 'sekce', 'stredisko', 'oddeleni', 'pracoviste', 'balirna', 'expedice', 'extrudovna', 'louparna', 'satny'].some((w) => type.includes(w));
 }
 
 function isContainerAsset(asset: { name?: string; entityType?: string; category?: string }): boolean {
@@ -305,12 +309,19 @@ export default function AssetCardPage() {
     category: asset.category,
   } as Partial<AssetV2> : null);
   // Budova položky: vlastní buildingId, jinak po řetězu rodičů nahoru.
+  // U rodiče bez buildingId zkus písmeno z názvu „Budova X" (stejně jako AI a Kartotéka).
   const buildingOfAsset = useCallback((start: (typeof allAssetsV2)[number] | undefined): string => {
     let cur = start;
     const seen = new Set<string>();
+    let first = true;
     while (cur) {
       const bid = String((cur as { buildingId?: string }).buildingId ?? '').trim().toUpperCase();
       if (bid) return bid;
+      if (!first) {
+        const m = String(cur.name ?? '').match(/budova\s+([a-z0-9]+)/i);
+        if (m?.[1]) return m[1].toUpperCase();
+      }
+      first = false;
       const pid = (cur as { parentId?: string | null }).parentId;
       if (!pid || seen.has(pid)) return '';
       seen.add(pid);

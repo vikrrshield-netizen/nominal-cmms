@@ -57,12 +57,13 @@ export const STATUS_CONFIG: Record<RevisionStatus, { label: string; color: strin
 
 const EXPIRING_THRESHOLD_DAYS = 30;
 
+// Porovnáváme KALENDÁŘNÍ dny, ne okamžiky — jinak je revize „prošlá" už odpoledne
+// v den platnosti (uložený čas půlnoci vs. aktuální hodina).
+const dayStartMs = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+
 export function computeRevisionStatus(nextDate: Timestamp | null | undefined): RevisionStatus {
   if (!nextDate || typeof nextDate.toDate !== 'function') return 'expired';
-  const next = nextDate.toDate();
-  const now = new Date();
-  const diffMs = next.getTime() - now.getTime();
-  const diffDays = diffMs / (1000 * 60 * 60 * 24);
+  const diffDays = Math.round((dayStartMs(nextDate.toDate()) - dayStartMs(new Date())) / 86400000);
 
   if (diffDays < 0) return 'expired';
   if (diffDays <= EXPIRING_THRESHOLD_DAYS) return 'expiring';
@@ -71,8 +72,7 @@ export function computeRevisionStatus(nextDate: Timestamp | null | undefined): R
 
 export function daysUntilRevision(nextDate: Timestamp | null | undefined): number {
   if (!nextDate || typeof nextDate.toDate !== 'function') return -1;
-  const next = nextDate.toDate();
-  return Math.round((next.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  return Math.round((dayStartMs(nextDate.toDate()) - dayStartMs(new Date())) / 86400000);
 }
 
 export function formatRevisionDate(ts: Timestamp | null | undefined): string {
@@ -159,12 +159,16 @@ export function useRevisions(filterAssetId?: string) {
       const lastDayOfMonth = new Date(nextDate.getFullYear(), nextDate.getMonth() + 1, 0).getDate();
       nextDate.setDate(Math.min(targetDay, lastDayOfMonth));
 
+      // Datum ukládáme ukotvené na POLEDNE UTC daného dne — žádná časová zóna pak
+      // nepřehodí kalendářní den (půlnoc lokálně = předchozí den v UTC a naopak).
+      const atNoonUTC = (d: Date) => new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), 12, 0, 0));
+
       // Update revize
       await updateDoc(doc(db, 'revisions', revisionId), {
-        lastRevisionDate: Timestamp.fromDate(data.date),
-        lastRevisionAt: Timestamp.fromDate(data.date),
-        nextRevisionDate: Timestamp.fromDate(nextDate),
-        nextRevisionAt: Timestamp.fromDate(nextDate),
+        lastRevisionDate: Timestamp.fromDate(atNoonUTC(data.date)),
+        lastRevisionAt: Timestamp.fromDate(atNoonUTC(data.date)),
+        nextRevisionDate: Timestamp.fromDate(atNoonUTC(nextDate)),
+        nextRevisionAt: Timestamp.fromDate(atNoonUTC(nextDate)),
         certificateNumber: data.certificateNumber,
         ...(data.technicianName && { technicianName: data.technicianName }),
         ...(data.notes && { notes: data.notes }),

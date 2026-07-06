@@ -37,11 +37,25 @@ const FV = admin.firestore.FieldValue;
 const OPEN_TASK = (s?: string) =>
   !['done', 'completed', 'closed', 'hotovo', 'uzavreno', 'uzavřeno', 'cancelled', 'zruseno'].includes((s || '').toLowerCase());
 
+// Kalendářní den v PRAZE jako číslo (UTC ms půlnoci) — termíny se počítají po dnech,
+// ne po hodinách. Jinak večer (Praha = UTC+1/2) termín „dnes/zítra" vychází o den jinak
+// a AI hlásí jiné propadlé termíny než ranní preventivní úloha (ta jede přes todayPrague).
+const pragueDayUTC = (d: Date): number => {
+  const s = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Prague', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+  const [y, m, dd] = s.split('-').map(Number);
+  return Date.UTC(y, m - 1, dd);
+};
 const daysUntil = (iso?: string): number | null => {
   if (!iso) return null;
-  const t = new Date(iso);
-  if (Number.isNaN(t.getTime())) return null;
-  return Math.ceil((t.getTime() - Date.now()) / 86400000);
+  let target: number;
+  const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (m) target = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])); // čistý datumový string = ten den
+  else {
+    const t = new Date(iso);
+    if (Number.isNaN(t.getTime())) return null;
+    target = pragueDayUTC(t);
+  }
+  return Math.round((target - pragueDayUTC(new Date())) / 86400000);
 };
 
 const STATUS_CZ: Record<string, string> = { operational: 'běží', maintenance: 'údržba', broken: 'PORUCHA', stopped: 'stop', idle: 'nečinný' };
@@ -333,7 +347,8 @@ async function forgetAiMemory(tenantId: string, uid: string, canTeach: boolean, 
 
 // ── Sklad / revize / statistiky / nové zařízení ────────────────
 const invStatus = (q: number, min: number) => (q <= 0 ? 'DOŠLO' : q <= min * 0.5 ? 'kriticky málo' : q <= min ? 'málo' : 'ok');
-const revDays = (ts: any): number | null => { const d = ts?.toDate?.(); return d ? Math.ceil((d.getTime() - Date.now()) / 86400000) : null; };
+// Dny do revize — po kalendářních dnech v Praze (viz pragueDayUTC), ne po hodinách.
+const revDays = (ts: any): number | null => { const d = ts?.toDate?.(); return d ? Math.round((pragueDayUTC(d) - pragueDayUTC(new Date())) / 86400000) : null; };
 
 async function getInventory(tenantId: string, cache?: ReqCache): Promise<any[]> {
   const load = async () => {
@@ -391,12 +406,17 @@ async function createAssetEntry(
 
 // Hromadné založení kartotéky: budovy → místnosti → stroje (propojené přes parentId).
 // Píše v dávkách (Firestore batch, max 500) → zvládne i velkou strukturu.
+// IDEMPOTENCE: s idemKey (id návrhu) jsou ID dokumentů DETERMINISTICKÁ — když zápis
+// spadne uprostřed dávek a uživatel to zopakuje, stejné uzly se PŘEPÍŠOU (set), nezaloží dvakrát.
 async function createAssetTree(
   tenantId: string,
   actor: Actor,
   tree: { buildings: any[] },
+  idemKey?: string,
 ): Promise<{ b: number; r: number; d: number }> {
   const col = db().collection('assets');
+  let seq = 0;
+  const newRef = () => idemKey ? col.doc(`t${idemKey}x${(seq++).toString(36)}`) : col.doc();
   let b = 0, r = 0, d = 0;
   let batch = db().batch();
   let ops = 0;
@@ -421,14 +441,14 @@ async function createAssetTree(
     if (dev.category) data.category = String(dev.category);
     if (dev.manufacturer) data.manufacturer = String(dev.manufacturer);
     if (dev.model) data.model = String(dev.model);
-    put(col.doc(), data);
+    put(newRef(), data);
     d++;
     if (ops >= 400) await flush();
   };
 
   for (const bl of (Array.isArray(tree?.buildings) ? tree.buildings : [])) {
     if (!bl?.name) continue;
-    const buildingRef = col.doc();
+    const buildingRef = newRef();
     const buildingId = bl.code ? String(bl.code) : undefined;
     const bData: Record<string, unknown> = { ...base(), name: String(bl.name), entityType: 'Budova', parentId: null };
     if (buildingId) bData.code = buildingId;
@@ -440,7 +460,7 @@ async function createAssetTree(
 
     for (const rm of (Array.isArray(bl.rooms) ? bl.rooms : [])) {
       if (!rm?.name) continue;
-      const roomRef = col.doc();
+      const roomRef = newRef();
       const rData: Record<string, unknown> = { ...base(), name: String(rm.name), entityType: 'Místnost', parentId: buildingRef.id, areaName: String(rm.name) };
       if (buildingId) rData.buildingId = buildingId;
       if (rm.code) rData.code = String(rm.code);
@@ -526,21 +546,25 @@ const entMatch = (a: any, words: string[]): boolean => {
   const s = `${normText(a?.entityType)} ${normText(a?.category)}`;
   return words.some((w) => s.includes(w));
 };
-const isBuildingA = (a: any) => entMatch(a, ['budova', 'building']);
-const isRoomA = (a: any) => entMatch(a, ['mistnost', 'room', 'prostor', 'hala', 'sekce', 'stredisko', 'oddeleni', 'pracoviste', 'balirna', 'expedice', 'extrudovna', 'louparna', 'satny']);
+// JEDEN ZDROJ PRAVDY typu — STEJNÁ slova drží KartotekaPage (isBuildingAsset/isRoomAsset)
+// i AssetCardPage (isBuildingLikeAsset/isRoomLikeAsset); měnit vždy VŠECHNY TŘI (audit 2026-07-04).
+// „hala" = BUDOVA (jako v Kartotéce, kde je kořenovou kartou).
+const isBuildingA = (a: any) => entMatch(a, ['budova', 'building', 'hala', 'areal']);
+const isRoomA = (a: any) => !isBuildingA(a) && entMatch(a, ['mistnost', 'room', 'prostor', 'sekce', 'stredisko', 'oddeleni', 'pracoviste', 'balirna', 'expedice', 'extrudovna', 'louparna', 'satny']);
 const isLineA = (a: any) => entMatch(a, ['linka', 'line']);
 const isContainerA = (a: any) => isBuildingA(a) || isRoomA(a);
 const isDeviceA = (a: any) => !isBuildingA(a) && !isRoomA(a) && !isLineA(a) && !entMatch(a, ['kontrola', 'kontrolni']);
 
 function assetBuilding(a: any, all: any[]): string {
-  if (a?.buildingId) return String(a.buildingId);
+  // Vždy UPPERCASE — malými písmeny uložené buildingId jinak nesedí s porovnáním cílů (bCode).
+  if (a?.buildingId) return String(a.buildingId).trim().toUpperCase();
   let pid = a?.parentId;
   const seen = new Set<string>();
   while (pid && !seen.has(pid)) {
     seen.add(pid);
     const p = all.find((x) => x.id === pid);
     if (!p) break;
-    if (p.buildingId) return String(p.buildingId);
+    if (p.buildingId) return String(p.buildingId).trim().toUpperCase();
     const m = String(p.name ?? '').match(/Budova\s+([A-Za-z0-9]+)/i);
     if (m?.[1]) return m[1].toUpperCase();
     pid = p.parentId;
@@ -1557,8 +1581,9 @@ export const assistantChat = functions
   });
 
 // ── Potvrzení akce (Ano) → TEPRVE TEĎ se zapíše ──
+// Timeout 300 s: hromadné založení kartotéky (create_asset_tree) u velké struktury trvá.
 export const assistantConfirmAction = functions
-  .runWith({ timeoutSeconds: 60, memory: '512MB' })
+  .runWith({ timeoutSeconds: 300, memory: '512MB' })
   .https.onCall(async (data: any, context: functions.https.CallableContext) => {
     const { tenantId, actor, role } = await authContext(context);
 
@@ -1569,14 +1594,30 @@ export const assistantConfirmAction = functions
     let pendingRef: FirebaseFirestore.DocumentReference | null = null;
     if (pendingId) {
       const ref = db().collection('aiPendingActions').doc(pendingId);
-      const snap = await ref.get();
-      if (!snap.exists) throw new functions.https.HttpsError('not-found', 'Návrh vypršel nebo neexistuje. Zopakuj to prosím.');
-      const d = snap.data() as any;
-      if (d.uid !== actor.uid || d.tenantId !== tenantId) throw new functions.https.HttpsError('permission-denied', 'Tenhle návrh není tvůj.');
-      if (Date.now() - (d.createdAt?.toMillis?.() ?? 0) > 60 * 60 * 1000) throw new functions.https.HttpsError('deadline-exceeded', 'Návrh je starý, zopakuj to prosím.');
-      // Idempotence: hotovou akci NEPROVÁDĚJ znovu, jen vrať původní hlášku.
-      if (d.used) return { reply: String(d.resultReply || '✅ Už provedeno.') };
-      a = d.action;
+      // ATOMICKÉ ZABRÁNÍ návrhu (transakce): dvojí rychlé „Ano" (dvojklik, retry sítě, dvě
+      // záložky) nesmí akci provést dvakrát. Zabrání = claimedAt; used:true se nastaví až PO
+      // úspěšném zápisu (execute-first). Kdyby funkce spadla mezi zabráním a dokončením,
+      // zámek po 2 minutách vyprší a jde to bezpečně zopakovat.
+      const CLAIM_MS = 2 * 60 * 1000;
+      const claim = await db().runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists) return { err: 'notfound' as const };
+        const d = snap.data() as any;
+        if (d.uid !== actor.uid || d.tenantId !== tenantId) return { err: 'denied' as const };
+        if (Date.now() - (d.createdAt?.toMillis?.() ?? 0) > 60 * 60 * 1000) return { err: 'expired' as const };
+        // Idempotence: hotovou akci NEPROVÁDĚJ znovu, jen vrať původní hlášku.
+        if (d.used) return { doneReply: String(d.resultReply || '✅ Už provedeno.') };
+        const claimedAt = d.claimedAt?.toMillis?.() ?? 0;
+        if (claimedAt && Date.now() - claimedAt < CLAIM_MS) return { err: 'running' as const };
+        tx.update(ref, { claimedAt: FV.serverTimestamp() });
+        return { action: d.action };
+      });
+      if (claim.err === 'notfound') throw new functions.https.HttpsError('not-found', 'Návrh vypršel nebo neexistuje. Zopakuj to prosím.');
+      if (claim.err === 'denied') throw new functions.https.HttpsError('permission-denied', 'Tenhle návrh není tvůj.');
+      if (claim.err === 'expired') throw new functions.https.HttpsError('deadline-exceeded', 'Návrh je starý, zopakuj to prosím.');
+      if (claim.err === 'running') throw new functions.https.HttpsError('aborted', 'Akce právě probíhá — chvilku počkej, ať se neprovede dvakrát.');
+      if (claim.doneReply) return { reply: claim.doneReply };
+      a = claim.action;
       pendingRef = ref;
     } else {
       a = data?.action;
@@ -1673,6 +1714,12 @@ export const assistantConfirmAction = functions
           if (!task || !belongsToTenant(task, tenantId)) {
             throw new functions.https.HttpsError('permission-denied', 'Tenhle úkol nepatří tvojí firmě nebo neexistuje.');
           }
+          // Mezitím ho mohl dokončit někdo jiný — nepřepisuj, kdo a kdy ho reálně uzavřel.
+          if (!OPEN_TASK(task.status)) {
+            reply = `ℹ️ Úkol ${[a.taskCode, a.title].filter(Boolean).join(' · ')} už mezitím někdo uzavřel — nic jsem neměnil.`;
+            targetId = String(a.taskId);
+            break;
+          }
           await closeTaskEntry(tenantId, String(a.taskId), actor);
           reply = `✅ Úkol uzavřen — ${[a.taskCode, a.title].filter(Boolean).join(' · ')}`.trim();
           targetId = String(a.taskId);
@@ -1680,7 +1727,7 @@ export const assistantConfirmAction = functions
         }
         case 'create_asset_tree': {
           if (!a.tree || !Array.isArray(a.tree.buildings)) throw new functions.https.HttpsError('invalid-argument', 'Chybí struktura.');
-          const c = await createAssetTree(tenantId, actor, a.tree);
+          const c = await createAssetTree(tenantId, actor, a.tree, pendingRef?.id);
           reply = `✅ Kartotéka založena — ${c.b} budov, ${c.r} místností, ${c.d} strojů. Najdeš je v Kartotéce.`;
           break;
         }
@@ -1689,11 +1736,13 @@ export const assistantConfirmAction = functions
       }
       // AŽ TEĎ (po úspěšném zápisu) označ návrh jako hotový + ulož výsledek.
       // Kdyby zápis selhal, sem se nedostaneme → used zůstane false → uživatel může bezpečně zopakovat.
-      if (pendingRef) { try { await pendingRef.update({ used: true, usedAt: FV.serverTimestamp(), resultReply: reply }); } catch { /* ignore */ } }
+      if (pendingRef) { try { await pendingRef.update({ used: true, usedAt: FV.serverTimestamp(), resultReply: reply, claimedAt: FV.delete() }); } catch { /* ignore */ } }
       // Nezměnitelná stopa akce pro kontrolu / audit (IFS/BRC).
       await writeAiAuditLog(tenantId, actor, { action: a.type, targetId, summary: a.summary });
       return { reply };
     } catch (err) {
+      // Uvolni zámek (claimedAt) — akce se neprovedla, uživatel to smí hned bezpečně zopakovat.
+      if (pendingRef) { try { await pendingRef.update({ claimedAt: FV.delete() }); } catch { /* ignore */ } }
       if (err instanceof functions.https.HttpsError) throw err;
       console.error('[assistantConfirmAction] error:', (err as Error)?.message);
       throw new functions.https.HttpsError('internal', 'Akci se nepodařilo provést. Zkus to prosím znovu.');
