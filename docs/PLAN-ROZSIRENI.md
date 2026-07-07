@@ -18,13 +18,13 @@ Prescriptivní AI platformy, SCADA/IIoT pipeline, digital twin, plná AI optimal
 
 ---
 
-## DÁVKA T1 — AI poradce příčin poruchy (malá; čistě prompt+data)
+## DÁVKA T1 — ✅ HOTOVO 2026-07-04 — AI poradce příčin poruchy (malá; čistě prompt+data)
 **Trend:** diagnostika z popisu/fotky nad VLASTNÍ historií oprav (obecná AI nezná náš extruder — naše historie ano).
 **Cíl:** když uživatel hlásí poruchu (chat/kiosk/foto), AI se sama podívá do historie oprav toho stroje a nabídne: „u tohohle stroje se 3× řešilo X — zkontroluj Y" + rovnou návrh úkolu.
 **Postup:** `functions/src/assistant.ts` → buildSystemPrompt: přidat pravidlo „při hlášení poruchy NEJDŘÍV zavolej get_asset_detail (má posledních N prací) a search_worklogs pro daný stroj; z historie navrhni pravděpodobné příčiny; pak teprve create_task s popisem vč. tipů". Ověř, že get_asset_detail vrací dost historie (případně zvyš limit posledních prací). Žádný nový nástroj.
 **Ověření:** ručně v /ai: „extruder 2 nejede" → odpověď má obsahovat odkazy na minulé opravy. Deploy `functions:assistantChat`.
 
-## DÁVKA T2 — Hlídač zanedbané preventivky (malá)
+## DÁVKA T2 — ✅ HOTOVO 2026-07-04 — Hlídač zanedbané preventivky (malá)
 **Trend:** „AI upozorní, že se PM přeskakuje / stroj má rostoucí četnost závad" (Fiix: −80 % prostojů z dodržování PM).
 **Cíl:** týdenní AI souhrn + doktor kartotéky řeknou: (a) preventivní úkoly po termínu nedokončené >7 dní, (b) stroje s rostoucí četností závad (≥3 poruchy/30 dní už hlídá repairWarning — přidat do souhrnu).
 **Postup:** `functions/src/assistant.ts` → `gatherSummaryData`: spočti otevřené tasky `source=='preventive'` starší 7 dní (createdAt) + top stroje dle poruch; přidej do promptu weekly/monthly souhrnu. `KartotekaPage` doktor: warn „N× preventivní úkol leží přes týden".
