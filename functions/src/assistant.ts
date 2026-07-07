@@ -696,6 +696,11 @@ const READ_TOOLS: Anthropic.Tool[] = [
     input_schema: { type: 'object', properties: {} },
   },
   {
+    name: 'get_gearboxes',
+    description: 'Kompletní přehled VŠECH převodovek najednou: kde jsou (extruder/sklad/servis), teplota vs. prahy, poslední práce z Deníku, otevřené úkoly. Použij na dotazy typu „co převodovky / stav převodovek / vše o převodovkách".',
+    input_schema: { type: 'object', properties: {} },
+  },
+  {
     name: 'list_overdue_checks',
     description: 'Propadlé nebo brzy propadající termíny (kalibrace, kontroly, údržba, revize) ze zařízení.',
     input_schema: {
@@ -1077,6 +1082,50 @@ async function runTool(name: string, input: any, ctx: { tenantId: string; actor:
           `⏳ Blíží se (do 30 dní): ${soon.length}`,
           ...soon.slice(0, 30).map((x: any) => `   • ${x.a.name}: ${x.ev.name} (${x.ev.nextDate ?? '—'})`),
         ].join('\n');
+      }
+      case 'get_gearboxes': {
+        // Vše o převodovkách na JEDNO zavolání — kde jsou, teploty vs. prahy, poslední práce, úkoly.
+        const all = await getAssets(tenantId, cache);
+        const isGb = (a: any) => {
+          const s = normText(`${a?.name ?? ''} ${a?.code ?? ''} ${a?.entityType ?? ''} ${a?.category ?? ''}`);
+          return s.includes('prevodov') || !!a?.gearboxStatus; // kmen chytí všechny pády
+        };
+        const gbs = all.filter(isGb).sort((x, y) => String(x.name ?? '').localeCompare(String(y.name ?? ''), 'cs'));
+        if (!gbs.length) return 'V Kartotéce nejsou žádné převodovky.';
+        const openTasks = await getOpenTasks(tenantId, cache);
+        const logs = (await getWorkLogs(tenantId, { limit: 300 }))
+          .sort((a, b) => ((b.performedAt ?? b.createdAt)?.toMillis?.() ?? 0) - ((a.performedAt ?? a.createdAt)?.toMillis?.() ?? 0));
+        const lastLog = new Map<string, any>();
+        for (const l of logs) { const id = String(l.assetId ?? ''); if (id && !lastLog.has(id)) lastLog.set(id, l); }
+        const gbState = (a: any) => a.gearboxStatus || (a.currentExtruderId ? 'installed' : '');
+        const stateLabel = (a: any) => {
+          const st = gbState(a);
+          if (st === 'installed') return `V PROVOZU${a.currentExtruderName ? ` na ${a.currentExtruderName}` : ''}`;
+          if (st === 'service') return 'V SERVISU';
+          if (st === 'in_stock') return 'VE SKLADU';
+          return statusLabel(a.status);
+        };
+        const lines = gbs.map((a: any) => {
+          const t = Number(a.lastTemperatureC);
+          const warn = Number(a.gearboxWarningTemperatureC) || 70;
+          const crit = Number(a.gearboxCriticalTemperatureC) || 85;
+          const temp = Number.isFinite(t)
+            ? `teplota ${t} °C ${t >= crit ? '🔴 KRITICKÁ' : t >= warn ? '🟠 zvýšená' : '✅ OK'} (prahy ${warn}/${crit})`
+            : 'teplota zatím nezměřena';
+          const open = openTasks.filter((tk) => tk.assetId === a.id);
+          const ll = lastLog.get(a.id);
+          const lastTxt = ll
+            ? `poslední práce ${czDate(ll.performedAt ?? ll.createdAt)}: ${String(ll.content ?? ll.workType ?? '').slice(0, 100)}`
+            : 'bez záznamu v Deníku';
+          return [
+            `• ${a.name}${a.code ? ` (${a.code})` : ''} — ${stateLabel(a)}`,
+            `   ${temp}`,
+            `   ${lastTxt}`,
+            open.length ? `   ⚠️ otevřené úkoly (${open.length}): ${open.map((o: any) => o.code ?? o.title).slice(0, 3).join(', ')}` : '',
+          ].filter(Boolean).join('\n');
+        });
+        const cnt = (st: string) => gbs.filter((a: any) => gbState(a) === st).length;
+        return `PŘEVODOVKY (${gbs.length}) — v provozu ${cnt('installed')} · sklad ${cnt('in_stock')} · servis ${cnt('service')}\n\n${lines.join('\n\n')}`;
       }
       case 'search_worklogs': {
         let logs = await getWorkLogs(tenantId, { assetId: input?.assetId, limit: input?.assetId ? (input?.limit ?? 50) : 200 });
@@ -1846,6 +1895,7 @@ export const assistantFacts = functions
       case 'faults': reply = await runTool('get_machine_status', { onlyProblems: true }, ctx); break;
       case 'machines': reply = await runTool('get_machine_status', { query: query || undefined }, ctx); break;
       case 'overdue': reply = await runTool('list_overdue_checks', { withinDays: 7 }, ctx); break;
+      case 'gearboxes': reply = await runTool('get_gearboxes', {}, ctx); break;
       case 'structure': reply = await runTool('get_structure', { query: query || undefined }, ctx); break;
       case 'worklogs': reply = await runTool('search_worklogs', { query: query || undefined }, ctx); break;
       case 'audit': reply = await runTool('audit_readiness', {}, ctx); break;

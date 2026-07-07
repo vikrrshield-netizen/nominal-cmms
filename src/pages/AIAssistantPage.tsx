@@ -12,7 +12,7 @@ import VoiceMemoRecorder from '../components/ui/VoiceMemoRecorder';
 import {
   Sparkles, Mic, MicOff, Send, ArrowLeft, Bot, User,
   AlertTriangle, Package, Calendar, FileText,
-  Volume2, VolumeX, Loader2, Camera, SquarePen, Bell, ScanLine, ClipboardList,
+  Volume2, VolumeX, Loader2, Camera, SquarePen, Bell, ScanLine, ClipboardList, Cog,
 } from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════════════════
@@ -75,6 +75,7 @@ async function callAssistant(
 
 const QUICK_COMMANDS = [
   { label: 'Nahlásit poruchu', icon: AlertTriangle, color: 'bg-red-500', keyword: 'Chci nahlásit poruchu.' },
+  { label: 'Převodovky', icon: Cog, color: 'bg-violet-500', keyword: 'převodovky' },
   { label: 'Stav skladu', icon: Package, color: 'bg-emerald-500', keyword: 'sklad' },
   { label: 'Revize', icon: Calendar, color: 'bg-amber-500', keyword: 'revize' },
   { label: 'Report', icon: FileText, color: 'bg-blue-500', keyword: 'report' },
@@ -97,6 +98,9 @@ function detectLocalIntent(raw: string): { kind: string; query?: string } | null
 
   if (/\b(co (ted )?hori|co je noveho|co mam hlidat|situace|co se deje|co je dnes|shrnuti)/.test(t) || t === 'stav' || t === 'prehled') return { kind: 'overview' };
   if (/\b(co je (v )?poruse|jake jsou poruchy|co je rozbit|co nefunguje|poruchy stroju|rozbite stroje|v poruch)/.test(t)) return { kind: 'faults' };
+  // Převodovky = srdcovka: kompletní přehled okamžitě z dat (kde jsou, teploty, poslední práce, úkoly).
+  // Kmen „prevodov" chytí všechny pády (převodovky/převodovek/převodovkách).
+  if (/\bprevodov/.test(t)) return { kind: 'gearboxes' };
   if (/\b(reviz|co propada|propadl|terminy reviz)/.test(t)) return { kind: 'revisions' };
   if (/\b(report|statistik|prehled provozu|mttr|nejporuchov|kolik ukolu)/.test(t)) return { kind: 'stats' };
   if (/\b(otevrene ukoly|co se resi|seznam ukolu|jake ukoly|ukoly co)/.test(t)) return { kind: 'tasks' };
