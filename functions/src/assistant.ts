@@ -710,12 +710,13 @@ const READ_TOOLS: Anthropic.Tool[] = [
   },
   {
     name: 'search_worklogs',
-    description: 'Prohledá Deník (záznamy práce). Buď podle assetId, nebo textem (název zařízení, co se dělalo).',
+    description: 'Prohledá Deník (záznamy práce). DŮLEŽITÉ: query = JEN klíčová slova (stroj, díl, typ práce — např. "převodovka ložisko"), ŽÁDNÁ časová slova. Časové období zadej číslem přes sinceDays (poslední půl roku = 180, měsíc = 30, rok = 365). Bez query vrátí poslední záznamy (jde kombinovat jen se sinceDays).',
     input_schema: {
       type: 'object',
       properties: {
         assetId: { type: 'string' },
-        query: { type: 'string' },
+        query: { type: 'string', description: 'jen klíčová slova, bez časových údajů' },
+        sinceDays: { type: 'number', description: 'jen záznamy za posledních X dní (volitelné)' },
         limit: { type: 'number' },
       },
     },
@@ -1079,6 +1080,12 @@ async function runTool(name: string, input: any, ctx: { tenantId: string; actor:
       }
       case 'search_worklogs': {
         let logs = await getWorkLogs(tenantId, { assetId: input?.assetId, limit: input?.assetId ? (input?.limit ?? 50) : 200 });
+        // Časové okno číslem (sinceDays) — časová slova v query nefungují (nejsou v textu záznamů).
+        const sinceDays = Number(input?.sinceDays);
+        if (Number.isFinite(sinceDays) && sinceDays > 0) {
+          const cutoff = Date.now() - sinceDays * 86400000;
+          logs = logs.filter((l) => ((l.performedAt ?? l.createdAt)?.toMillis?.() ?? 0) >= cutoff);
+        }
         if (input?.query && !input?.assetId) {
           // Tolerantní hledání: bez diakritiky, po slovech (AND), snese skloňování
           // („vložené kolo" najde „vloženého kola") — sdílený prefix, ne přesná fráze.
@@ -1088,8 +1095,9 @@ async function runTool(name: string, input: any, ctx: { tenantId: string; actor:
             const L = Math.max(3, Math.min(tok.length, w.length) - 2);
             return tok.slice(0, L) === w.slice(0, L);
           });
-          // Vata navíc typická pro dotazy na Deník („bylo měněné, na kterých, ukaž záznamy…").
-          const WORKLOG_STOP = new Set(['byl', 'byla', 'bylo', 'byly', 'ktery', 'ktera', 'ktere', 'kterych', 'kterem', 'kterou', 'jak', 'kde', 'kdy', 'proc', 'menil', 'menila', 'menili', 'menene', 'meneno', 'menena', 'zaznam', 'zaznamy', 'historie', 'denik', 'deniku']);
+          // Vata navíc typická pro dotazy na Deník („bylo měněné, na kterých, ukaž záznamy…")
+          // + časová slova (kdyby je AI přes zákaz nechala v query, nesmí zabít hledání).
+          const WORKLOG_STOP = new Set(['byl', 'byla', 'bylo', 'byly', 'ktery', 'ktera', 'ktere', 'kterych', 'kterem', 'kterou', 'jak', 'kde', 'kdy', 'proc', 'menil', 'menila', 'menili', 'menene', 'meneno', 'menena', 'zaznam', 'zaznamy', 'historie', 'denik', 'deniku', 'posledni', 'posledniho', 'poslednich', 'pul', 'roku', 'rok', 'roky', 'mesic', 'mesice', 'mesicu', 'tyden', 'tydny', 'tydnu', 'den', 'dni', 'dny', 'letos', 'loni', 'vcera', 'dnes', 'vsechny', 'vsech', 'vsechno', 'hlavne', 'zajimaji', 'zajima']);
           const qTokens = normText(String(input.query)).split(' ').filter((t) => t.length >= 3 && !STRUCT_STOP.has(t) && !WORKLOG_STOP.has(t));
           if (qTokens.length) {
             // Krátký dotaz (≤2 slova) musí sedět celý; u delší věty stačí 60 % slov
@@ -1405,6 +1413,7 @@ JAK ODPOVÍDAT:
 - Když se uživatel ptá na STAV, ČÍSLA nebo TERMÍNY, NEHÁDEJ — nejdřív použij čtecí nástroj a odpověz z dat.
 - ZAŘÍZENÍ Z KARTOTÉKY: Lidé píšou názvy strojů různě, zkráceně, bez diakritiky nebo s překlepem. Systém to umí dohledat. Ale když si NEJSI jistý, který stroj uživatel myslí — nebo je víc možností — NEZAPISUJ naslepo: použij find_asset a zeptej se, který to je. Stroj si nikdy nevymýšlej. Když ti nástroj řekne, že zařízení není v Kartotéce nebo je zápis neprovázaný, řekni to uživateli.
 - PORUCHA → PORAĎ Z HISTORIE: když uživatel hlásí poruchu/problém stroje, NEJDŘÍV se podívej do jeho historie (get_asset_detail má poslední práce; víc najdeš přes search_worklogs). Když se podobná závada už řešila, řekni to konkrétně („u tohohle stroje se 3× měnilo ložisko — zkontroluj ho nejdřív") a stejný tip přidej i do popisu navrhovaného úkolu. NIC si nevymýšlej — když historie mlčí, prostě založ hlášení bez tipů.
+- HLEDÁNÍ V DENÍKU (search_worklogs): do query dávej JEN klíčová slova (stroj, díl, typ práce) — NIKDY časové údaje, ty patří do sinceDays (půl roku=180, měsíc=30, rok=365). Když nic nenajdeš, NEVZDÁVEJ to hned: zkus širší dotaz (jen název stroje, nebo úplně bez query se sinceDays) a teprve pak řekni, že záznamy nejsou.
 - VÝROBNÍ ŠTÍTEK Z FOTKY: Když dostaneš fotku výrobního štítku stroje, přečti z něj název, kód/typ, výrobce, model, výrobní (sériové) číslo a rok. NEJDŘÍV ověř find_asset, jestli stroj v Kartotéce už není (ať nevznikají duplicity). Pokud není, ukaž načtené údaje a po souhlasu ho založ přes create_asset. Pokud je, ukaž jeho kartu/stav.
 - ZAKLÁDÁNÍ KARTOTÉKY (hlavně nová firma): Když uživatel popisuje uspořádání firmy — budovy/haly, místnosti/úseky a stroje v nich — použij create_asset_tree a založ CELOU strukturu najednou (rozklíčuj do budov → místností → strojů). Chybějící detaily (kódy, výrobce) nech prázdné, neptej se na drobnosti; doptej se jen když je struktura nejasná. (Smí to jen vedení.)
 - Když si všimneš opakujícího se problému nebo příležitosti ke zlepšení (často se kazící stroj, propadlé termíny), stručně NAVRHNI zlepšení.
