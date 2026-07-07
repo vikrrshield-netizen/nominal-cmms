@@ -39,7 +39,7 @@
 **Ověření:** node mini-test logiky (vzor: scratchpad testy), build, demo render.
 **Rozsah:** ~30 řádků. Bez backendu.
 
-## DÁVKA 2 — Kalibrace měřidel (audit MUST — BRCGS/Tesco S28)
+## DÁVKA 2 — ✅ HOTOVO 2026-07-04 (stránka /kalibrace + AI type=meridlo) — Kalibrace měřidel (audit MUST — BRCGS/Tesco S28)
 **Cíl:** registr měřidel s termíny kalibrace a hlídáním expirace — DOLOŽITELNÉ auditorovi.
 **Jak stavět (využít co existuje, NEstavět modul od nuly):**
 1. Měřidlo = položka kartotéky s `entityType: 'Měřidlo'` (kartotéka i AI ji už unesou).
@@ -54,7 +54,7 @@
 **Postup:** 1) přečti stránku a zjisti, co už umí; 2) doplň, co chybí z požadavku: seznam položek skla/křehkého plastu s umístěním, pravidelná kontrola celistvosti (event `integrity_check` už v seedu je), **záznam rozbití** (breakage log: co, kde, kdy, kdo, opatření — nová kolekce `glass_breakages` NEBO záznam do workLogs s tagem; preferuj workLogs, žádné nové rules). 3) Mockup formuláře rozbití → schválení → implementace.
 **Rozsah:** malá–střední.
 
-## DÁVKA 4 — Detektory cizích těles (audit MUST — IFS v8 povinné!)
+## DÁVKA 4 — ✅ HOTOVO 2026-07-04 (stránka /detektory + AI type=detektor) — Detektory cizích těles (audit MUST — IFS v8 povinné!)
 **Cíl:** evidence detektorů (magnety, síta, kovodetektor…) + test funkčnosti min. 1× za 12 měsíců.
 **Postup:** stejný vzor jako měřidla: `entityType: 'Detektor'` + událost `test_funkcnosti` s `frequencyDays: 365` → auto-úkoly zadarmo. Přidej do Kontroly kartotéky check „detektor bez testu >12 měsíců" (z `events` lastDate). Se souhlasem uživatele seedni reálné detektory (zeptej se, jaké mají).
 **Rozsah:** malá.
