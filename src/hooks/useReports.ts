@@ -129,6 +129,105 @@ async function exportToXLSX(type: ExportType, data: unknown[], options?: ExportO
   return filename;
 }
 
+// „Audit balíček" — vícelistý XLSX pro auditora (IFS/BRC): plány údržby na všech zařízeních,
+// propadlé termíny, provedená údržba za 12 měsíců. Jen čtení, nic nemění.
+async function exportAuditPackXLSX(): Promise<string> {
+  const ExcelJS = await import('exceljs');
+  const { saveAs } = await import('file-saver');
+
+  type Row = Record<string, unknown> & { id: string };
+  const assetsSnap = await getDocs(collection(db, 'assets'));
+  const assets: Row[] = assetsSnap.docs
+    .map((d) => ({ ...(d.data() as Record<string, unknown>), id: d.id } as Row))
+    .filter((a) => !a.isDeleted);
+
+  const yearAgo = new Date();
+  yearAgo.setFullYear(yearAgo.getFullYear() - 1);
+  const tasksSnap = await getDocs(query(
+    collection(db, 'tasks'),
+    where('createdAt', '>=', Timestamp.fromDate(yearAgo)),
+    orderBy('createdAt', 'desc'),
+  ));
+  const doneTasks: Row[] = tasksSnap.docs
+    .map((d) => ({ ...(d.data() as Record<string, unknown>), id: d.id } as Row))
+    .filter((t) => !t.isDeleted && String(t.status) === 'completed');
+
+  const dayStart = (dt: Date) => new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()).getTime();
+  const daysTo = (iso: unknown): number | null => {
+    const m = String(iso ?? '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return null;
+    return Math.round((new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getTime() - dayStart(new Date())) / 86400000);
+  };
+  const locOf = (a: Record<string, unknown>) =>
+    [a.buildingId ? `Budova ${a.buildingId}` : '', String(a.areaName ?? a.location ?? '')].filter(Boolean).join(' › ');
+  const dateOnly = (v: unknown) => String(v ?? '').slice(0, 10) || '—';
+
+  const wb = new ExcelJS.Workbook();
+  wb.creator = appConfig.APP_NAME;
+  wb.created = new Date();
+  const sheetOpts = { views: [{ state: 'frozen' as const, ySplit: 1 }] };
+
+  // List 1: plány údržby — řádek na událost; zařízení bez plánu = zvýrazněný řádek
+  const s1 = wb.addWorksheet('Plány údržby', sheetOpts);
+  s1.addRow(['Zařízení', 'Kód', 'Typ', 'Umístění', 'Událost', 'Frekvence (dní)', 'Poslední', 'Další termín', 'Dní do termínu', 'Stav']);
+  const overdueRows: Array<Array<unknown>> = [];
+  for (const a of assets) {
+    const events = (Array.isArray(a.events) ? a.events : []) as Array<Record<string, unknown>>;
+    const named = events.filter((ev) => String(ev?.name ?? '').trim());
+    if (!named.length) {
+      s1.addRow([a.name ?? '', a.code ?? '', a.entityType ?? '', locOf(a), '— BEZ PLÁNU —', '', '', '', '', 'CHYBÍ']);
+      continue;
+    }
+    for (const ev of named) {
+      const d = daysTo(ev.nextDate);
+      s1.addRow([
+        a.name ?? '', a.code ?? '', a.entityType ?? '', locOf(a),
+        ev.name ?? '', Number(ev.frequencyDays) || '', dateOnly(ev.lastDate), dateOnly(ev.nextDate),
+        d ?? '', d !== null && d < 0 ? 'PO TERMÍNU' : 'OK',
+      ]);
+      if (d !== null && d < 0) {
+        overdueRows.push([a.name ?? '', a.code ?? '', locOf(a), ev.name ?? '', dateOnly(ev.nextDate), Math.abs(d)]);
+      }
+    }
+  }
+  styleHeader(s1.getRow(1));
+  styleSheet(s1);
+
+  // List 2: propadlé termíny (seřazené od nejstaršího)
+  const s2 = wb.addWorksheet('Propadlé termíny', sheetOpts);
+  s2.addRow(['Zařízení', 'Kód', 'Umístění', 'Událost', 'Termín', 'Dní po termínu']);
+  overdueRows.sort((x, y) => Number(y[5]) - Number(x[5])).forEach((r) => s2.addRow(r));
+  styleHeader(s2.getRow(1));
+  styleSheet(s2);
+
+  // List 3: provedená údržba za 12 měsíců (dokončené úkoly)
+  const s3 = wb.addWorksheet('Provedeno (12 měs.)', sheetOpts);
+  s3.addRow(['Kód úkolu', 'Název', 'Typ', 'Zařízení', 'Priorita', 'Dokončeno', 'Dokončil', 'Zdroj']);
+  doneTasks.forEach((t) => s3.addRow([
+    t.code ?? '', t.title ?? '', t.type ?? '', t.assetName ?? '', t.priority ?? '',
+    formatDateCZ(t.completedAt), t.completedBy ?? t.completedByName ?? '', t.source ?? '',
+  ]));
+  styleHeader(s3.getRow(1));
+  styleSheet(s3);
+
+  const info = wb.addWorksheet('Info');
+  info.addRows([
+    ['Položka', 'Hodnota'],
+    ['Exportováno', new Date().toLocaleString('cs-CZ')],
+    ['Typ', 'Audit balíček (IFS/BRC) — plány, propadlé termíny, provedená údržba'],
+    ['Zařízení celkem', assets.length],
+    ['Dokončených úkolů (12 měs.)', doneTasks.length],
+    ['Systém', `${appConfig.APP_NAME} ${appConfig.VERSION}`],
+  ]);
+  styleHeader(info.getRow(1));
+  styleSheet(info);
+
+  const filename = `${appConfig.APP_NAME_SHORT}_audit_balicek_${formatDateFile(new Date())}.xlsx`;
+  const buffer = await wb.xlsx.writeBuffer();
+  saveAs(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), filename);
+  return filename;
+}
+
 function printDocument(title: string, body: string): void {
   const win = window.open('', '_blank', 'width=1000,height=900');
   if (!win) throw new Error('Tiskové okno bylo zablokováno prohlížečem.');
@@ -260,11 +359,14 @@ export function useReports() {
     [user]
   );
 
+  const exportAuditPack = useCallback(() => exportAuditPackXLSX(), []);
+
   return {
     exportXLSX,
     exportPDF,
     exportInventoryXLSX,
     exportTasksXLSX,
+    exportAuditPack,
     printServiceReport,
   };
 }

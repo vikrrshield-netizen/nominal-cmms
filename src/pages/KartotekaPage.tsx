@@ -1470,6 +1470,15 @@ export default function KartotekaPage() {
     if ((stalePreventive ?? 0) > 0) {
       issues.push({ level: 'warn', text: `${stalePreventive}× preventivní úkol leží přes týden — nedodržovaná prevence = prostoje`, nav: 'tasks' });
     }
+    // Audit (IFS/BRC) chce preventivní plán na VŠECHNY stroje — ukaž, kterým chybí.
+    const noPlan = devs.filter((d) => {
+      const events = (d as { events?: Array<{ frequencyDays?: unknown }> }).events;
+      return !(Array.isArray(events) && events.some((ev) => Number(ev?.frequencyDays) > 0));
+    });
+    if (noPlan.length > 0) {
+      const names = noPlan.slice(0, 3).map((d) => safeText(d.name)).filter(Boolean).join(', ');
+      issues.push({ level: 'warn', text: `${noPlan.length}× stroj bez preventivního plánu (např. ${names}…) — nastav v rodném listu: Potřeby → Události + frekvence ve dnech` });
+    }
     const noCode = devs.filter((d) => !safeText(d.code).trim()).length;
     if (noCode > 0) issues.push({ level: 'info', text: `${noCode}× stroj bez kódu (nepovinné, ale pomáhá hledání)` });
     const order = { err: 0, warn: 1, info: 2 } as const;

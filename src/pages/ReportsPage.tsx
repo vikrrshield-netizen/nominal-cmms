@@ -6,6 +6,8 @@ import { collection, limit, onSnapshot, orderBy, query, Timestamp, where } from 
 import { db } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
 import { useBackNavigation } from '../hooks/useBackNavigation';
+import { useReports } from '../hooks/useReports';
+import { showToast } from '../components/ui/Toast';
 import appConfig from '../appConfig';
 import { brandFilePrefix } from '../lib/branding';
 import {
@@ -1392,6 +1394,22 @@ export default function ReportsPage() {
 
   const canExport = hasPermission('report.export');
 
+  // „Audit balíček" — vícelistý XLSX pro auditora (plány údržby, propadlé termíny, provedeno).
+  const { exportAuditPack } = useReports();
+  const [auditPackBusy, setAuditPackBusy] = useState(false);
+  const handleAuditPack = useCallback(async () => {
+    if (auditPackBusy) return;
+    setAuditPackBusy(true);
+    try {
+      const filename = await exportAuditPack();
+      showToast(`Audit balíček stažen: ${filename}`, 'success');
+    } catch (err) {
+      console.error('[Reports] audit pack:', err);
+      showToast('Export audit balíčku se nepovedl.', 'error');
+    }
+    setAuditPackBusy(false);
+  }, [auditPackBusy, exportAuditPack]);
+
   // Date range
   const { start, end, label: rangeLabel } = useMemo(() => getDateRange(dateRange), [dateRange]);
   const {
@@ -1594,6 +1612,14 @@ export default function ReportsPage() {
             </div>
             {canExport && (
               <div className="flex gap-2">
+                <button
+                  onClick={handleAuditPack}
+                  disabled={auditPackBusy}
+                  title="Audit balíček (IFS/BRC): plány údržby, propadlé termíny a provedená údržba za 12 měsíců — jeden Excel pro auditora"
+                  className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-800 border border-amber-200 rounded-xl hover:bg-amber-100 transition active:scale-95 disabled:opacity-50"
+                >
+                  <ShieldCheck className="w-4 h-4" /><span className="hidden sm:inline">{auditPackBusy ? 'Připravuji…' : 'Audit balíček'}</span>
+                </button>
                 <button onClick={() => handleExport('csv')} className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl hover:bg-emerald-100 transition active:scale-95">
                   <FileSpreadsheet className="w-4 h-4" /><span className="hidden sm:inline">CSV</span>
                 </button>
