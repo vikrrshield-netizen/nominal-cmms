@@ -32,7 +32,7 @@
 **Postup:** každý nález = samostatný mini-fix: přečti uvedený soubor:řádek → oprav minimálně → build → nasaď → commit.
 **NEDĚLAT:** rules hardening (jen s uživatelem u obrazovky), gearbox montáž race (chce změnu modelu).
 
-## DÁVKA 1 — „Stroje bez preventivního plánu" v Kontrole kartotéky (malá, rychlá výhra)
+## DÁVKA 1 — ✅ HOTOVO 2026-07-04 — „Stroje bez preventivního plánu" v Kontrole kartotéky
 **Cíl:** audit chce PPM na VŠECHNY stroje → doktor kartotéky ukáže, kterým chybí.
 **Soubor:** `src/pages/KartotekaPage.tsx` → memo `healthReport` (hledej `🩺 Kontrola kartotéky`).
 **Postup:** do `healthReport` přidej info-check: spočítej stroje (`!isBuildingAsset && !isRoomAsset`, ne virtuální), které NEMAJÍ žádnou událost s `frequencyDays > 0` (pole `asset.events`). Přidej `issues.push({ level: 'info', text: 'N× stroj bez preventivního plánu (Události + frekvence)' })` + po kliku vysvětli, jak plán nastavit (rodný list → Potřeby → Události).
@@ -70,7 +70,7 @@
 **Postup:** 1) klient: checkbox „dočasná oprava" + datum při zakládání/dokončení úkolu → pole `temporaryFix: { until: 'YYYY-MM-DD' }`. 2) backend: rozšíř `functions/src/preventive.ts` denní běh — najdi dokončené úkoly s `temporaryFix.until <= dnes` bez follow-upu → založ úkol „Trvalá oprava: …" (dedup přes `followUpOf: taskId`).
 **Rozsah:** střední. Funkce: build + deploy `functions:generatePreventiveTasks`.
 
-## DÁVKA 7 — Audit balíček (export pro auditora) (SHOULD)
+## DÁVKA 7 — ✅ HOTOVO 2026-07-04 — Audit balíček (export pro auditora)
 **Cíl:** jedním klikem XLSX: stroje + jejich PPM plány + poslední provedení, propadlé termíny, kalibrace, detektory, rozbití skla.
 **Postup:** využij `src/hooks/useReports.ts` (exportXLSX existuje — podívej se, jak ho volá InventoryPage/Reporty). Nová položka v Reportech „Audit balíček (IFS/BRC)": posbírej data z `assets` (events+lastDate/nextDate), `tasks` (source preventive, completed), workLogs. Jen čtení + export, žádné zápisy.
 **Rozsah:** střední, bezpečná (read-only).
