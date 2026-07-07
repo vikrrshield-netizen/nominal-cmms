@@ -531,7 +531,8 @@ export default function AIAssistantPage() {
               {message.image && (
                 <img src={message.image} alt="foto" className="mb-2 max-h-48 w-auto rounded-lg border border-black/10" />
               )}
-              <p className="whitespace-pre-wrap">{message.content}</p>
+              {/* AI občas pošle markdown hvězdičky — chat je nevykresluje, tak je schovej */}
+              <p className="whitespace-pre-wrap">{message.content.replace(/\*\*/g, '')}</p>
 
               <p className="text-xs opacity-60 mt-2">
                 {message.timestamp.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}

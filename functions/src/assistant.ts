@@ -1080,8 +1080,26 @@ async function runTool(name: string, input: any, ctx: { tenantId: string; actor:
       case 'search_worklogs': {
         let logs = await getWorkLogs(tenantId, { assetId: input?.assetId, limit: input?.assetId ? (input?.limit ?? 50) : 200 });
         if (input?.query && !input?.assetId) {
-          const q = String(input.query).toLowerCase();
-          logs = logs.filter((l) => `${l.assetName ?? ''} ${l.workType ?? ''} ${l.content ?? ''}`.toLowerCase().includes(q)).slice(0, input?.limit ?? 50);
+          // Tolerantní hledání: bez diakritiky, po slovech (AND), snese skloňování
+          // („vložené kolo" najde „vloženého kola") — sdílený prefix, ne přesná fráze.
+          const stemHit = (tok: string, words: string[]) => words.some((w) => {
+            if (w.includes(tok) || tok.includes(w)) return true;
+            if (tok.length < 3 || w.length < 3) return false;
+            const L = Math.max(3, Math.min(tok.length, w.length) - 2);
+            return tok.slice(0, L) === w.slice(0, L);
+          });
+          // Vata navíc typická pro dotazy na Deník („bylo měněné, na kterých, ukaž záznamy…").
+          const WORKLOG_STOP = new Set(['byl', 'byla', 'bylo', 'byly', 'ktery', 'ktera', 'ktere', 'kterych', 'kterem', 'kterou', 'jak', 'kde', 'kdy', 'proc', 'menil', 'menila', 'menili', 'menene', 'meneno', 'menena', 'zaznam', 'zaznamy', 'historie', 'denik', 'deniku']);
+          const qTokens = normText(String(input.query)).split(' ').filter((t) => t.length >= 3 && !STRUCT_STOP.has(t) && !WORKLOG_STOP.has(t));
+          if (qTokens.length) {
+            // Krátký dotaz (≤2 slova) musí sedět celý; u delší věty stačí 60 % slov
+            // (uživatel do dotazu přibalí vatu typu „na kterých… bylo měněné…").
+            const need = qTokens.length <= 2 ? qTokens.length : Math.ceil(qTokens.length * 0.6);
+            logs = logs.filter((l) => {
+              const words = normText(`${l.assetName ?? ''} ${l.workType ?? ''} ${l.content ?? ''}`).split(' ').filter(Boolean);
+              return qTokens.filter((t) => stemHit(t, words)).length >= need;
+            }).slice(0, input?.limit ?? 50);
+          }
         }
         const lines = logs.map((l) => `• ${czDate(l.performedAt ?? l.createdAt)} — ${l.assetName ?? '?'}: ${l.workType ?? l.type ?? ''} ${l.content ?? ''} (${l.userName ?? '?'})`);
         return `Záznamy: ${logs.length}\n${lines.join('\n') || '—'}`;
@@ -1382,6 +1400,8 @@ Dnešní datum: ${today}. Mluvíš s: ${actor.name} (role ${role}).
 
 JAK ODPOVÍDAT:
 - VŽDY česky. Stručně, lidsky, jen finální odpověď — žádné meta-komentáře o tom, jak přemýšlíš.
+- VŽDY TYKEJ — jsi kolega z dílny, ne úředník. Nikdy „můžete/prosím upřesněte", ale „můžeš/upřesni mi".
+- PROSTÝ TEXT, ŽÁDNÝ MARKDOWN: chat hvězdičky nevykresluje. Nikdy **tučně**, žádné # nadpisy. Odrážky dělej pomlčkou nebo •, zvýraznění VELKÝMI PÍSMENY nebo emoji.
 - Když se uživatel ptá na STAV, ČÍSLA nebo TERMÍNY, NEHÁDEJ — nejdřív použij čtecí nástroj a odpověz z dat.
 - ZAŘÍZENÍ Z KARTOTÉKY: Lidé píšou názvy strojů různě, zkráceně, bez diakritiky nebo s překlepem. Systém to umí dohledat. Ale když si NEJSI jistý, který stroj uživatel myslí — nebo je víc možností — NEZAPISUJ naslepo: použij find_asset a zeptej se, který to je. Stroj si nikdy nevymýšlej. Když ti nástroj řekne, že zařízení není v Kartotéce nebo je zápis neprovázaný, řekni to uživateli.
 - PORUCHA → PORAĎ Z HISTORIE: když uživatel hlásí poruchu/problém stroje, NEJDŘÍV se podívej do jeho historie (get_asset_detail má poslední práce; víc najdeš přes search_worklogs). Když se podobná závada už řešila, řekni to konkrétně („u tohohle stroje se 3× měnilo ložisko — zkontroluj ho nejdřív") a stejný tip přidej i do popisu navrhovaného úkolu. NIC si nevymýšlej — když historie mlčí, prostě založ hlášení bez tipů.

@@ -179,7 +179,7 @@ export default function AiImportSheet({ isOpen, onClose, onImported }: AiImportS
 
         {reply && (
           <div className="max-h-[40vh] overflow-y-auto whitespace-pre-wrap rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[13px] leading-relaxed text-slate-800">
-            {reply}
+            {reply.replace(/\*\*/g, '')}
           </div>
         )}
 

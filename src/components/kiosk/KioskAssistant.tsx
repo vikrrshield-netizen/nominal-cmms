@@ -138,7 +138,8 @@ export default function KioskAssistant() {
             </div>
             <div className={`max-w-[82%] rounded-2xl p-3 text-lg ${m.role === 'user' ? 'bg-blue-500 text-white' : 'border border-slate-200 bg-white text-slate-900'}`}>
               {m.image && <img src={m.image} alt="foto" className="mb-2 max-h-40 w-auto rounded-lg border border-black/10" />}
-              <p className="whitespace-pre-wrap">{m.content}</p>
+              {/* AI občas pošle markdown hvězdičky — chat je nevykresluje, tak je schovej */}
+              <p className="whitespace-pre-wrap">{m.content.replace(/\*\*/g, '')}</p>
             </div>
           </div>
         ))}
