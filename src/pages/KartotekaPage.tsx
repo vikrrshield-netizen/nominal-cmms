@@ -5,7 +5,7 @@
 
 import { useEffect, useState, useMemo, useCallback, type DragEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { addDoc, collection, doc, serverTimestamp, setDoc, Timestamp } from 'firebase/firestore';
+import { addDoc, collection, doc, serverTimestamp, setDoc, Timestamp, getDocs, query, where } from 'firebase/firestore';
 import {
   ArrowLeft, Building2, Search, Upload, Plus, X,
   ChevronRight, ChevronDown, FileText, Loader2, Trash2,
@@ -760,6 +760,7 @@ export default function KartotekaPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [moveSheetOpen, setMoveSheetOpen] = useState(false);
   const [checkOpen, setCheckOpen] = useState(false); // 🩺 kontrola kartotéky
+  const [stalePreventive, setStalePreventive] = useState<number | null>(null); // preventivní úkoly ležící >7 dní
   const [actionTarget, setActionTarget] = useState<DisplayAsset | null>(null); // ⋯ menu položky
   const [bulkBuilding, setBulkBuilding] = useState('');
   const [bulkRoomKey, setBulkRoomKey] = useState(''); // id uzlu místnosti ve stromu (reálná i virtuální)
@@ -1374,11 +1375,32 @@ export default function KartotekaPage() {
     return Array.from(map.entries()).sort((x, y) => x[0].localeCompare(y[0], 'cs'));
   }, [treeAssets]);
 
+  // Ležící preventivní úkoly (>7 dní) — načte se jednou při otevření kontroly.
+  useEffect(() => {
+    if (!checkOpen || stalePreventive !== null) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const snap = await getDocs(query(collection(db, 'tasks'), where('source', '==', 'preventive')));
+        const now = Date.now();
+        const OPEN = ['backlog', 'planned', 'in_progress', 'paused'];
+        const n = snap.docs
+          .map((d) => d.data() as { status?: string; createdAt?: { toMillis?: () => number } })
+          .filter((t) => OPEN.includes(String(t.status ?? '')) && (t.createdAt?.toMillis?.() ?? now) < now - 7 * 86400000)
+          .length;
+        if (!cancelled) setStalePreventive(n);
+      } catch {
+        if (!cancelled) setStalePreventive(0); // bez práva na úkoly → kontrolu nepokazit
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [checkOpen, stalePreventive]);
+
   // 🩺 Kontrola kartotéky: projede všechny položky a najde nesrovnalosti v datech.
   // Počítá se až po otevření panelu (checkOpen) — jinak zbytečná práce při každém renderu.
   const healthReport = useMemo(() => {
     if (!checkOpen) return null;
-    type HealthIssue = { level: 'err' | 'warn' | 'info'; text: string; asset?: Asset };
+    type HealthIssue = { level: 'err' | 'warn' | 'info'; text: string; asset?: Asset; nav?: 'unassigned' | 'tasks' };
     const issues: HealthIssue[] = [];
     const byId = new Map(assets.map((a) => [a.id, a]));
     // Budova položky po řetězu SKUTEČNÝCH rodičů (bez vlastního buildingId).
@@ -1443,7 +1465,10 @@ export default function KartotekaPage() {
       if (arr.length > 1) issues.push({ level: 'warn', text: `Duplicitní kód ${safeText(arr[0].code)} (${arr.length}×)`, asset: arr[0] });
     }
     if (unassignedIds.size > 0) {
-      issues.push({ level: 'warn', text: `${unassignedIds.size}× stroj bez budovy — klepni a ukážu je` });
+      issues.push({ level: 'warn', text: `${unassignedIds.size}× stroj bez budovy — klepni a ukážu je`, nav: 'unassigned' });
+    }
+    if ((stalePreventive ?? 0) > 0) {
+      issues.push({ level: 'warn', text: `${stalePreventive}× preventivní úkol leží přes týden — nedodržovaná prevence = prostoje`, nav: 'tasks' });
     }
     const noCode = devs.filter((d) => !safeText(d.code).trim()).length;
     if (noCode > 0) issues.push({ level: 'info', text: `${noCode}× stroj bez kódu (nepovinné, ale pomáhá hledání)` });
@@ -1454,7 +1479,7 @@ export default function KartotekaPage() {
       errs: issues.filter((i) => i.level === 'err').length,
       warns: issues.filter((i) => i.level === 'warn').length,
     };
-  }, [checkOpen, assets, unassignedIds]);
+  }, [checkOpen, assets, unassignedIds, stalePreventive]);
 
   // Nabídka EXISTUJÍCÍCH místností pro hromadný přesun (jen ze zvolené budovy).
   // Hodnota = id uzlu ve stromu → u reálné místnosti známe rovnou parentId, žádné hádání podle názvu.
@@ -2345,7 +2370,8 @@ export default function KartotekaPage() {
                     onClick={() => {
                       setCheckOpen(false);
                       if (iss.asset) handleDetail(iss.asset as DisplayAsset);
-                      else { setFilter('unassigned'); setBuildingFilter('all'); setTypeFilter('all'); }
+                      else if (iss.nav === 'tasks') navigate('/tasks');
+                      else if (iss.nav === 'unassigned') { setFilter('unassigned'); setBuildingFilter('all'); setTypeFilter('all'); }
                     }}
                     className={`flex w-full items-start gap-2 rounded-xl border px-3 py-2.5 text-left text-[13px] font-semibold transition active:scale-[0.99] ${
                       iss.level === 'err'

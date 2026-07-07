@@ -1115,7 +1115,7 @@ async function runTool(name: string, input: any, ctx: { tenantId: string; actor:
           const d = daysUntil(ev.nextDate);
           return `   • ${ev.name}: ${ev.nextDate ?? '—'}${d !== null ? (d < 0 ? ' (PO TERMÍNU)' : ` (za ${d} dní)`) : ''}`;
         });
-        const logs = await getWorkLogs(tenantId, { assetId: asset.id, limit: 5 });
+        const logs = await getWorkLogs(tenantId, { assetId: asset.id, limit: 8 });
         const logLines = logs.map((l) => `   • ${czDate(l.performedAt ?? l.createdAt)}: ${l.workType ?? l.type ?? ''} ${l.content ?? ''}`);
         const out: string[] = [
           `${asset.name} — ${typeLabel} — ${statusLabel(asset.status)}`,
@@ -1384,6 +1384,7 @@ JAK ODPOVÍDAT:
 - VŽDY česky. Stručně, lidsky, jen finální odpověď — žádné meta-komentáře o tom, jak přemýšlíš.
 - Když se uživatel ptá na STAV, ČÍSLA nebo TERMÍNY, NEHÁDEJ — nejdřív použij čtecí nástroj a odpověz z dat.
 - ZAŘÍZENÍ Z KARTOTÉKY: Lidé píšou názvy strojů různě, zkráceně, bez diakritiky nebo s překlepem. Systém to umí dohledat. Ale když si NEJSI jistý, který stroj uživatel myslí — nebo je víc možností — NEZAPISUJ naslepo: použij find_asset a zeptej se, který to je. Stroj si nikdy nevymýšlej. Když ti nástroj řekne, že zařízení není v Kartotéce nebo je zápis neprovázaný, řekni to uživateli.
+- PORUCHA → PORAĎ Z HISTORIE: když uživatel hlásí poruchu/problém stroje, NEJDŘÍV se podívej do jeho historie (get_asset_detail má poslední práce; víc najdeš přes search_worklogs). Když se podobná závada už řešila, řekni to konkrétně („u tohohle stroje se 3× měnilo ložisko — zkontroluj ho nejdřív") a stejný tip přidej i do popisu navrhovaného úkolu. NIC si nevymýšlej — když historie mlčí, prostě založ hlášení bez tipů.
 - VÝROBNÍ ŠTÍTEK Z FOTKY: Když dostaneš fotku výrobního štítku stroje, přečti z něj název, kód/typ, výrobce, model, výrobní (sériové) číslo a rok. NEJDŘÍV ověř find_asset, jestli stroj v Kartotéce už není (ať nevznikají duplicity). Pokud není, ukaž načtené údaje a po souhlasu ho založ přes create_asset. Pokud je, ukaž jeho kartu/stav.
 - ZAKLÁDÁNÍ KARTOTÉKY (hlavně nová firma): Když uživatel popisuje uspořádání firmy — budovy/haly, místnosti/úseky a stroje v nich — použij create_asset_tree a založ CELOU strukturu najednou (rozklíčuj do budov → místností → strojů). Chybějící detaily (kódy, výrobce) nech prázdné, neptej se na drobnosti; doptej se jen když je struktura nejasná. (Smí to jen vedení.)
 - Když si všimneš opakujícího se problému nebo příležitosti ke zlepšení (často se kazící stroj, propadlé termíny), stručně NAVRHNI zlepšení.
@@ -1845,6 +1846,9 @@ async function gatherSummaryData(tenantId: string): Promise<{ dataText: string; 
   const auditOverdue = events.filter((x: any) => x.d !== null && x.d < 0 && AUDIT_RE.test(`${x.ev.name ?? ''} ${x.ev.eventType ?? ''}`));
   const tasks = await getOpenTasks(tenantId);
   const p1 = tasks.filter((t) => String(t.priority) === 'P1');
+  // Zanedbaná preventivka: automaticky založený preventivní úkol, který leží přes týden.
+  const nowMs = Date.now();
+  const stalePrev = tasks.filter((t) => String(t.source) === 'preventive' && (t.createdAt?.toMillis?.() ?? nowMs) < nowMs - 7 * 86400000);
   const stats = await getGlobalStats();
   const lemon = Array.isArray(stats?.lemonList) ? stats.lemonList : [];
   const memories = (await getAiMemory(tenantId, '')).firm;
@@ -1855,6 +1859,8 @@ async function gatherSummaryData(tenantId: string): Promise<{ dataText: string; 
     `Z toho auditních po termínu (IFS/BRC): ${auditOverdue.length}`,
     `Blíží se do 14 dní: ${soon.length}`,
     `Otevřené úkoly: ${tasks.length} (P1 havárie: ${p1.length})`,
+    `ZANEDBANÁ PREVENTIVKA (úkol leží >7 dní): ${stalePrev.length}`,
+    ...stalePrev.slice(0, 8).map((t: any) => `   • ${[t.code, t.title].filter(Boolean).join(' — ')}`),
     `Dokončeno celkem: ${stats?.completedTasks ?? '?'} / ${stats?.totalTasks ?? '?'}`,
     stats?.mttrMinutes ? `Průměrná doba opravy (MTTR): ${Math.round(stats.mttrMinutes)} min` : '',
     `Nejporuchovější stroje (30 dní): ${lemon.slice(0, 5).map((l: any) => `${l.assetName ?? l.assetId} (${l.issueCount}×)`).join(', ') || '—'}`,
@@ -1871,8 +1877,8 @@ async function sendAiSummary(kind: 'weekly' | 'monthly'): Promise<void> {
   const { dataText, memBlock } = await gatherSummaryData(tenantId);
 
   const system = kind === 'monthly'
-    ? `Jsi AI asistent údržby potravinářského závodu (firma nominal). Napiš MĚSÍČNÍ MANAŽERSKÝ REPORT pro vedení v češtině. Struktura: (1) 2–3 věty celkové shrnutí měsíce; (2) klíčová čísla (poruchy, dokončené úkoly, MTTR, audit); (3) 3 nejrizikovější stroje/oblasti; (4) 3–5 konkrétních doporučení na příští měsíc (prevence, priority, audit IFS/BRC). Věcně, přehledně, bez balastu — čte to šéf.${memBlock}`
-    : `Jsi AI asistent údržby potravinářského závodu (firma nominal). Napiš KRÁTKÝ týdenní souhrn pro vedení v češtině: 3–5 vět co je tento týden důležité + 2–3 konkrétní návrhy, na co se zaměřit (priority, prevence, audit). Stručně, lidsky, bez balastu.${memBlock}`;
+    ? `Jsi AI asistent údržby potravinářského závodu (firma nominal). Napiš MĚSÍČNÍ MANAŽERSKÝ REPORT pro vedení v češtině. Struktura: (1) 2–3 věty celkové shrnutí měsíce; (2) klíčová čísla (poruchy, dokončené úkoly, MTTR, audit); (3) 3 nejrizikovější stroje/oblasti; (4) 3–5 konkrétních doporučení na příští měsíc (prevence, priority, audit IFS/BRC). Když data ukazují ZANEDBANOU PREVENTIVKU (ležící preventivní úkoly), zmiň ji VÝSLOVNĚ — nedodržovaná prevence je nejčastější příčina prostojů. Věcně, přehledně, bez balastu — čte to šéf.${memBlock}`
+    : `Jsi AI asistent údržby potravinářského závodu (firma nominal). Napiš KRÁTKÝ týdenní souhrn pro vedení v češtině: 3–5 vět co je tento týden důležité + 2–3 konkrétní návrhy, na co se zaměřit (priority, prevence, audit). Když data ukazují ZANEDBANOU PREVENTIVKU (ležící preventivní úkoly), zmiň ji výslovně. Stručně, lidsky, bez balastu.${memBlock}`;
 
   const client = new Anthropic({ apiKey });
   const resp = await client.messages.create({
