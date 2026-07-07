@@ -814,8 +814,8 @@ const WRITE_TOOLS: Anthropic.Tool[] = [
     input_schema: {
       type: 'object',
       properties: {
-        name: { type: 'string', description: 'název položky (stroje / místnosti / budovy)' },
-        type: { type: 'string', enum: ['stroj', 'mistnost', 'budova'], description: 'co zakládáš: stroj (default), mistnost, nebo budova' },
+        name: { type: 'string', description: 'název položky (stroje / místnosti / budovy / měřidla / detektoru)' },
+        type: { type: 'string', enum: ['stroj', 'mistnost', 'budova', 'meridlo', 'detektor'], description: 'co zakládáš: stroj (default), mistnost, budova, meridlo (kalibrované měřidlo), detektor (cizí tělesa — magnet/síto/kovodetektor)' },
         building: { type: 'string', description: 'kam patří — budova: písmeno A–L nebo název (např. „Výrobní hala"). U type=budova nech prázdné.' },
         room: { type: 'string', description: 'kam patří — místnost (název, např. „Míchárna"). Jen u type=stroj.' },
         code: { type: 'string', description: 'kód / typ / označení (např. ze štítku), volitelné' },
@@ -1292,8 +1292,8 @@ async function runTool(name: string, input: any, ctx: { tenantId: string; actor:
         if (!roleCan(role, 'asset.create')) return NO_PERM_MSG;
         if (!input?.name) return 'Chybí název položky.';
         const kind = String(input?.type ?? 'stroj').toLowerCase();
-        const entityType = kind === 'budova' ? 'Budova' : kind === 'mistnost' ? 'Místnost' : 'Zařízení';
-        const kindLabel = kind === 'budova' ? 'budovu' : kind === 'mistnost' ? 'místnost' : 'stroj';
+        const entityType = kind === 'budova' ? 'Budova' : kind === 'mistnost' ? 'Místnost' : kind === 'meridlo' ? 'Měřidlo' : kind === 'detektor' ? 'Detektor' : 'Zařízení';
+        const kindLabel = kind === 'budova' ? 'budovu' : kind === 'mistnost' ? 'místnost' : kind === 'meridlo' ? 'měřidlo' : kind === 'detektor' ? 'detektor' : 'stroj';
         // Ochrana proti duplicitám — jen u strojů (místnost/budova se stejným názvem může legitimně být víc).
         if (kind === 'stroj') {
           let existing = (await resolveAsset(tenantId, String(input.name), cache)).match;
@@ -1469,7 +1469,7 @@ JAK ODPOVÍDAT:
 ${canWrite
     ? `- Umíš i AKCE: zápis do Deníku (log_work), založení úkolu (create_task), uzavření úkolu (close_task), změna stavu stroje (set_machine_status) a hlavně SPRÁVA KARTOTÉKY — založení položky (create_asset), přesun (move_asset), úprava údajů (update_asset), hromadné založení struktury (create_asset_tree). Použij je JEN když to uživatel jasně chce (např. „zapiš že jsme vyměnili ložisko na EXT-001", „extruder je v poruše", „úkol WO-2026-12 je hotový", „přesuň Extruder 3 do míchárny", „u pece doplň výrobce"). DŮLEŽITÉ: tyhle akce se NEprovedou hned — připraví se jako NÁVRH a uživatel je potvrdí tlačítkem Ano/Ne (ukáže se samo). Proto NEHLAŠ „zapsáno/hotovo" dopředu; jen KRÁTCE řekni, co chystáš, a nech potvrdit. Stejný nástroj nevolej dvakrát.
 - SPRÁVA KARTOTÉKY PŘES CHAT (důležité, uživatel chce vést kartotéku přes tebe): rozuměj hierarchii BUDOVA → MÍSTNOST → STROJ a hledej v ní logiku.
-   • Zakládání: create_asset s „type" (stroj/mistnost/budova). Umístění řekni přes „building" (písmeno A–L nebo název, např. „Výrobní hala") a u stroje i „room" (název místnosti) — položka se sama propojí pod správnou budovu/místnost. Když uživatel popisuje celé uspořádání firmy naráz, použij radši create_asset_tree.
+   • Zakládání: create_asset s „type" (stroj/mistnost/budova/meridlo/detektor). Měřidla (teploměry, váhy, sondy) = type meridlo; detektory cizích těles (magnety, síta, kovodetektory) = type detektor — audit je eviduje zvlášť, po založení poraď nastavit v rodném listu Událost kalibrace/test s frekvencí. Umístění řekni přes „building" (písmeno A–L nebo název, např. „Výrobní hala") a u stroje i „room" (název místnosti) — položka se sama propojí pod správnou budovu/místnost. Když uživatel popisuje celé uspořádání firmy naráz, použij radši create_asset_tree.
    • Přesun (když je něco zapsané špatně / patří jinam): move_asset — zadej „asset" (co) a cíl „building" a/nebo „room".
    • Úprava rodného listu (název, kód, výrobce, model, sériové číslo, rok, kategorie): update_asset — měň JEN pole, která uživatel zmíní.
    • Když neznáš budovu/místnost přesně, zeptej se; nezakládej duplicitní stroj (nejdřív ověř find_asset). Pro změnu STAVU stroje použij set_machine_status, ne update_asset.`
