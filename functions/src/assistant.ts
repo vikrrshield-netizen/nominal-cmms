@@ -14,8 +14,9 @@ import * as admin from 'firebase-admin';
 import Anthropic from '@anthropic-ai/sdk';
 
 // ── Konfigurace ────────────────────────────────────────────────
-// MODEL: claude-haiku-4-5 = nejrychlejší + nejlevnější. Chytřejší: 'claude-sonnet-4-6'. Nejchytřejší: 'claude-opus-4-8'.
-const MODEL = 'claude-haiku-4-5';
+// MODEL: claude-sonnet-4-6 = chytřejší (líp chápe nejasné dotazy), ~3× dražší než Haiku, o vteřinku pomalejší.
+// Rychlejší+levnější: 'claude-haiku-4-5'. Nejchytřejší: 'claude-opus-4-8'. Přepnuto na Sonnet 2026-07-04 (uživateli Haiku nepřišel dost chytrý).
+const MODEL = 'claude-sonnet-4-6';
 const MAX_TOKENS = 2048;       // strop odpovědi (chat = krátké odpovědi → drží to náklady)
 const MAX_TURNS = 6;           // strop kol smyčky nástrojů (ochrana proti zacyklení)
 const HISTORY_LIMIT = 12;      // kolik posledních zpráv historie posíláme
