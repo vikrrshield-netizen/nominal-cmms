@@ -5,10 +5,10 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, getDocs, limit, orderBy, query } from 'firebase/firestore';
+import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 import {
   ArrowLeft, Activity, AlertTriangle, ClipboardCheck,
-  FileText, ShieldCheck, Loader2, Gauge,
+  FileText, ShieldCheck, Loader2, Gauge, Bug,
 } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
@@ -93,6 +93,7 @@ export default function OversightPage() {
   const [workLast7, setWorkLast7] = useState<number>(0);
   const [lastInspectMs, setLastInspectMs] = useState<number>(0);
   const [inspectLast7, setInspectLast7] = useState<number>(0);
+  const [errRows, setErrRows] = useState<Array<{ message: string; path: string; severity: string; ms: number }>>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -118,6 +119,27 @@ export default function OversightPage() {
             setLastInspectMs(rows[0] ? toMs((rows[0] as { createdAt?: unknown }).createdAt) : 0);
             setInspectLast7(rows.filter((r) => toMs((r as { createdAt?: unknown }).createdAt) >= week).length);
           } catch { /* ignore */ }
+        })(),
+        (async () => {
+          // Chyby appky = audit_logs type 'error'. Zkus indexovaný dotaz, jinak spadni na
+          // čtení posledních logů a filtruj chyby v paměti (bez nutnosti indexu).
+          try {
+            let rows: Array<Record<string, unknown>>;
+            try {
+              const snap = await getDocs(query(collection(db, 'audit_logs'), where('type', '==', 'error'), orderBy('createdAt', 'desc'), limit(40)));
+              rows = snap.docs.map((d) => d.data());
+            } catch {
+              const snap = await getDocs(query(collection(db, 'audit_logs'), orderBy('createdAt', 'desc'), limit(300)));
+              rows = snap.docs.map((d) => d.data()).filter((r) => r.type === 'error' || r.category === 'app_error').slice(0, 40);
+            }
+            if (!alive) return;
+            setErrRows(rows.map((r) => ({
+              message: String(r.message ?? r.name ?? 'Chyba'),
+              path: String(r.path ?? ''),
+              severity: String(r.severity ?? 'error'),
+              ms: toMs(r.createdAt),
+            })));
+          } catch { /* bez práva → prázdné */ }
         })(),
       ]);
       if (alive) { setAssets(a); setLoading(false); }
@@ -147,6 +169,31 @@ export default function OversightPage() {
   }, [assets]);
 
   const donePct = stats.totalTasks > 0 ? Math.round((stats.completedTasks / stats.totalTasks) * 100) : null;
+
+  // ── Chyby aplikace (to „gro" — co se v appce rozbilo) ──
+  const err = useMemo(() => {
+    const now = Date.now();
+    const last24 = errRows.filter((e) => e.ms >= now - 86400000);
+    const last7 = errRows.filter((e) => e.ms >= now - 7 * 86400000);
+    const fatal24 = last24.filter((e) => e.severity === 'fatal').length;
+    return { last24: last24.length, last7: last7.length, fatal24, recent: errRows.slice(0, 6) };
+  }, [errRows]);
+
+  const errSignals: Signal[] = [
+    {
+      label: 'Chyby za 24 hodin', value: String(err.last24),
+      tone: err.fatal24 > 0 ? 'crit' : err.last24 > 0 ? 'warn' : 'ok',
+      hint: err.fatal24 > 0 ? `${err.fatal24}× vážná (appka spadla)` : err.last24 === 0 ? 'appka běží čistě' : undefined,
+    },
+    { label: 'Chyby za 7 dní', value: String(err.last7), tone: err.last7 > 0 ? 'warn' : 'ok' },
+    ...err.recent.map((e): Signal => ({
+      label: e.message.slice(0, 90),
+      value: agoLabel(e.ms),
+      tone: e.severity === 'fatal' ? 'crit' : e.severity === 'warning' ? 'idle' : 'warn',
+      hint: e.path ? `kde: ${e.path}` : undefined,
+      onClick: e.path && e.path.startsWith('/') ? () => navigate(e.path) : undefined,
+    })),
+  ];
 
   // ── Panel 1: Žijí data / používá se to ──
   const fungujeSignals: Signal[] = [
@@ -200,7 +247,7 @@ export default function OversightPage() {
         <Gauge className="shrink-0 text-emerald-700" size={24} />
         <div className="min-w-0 flex-1">
           <h1 className="text-xl font-black text-slate-900">Dohled</h1>
-          <p className="text-[13px] text-slate-500">Kontrolní věž — na první pohled, jestli to celé žije a funguje.</p>
+          <p className="text-[13px] text-slate-500">Chyby appky a jak to celé funguje — na jednom místě.</p>
         </div>
       </div>
 
@@ -208,6 +255,7 @@ export default function OversightPage() {
         <div className="flex items-center justify-center gap-2 py-12 text-slate-500"><Loader2 size={20} className="animate-spin" /> Načítám…</div>
       ) : (
         <>
+          <Panel title="Chyby aplikace" icon={Bug} signals={errSignals} />
           <Panel title="Žijí data / používá se to" icon={Activity} signals={fungujeSignals} />
           <Panel title="Provoz v kondici" icon={AlertTriangle} signals={provozSignals} />
           <Panel title="Dodržuje se" icon={ClipboardCheck} signals={dodrzujeSignals} />
