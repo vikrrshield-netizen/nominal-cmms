@@ -15,7 +15,7 @@ import {
   Settings, AlertTriangle, Bell, LogOut, Loader2, ClipboardCheck,
   Sparkles, Wrench, BarChart3, Ruler, GlassWater, ScanLine, HelpCircle, QrCode,
   Clock, FileText, PlusCircle, Search, ShieldCheck, X, User, MapPin,
-  Calendar, Building2, Package, Wind, Cog, Thermometer, Monitor, Factory, FlaskConical, Users,
+  Calendar, Building2, Package, Wind, Cog, Thermometer, Monitor, Factory, FlaskConical, Users, Gauge,
   ChevronUp, ChevronDown,
 } from 'lucide-react';
 import appConfig from '../appConfig';
@@ -272,6 +272,7 @@ function ModuleShortcuts({ onNavigate, showHeader = true, counts }: { onNavigate
   const canAny = (permissions: string[]) => permissions.some((permission) => hasPermission(permission));
 
   const modules = [
+    { label: 'Dohled', detail: 'jak to celé funguje', path: '/dohled', icon: Gauge, tone: 'text-emerald-700', permissions: ['report.read'] },
     { label: 'Kartotéka', detail: 'budovy, místnosti, zařízení', path: '/kartoteka', icon: Building2, tone: 'text-sky-600', permissions: ['asset.read'] },
     { label: 'Úkoly', detail: 'otevřená práce', path: '/tasks', icon: Wrench, tone: 'text-amber-600', permissions: ['wo.read', 'wo.create', 'wo.update'] },
     { label: 'Deník prací', detail: 'hotové zápisy', path: '/work-diary', icon: FileText, tone: 'text-emerald-700', permissions: ['wo.read', 'wo.create', 'wo.update'] },

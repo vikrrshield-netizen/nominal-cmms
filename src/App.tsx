@@ -24,6 +24,7 @@ const HvacPage = lazy(() => import('./pages/HvacPage'));
 const CalibrationPage = lazy(() => import('./pages/CalibrationPage'));
 const GlassRegisterPage = lazy(() => import('./pages/GlassRegisterPage'));
 const DetectorsPage = lazy(() => import('./pages/DetectorsPage'));
+const OversightPage = lazy(() => import('./pages/OversightPage'));
 const GuidesPage = lazy(() => import('./pages/GuidesPage'));
 const LabelsPage = lazy(() => import('./pages/LabelsPage'));
 const GearboxesPage = lazy(() => import('./pages/GearboxesPage'));
@@ -168,6 +169,7 @@ function RoutedContent() {
         <Route path="/kalibrace" element={<ProtectedPage permissions={['asset.read']}><CalibrationPage /></ProtectedPage>} />
         <Route path="/registr-skla" element={<ProtectedPage permissions={['asset.read']}><GlassRegisterPage /></ProtectedPage>} />
         <Route path="/detektory" element={<ProtectedPage permissions={['asset.read']}><DetectorsPage /></ProtectedPage>} />
+        <Route path="/dohled" element={<ProtectedPage permissions={['report.read']}><OversightPage /></ProtectedPage>} />
         <Route path="/navody" element={<ProtectedPage permissions={[]}><GuidesPage /></ProtectedPage>} />
         <Route path="/stitky" element={<ProtectedPage permissions={['asset.read']}><LabelsPage /></ProtectedPage>} />
         <Route path="/linky" element={<ProtectedPage permissions={['asset.read']}><ProductionLinesPage /></ProtectedPage>} />
