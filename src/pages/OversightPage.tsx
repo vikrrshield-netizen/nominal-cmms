@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 import {
   ArrowLeft, Activity, AlertTriangle, ClipboardCheck,
-  FileText, ShieldCheck, Loader2, Gauge, Bug,
+  FileText, ShieldCheck, Loader2, Gauge, Bug, Users,
 } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { useAuthContext } from '../context/AuthContext';
@@ -94,6 +94,11 @@ export default function OversightPage() {
   const [lastInspectMs, setLastInspectMs] = useState<number>(0);
   const [inspectLast7, setInspectLast7] = useState<number>(0);
   const [errRows, setErrRows] = useState<Array<{ message: string; path: string; severity: string; ms: number }>>([]);
+  // Adopce (Cíl 1): kdo appku reálně používá.
+  const [wlUsers7, setWlUsers7] = useState<string[]>([]);
+  const [taskUsers7, setTaskUsers7] = useState<string[]>([]);
+  const [reports7, setReports7] = useState(0);
+  const [viaAi7, setViaAi7] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -108,8 +113,22 @@ export default function OversightPage() {
             if (!alive) return;
             const rows = snap.docs.map((d) => d.data());
             setLastWorkMs(rows[0] ? toMs((rows[0] as { performedAt?: unknown; createdAt?: unknown }).performedAt ?? (rows[0] as { createdAt?: unknown }).createdAt) : 0);
-            setWorkLast7(rows.filter((r) => toMs((r as { performedAt?: unknown; createdAt?: unknown }).performedAt ?? (r as { createdAt?: unknown }).createdAt) >= week).length);
+            const rows7 = rows.filter((r) => toMs((r as { performedAt?: unknown; createdAt?: unknown }).performedAt ?? (r as { createdAt?: unknown }).createdAt) >= week);
+            setWorkLast7(rows7.length);
+            setWlUsers7(rows7.map((r) => String((r as { userId?: unknown; userName?: unknown }).userId ?? (r as { userName?: unknown }).userName ?? '')).filter(Boolean));
           } catch { /* bez práva/indexu → nech 0 */ }
+        })(),
+        (async () => {
+          // Nové úkoly/hlášení za 7 dní + kdo je zakládá (adopce, Cíl 1).
+          try {
+            const snap = await getDocs(query(collection(db, 'tasks'), orderBy('createdAt', 'desc'), limit(200)));
+            if (!alive) return;
+            const rows = snap.docs.map((d) => d.data() as Record<string, unknown>);
+            const last7 = rows.filter((r) => toMs(r.createdAt) >= week && String(r.source ?? '') !== 'preventive');
+            setReports7(last7.length);
+            setViaAi7(last7.filter((r) => String(r.source ?? '') === 'ai').length);
+            setTaskUsers7(last7.map((r) => String(r.createdById ?? r.createdByName ?? '')).filter((v) => v && v !== 'system'));
+          } catch { /* ignore */ }
         })(),
         (async () => {
           try {
@@ -169,6 +188,33 @@ export default function OversightPage() {
   }, [assets]);
 
   const donePct = stats.totalTasks > 0 ? Math.round((stats.completedTasks / stats.totalTasks) * 100) : null;
+
+  // ── Adopce (Cíl 1 z CILOVA-CARA.md): používá firma appku doopravdy? ──
+  const adoption = useMemo(() => {
+    const users = new Set([...wlUsers7, ...taskUsers7]);
+    return {
+      users7: users.size,
+      perDay: Math.round((workLast7 / 7) * 10) / 10,
+    };
+  }, [wlUsers7, taskUsers7, workLast7]);
+
+  const adopceSignals: Signal[] = [
+    {
+      label: 'Aktivní lidé za 7 dní', value: `${adoption.users7} / cíl 8`,
+      tone: adoption.users7 >= 8 ? 'ok' : adoption.users7 >= 4 ? 'warn' : 'crit',
+      hint: 'kdo zapsal práci nebo založil úkol/hlášení',
+    },
+    {
+      label: 'Zápisy do Deníku za den', value: `${adoption.perDay} / cíl 5`,
+      tone: adoption.perDay >= 5 ? 'ok' : adoption.perDay >= 2 ? 'warn' : 'crit',
+      hint: 'průměr za posledních 7 dní',
+    },
+    {
+      label: 'Nová hlášení a úkoly za 7 dní', value: String(reports7),
+      tone: reports7 > 0 ? 'ok' : 'idle',
+      hint: viaAi7 > 0 ? `z toho přes AI/kiosk: ${viaAi7}` : 'bez automatických (preventivka se nepočítá)',
+    },
+  ];
 
   // ── Chyby aplikace (to „gro" — co se v appce rozbilo) ──
   const err = useMemo(() => {
@@ -256,6 +302,7 @@ export default function OversightPage() {
       ) : (
         <>
           <Panel title="Chyby aplikace" icon={Bug} signals={errSignals} />
+          <Panel title="Adopce — Cíl 1: firma to žije" icon={Users} signals={adopceSignals} />
           <Panel title="Žijí data / používá se to" icon={Activity} signals={fungujeSignals} />
           <Panel title="Provoz v kondici" icon={AlertTriangle} signals={provozSignals} />
           <Panel title="Dodržuje se" icon={ClipboardCheck} signals={dodrzujeSignals} />

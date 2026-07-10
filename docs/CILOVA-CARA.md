@@ -45,11 +45,12 @@ Cílové termíny: pitch **do 30. 9. 2026**, první firma **do 31. 12. 2026** (u
 
 ---
 
-## Dávka C1 — Čísla adopce v Dohledu (malá; udělat brzy)
-**Cíl:** aby šel Cíl 1 MĚŘIT. Do OversightPage (panel „Žijí data") doplnit: aktivních uživatelů za 7 dní
-(workLogs+tasks distinct userId), zápisů/den (průměr 7 dní), % úkolů založených z kiosku/AI (source pole).
-Jen čtení, žádné rules. Pak stejná čísla přidat do týdenního AI souhrnu (gatherSummaryData).
+## Dávka C1 — ✅ HOTOVO 2026-07-10 — Čísla adopce v Dohledu
+Dohled má panel „Adopce — Cíl 1: firma to žije": aktivní lidé/7 dní (cíl 8), zápisy/den (cíl 5),
+nová hlášení/7 dní (+ kolik přes AI/kiosk; preventivka se nepočítá). Stejná čísla chodí vedení
+v týdenním/měsíčním AI souhrnu (gatherSummaryData → řádek ADOPCE).
 
 ## Stav (aktualizovat při každém posunu)
 - 2026-07-10: cílová čára založena. Appka funkčně připravená (kartotéka, preventivka, kalibrace,
   detektory, QR, AI, audit balíček, dohled). Teď se DOTAHUJE: data + lidi + čísla, ne nové funkce.
+- 2026-07-10: C1 hotová — Cíl 1 jde měřit v Dohledu i v AI souhrnech. Další krok: lidi + QR + termín auditu.

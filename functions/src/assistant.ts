@@ -1929,6 +1929,11 @@ async function gatherSummaryData(tenantId: string): Promise<{ dataText: string; 
   // Zanedbaná preventivka: automaticky založený preventivní úkol, který leží přes týden.
   const nowMs = Date.now();
   const stalePrev = tasks.filter((t) => String(t.source) === 'preventive' && (t.createdAt?.toMillis?.() ?? nowMs) < nowMs - 7 * 86400000);
+  // Adopce (Cíl 1 z docs/CILOVA-CARA.md): používá firma appku doopravdy?
+  const logs7 = (await getWorkLogs(tenantId, { limit: 300 }))
+    .filter((l) => ((l.performedAt ?? l.createdAt)?.toMillis?.() ?? 0) >= nowMs - 7 * 86400000);
+  const activeUsers7 = new Set(logs7.map((l) => String(l.userId ?? l.userName ?? '')).filter(Boolean)).size;
+  const perDay = Math.round((logs7.length / 7) * 10) / 10;
   const stats = await getGlobalStats();
   const lemon = Array.isArray(stats?.lemonList) ? stats.lemonList : [];
   const memories = (await getAiMemory(tenantId, '')).firm;
@@ -1941,6 +1946,7 @@ async function gatherSummaryData(tenantId: string): Promise<{ dataText: string; 
     `Otevřené úkoly: ${tasks.length} (P1 havárie: ${p1.length})`,
     `ZANEDBANÁ PREVENTIVKA (úkol leží >7 dní): ${stalePrev.length}`,
     ...stalePrev.slice(0, 8).map((t: any) => `   • ${[t.code, t.title].filter(Boolean).join(' — ')}`),
+    `ADOPCE (cíl „firma to žije"): aktivních lidí za 7 dní: ${activeUsers7} (cíl 8) · zápisů do Deníku za den: ${perDay} (cíl 5)`,
     `Dokončeno celkem: ${stats?.completedTasks ?? '?'} / ${stats?.totalTasks ?? '?'}`,
     stats?.mttrMinutes ? `Průměrná doba opravy (MTTR): ${Math.round(stats.mttrMinutes)} min` : '',
     `Nejporuchovější stroje (30 dní): ${lemon.slice(0, 5).map((l: any) => `${l.assetName ?? l.assetId} (${l.issueCount}×)`).join(', ') || '—'}`,
