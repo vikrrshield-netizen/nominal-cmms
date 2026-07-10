@@ -3,7 +3,7 @@
 // Digitalizace formuláře "Kontrola budovy C,D"
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, AlertTriangle,
   ChevronDown, ChevronRight, ChevronLeft, X, Loader2, ClipboardCheck, CheckCircle2, RotateCcw,
@@ -208,6 +208,7 @@ const DONUT_C = 2 * Math.PI * DONUT_R;
 
 export default function InspectionsPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuthContext();
   const { ask } = useConfirm();
   const tenantId = user?.tenantId ?? 'main_firm';
@@ -260,6 +261,18 @@ export default function InspectionsPage() {
   const [selectedAssetType, setSelectedAssetType] = useState('');
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
   const [assetSearch, setAssetSearch] = useState('');
+
+  // QR deep-link: /inspections?bod={id} → rovnou otevři „Provést kontrolu" daného bodu.
+  const bodHandledRef = useRef(false);
+  useEffect(() => {
+    const bod = searchParams.get('bod');
+    if (!bod || bodHandledRef.current || loading) return;
+    bodHandledRef.current = true;
+    const log = logs.find((l) => l.id === bod);
+    if (log) setActiveLog(log);
+    else showToast('Kontrolní bod z QR kódu nebyl nalezen — možná byl smazán.', 'error');
+    setSearchParams({}, { replace: true });
+  }, [searchParams, logs, loading, setSearchParams]);
   const [viewMode, setViewMode] = useState<'current' | 'archive'>('current');
   const [archiveBuilding, setArchiveBuilding] = useState('');
   const [archiveFrom, setArchiveFrom] = useState('');
