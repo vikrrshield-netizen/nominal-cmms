@@ -258,9 +258,35 @@ function czNewMessages(n: number): string {
   return `${n} nových zpráv`;
 }
 
+// Balíky modulů — dlaždice se do nich rozřazují přes pole `group` (zpřehlednění plochy).
+const MODULE_GROUPS: Array<{ key: string; title: string; icon: typeof Calendar; tone: string }> = [
+  { key: 'provoz', title: 'Denní provoz', icon: Calendar, tone: 'text-emerald-700' },
+  { key: 'stroje', title: 'Stroje', icon: Cog, tone: 'text-sky-600' },
+  { key: 'kvalita', title: 'Kvalita a audit', icon: ShieldCheck, tone: 'text-amber-600' },
+  { key: 'sklad', title: 'Sklad a výroba', icon: Package, tone: 'text-orange-600' },
+  { key: 'sprava', title: 'Správa', icon: Settings, tone: 'text-slate-600' },
+];
+
 function ModuleShortcuts({ onNavigate, showHeader = true, counts }: { onNavigate: (path: string) => void; showHeader?: boolean; counts?: Record<string, number> }) {
   const { canViewSecretBox, hasPermission, user } = useAuthContext();
   const [trustboxNew, setTrustboxNew] = useState(0);
+  // Rozbalené sekce — pamatuje si přes localStorage; ve výchozu otevřený jen „Denní provoz".
+  const [openGroups, setOpenGroups] = useState<Set<string>>(() => {
+    if (typeof window === 'undefined') return new Set(['provoz']);
+    try {
+      const saved = window.localStorage.getItem('dash-groups-open-v1');
+      if (saved) return new Set(JSON.parse(saved) as string[]);
+    } catch { /* ignore */ }
+    return new Set(['provoz']);
+  });
+  const toggleGroup = (key: string) => {
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      try { window.localStorage.setItem('dash-groups-open-v1', JSON.stringify(Array.from(next))); } catch { /* ignore */ }
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!canViewSecretBox) { setTrustboxNew(0); return; }
@@ -272,34 +298,34 @@ function ModuleShortcuts({ onNavigate, showHeader = true, counts }: { onNavigate
   const canAny = (permissions: string[]) => permissions.some((permission) => hasPermission(permission));
 
   const modules = [
-    { label: 'Dohled', detail: 'jak to celé funguje', path: '/dohled', icon: Gauge, tone: 'text-emerald-700', permissions: ['report.read'] },
-    { label: 'Kartotéka', detail: 'budovy, místnosti, zařízení', path: '/kartoteka', icon: Building2, tone: 'text-sky-600', permissions: ['asset.read'] },
-    { label: 'Úkoly', detail: 'otevřená práce', path: '/tasks', icon: Wrench, tone: 'text-amber-600', permissions: ['wo.read', 'wo.create', 'wo.update'] },
-    { label: 'Deník prací', detail: 'hotové zápisy', path: '/work-diary', icon: FileText, tone: 'text-emerald-700', permissions: ['wo.read', 'wo.create', 'wo.update'] },
-    { label: 'Kontroly', detail: 'plány a závady', path: '/inspections', icon: ClipboardCheck, tone: 'text-cyan-600', permissions: ['asset.read', 'weekly.modify'] },
-    { label: 'Reporty', detail: 'audit a historie', path: '/reports', icon: BarChart3, tone: 'text-violet-600', permissions: ['report.read', 'audit.read'] },
-    { label: 'Kalibrace', detail: 'měřidla a platnost', path: '/kalibrace', icon: Ruler, tone: 'text-cyan-700', permissions: ['asset.read'] },
-    { label: 'Sklo a plast', detail: 'celistvost a kontroly', path: '/registr-skla', icon: GlassWater, tone: 'text-sky-700', permissions: ['asset.read'] },
-    { label: 'Detektory', detail: 'cizí tělesa, test 1×/rok', path: '/detektory', icon: ScanLine, tone: 'text-rose-700', permissions: ['asset.read'] },
-    { label: 'Návody', detail: 'jak na to, krok za krokem', path: '/navody', icon: HelpCircle, tone: 'text-slate-600', permissions: ['asset.read'] },
-    { label: 'QR štítky', detail: 'tisk na stroje', path: '/stitky', icon: QrCode, tone: 'text-slate-700', permissions: ['asset.read'] },
-    { label: 'Kalendář', detail: 'plán a dovolené', path: '/calendar', icon: Calendar, tone: 'text-indigo-600', permissions: ['wo.read', 'schedule.manage'] },
-    { label: 'Sklad ND', detail: 'díly a převodovky', path: '/inventory', icon: Package, tone: 'text-orange-600', permissions: ['inv.consume', 'inv.restock', 'inv.manage', 'inv.order', 'report.read'] },
-    { label: 'Převodovky', detail: 'umístění a teploty', path: '/gearboxes', icon: Cog, tone: 'text-violet-600', permissions: ['gearbox.temperature.write', 'gearbox.manage', 'asset.update', 'asset.read'] },
-    { label: 'Datalogery', detail: 'denní teploty skladu', path: '/dataloggers', icon: Thermometer, tone: 'text-cyan-700', permissions: ['datalogger.read', 'datalogger.temperature.write', 'datalogger.manage'] },
-    { label: 'Suroviny', detail: 'šarže, alergeny, dodavatelé', path: '/materials', icon: Package, tone: 'text-emerald-700', permissions: ['production.read', 'production.manage', 'report.read'] },
-    { label: 'Výrobky', detail: 'receptury a šarže', path: '/products', icon: Factory, tone: 'text-emerald-700', permissions: ['production.read', 'production.manage', 'report.read'] },
-    { label: 'Vzduchotechnika', detail: 'filtry a výměny', path: '/hvac', icon: Wind, tone: 'text-sky-600', permissions: ['hvac.read', 'hvac.manage'] },
-    { label: 'Směny', detail: 'plánování směn', path: '/shifts', icon: Users, tone: 'text-violet-600', permissions: ['shifts.view', 'shifts.manage'] },
+    { label: 'Dohled', detail: 'jak to celé funguje', path: '/dohled', icon: Gauge, tone: 'text-emerald-700', group: 'kvalita', permissions: ['report.read'] },
+    { label: 'Kartotéka', detail: 'budovy, místnosti, zařízení', path: '/kartoteka', icon: Building2, tone: 'text-sky-600', group: 'stroje', permissions: ['asset.read'] },
+    { label: 'Úkoly', detail: 'otevřená práce', path: '/tasks', icon: Wrench, tone: 'text-amber-600', group: 'provoz', permissions: ['wo.read', 'wo.create', 'wo.update'] },
+    { label: 'Deník prací', detail: 'hotové zápisy', path: '/work-diary', icon: FileText, tone: 'text-emerald-700', group: 'provoz', permissions: ['wo.read', 'wo.create', 'wo.update'] },
+    { label: 'Kontroly', detail: 'plány a závady', path: '/inspections', icon: ClipboardCheck, tone: 'text-cyan-600', group: 'provoz', permissions: ['asset.read', 'weekly.modify'] },
+    { label: 'Reporty', detail: 'audit a historie', path: '/reports', icon: BarChart3, tone: 'text-violet-600', group: 'kvalita', permissions: ['report.read', 'audit.read'] },
+    { label: 'Kalibrace', detail: 'měřidla a platnost', path: '/kalibrace', icon: Ruler, tone: 'text-cyan-700', group: 'kvalita', permissions: ['asset.read'] },
+    { label: 'Sklo a plast', detail: 'celistvost a kontroly', path: '/registr-skla', icon: GlassWater, tone: 'text-sky-700', group: 'kvalita', permissions: ['asset.read'] },
+    { label: 'Detektory', detail: 'cizí tělesa, test 1×/rok', path: '/detektory', icon: ScanLine, tone: 'text-rose-700', group: 'kvalita', permissions: ['asset.read'] },
+    { label: 'Návody', detail: 'jak na to, krok za krokem', path: '/navody', icon: HelpCircle, tone: 'text-slate-600', group: 'sprava', permissions: ['asset.read'] },
+    { label: 'QR štítky', detail: 'tisk na stroje', path: '/stitky', icon: QrCode, tone: 'text-slate-700', group: 'stroje', permissions: ['asset.read'] },
+    { label: 'Kalendář', detail: 'plán a dovolené', path: '/calendar', icon: Calendar, tone: 'text-indigo-600', group: 'provoz', permissions: ['wo.read', 'schedule.manage'] },
+    { label: 'Sklad ND', detail: 'díly a převodovky', path: '/inventory', icon: Package, tone: 'text-orange-600', group: 'sklad', permissions: ['inv.consume', 'inv.restock', 'inv.manage', 'inv.order', 'report.read'] },
+    { label: 'Převodovky', detail: 'umístění a teploty', path: '/gearboxes', icon: Cog, tone: 'text-violet-600', group: 'stroje', permissions: ['gearbox.temperature.write', 'gearbox.manage', 'asset.update', 'asset.read'] },
+    { label: 'Datalogery', detail: 'denní teploty skladu', path: '/dataloggers', icon: Thermometer, tone: 'text-cyan-700', group: 'kvalita', permissions: ['datalogger.read', 'datalogger.temperature.write', 'datalogger.manage'] },
+    { label: 'Suroviny', detail: 'šarže, alergeny, dodavatelé', path: '/materials', icon: Package, tone: 'text-emerald-700', group: 'sklad', permissions: ['production.read', 'production.manage', 'report.read'] },
+    { label: 'Výrobky', detail: 'receptury a šarže', path: '/products', icon: Factory, tone: 'text-emerald-700', group: 'sklad', permissions: ['production.read', 'production.manage', 'report.read'] },
+    { label: 'Vzduchotechnika', detail: 'filtry a výměny', path: '/hvac', icon: Wind, tone: 'text-sky-600', group: 'stroje', permissions: ['hvac.read', 'hvac.manage'] },
+    { label: 'Směny', detail: 'plánování směn', path: '/shifts', icon: Users, tone: 'text-violet-600', group: 'provoz', permissions: ['shifts.view', 'shifts.manage'] },
     ...(user?.role === 'SUPERADMIN'
-      ? [{ label: 'Výroba', detail: 'plán extrudoven', path: '/production', icon: Factory, tone: 'text-emerald-700', permissions: ['production.manage'] }]
+      ? [{ label: 'Výroba', detail: 'plán extrudoven', path: '/production', icon: Factory, tone: 'text-emerald-700', group: 'sklad', permissions: ['production.manage'] }]
       : []),
-    { label: 'Administrace', detail: 'uživatelé a práva', path: '/admin', icon: Settings, tone: 'text-slate-600', permissions: ['admin.view', 'admin.manage', 'user.manage'] },
+    { label: 'Administrace', detail: 'uživatelé a práva', path: '/admin', icon: Settings, tone: 'text-slate-600', group: 'sprava', permissions: ['admin.view', 'admin.manage', 'user.manage'] },
     ...(user?.role === 'SUPERADMIN'
-      ? [{ label: 'Testovací stránky', detail: 'preview před produkcí', path: '/preview', icon: FlaskConical, tone: 'text-emerald-700', permissions: ['admin.manage'] }]
+      ? [{ label: 'Testovací stránky', detail: 'preview před produkcí', path: '/preview', icon: FlaskConical, tone: 'text-emerald-700', group: 'sprava', permissions: ['admin.manage'] }]
       : []),
     ...(canViewSecretBox
-      ? [{ label: 'Schránka důvěry', detail: trustboxNew > 0 ? czNewMessages(trustboxNew) : 'anonymní zprávy', path: '/trustbox', icon: ShieldCheck, tone: 'text-purple-600', badge: trustboxNew, permissions: ['secretbox.view'] }]
+      ? [{ label: 'Schránka důvěry', detail: trustboxNew > 0 ? czNewMessages(trustboxNew) : 'anonymní zprávy', path: '/trustbox', icon: ShieldCheck, tone: 'text-purple-600', group: 'sprava', badge: trustboxNew, permissions: ['secretbox.view'] }]
       : []),
   ].filter((mod) => canAny(mod.permissions));
 
@@ -313,34 +339,62 @@ function ModuleShortcuts({ onNavigate, showHeader = true, counts }: { onNavigate
           </div>
         </div>
       )}
-      <div className="grid grid-cols-2 gap-2.5 @2xl:grid-cols-3 @4xl:grid-cols-4">
-        {modules.map((mod) => {
-          const { label, detail, path, icon: Icon, tone } = mod;
-          const badge = (mod as { badge?: number }).badge ?? 0;
-          const count = counts?.[path];
+      <div className="flex flex-col gap-2.5">
+        {MODULE_GROUPS.map((grp) => {
+          const items = modules.filter((m) => (m as { group?: string }).group === grp.key);
+          if (items.length === 0) return null;
+          const GroupIcon = grp.icon;
+          const isOpen = openGroups.has(grp.key);
+          const badgeSum = items.reduce((s, m) => s + ((m as { badge?: number }).badge ?? 0), 0);
           return (
-          <button
-            key={path}
-            type="button"
-            onClick={() => onNavigate(path)}
-            className={`${DASH_PANEL} ${DASH_PANEL_HOVER} relative min-h-[82px] p-3 text-left flex items-center gap-3`}
-          >
-            <span className={DASH_ICON_BOX}>
-              <Icon className={`w-5 h-5 ${tone}`} />
-            </span>
-            <span className="min-w-0">
-              <span className="block text-sm font-black leading-tight text-slate-950">{label}</span>
-              <span className="block text-xs font-semibold text-slate-500 mt-0.5 leading-snug">{detail}</span>
-            </span>
-            {badge > 0 && (
-              <span className="absolute right-2 top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-black text-white">
-                {badge}
-              </span>
-            )}
-            {badge === 0 && count != null && (
-              <span className="absolute right-3 top-2.5 text-lg font-black text-slate-300">{count}</span>
-            )}
-          </button>
+            <div key={grp.key} className={`${DASH_PANEL} overflow-hidden`}>
+              <button
+                type="button"
+                onClick={() => toggleGroup(grp.key)}
+                className="flex w-full items-center gap-3 p-3 text-left"
+                aria-expanded={isOpen}
+              >
+                <span className={DASH_ICON_BOX}><GroupIcon className={`w-5 h-5 ${grp.tone}`} /></span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-black leading-tight text-slate-950">{grp.title}</span>
+                  <span className="block truncate text-xs font-semibold text-slate-500 mt-0.5">{items.map((m) => m.label).join(' · ')}</span>
+                </span>
+                {badgeSum > 0 && (
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-black text-white">{badgeSum}</span>
+                )}
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 font-mono text-[11px] font-bold text-slate-500">{items.length}</span>
+                {isOpen ? <ChevronUp className="h-5 w-5 shrink-0 text-slate-400" /> : <ChevronDown className="h-5 w-5 shrink-0 text-slate-400" />}
+              </button>
+              {isOpen && (
+                <div className="grid grid-cols-2 gap-2.5 border-t border-slate-100 p-2.5 @2xl:grid-cols-3">
+                  {items.map((mod) => {
+                    const { label, detail, path, icon: Icon, tone } = mod;
+                    const badge = (mod as { badge?: number }).badge ?? 0;
+                    const count = counts?.[path];
+                    return (
+                      <button
+                        key={path}
+                        type="button"
+                        onClick={() => onNavigate(path)}
+                        className={`${DASH_PANEL} ${DASH_PANEL_HOVER} relative min-h-[72px] p-3 text-left flex items-center gap-3`}
+                      >
+                        <span className={DASH_ICON_BOX}><Icon className={`w-5 h-5 ${tone}`} /></span>
+                        <span className="min-w-0">
+                          <span className="block text-sm font-black leading-tight text-slate-950">{label}</span>
+                          <span className="block text-xs font-semibold text-slate-500 mt-0.5 leading-snug">{detail}</span>
+                        </span>
+                        {badge > 0 && (
+                          <span className="absolute right-2 top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-black text-white">{badge}</span>
+                        )}
+                        {badge === 0 && count != null && (
+                          <span className="absolute right-3 top-2.5 text-lg font-black text-slate-300">{count}</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           );
         })}
       </div>
