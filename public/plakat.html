@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plakát — Jak nahlásit poruchu</title>
+<style>
+  @page { size: A4 portrait; margin: 10mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, -apple-system, 'Segoe UI', Arial, sans-serif; background: #f1ece3; color: #12211a; }
+  .sheet { max-width: 800px; margin: 0 auto; padding: 28px 24px; }
+  @media print { body { background: #fff; } .sheet { max-width: none; padding: 0; } .noprint { display: none; } }
+  .top { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+  .logo { width: 56px; height: 56px; border-radius: 14px; background: #1a6b4f; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 30px; font-weight: 800; }
+  .top small { display: block; color: #5c6b61; font-weight: 700; letter-spacing: .06em; }
+  h1 { font-size: 40px; line-height: 1.1; margin: 6px 0 22px; }
+  h1 span { color: #1a6b4f; }
+  .krok { display: flex; align-items: center; gap: 18px; background: #fff; border: 2px solid #e3dccd; border-radius: 20px; padding: 18px 20px; margin-bottom: 14px; }
+  .cislo { width: 54px; height: 54px; border-radius: 50%; background: #1a6b4f; color: #fff; font-size: 28px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .emoji { font-size: 44px; flex-shrink: 0; }
+  .krok b { display: block; font-size: 24px; margin-bottom: 4px; }
+  .krok p { font-size: 17px; color: #44544b; line-height: 1.35; }
+  .nebo { text-align: center; font-weight: 800; color: #97a096; margin: 2px 0 14px; font-size: 15px; letter-spacing: .1em; }
+  .paty { display: flex; align-items: center; gap: 20px; background: #12332a; color: #fff; border-radius: 20px; padding: 18px 22px; margin-top: 20px; }
+  .paty .qr { background: #fff; border-radius: 12px; padding: 8px; flex-shrink: 0; display: flex; }
+  .paty b { display: block; font-size: 22px; margin-bottom: 6px; }
+  .paty p { font-size: 16px; color: #cfe0d8; line-height: 1.4; }
+  .paty .url { font-size: 20px; font-weight: 800; color: #7fd6b5; margin-top: 4px; }
+  .tisk { position: fixed; right: 18px; bottom: 18px; background: #1a6b4f; color: #fff; border: 0; border-radius: 14px; padding: 14px 22px; font-size: 17px; font-weight: 800; cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <div class="top">
+    <div class="logo">N</div>
+    <div><small>NOMINAL · PROVOZ 360</small><strong style="font-size:18px">Údržba v mobilu</strong></div>
+  </div>
+
+  <h1>Něco se rozbilo?<br><span>Nahlaš to za 10 vteřin.</span></h1>
+
+  <div class="krok">
+    <div class="cislo">1</div>
+    <div class="emoji">📷</div>
+    <div><b>Pípni QR kód na stroji</b>
+    <p>Namiř foťák telefonu na štítek → otevře se karta stroje → klepni <b style="display:inline;font-size:17px">Nahlásit poruchu</b>.</p></div>
+  </div>
+  <div class="nebo">— NEBO —</div>
+  <div class="krok">
+    <div class="cislo">2</div>
+    <div class="emoji">🤖</div>
+    <div><b>Řekni to AI asistentovi</b>
+    <p>V appce klepni na <b style="display:inline;font-size:17px">AI asistent</b> a napiš nebo namluv: „extruder 2 divně hrká&quot;. Zbytek zařídí sám.</p></div>
+  </div>
+  <div class="nebo">— NEBO —</div>
+  <div class="krok">
+    <div class="cislo">3</div>
+    <div class="emoji">🖥️</div>
+    <div><b>Kiosk na dílně</b>
+    <p>Na tabletu klepni na velké tlačítko <b style="display:inline;font-size:17px">Nahlásit poruchu</b>. Můžeš i vyfotit.</p></div>
+  </div>
+
+  <div class="paty">
+    <div class="qr"><svg width="150" height="150" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 33 33" shape-rendering="crispEdges"><path fill="#ffffff" d="M0 0h33v33H0z"/><path stroke="#000000" d="M4 4.5h7m1 0h3m3 0h1m1 0h1m1 0h7M4 5.5h1m5 0h1m5 0h3m3 0h1m5 0h1M4 6.5h1m1 0h3m1 0h1m1 0h2m2 0h3m1 0h1m1 0h1m1 0h3m1 0h1M4 7.5h1m1 0h3m1 0h1m2 0h1m1 0h1m1 0h2m1 0h1m1 0h1m1 0h3m1 0h1M4 8.5h1m1 0h3m1 0h1m2 0h1m3 0h2m3 0h1m1 0h3m1 0h1M4 9.5h1m5 0h1m1 0h4m1 0h1m4 0h1m5 0h1M4 10.5h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7M15 11.5h2m1 0h2M4 12.5h1m1 0h1m3 0h2m1 0h2m4 0h1m3 0h1m2 0h1m1 0h1M5 13.5h1m2 0h1m2 0h1m2 0h1m2 0h1m1 0h5m1 0h1m1 0h2M4 14.5h1m2 0h1m1 0h5m1 0h2m2 0h1m1 0h2m1 0h3m1 0h1M8 15.5h2m1 0h2m2 0h2m1 0h2m5 0h1M4 16.5h2m3 0h3m3 0h2m3 0h1m1 0h2m4 0h1M8 17.5h2m1 0h4m1 0h2m1 0h5m3 0h2M4 18.5h4m1 0h6m1 0h2m1 0h1m1 0h2m2 0h2m1 0h1M6 19.5h1m1 0h1m2 0h2m2 0h2m1 0h1m4 0h3M4 20.5h2m1 0h1m2 0h2m1 0h2m2 0h2m1 0h5m2 0h1M12 21.5h2m3 0h1m2 0h1m3 0h1m3 0h1M4 22.5h7m1 0h1m1 0h2m4 0h1m1 0h1m1 0h1m3 0h1M4 23.5h1m5 0h1m2 0h2m2 0h1m1 0h2m3 0h1m2 0h1M4 24.5h1m1 0h3m1 0h1m2 0h5m1 0h6m3 0h1M4 25.5h1m1 0h3m1 0h1m2 0h1m2 0h1m3 0h1m3 0h1m1 0h2M4 26.5h1m1 0h3m1 0h1m1 0h1m3 0h3m1 0h2m1 0h3m1 0h2M4 27.5h1m5 0h1m4 0h2m1 0h7M4 28.5h7m1 0h1m1 0h1m2 0h2m1 0h2m3 0h1m2 0h1"/></svg></div>
+    <div>
+      <b>Appka v tvém telefonu</b>
+      <p>Pípni tenhle kód → přihlas se svým PINem → v menu Sdílet vyber „Přidat na plochu&quot;.</p>
+      <div class="url">app.vikrr.com</div>
+    </div>
+  </div>
+</div>
+<button class="tisk noprint" onclick="window.print()">🖨️ Vytisknout</button>
+</body>
+</html>
