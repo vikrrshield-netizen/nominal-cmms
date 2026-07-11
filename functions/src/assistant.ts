@@ -79,8 +79,18 @@ const ROLE_PERMS: Record<string, string[]> = {
   VEDENI: [], // vedení jen schvaluje/čte, samo zápisové akce v rules nemá
   MAJITEL: [], // read-only
 };
-function roleCan(role: string, perm: string): boolean {
-  return (ROLE_PERMS[role] || []).includes(perm);
+// Efektivní práva = práva role ± individuální výjimky (customPermissions.granted/revoked)
+// — zrcadlí hasPermission() ve firestore.rules. Bez revoked by AI dovolila akci,
+// kterou UI i rules stejnému člověku zakazují.
+function effectivePerms(role: string, userData: any): Set<string> {
+  const perms = new Set(ROLE_PERMS[role] || []);
+  const cp = (userData && typeof userData.customPermissions === 'object' && userData.customPermissions) || {};
+  const granted = Array.isArray(cp.granted) ? cp.granted.map(String) : [];
+  const revoked = Array.isArray(cp.revoked) ? cp.revoked.map(String) : [];
+  const known = new Set(Object.values(ACTION_PERM));
+  for (const p of granted) if (known.has(p)) perms.add(p);
+  for (const p of revoked) perms.delete(p);
+  return perms;
 }
 // Jaké oprávnění vyžaduje která AI akce.
 const ACTION_PERM: Record<string, string> = {
@@ -980,8 +990,8 @@ const MEMORY_TOOLS: Anthropic.Tool[] = [
 ];
 
 // ── Vykonání nástroje → text pro Claude ────────────────────────
-async function runTool(name: string, input: any, ctx: { tenantId: string; actor: Actor; role: string; canWrite: boolean; canTeach: boolean; pending?: PendingAction[]; cache?: ReqCache }): Promise<string> {
-  const { tenantId, actor, role, canWrite, canTeach, cache } = ctx;
+async function runTool(name: string, input: any, ctx: { tenantId: string; actor: Actor; role: string; perms: Set<string>; canWrite: boolean; canTeach: boolean; pending?: PendingAction[]; cache?: ReqCache }): Promise<string> {
+  const { tenantId, actor, perms, canWrite, canTeach, cache } = ctx;
   try {
     switch (name) {
       case 'get_machine_status': {
@@ -1209,7 +1219,7 @@ async function runTool(name: string, input: any, ctx: { tenantId: string; actor:
         return out.filter(Boolean).join('\n');
       }
       case 'log_work': {
-        if (!roleCan(role, 'wo.create')) return NO_PERM_MSG;
+        if (!perms.has('wo.create')) return NO_PERM_MSG;
         if (!input?.content) return 'Chybí popis, co bylo uděláno.';
         let assetId: string | undefined;
         let assetName: string | undefined;
@@ -1226,7 +1236,7 @@ async function runTool(name: string, input: any, ctx: { tenantId: string; actor:
         return `NÁVRH připraven k potvrzení: ${summary}${assetName && !assetId ? ` — ⚠️ „${assetName}" není v Kartotéce${near ? ` (nejblíž „${near}")` : ''}` : ''}. Krátce uživateli řekni, co zapíšeš, a nech ho potvrdit (Ano/Ne se ukáže samo).`;
       }
       case 'create_task': {
-        if (!roleCan(role, 'wo.create')) return NO_PERM_MSG;
+        if (!perms.has('wo.create')) return NO_PERM_MSG;
         if (!input?.title) return 'Chybí název úkolu.';
         let assetId: string | undefined;
         let assetName: string | undefined;
@@ -1290,7 +1300,7 @@ async function runTool(name: string, input: any, ctx: { tenantId: string; actor:
         ].filter(Boolean).join('\n');
       }
       case 'create_asset': {
-        if (!roleCan(role, 'asset.create')) return NO_PERM_MSG;
+        if (!perms.has('asset.create')) return NO_PERM_MSG;
         if (!input?.name) return 'Chybí název položky.';
         const kind = String(input?.type ?? 'stroj').toLowerCase();
         const entityType = kind === 'budova' ? 'Budova' : kind === 'mistnost' ? 'Místnost' : kind === 'meridlo' ? 'Měřidlo' : kind === 'detektor' ? 'Detektor' : 'Zařízení';
@@ -1337,7 +1347,7 @@ async function runTool(name: string, input: any, ctx: { tenantId: string; actor:
         return `NÁVRH připraven k potvrzení: ${summary}. Krátce uživateli řekni, co založíš, a nech ho potvrdit.`;
       }
       case 'move_asset': {
-        if (!roleCan(role, 'asset.update')) return NO_PERM_MSG;
+        if (!perms.has('asset.update')) return NO_PERM_MSG;
         if (!input?.asset) return 'Chybí, kterou položku přesunout.';
         if (!input?.building && !input?.room) return 'Chybí cíl přesunu — řekni budovu (A–L nebo název) a/nebo místnost.';
         const r = await resolveForWrite(tenantId, String(input.asset), cache);
@@ -1353,7 +1363,7 @@ async function runTool(name: string, input: any, ctx: { tenantId: string; actor:
         return `NÁVRH připraven k potvrzení: ${summary}. Krátce to řekni uživateli a nech ho potvrdit.`;
       }
       case 'update_asset': {
-        if (!roleCan(role, 'asset.update')) return NO_PERM_MSG;
+        if (!perms.has('asset.update')) return NO_PERM_MSG;
         if (!input?.asset) return 'Chybí, kterou položku upravit.';
         const r = await resolveForWrite(tenantId, String(input.asset), cache);
         if (r.block) return r.block;
@@ -1380,7 +1390,7 @@ async function runTool(name: string, input: any, ctx: { tenantId: string; actor:
         return `NÁVRH připraven k potvrzení: ${summary}. Krátce to řekni uživateli a nech ho potvrdit.`;
       }
       case 'set_machine_status': {
-        if (!roleCan(role, 'asset.update')) return NO_PERM_MSG;
+        if (!perms.has('asset.update')) return NO_PERM_MSG;
         const status = String(input?.status ?? '').toLowerCase();
         if (!input?.asset) return 'Chybí, kterého stroje se to týká.';
         if (!VALID_STATUS.includes(status)) return `Neznámý stav. Použij: ${VALID_STATUS.join(', ')}.`;
@@ -1392,7 +1402,7 @@ async function runTool(name: string, input: any, ctx: { tenantId: string; actor:
         return `NÁVRH připraven k potvrzení: ${summary}. Krátce to řekni uživateli a nech ho potvrdit.`;
       }
       case 'close_task': {
-        if (!roleCan(role, 'wo.close')) return NO_PERM_MSG;
+        if (!perms.has('wo.close')) return NO_PERM_MSG;
         if (!input?.task) return 'Chybí, který úkol uzavřít (kód WO-… nebo název).';
         const task = await findTaskByRef(tenantId, String(input.task));
         if (!task) return `Otevřený úkol „${input.task}" jsem nenašel. Zkontroluj kód (WO-…) nebo název.`;
@@ -1401,7 +1411,7 @@ async function runTool(name: string, input: any, ctx: { tenantId: string; actor:
         return `NÁVRH připraven k potvrzení: ${summary}. Krátce to řekni uživateli a nech ho potvrdit.`;
       }
       case 'create_asset_tree': {
-        if (!roleCan(role, 'asset.create')) return 'Hromadné zakládání kartotéky smí jen správce (asset.create). Řekni to prosím uživateli.';
+        if (!perms.has('asset.create')) return 'Hromadné zakládání kartotéky smí jen správce (asset.create). Řekni to prosím uživateli.';
         const buildings = Array.isArray(input?.buildings) ? input.buildings : [];
         if (!buildings.length) return 'Chybí struktura — popiš budovy, místnosti a stroje.';
         let nB = 0, nR = 0, nD = 0;
@@ -1573,12 +1583,9 @@ export const assistantChat = functions
       throw new functions.https.HttpsError('invalid-argument', 'Obrázek je příliš velký.');
     }
 
-    const uid = context.auth.uid;
-    const userSnap = await db().doc(`users/${uid}`).get();
-    const userData = userSnap.data() || {};
-    const role = String(userData.role || (context.auth.token as any)?.role || 'OPERATOR').toUpperCase();
-    const tenantId = String(userData.tenantId || 'main_firm').trim() || 'main_firm';
-    const actor: Actor = { uid, name: String(userData.displayName || 'Uživatel').trim() || 'Uživatel' };
+    // Jednotná brána (fail-closed: bez profilu / deaktivovaný = zamítnout) + efektivní práva.
+    const { tenantId, actor, role, perms } = await authContext(context);
+    const uid = actor.uid;
     const canWrite = role !== 'MAJITEL';
     const canTeach = ['MAJITEL', 'VEDENI', 'SUPERADMIN'].includes(role);
 
@@ -1637,7 +1644,7 @@ export const assistantChat = functions
           const results: Anthropic.ToolResultBlockParam[] = await Promise.all(
             toolBlocks.map(async (block) => {
               toolsUsed.push(block.name);
-              const out = await runTool(block.name, block.input, { tenantId, actor, role, canWrite, canTeach, pending: pendingActions, cache });
+              const out = await runTool(block.name, block.input, { tenantId, actor, role, perms, canWrite, canTeach, pending: pendingActions, cache });
               return { type: 'tool_result', tool_use_id: block.id, content: out } as Anthropic.ToolResultBlockParam;
             }),
           );
@@ -1665,7 +1672,7 @@ export const assistantChat = functions
 export const assistantConfirmAction = functions
   .runWith({ timeoutSeconds: 300, memory: '512MB' })
   .https.onCall(async (data: any, context: functions.https.CallableContext) => {
-    const { tenantId, actor, role } = await authContext(context);
+    const { tenantId, actor, perms } = await authContext(context);
 
     // Zdroj akce: PREFEROVANĚ serverem uložený návrh (pendingId) — nelze ho podvrhnout a jde provést
     // jen JEDNOU (idempotence). Fallback na `action` z klienta (starší klient) je dál hlídán rolí + tenantem.
@@ -1708,7 +1715,7 @@ export const assistantConfirmAction = functions
     }
     // BEZPEČNOST: ověř oprávnění role na TUTO akci (obrana proti eskalaci i u uloženého návrhu).
     const needPerm = ACTION_PERM[a.type];
-    if (!needPerm || !roleCan(role, needPerm)) {
+    if (!needPerm || !perms.has(needPerm)) {
       throw new functions.https.HttpsError('permission-denied', 'Na tuhle akci nemáš oprávnění.');
     }
     try {
@@ -1855,17 +1862,29 @@ async function computeBriefing(tenantId: string, name: string, cache?: ReqCache)
 }
 
 // Pomocná: společný začátek callable (ověří přihlášení, vytáhne tenant + actor).
-async function authContext(context: functions.https.CallableContext): Promise<{ tenantId: string; actor: Actor; role: string }> {
+async function authContext(context: functions.https.CallableContext): Promise<{ tenantId: string; actor: Actor; role: string; perms: Set<string> }> {
   if (!context.auth?.uid) {
     throw new functions.https.HttpsError('unauthenticated', 'Pro AI asistenta se musíš přihlásit.');
   }
   const uid = context.auth.uid;
   const userSnap = await db().doc(`users/${uid}`).get();
+  // FAIL-CLOSED: Auth účet může vzniknout i mimo appku (např. REST API s veřejným
+  // klíčem projektu). Bez profilu v `users` sem NIKDO nesmí — AI čte přes Admin SDK,
+  // tedy MIMO firestore.rules, a dřívější default (OPERATOR + main_firm) by neznámý
+  // účet pustil k firemním datům.
+  if (!userSnap.exists) {
+    throw new functions.https.HttpsError('permission-denied', 'Tvůj účet nemá v systému profil — přístup zamítnut. Ozvi se správci.');
+  }
   const userData = userSnap.data() || {};
+  // Deaktivovaný účet: Auth disable + revoke řeší nové tokeny, ale už vydaný ID token
+  // žije až hodinu — tahle kontrola tu díru zavírá okamžitě.
+  if (userData.active === false || userData.isActive === false || userData.isDeleted === true) {
+    throw new functions.https.HttpsError('permission-denied', 'Tvůj účet je deaktivovaný. Ozvi se správci.');
+  }
   const tenantId = String(userData.tenantId || 'main_firm').trim() || 'main_firm';
   const role = String(userData.role || (context.auth.token as any)?.role || 'OPERATOR').toUpperCase();
   const actor: Actor = { uid, name: String(userData.displayName || 'Uživatel').trim() || 'Uživatel' };
-  return { tenantId, actor, role };
+  return { tenantId, actor, role, perms: effectivePerms(role, userData) };
 }
 
 export const assistantBriefing = functions
@@ -1879,11 +1898,11 @@ export const assistantBriefing = functions
 export const assistantFacts = functions
   .runWith({ timeoutSeconds: 60, memory: '512MB' })
   .https.onCall(async (data: any, context: functions.https.CallableContext) => {
-    const { tenantId, actor, role } = await authContext(context);
+    const { tenantId, actor, role, perms } = await authContext(context);
     const kind = String(data?.kind || '');
     const query = data?.query ? String(data.query) : '';
     const cache: ReqCache = new Map();
-    const ctx = { tenantId, actor, role, canWrite: false, canTeach: false, cache };
+    const ctx = { tenantId, actor, role, perms, canWrite: false, canTeach: false, cache };
 
     let reply = '';
     let count: number | undefined;

@@ -161,29 +161,35 @@ function assertNotLocked(attempt: AttemptDoc, now: number): void {
   }
 }
 
+// TRANSAKČNĚ: čtení→počítání→zápis dřív běželo bez zámku, souběžné pokusy se
+// navzájem přepisovaly a útočník tak mohl počítadlo „ředit". Transakce se při
+// konfliktu sama zopakuje, žádný neúspěšný pokus se neztratí.
 async function recordFailedAttempt(
   ref: admin.firestore.DocumentReference,
-  attempt: AttemptDoc,
   now: number,
   maxFails: number,
   windowMs: number,
   lockMs: number,
 ): Promise<void> {
-  const windowStart = attempt.windowStartedAt?.toMillis?.() || now;
-  const resetWindow = now - windowStart > windowMs;
-  const fails = (resetWindow ? 0 : attempt.fails || 0) + 1;
-  const update: admin.firestore.UpdateData<admin.firestore.DocumentData> = {
-    fails,
-    lastFailAt: admin.firestore.Timestamp.fromMillis(now),
-    windowStartedAt: admin.firestore.Timestamp.fromMillis(resetWindow ? now : windowStart),
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-  };
-  if (fails >= maxFails) {
-    update.lockedUntil = admin.firestore.Timestamp.fromMillis(now + lockMs);
-    update.fails = 0;
-    update.windowStartedAt = admin.firestore.Timestamp.fromMillis(now);
-  }
-  await ref.set(update, { merge: true });
+  await db().runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const attempt = (snap.exists ? snap.data() : {}) as AttemptDoc;
+    const windowStart = attempt.windowStartedAt?.toMillis?.() || now;
+    const resetWindow = now - windowStart > windowMs;
+    const fails = (resetWindow ? 0 : attempt.fails || 0) + 1;
+    const update: admin.firestore.UpdateData<admin.firestore.DocumentData> = {
+      fails,
+      lastFailAt: admin.firestore.Timestamp.fromMillis(now),
+      windowStartedAt: admin.firestore.Timestamp.fromMillis(resetWindow ? now : windowStart),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    if (fails >= maxFails) {
+      update.lockedUntil = admin.firestore.Timestamp.fromMillis(now + lockMs);
+      update.fails = 0;
+      update.windowStartedAt = admin.firestore.Timestamp.fromMillis(now);
+    }
+    tx.set(ref, update, { merge: true });
+  });
 }
 
 async function clearLoginAttempts(): Promise<number> {
@@ -214,13 +220,27 @@ export const loginWithPin = functions
     const ipAttemptRef = db().doc(`login_attempts/${ipAttemptKey(context)}`);
     const deviceAttemptRef = deviceId ? db().doc(`login_attempts/${deviceAttemptKey(deviceId)}`) : null;
     const globalAttemptRef = db().doc(`login_attempts/${GLOBAL_ATTEMPT_KEY}`);
-    const ipAttempt = await readAttempt(ipAttemptRef);
-    const deviceAttempt = deviceAttemptRef ? await readAttempt(deviceAttemptRef) : {};
-    const globalAttempt = await readAttempt(globalAttemptRef);
+    // Ověřené zařízení = už se z něj někdy někdo úspěšně přihlásil (zapisuje se níž).
+    // Kolekce je oddělená od login_attempts, aby ji nemazal clearLoginAttempts().
+    // Prefix dev_ = obrana proti rezervovaným ID `__…__` (podvržené deviceId by shodilo požadavek).
+    const trustedDeviceRef = deviceId ? db().doc(`trusted_devices/${deviceAttemptKey(deviceId)}`) : null;
+    const [ipAttempt, deviceAttempt, globalAttempt, trustedSnap] = await Promise.all([
+      readAttempt(ipAttemptRef),
+      deviceAttemptRef ? readAttempt(deviceAttemptRef) : Promise.resolve({} as AttemptDoc),
+      readAttempt(globalAttemptRef),
+      trustedDeviceRef ? trustedDeviceRef.get() : Promise.resolve(null),
+    ]);
+    const deviceTrusted = !!trustedSnap?.exists;
 
     assertNotLocked(ipAttempt, now);
     assertNotLocked(deviceAttempt, now);
-    assertNotLocked(globalAttempt, now); // hromadné hádání zablokuje login krátce pro všechny
+    // Globální zámek (backstop proti hromadnému hádání) NEplatí pro ověřená zařízení —
+    // jinak by útočník spamem špatných PINů odstřihl přihlášení celé firmě (DoS).
+    // Útočník ověřené deviceId nezná (náhodné, jen v localStorage zařízení) a nové
+    // zařízení si ověření nevyrobí jinak než správným PINem.
+    if (!deviceTrusted) {
+      assertNotLocked(globalAttempt, now);
+    }
 
     const pinHash = hashPin(pin);
     const secretSnap = await db().collection('user_secrets').where('pinHash', '==', pinHash).limit(1).get();
@@ -236,17 +256,24 @@ export const loginWithPin = functions
 
     if (!userId) {
       const fails: Promise<void>[] = [
-        recordFailedAttempt(ipAttemptRef, ipAttempt, now, IP_MAX_FAILS, IP_WINDOW_MS, IP_LOCK_MS),
-        recordFailedAttempt(globalAttemptRef, globalAttempt, now, GLOBAL_MAX_FAILS, GLOBAL_WINDOW_MS, GLOBAL_LOCK_MS),
+        recordFailedAttempt(ipAttemptRef, now, IP_MAX_FAILS, IP_WINDOW_MS, IP_LOCK_MS),
+        recordFailedAttempt(globalAttemptRef, now, GLOBAL_MAX_FAILS, GLOBAL_WINDOW_MS, GLOBAL_LOCK_MS),
       ];
       if (deviceAttemptRef) {
-        fails.push(recordFailedAttempt(deviceAttemptRef, deviceAttempt, now, DEVICE_MAX_FAILS, DEVICE_WINDOW_MS, DEVICE_LOCK_MS));
+        fails.push(recordFailedAttempt(deviceAttemptRef, now, DEVICE_MAX_FAILS, DEVICE_WINDOW_MS, DEVICE_LOCK_MS));
       }
       await Promise.all(fails);
       throw new functions.https.HttpsError('unauthenticated', 'Nespravny PIN.');
     }
 
     if (deviceAttemptRef) await deviceAttemptRef.delete().catch(() => undefined);
+    // Úspěšný PIN = zařízení je ověřené → globální zámek ho příště neodstřihne.
+    if (trustedDeviceRef) {
+      await trustedDeviceRef.set(
+        { lastLoginAt: admin.firestore.FieldValue.serverTimestamp(), lastUid: userId },
+        { merge: true },
+      ).catch(() => undefined);
+    }
     await db().doc(`users/${userId}`).set(
       { lastLoginAt: admin.firestore.FieldValue.serverTimestamp() },
       { merge: true },
@@ -267,20 +294,25 @@ export const adminSetUserPin = functions
     if (!PIN_SET_RE.test(pin)) throw new functions.https.HttpsError('invalid-argument', 'PIN musi mit 6 cislic.');
 
     const pinHash = hashPin(pin);
-    const dup = await db().collection('user_secrets').where('pinHash', '==', pinHash).limit(1).get();
-    if (!dup.empty && dup.docs[0].id !== userId) {
-      throw new functions.https.HttpsError('already-exists', 'Tento PIN uz pouziva jiny uzivatel.');
-    }
-
-    await db().doc(`user_secrets/${userId}`).set(
-      {
-        pinHash,
-        pinLength: pin.length,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedBy: context.auth?.uid || '',
-      },
-      { merge: true },
-    );
+    // TRANSAKČNĚ: kontrola duplicity + zápis v jednom kroku. Dva souběžné resety na
+    // stejný PIN by se dřív oba „provedly" a dva lidi by měli stejný PIN (= přihlášení
+    // by pak vracelo náhodně jednoho z nich).
+    await db().runTransaction(async (tx) => {
+      const dup = await tx.get(db().collection('user_secrets').where('pinHash', '==', pinHash).limit(1));
+      if (!dup.empty && dup.docs[0].id !== userId) {
+        throw new functions.https.HttpsError('already-exists', 'Tento PIN uz pouziva jiny uzivatel.');
+      }
+      tx.set(
+        db().doc(`user_secrets/${userId}`),
+        {
+          pinHash,
+          pinLength: pin.length,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedBy: context.auth?.uid || '',
+        },
+        { merge: true },
+      );
+    });
 
     await admin.auth().updateUser(userId, { password: randomPassword() }).catch(() => undefined);
     await db().doc(`users/${userId}`).set(
@@ -326,11 +358,20 @@ export const adminCreateUser = functions
 
     try {
       await admin.auth().updateUser(uid, { email });
-      await db().doc(`user_secrets/${uid}`).set({
-        pinHash,
-        pinLength: pin.length,
-        updatedAt: now,
-        updatedBy: context.auth?.uid || '',
+      // TRANSAKČNĚ: duplicitu PINu znovu ověř + zapiš atomicky (souběh dvou založení
+      // se stejným PINem projde přes pre-check výš, tady už neprojde). Při kolizi
+      // vyhodí already-exists → catch níže uklidí založený Auth účet.
+      await db().runTransaction(async (tx) => {
+        const dupTx = await tx.get(db().collection('user_secrets').where('pinHash', '==', pinHash).limit(1));
+        if (!dupTx.empty) {
+          throw new functions.https.HttpsError('already-exists', 'Tento PIN uz pouziva jiny uzivatel.');
+        }
+        tx.set(db().doc(`user_secrets/${uid}`), {
+          pinHash,
+          pinLength: pin.length,
+          updatedAt: now,
+          updatedBy: context.auth?.uid || '',
+        });
       });
       await db().doc(`users/${uid}`).set({
         id: uid,
