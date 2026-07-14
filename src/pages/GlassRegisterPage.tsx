@@ -23,6 +23,8 @@ export default function GlassRegisterPage() {
         emptyHint: 'Zatím tu nic není. Přidej v kartotéce zařízení se jménem Sklo / Průzor / Zářivka / Kryt / Keramika… a objeví se tady.',
         events: [{ name: 'Kontrola celistvosti', eventType: 'integrity_check', frequencyDays: 30 }],
         doneLabel: 'zapsat kontrolu',
+        // IFS/BRCGS 4.9: záznam rozbití (co/kdy/kdo/opatření) → Deník s workType „Rozbití skla".
+        incident: { buttonLabel: 'Nahlásit rozbití', workType: 'Rozbití skla', historyTitle: 'Rozbití — historie' },
       }}
     />
   );

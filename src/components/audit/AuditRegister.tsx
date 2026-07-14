@@ -7,17 +7,24 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2, Check, Plus } from 'lucide-react';
+import { ArrowLeft, Loader2, Check, Plus, AlertTriangle } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuthContext } from '../../context/AuthContext';
 import { assetService } from '../../services/assetService';
-import { addWorkLog } from '../../services/workLogService';
+import { addWorkLog, getWorkLogsByWorkType } from '../../services/workLogService';
 import { showToast } from '../ui/Toast';
 import LogWorkSheet, { type WorkEntry } from './LogWorkSheet';
+import BreakageSheet, { type BreakageEntry } from './BreakageSheet';
 import { useLastWorkLog, logDateCz } from './useLastWorkLog';
 import type { Asset, AssetEvent } from '../../types/asset';
+import type { WorkLog } from '../../types/workLog';
 
 export interface RegisterEventDef { name: string; eventType: string; frequencyDays: number }
+export interface RegisterIncidentDef {
+  buttonLabel: string;       // „Nahlásit rozbití"
+  workType: string;          // klíč v Deníku (workLogs.workType), např. „Rozbití skla"
+  historyTitle: string;      // „Rozbití — historie"
+}
 export interface AuditRegisterConfig {
   title: string;
   subtitle: string;
@@ -26,6 +33,7 @@ export interface AuditRegisterConfig {
   emptyHint: string;         // text prázdného stavu
   events: RegisterEventDef[]; // co se na položce hlídá (a seeduje)
   doneLabel?: string;        // text potvrzovacího tlačítka (default „zapsat provedení")
+  incident?: RegisterIncidentDef; // volitelný záznam incidentu (rozbití) do Deníku
 }
 
 type Tone = 'ok' | 'warn' | 'crit' | 'none';
@@ -82,11 +90,16 @@ export default function AuditRegister({ config, detect }: { config: AuditRegiste
   const { user, hasPermission } = useAuthContext();
   const tenantId = user?.tenantId ?? 'main_firm';
   const canEdit = hasPermission('asset.update');
+  // Incident (rozbití) smí nahlásit každý, kdo smí psát do Deníku — i operátor bez asset.update.
+  const canReport = hasPermission('wo.create') || hasPermission('wo.update');
   const navigate = useNavigate();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [pending, setPending] = useState<{ asset: Asset; ev: AssetEvent } | null>(null);
+  const [reporting, setReporting] = useState(false);
+  const [savingIncident, setSavingIncident] = useState(false);
+  const [incidents, setIncidents] = useState<WorkLog[]>([]);
 
   const lastLog = useLastWorkLog();
   const configNames = useMemo(() => config.events.map((e) => auditNorm(e.name)), [config.events]);
@@ -101,6 +114,46 @@ export default function AuditRegister({ config, detect }: { config: AuditRegiste
       .finally(() => setLoading(false));
   }, [tenantId]);
   useEffect(() => { load(); }, [load]);
+
+  const incidentType = config.incident?.workType;
+  const loadIncidents = useCallback(() => {
+    if (!incidentType) return;
+    getWorkLogsByWorkType(incidentType, 50)
+      .then(setIncidents)
+      .catch((err) => console.error('[AuditRegister] incidents load error:', err));
+  }, [incidentType]);
+  useEffect(() => { loadIncidents(); }, [loadIncidents]);
+
+  const confirmIncident = async (entry: BreakageEntry) => {
+    if (!config.incident) return;
+    setSavingIncident(true);
+    try {
+      const asset = entry.assetId ? assets.find((a) => a.id === entry.assetId) : undefined;
+      await addWorkLog({
+        userId: user?.id || user?.uid || 'unknown',
+        userName: user?.displayName || 'Neznámý',
+        workerNames: entry.solver ? [entry.solver] : undefined,
+        type: 'inspection',
+        workType: config.incident.workType,
+        content: [entry.description, `Opatření: ${entry.measures.length ? entry.measures.join(', ') : 'zatím žádné'}`].join('\n'),
+        assetId: entry.assetId,
+        assetName: entry.assetName,
+        location: asset
+          ? [asset.buildingId ? `Budova ${asset.buildingId}` : '', asset.areaName || asset.location].filter(Boolean).join(' · ') || undefined
+          : undefined,
+        performedAt: entry.when,
+        auditReady: true,
+      });
+      showToast('Rozbití zapsáno do deníku', 'success');
+      setReporting(false);
+      loadIncidents();
+    } catch (err) {
+      console.error('[AuditRegister] incident error:', err);
+      showToast('Uložení selhalo', 'error');
+    } finally {
+      setSavingIncident(false);
+    }
+  };
 
   const units = useMemo(() => assets.filter(detect), [assets, detect]);
   const registerEvents = useCallback(
@@ -192,10 +245,19 @@ export default function AuditRegister({ config, detect }: { config: AuditRegiste
           <ArrowLeft size={20} />
         </button>
         <Icon className="text-emerald-700 flex-shrink-0" size={24} />
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h1 className="text-xl font-black text-slate-900">{config.title}</h1>
           <p className="text-[13px] text-slate-500">{config.subtitle}</p>
         </div>
+        {config.incident && canReport && (
+          <button
+            type="button"
+            onClick={() => setReporting(true)}
+            className="flex min-h-11 flex-shrink-0 items-center gap-1.5 rounded-xl bg-red-600 px-3.5 font-bold text-white"
+          >
+            <AlertTriangle size={16} /> {config.incident.buttonLabel}
+          </button>
+        )}
       </div>
 
       <div className="flex gap-2 flex-wrap mb-5">
@@ -274,6 +336,34 @@ export default function AuditRegister({ config, detect }: { config: AuditRegiste
         </div>
       )}
 
+      {config.incident && (
+        <div className="mt-7">
+          <div className="mb-3 flex items-center gap-2">
+            <AlertTriangle size={16} className="text-red-600" />
+            <h2 className="text-[15px] font-black text-slate-900">{config.incident.historyTitle}</h2>
+            <span className="text-[12px] text-slate-400">({incidents.length}) — auditor uvidí</span>
+          </div>
+          {incidents.length === 0 ? (
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 text-[13px] text-slate-500">
+              Zatím žádné rozbití. Až se něco stane, zapiš to tlačítkem „{config.incident.buttonLabel}" nahoře — auditor chce vidět i incidenty a jejich řešení.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {incidents.map((log) => (
+                <div key={log.id} className="rounded-2xl border border-red-100 bg-white p-3.5" style={{ borderLeft: '3px solid #ef4444' }}>
+                  <div className="text-[13px] font-black text-slate-900">
+                    {log.assetName || 'Neznámý prvek'}
+                    <span className="font-semibold text-slate-400"> · {logDateCz(log)} · {log.workerNames?.[0] || log.userName}</span>
+                  </div>
+                  {log.location && <div className="text-[11px] text-slate-400">{log.location}</div>}
+                  <div className="mt-1 whitespace-pre-line text-[13px] text-slate-600">{log.content}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       <p className="mt-5 text-[12px] text-slate-400">Stav: zelená = v pořádku, oranžová = blíží se termín, červená = po termínu (auditor uvidí). „{doneLabel}" zapíše práci do deníku a posune termín o interval dál.</p>
 
       {pending && (
@@ -283,6 +373,15 @@ export default function AuditRegister({ config, detect }: { config: AuditRegiste
           saving={saving === pending.asset.id}
           onClose={() => setPending(null)}
           onSubmit={confirmLog}
+        />
+      )}
+      {reporting && config.incident && (
+        <BreakageSheet
+          items={units}
+          defaultSolver={user?.displayName || ''}
+          saving={savingIncident}
+          onClose={() => setReporting(false)}
+          onSubmit={confirmIncident}
         />
       )}
     </div>

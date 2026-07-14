@@ -1,4 +1,4 @@
-import { collection, addDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp, limit, doc, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp, limit, doc, updateDoc, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import type { WorkLog } from '../types/workLog';
 
@@ -60,6 +60,25 @@ export const subscribeToWorkLogs = (
       .sort((a, b) => (b.createdAt?.getTime?.() || 0) - (a.createdAt?.getTime?.() || 0));
     callback(logs);
   });
+};
+
+// Jednorázově načte záznamy daného druhu práce (např. „Rozbití skla" pro auditní historii).
+// Jen rovnost bez orderBy → nepotřebuje složený index; řadí se u klienta.
+export const getWorkLogsByWorkType = async (workType: string, max = 50): Promise<WorkLog[]> => {
+  const q = query(collection(db, COLLECTION), where('workType', '==', workType), limit(max));
+  const snap = await getDocs(q);
+  return snap.docs
+    .map((d) => {
+      const data = d.data();
+      return {
+        id: d.id,
+        ...data,
+        createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(),
+        performedAt: data.performedAt instanceof Timestamp ? data.performedAt.toDate() : undefined,
+        updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : undefined,
+      } as WorkLog;
+    })
+    .sort((a, b) => (b.performedAt ?? b.createdAt).getTime() - (a.performedAt ?? a.createdAt).getTime());
 };
 
 export const subscribeToRecentWorkLogs = (
