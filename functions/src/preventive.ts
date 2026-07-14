@@ -74,7 +74,10 @@ export const generatePreventiveTasks = functions
         const freq = Number(ev.frequencyDays);
         let next = normDate(ev.nextDate);
         while (next <= today) next = addDays(next, freq); // dožene i zameškané periody
-        return { ...ev, lastDate: normDate(ev.nextDate), nextDate: next };
+        // lastDate (= „naposledy PROVEDENO") se tady NEnastavuje — úkol byl teprve založen.
+        // Zapíše ho až preventiveTaskCompleted níže, když někdo úkol skutečně dokončí.
+        // Jinak by audit viděl „provedeno", i když práce jen leží v backlogu.
+        return { ...ev, nextDate: next };
       });
 
       for (const ev of due) {
@@ -112,5 +115,41 @@ export const generatePreventiveTasks = functions
     }
     await flush();
     console.log(`[preventive] ${today}: založeno ${created} úkolů, přeskočeno ${skipped} (už otevřený), assets: ${snap.size}`);
+    return null;
+  });
+
+// „Naposledy provedeno" (event.lastDate) se zapisuje AŽ TADY — když někdo preventivní úkol
+// skutečně DOKONČÍ. Plánovač výš lastDate neposouvá (jen nextDate), jinak by audit viděl
+// „provedeno", i když úkol jen leží otevřený. Admin SDK = funguje i pro role bez asset.update.
+export const preventiveTaskCompleted = functions.firestore
+  .document('tasks/{taskId}')
+  .onUpdate(async (change) => {
+    const before = change.before.data() as any;
+    const after = change.after.data() as any;
+    if (String(after?.source ?? '') !== 'preventive') return null;
+    if (String(before?.status ?? '') === String(after?.status ?? '')) return null;
+    if (String(after?.status ?? '') !== 'completed') return null;
+    const assetId = String(after?.assetId ?? '').trim();
+    const evName = String(after?.eventName ?? '').trim();
+    if (!assetId || !evName) return null;
+
+    const done = todayPrague();
+    const ref = db().collection('assets').doc(assetId);
+    await db().runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) return;
+      const a = snap.data() as any;
+      const events = Array.isArray(a.events) ? a.events : [];
+      let hit = false;
+      const updated = events.map((ev: any) => {
+        if (String(ev?.name ?? '').trim() !== evName) return ev;
+        hit = true;
+        // Nepřepisuj novější datum starším (např. pozdě zavřený starý úkol).
+        const prev = normDate(ev?.lastDate);
+        return { ...ev, lastDate: prev && prev > done ? prev : done };
+      });
+      if (hit) tx.update(ref, { events: updated, updatedAt: FV.serverTimestamp() });
+    });
+    console.log(`[preventive] lastDate → ${done}: ${evName} @ ${assetId}`);
     return null;
   });

@@ -15,7 +15,9 @@ import { listenForForegroundPush } from './services/pushNotificationService';
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const KioskPage = lazy(() => import('./pages/KioskPage'));
-const BuildingInspectionPage = lazy(() => import('./pages/BuildingInspectionPage'));
+// BuildingInspectionPage (stará /inspection) VYPNUTA 2026-07-14: „Dokončit oblast" označovala
+// neprojité body hromadně jako OK (auditReady:true) = vyrobený doklad o kontrole → riziko u IFS/BRC.
+// Kontroly jedou JEN přes /inspections; /inspection přesměrováno níž. Soubor zůstává v repu.
 const TasksPage = lazy(() => import('./pages/TasksPage'));
 const InventoryPage = lazy(() => import('./pages/InventoryPage'));
 const FleetPage = lazy(() => import('./pages/FleetPage'));
@@ -155,7 +157,7 @@ function RoutedContent() {
       <div className="vik-fade-in">
       <Routes>
         <Route path="/" element={<DashboardPage />} />
-        <Route path="/inspection" element={<ProtectedPage moduleId="inspections" permissions={['asset.read', 'weekly.modify']}><BuildingInspectionPage /></ProtectedPage>} />
+        <Route path="/inspection" element={<Navigate to="/inspections" replace />} />
         <Route path="/tasks" element={<ProtectedPage moduleId="tasks" permissions={['wo.read']}><TasksPage /></ProtectedPage>} />
         <Route path="/inventory" element={<ProtectedPage permissions={['inv.consume', 'inv.restock', 'inv.manage', 'inv.order']}><InventoryPage /></ProtectedPage>} />
         <Route path="/fleet" element={<ProtectedPage moduleId="fleet" permissions={['fleet.read', 'fleet.manage']}><FleetPage /></ProtectedPage>} />

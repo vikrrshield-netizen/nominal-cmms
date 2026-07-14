@@ -31,7 +31,10 @@
 - [ ] při reálném auditu: **0 neshod kvůli dokumentaci údržby**
 
 **Cesta:** dávky D3/D5/D6 z PLAN-DOSPERKOVANI.md + naplnit data (měřidla, detektory — majitel).
-Cílový termín: **před příštím auditem — ⚠️ DOPLNIT DATUM AUDITU (zeptat se majitele!)**.
+Cílový termín: **AUDIT JE DO 2 MĚSÍCŮ (majitel potvrdil 14. 7. 2026 → cca polovina září 2026).**
+Pořadí kvůli termínu: (1) opravit falešné doklady — staré kontroly auto-OK + preventivka „hotovo"
+při vytvoření (audit cbcad body 2+8), (2) D3 sklo, (3) D5 hygienické uvolnění, (4) D6 dočasné opravy,
+(5) naplnit měřidla+detektory (majitel, jde větou přes AI), (6) audit balíček s kvalitářkou.
 
 ## CÍL 3 — PROVOZ 360 = peníze 💰
 **Hotovo, když:**
@@ -54,3 +57,6 @@ v týdenním/měsíčním AI souhrnu (gatherSummaryData → řádek ADOPCE).
 - 2026-07-10: cílová čára založena. Appka funkčně připravená (kartotéka, preventivka, kalibrace,
   detektory, QR, AI, audit balíček, dohled). Teď se DOTAHUJE: data + lidi + čísla, ne nové funkce.
 - 2026-07-10: C1 hotová — Cíl 1 jde měřit v Dohledu i v AI souhrnech. Další krok: lidi + QR + termín auditu.
+- 2026-07-14: ⚠️ AUDIT DO 2 MĚSÍCŮ (potvrdil majitel). Stav čísel: Deník od 2. 7. bez zápisu (12 dní!),
+  ~4 aktivní pisatelé, 0 auditních kontrol v datech (měřidla/detektory nezaložené). Kód: bezpečnostní
+  Dávka A nasazena; plakát /plakat.html živý. Priorita: opravy pro audit (pořadí výš) + adopce (QR, plakát).
