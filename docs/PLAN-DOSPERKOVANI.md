@@ -49,10 +49,11 @@
 **Rozhodnutí uživatele předem:** chce samostatnou stránku, nebo stačí filtr v Kartotéce? (AskUserQuestion)
 **Rozsah:** střední. Bez rules změn (kolekce assets už práva má).
 
-## DÁVKA 3 — Registr skla — dotáhnout (audit MUST — IFS/BRCGS 4.9)
-**Cíl:** registr existuje (`src/pages/GlassRegisterPage.tsx`) — ověř stav a dotáhni díry.
-**Postup:** 1) přečti stránku a zjisti, co už umí; 2) doplň, co chybí z požadavku: seznam položek skla/křehkého plastu s umístěním, pravidelná kontrola celistvosti (event `integrity_check` už v seedu je), **záznam rozbití** (breakage log: co, kde, kdy, kdo, opatření — nová kolekce `glass_breakages` NEBO záznam do workLogs s tagem; preferuj workLogs, žádné nové rules). 3) Mockup formuláře rozbití → schválení → implementace.
-**Rozsah:** malá–střední.
+## DÁVKA 3 — ✅ KÓD HOTOV 2026-07-14 (commit 4fd7e85) — ⚠️ NENASAZENO (majitel: nasadit později, třeba s D5)
+Registr skla dotažen: `BreakageSheet` (co/kdy/kdo/popis/opatření, validace) + `AuditRegister`
+s volitelnou `config.incident` (červené tlačítko — smí wo.create/wo.update; historie z workLogs
+where workType „Rozbití skla", bez složeného indexu). Zápis do Deníku s `auditReady`, žádné nové
+rules. Ověřeno buildem + náhledem. Deploy = jen hosting.
 
 ## DÁVKA 4 — ✅ HOTOVO 2026-07-04 (stránka /detektory + AI type=detektor) — Detektory cizích těles (audit MUST — IFS v8 povinné!)
 **Cíl:** evidence detektorů (magnety, síta, kovodetektor…) + test funkčnosti min. 1× za 12 měsíců.
