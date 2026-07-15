@@ -49,7 +49,7 @@
 **Rozhodnutí uživatele předem:** chce samostatnou stránku, nebo stačí filtr v Kartotéce? (AskUserQuestion)
 **Rozsah:** střední. Bez rules změn (kolekce assets už práva má).
 
-## DÁVKA 3 — ✅ KÓD HOTOV 2026-07-14 (commit 4fd7e85) — ⚠️ NENASAZENO (majitel: nasadit později, třeba s D5)
+## DÁVKA 3 — ✅ HOTOVO A NASAZENO 2026-07-14 (commit 4fd7e85)
 Registr skla dotažen: `BreakageSheet` (co/kdy/kdo/popis/opatření, validace) + `AuditRegister`
 s volitelnou `config.incident` (červené tlačítko — smí wo.create/wo.update; historie z workLogs
 where workType „Rozbití skla", bez složeného indexu). Zápis do Deníku s `auditReady`, žádné nové
@@ -60,7 +60,7 @@ rules. Ověřeno buildem + náhledem. Deploy = jen hosting.
 **Postup:** stejný vzor jako měřidla: `entityType: 'Detektor'` + událost `test_funkcnosti` s `frequencyDays: 365` → auto-úkoly zadarmo. Přidej do Kontroly kartotéky check „detektor bez testu >12 měsíců" (z `events` lastDate). Se souhlasem uživatele seedni reálné detektory (zeptej se, jaké mají).
 **Rozsah:** malá.
 
-## DÁVKA 5 — ✅ KÓD HOTOV 2026-07-14 — ⚠️ NENASAZENO (nasadit hosting spolu s D3)
+## DÁVKA 5 — ✅ HOTOVO A NASAZENO 2026-07-14 (volitelné potvrzení)
 Majitel zvolil VOLITELNÉ potvrzení. Implementace: TasksPage `CompleteTaskModal.onConfirm` —
 u úkolu s `assetId` se před dokončením zeptá useConfirm „Je stroj po údržbě čistý a uvolněný
 zpět do provozu?"; „Ano" → `hygieneRelease: {by, byName, at}` do tasku + řádek „Hygienické
@@ -68,7 +68,7 @@ uvolnění: …" do Deníku; „Ne / netýká se" dokončí bez záznamu. Typ v 
 Žádné rules změny. POZN.: rychlé dokončení z Top5 widgetu a CalendarPage otázku nemá (řeší
 se s task state machine z auditu cbcad).
 
-## DÁVKA 6 — ✅ KÓD HOTOV 2026-07-14 — ⚠️ NENASAZENO (deploy s D3+D5)
+## DÁVKA 6 — ✅ HOTOVO A NASAZENO 2026-07-14
 Klient existoval už dřív (checkbox `temporaryRepair` + `permanentFixDueDate` Timestamp v TasksPage,
 štítek na kartě, přehled v Reportech). Doplněn backend: denní běh `generatePreventiveTasks`
 (preventive.ts) — dokončený úkol s `temporaryRepair:true` a PROŠLÝM `permanentFixDueDate`

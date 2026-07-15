@@ -26,7 +26,7 @@
 **Hotovo, když:**
 - [ ] 100 % strojů má preventivní plán (doktor: 0× „bez plánu")
 - [ ] kalibrace měřidel: 0 propadlých; detektory: 0 bez testu
-- [ ] sklo (D3), hygienické uvolnění (D5), dočasné opravy (D6) — dávky hotové
+- [x] sklo (D3), hygienické uvolnění (D5), dočasné opravy (D6) — dávky hotové (NASAZENO 14. 7. 2026)
 - [ ] „Audit balíček" vytištěný a projitý s kvalitářkou — obsah odsouhlasen
 - [ ] při reálném auditu: **0 neshod kvůli dokumentaci údržby**
 
@@ -60,3 +60,7 @@ v týdenním/měsíčním AI souhrnu (gatherSummaryData → řádek ADOPCE).
 - 2026-07-14: ⚠️ AUDIT DO 2 MĚSÍCŮ (potvrdil majitel). Stav čísel: Deník od 2. 7. bez zápisu (12 dní!),
   ~4 aktivní pisatelé, 0 auditních kontrol v datech (měřidla/detektory nezaložené). Kód: bezpečnostní
   Dávka A nasazena; plakát /plakat.html živý. Priorita: opravy pro audit (pořadí výš) + adopce (QR, plakát).
+- 2026-07-14 večer: VŠECHNY auditní dávky kódu HOTOVÉ A NASAZENÉ — opravy falešných dokladů
+  (staré kontroly, preventivka) + D3 rozbití skla + D5 hygienické uvolnění (volitelné) + D6 hlídač
+  dočasných oprav. Z kódu pro Cíl 2 zbývá jen údržba; teď je řada na DATECH a LIDECH (majitel):
+  měřidla+detektory přes AI, plakát, QR, pak audit balíček s kvalitářkou.
