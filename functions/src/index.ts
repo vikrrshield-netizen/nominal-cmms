@@ -22,7 +22,7 @@ export {
 
 // AI asistent v aplikaci (Claude) — bezpečný backend, API klíč jako secret
 // + týdenní AI souhrn (plánovaná funkce)
-export { assistantChat, assistantConfirmAction, assistantBriefing, assistantFacts, weeklyAiSummary, monthlyExecReport } from './assistant';
+export { assistantChat, assistantConfirmAction, assistantBriefing, assistantFacts, dailyAiBriefing, weeklyAiSummary, monthlyExecReport } from './assistant';
 
 // Preventivní údržba — denně ráno založí úkoly z propadlých periodických termínů v Kartotéce;
 // lastDate („naposledy provedeno") zapisuje až trigger při skutečném dokončení úkolu.

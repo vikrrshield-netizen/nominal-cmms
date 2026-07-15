@@ -2023,6 +2023,85 @@ async function sendAiSummary(kind: 'weekly' | 'monthly'): Promise<void> {
   console.log(`[${kind}AiSummary] hotovo, notifikováno ${targets.length}`);
 }
 
+// ── RANNÍ HLÁŠENÍ (denně 6:15, PO ranní preventivce v 5:45) ─────────────────
+// Deterministické — ŽÁDNÉ volání Claude (nulové náklady, jede každý den).
+// AI hlídač: co hoří + připravenost na audit + čísla adopce. Doručení stejnou
+// cestou jako týdenní souhrn (aiSummaries + notifikace vedení a údržbě).
+export const dailyAiBriefing = functions
+  .runWith({ timeoutSeconds: 120, memory: '512MB' })
+  .pubsub.schedule('15 6 * * *')
+  .timeZone('Europe/Prague')
+  .onRun(async () => {
+    try {
+      const tenantId = 'main_firm';
+      const cache: ReqCache = new Map();
+      const assets = await getAssets(tenantId, cache);
+      const broken = assets.filter((a) => isProblem(a.status));
+      const events = assets.flatMap((a) => (a.events ?? []).map((ev: any) => ({ a, ev, d: daysUntil(ev.nextDate) })));
+      const overdue = events.filter((x: any) => x.d !== null && x.d < 0).sort((x: any, y: any) => x.d - y.d);
+      const soon = events.filter((x: any) => x.d !== null && x.d >= 0 && x.d <= 7).sort((x: any, y: any) => x.d - y.d);
+      const auditOverdue = overdue.filter((x: any) => AUDIT_RE.test(`${x.ev.name ?? ''} ${x.ev.eventType ?? ''}`));
+      const tasks = await getOpenTasks(tenantId, cache);
+      const p1 = tasks.filter((t) => String(t.priority) === 'P1');
+      const nowMs = Date.now();
+      const stalePrev = tasks.filter((t) => String(t.source) === 'preventive' && (t.createdAt?.toMillis?.() ?? nowMs) < nowMs - 7 * 86400000);
+      // Stroj bez preventivního plánu = žádná periodická událost (budovy/místnosti se nepočítají).
+      const machines = assets.filter((a) => !isBuildingA(a) && !isRoomA(a));
+      const noPlan = machines.filter((a) => !(a.events ?? []).some((ev: any) => Number(ev?.frequencyDays) > 0));
+      // Adopce (Cíl 1): kolik lidí a zápisů za posledních 7 dní.
+      const logs7 = (await getWorkLogs(tenantId, { limit: 300 }))
+        .filter((l) => ((l.performedAt ?? l.createdAt)?.toMillis?.() ?? 0) >= nowMs - 7 * 86400000);
+      const activeUsers7 = new Set(logs7.map((l) => String(l.userId ?? l.userName ?? '')).filter(Boolean)).size;
+      const perDay = Math.round((logs7.length / 7) * 10) / 10;
+
+      const auditIssues = auditOverdue.length + stalePrev.length;
+      const parts: string[] = [];
+      if (broken.length) parts.push(`🔴 Poruchy (${broken.length}): ${broken.slice(0, 5).map((a) => a.name).join(', ')}${broken.length > 5 ? ' …' : ''}`);
+      if (p1.length) parts.push(`🚨 Havárie P1 (${p1.length}): ${p1.slice(0, 5).map((t) => t.title ?? t.code ?? '?').join(', ')}`);
+      if (overdue.length) parts.push(`❗ Po termínu (${overdue.length}): ${overdue.slice(0, 5).map((x: any) => `${x.a.name} – ${x.ev.name}`).join('; ')}${overdue.length > 5 ? ' …' : ''}`);
+      if (soon.length) parts.push(`⏳ Do 7 dní (${soon.length}): ${soon.slice(0, 5).map((x: any) => `${x.a.name} – ${x.ev.name} (za ${x.d} d)`).join('; ')}`);
+      parts.push(auditIssues
+        ? `🛡️ AUDIT: ⚠️ propadlé auditní termíny: ${auditOverdue.length} · preventivka leží >7 dní: ${stalePrev.length}${noPlan.length ? ` · strojů bez plánu: ${noPlan.length}` : ''}`
+        : `🛡️ AUDIT: v pořádku${noPlan.length ? ` (jen ${noPlan.length} strojů bez preventivního plánu)` : ''}`);
+      parts.push(`👥 ADOPCE: lidí za 7 dní: ${activeUsers7} (cíl 8) · zápisů/den: ${perDay} (cíl 5)`);
+
+      const alerts = broken.length + p1.length + overdue.length;
+      const dateCz = new Date().toLocaleDateString('cs-CZ', { timeZone: 'Europe/Prague', day: 'numeric', month: 'numeric' });
+      const content = [`☀️ RANNÍ HLÁŠENÍ ${dateCz}`, alerts === 0 ? '✅ Nic nehoří.' : '', ...parts].filter(Boolean).join('\n');
+
+      const ref = await db().collection('aiSummaries').add({ tenantId, content, source: 'daily', createdAt: FV.serverTimestamp() });
+
+      const usersSnap = await db().collection('users').get();
+      const targets = usersSnap.docs
+        .map((d) => ({ id: d.id, ...(d.data() as any) }))
+        .filter((u) => u.active !== false && (!u.tenantId || u.tenantId === tenantId)
+          && ['MAJITEL', 'VEDENI', 'SUPERADMIN', 'UDRZBA'].includes(String(u.role || '').toUpperCase()));
+      const batch = db().batch();
+      const title = alerts === 0 ? '☀️ Ranní hlášení: vše v pořádku' : `☀️ Ranní hlášení: ${alerts}× k řešení`;
+      targets.forEach((u) => {
+        batch.set(db().doc(`notifications/ai-daily-${ref.id}-${u.id}`), {
+          userId: u.id,
+          tenantId,
+          type: 'ai',
+          priority: alerts === 0 ? 'normal' : 'high',
+          title,
+          message: content.slice(0, 280),
+          actionUrl: '/ai',
+          actionLabel: 'Otevřít AI',
+          read: false,
+          generated: true,
+          source: 'ai-daily',
+          sourceId: ref.id,
+          createdAt: FV.serverTimestamp(),
+        });
+      });
+      await batch.commit();
+      console.log(`[dailyAiBriefing] hotovo — alerts: ${alerts}, audit: ${auditIssues}, notifikováno ${targets.length}`);
+    } catch (err) {
+      console.error('[dailyAiBriefing] error:', (err as Error)?.message);
+    }
+  });
+
 export const weeklyAiSummary = functions
   .runWith({ secrets: ['ANTHROPIC_API_KEY'], timeoutSeconds: 300, memory: '512MB' })
   .pubsub.schedule('every monday 07:00')
