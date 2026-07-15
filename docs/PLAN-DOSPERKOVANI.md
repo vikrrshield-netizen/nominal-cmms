@@ -68,10 +68,13 @@ uvolnění: …" do Deníku; „Ne / netýká se" dokončí bez záznamu. Typ v 
 Žádné rules změny. POZN.: rychlé dokončení z Top5 widgetu a CalendarPage otázku nemá (řeší
 se s task state machine z auditu cbcad).
 
-## DÁVKA 6 — Dočasné opravy s expirací (audit SHOULD — BRCGS 4.7.3)
-**Cíl:** úkol jde označit „dočasná oprava" s termínem, do kdy musí přijít trvalá; po termínu se sám založí následný úkol.
-**Postup:** 1) klient: checkbox „dočasná oprava" + datum při zakládání/dokončení úkolu → pole `temporaryFix: { until: 'YYYY-MM-DD' }`. 2) backend: rozšíř `functions/src/preventive.ts` denní běh — najdi dokončené úkoly s `temporaryFix.until <= dnes` bez follow-upu → založ úkol „Trvalá oprava: …" (dedup přes `followUpOf: taskId`).
-**Rozsah:** střední. Funkce: build + deploy `functions:generatePreventiveTasks`.
+## DÁVKA 6 — ✅ KÓD HOTOV 2026-07-14 — ⚠️ NENASAZENO (deploy s D3+D5)
+Klient existoval už dřív (checkbox `temporaryRepair` + `permanentFixDueDate` Timestamp v TasksPage,
+štítek na kartě, přehled v Reportech). Doplněn backend: denní běh `generatePreventiveTasks`
+(preventive.ts) — dokončený úkol s `temporaryRepair:true` a PROŠLÝM `permanentFixDueDate`
+(pražský den, den termínu se ještě smí) → follow-up úkol „Trvalá oprava: …" (P2, corrective,
+`source: 'temporary-followup'`, dedup přes `followUpOf` — nezakládá znovu ani po zrušení).
+Deploy: hosting + `functions:generatePreventiveTasks` (bez --force).
 
 ## DÁVKA 7 — ✅ HOTOVO 2026-07-04 — Audit balíček (export pro auditora)
 **Cíl:** jedním klikem XLSX: stroje + jejich PPM plány + poslední provedení, propadlé termíny, kalibrace, detektory, rozbití skla.

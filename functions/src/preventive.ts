@@ -114,7 +114,61 @@ export const generatePreventiveTasks = functions
       if (ops >= 400) await flush();
     }
     await flush();
-    console.log(`[preventive] ${today}: založeno ${created} úkolů, přeskočeno ${skipped} (už otevřený), assets: ${snap.size}`);
+
+    // ── Dočasné opravy (BRCGS 4.7.3): hlídač termínu trvalého řešení ──
+    // Dokončená „dočasná oprava" s prošlým termínem trvalého řešení → automaticky
+    // založ následný úkol „Trvalá oprava: …". Dedup přes followUpOf: jednou a dost —
+    // i kdyby follow-up někdo zrušil, znovu se nezakládá (bylo to rozhodnutí člověka).
+    const pragueDayOf = (d: Date): string =>
+      new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Prague', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+    let followUps = 0;
+    try {
+      const [tmpSnap, fuSnap] = await Promise.all([
+        db().collection('tasks').where('temporaryRepair', '==', true).get(),
+        db().collection('tasks').where('source', '==', 'temporary-followup').get(),
+      ]);
+      const hasFollowUp = new Set(fuSnap.docs.map((d) => String((d.data() as any).followUpOf ?? '')));
+      for (const docSnap of tmpSnap.docs) {
+        const t = docSnap.data() as any;
+        if (String(t.status ?? '') !== 'completed') continue; // dočasná oprava musí být hotová
+        const due = t.permanentFixDueDate?.toDate?.();
+        if (!due || pragueDayOf(due) >= today) continue; // termín ještě neuplynul (den termínu se ještě smí)
+        if (hasFollowUp.has(docSnap.id)) continue;
+        const code = `WO-${year}-TO${(Date.now() + followUps).toString(36).slice(-5).toUpperCase()}`;
+        batch.set(db().collection('tasks').doc(), {
+          code,
+          title: `Trvalá oprava: ${String(t.title ?? 'úkol')}`,
+          type: 'corrective',
+          status: 'backlog',
+          priority: 'P2',
+          source: 'temporary-followup',
+          followUpOf: docSnap.id,
+          description: [
+            `Dočasná oprava (úkol ${t.code ?? docSnap.id}) měla termín trvalého řešení ${pragueDayOf(due)} — termín uplynul.`,
+            'Je potřeba provést trvalou opravu.',
+            String(t.description ?? '').trim() ? `Původní popis: ${String(t.description).trim()}` : '',
+          ].filter(Boolean).join('\n'),
+          assetId: t.assetId ?? null,
+          assetName: t.assetName ?? null,
+          location: t.location ?? null,
+          tenantId: t.tenantId ?? 'main_firm',
+          isDone: false,
+          createdById: 'system',
+          createdByName: 'Hlídač dočasných oprav',
+          createdAt: FV.serverTimestamp(),
+          updatedAt: FV.serverTimestamp(),
+        });
+        ops++;
+        followUps++;
+        if (ops >= 400) await flush();
+      }
+      await flush();
+    } catch (err) {
+      // Hlídač nesmí shodit preventivku — chybu jen zaloguj (uvidí ji Dohled/logy).
+      console.error('[preventive] hlídač dočasných oprav selhal:', err);
+    }
+
+    console.log(`[preventive] ${today}: založeno ${created} úkolů, přeskočeno ${skipped} (už otevřený), trvalé opravy: ${followUps}, assets: ${snap.size}`);
     return null;
   });
 
