@@ -137,6 +137,10 @@ export interface TaskDoc {
   completedBy?: string;
   completedByNames?: string[];
 
+  // Hygienické uvolnění po údržbě (BRCGS 4.7.4) — kdo potvrdil, že stroj je čistý
+  // a uvolněný zpět do provozu. Volitelné (zapisuje se jen při „Ano" u dokončení).
+  hygieneRelease?: { by: string; byName: string; at: Timestamp };
+
   // Seznam dílčích závad (checklist) — každá se dokončuje zvlášť
   defects?: TaskDefect[];
 }

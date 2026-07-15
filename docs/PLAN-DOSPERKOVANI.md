@@ -60,11 +60,13 @@ rules. Ověřeno buildem + náhledem. Deploy = jen hosting.
 **Postup:** stejný vzor jako měřidla: `entityType: 'Detektor'` + událost `test_funkcnosti` s `frequencyDays: 365` → auto-úkoly zadarmo. Přidej do Kontroly kartotéky check „detektor bez testu >12 měsíců" (z `events` lastDate). Se souhlasem uživatele seedni reálné detektory (zeptej se, jaké mají).
 **Rozsah:** malá.
 
-## DÁVKA 5 — Hygienické uvolnění po údržbě (audit MUST — BRCGS 4.7.4) ⚠️ logika
-**Cíl:** po dokončení údržbového úkolu na stroji potvrdit „stroj očištěn a uvolněn do provozu".
-**Postup (nech si odsouhlasit!):** do dokončení úkolu (`src/services/taskService.ts` completeTask — POZOR, je v runTransaction; a `useInventory.completeTaskWithParts`) přidat volitelný krok: když má úkol `assetId` a typ údržby, klient se PŘED dokončením zeptá (useConfirm) „Stroj je čistý a uvolněný do provozu?" a zapíše do task dokumentu `hygieneRelease: { by, byName, at }`. Jen klientská pole — žádné rules změny. UI: TasksPage tlačítko dokončení.
-**NEDĚLAT:** povinnost/blokaci bez souhlasu uživatele (ať si vybere: volitelné vs povinné).
-**Rozsah:** střední, citlivá (dotýká se dokončování úkolů) — pečlivě testovat.
+## DÁVKA 5 — ✅ KÓD HOTOV 2026-07-14 — ⚠️ NENASAZENO (nasadit hosting spolu s D3)
+Majitel zvolil VOLITELNÉ potvrzení. Implementace: TasksPage `CompleteTaskModal.onConfirm` —
+u úkolu s `assetId` se před dokončením zeptá useConfirm „Je stroj po údržbě čistý a uvolněný
+zpět do provozu?"; „Ano" → `hygieneRelease: {by, byName, at}` do tasku + řádek „Hygienické
+uvolnění: …" do Deníku; „Ne / netýká se" dokončí bez záznamu. Typ v `types/firestore.ts`.
+Žádné rules změny. POZN.: rychlé dokončení z Top5 widgetu a CalendarPage otázku nemá (řeší
+se s task state machine z auditu cbcad).
 
 ## DÁVKA 6 — Dočasné opravy s expirací (audit SHOULD — BRCGS 4.7.3)
 **Cíl:** úkol jde označit „dočasná oprava" s termínem, do kdy musí přijít trvalá; po termínu se sám založí následný úkol.

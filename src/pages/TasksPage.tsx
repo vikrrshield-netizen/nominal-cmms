@@ -1486,11 +1486,23 @@ export default function TasksPage() {
             const assignedWorkerNames = uniqueNames([...taskWorkerNames(completingTask), ...completedByNames]);
             const performedAt = data.performedDate ? Timestamp.fromDate(new Date(`${data.performedDate}T12:00:00`)) : serverTimestamp();
             const resultLabel = taskResultLabel(data.result);
+            // Hygienické uvolnění po údržbě (BRCGS 4.7.4) — VOLITELNÉ (rozhodnutí majitele
+            // 2026-07-14): u úkolu na stroji se zeptáme; „Ne / netýká se" dokončí bez záznamu.
+            let hygieneReleased = false;
+            if (completingTask.assetId) {
+              hygieneReleased = await ask({
+                title: 'Hygienické uvolnění',
+                message: 'Je stroj po údržbě čistý a uvolněný zpět do provozu?\n\n„Ano" se zapíše k úkolu i do Deníku (auditor to chce vidět). „Ne / netýká se" úkol normálně dokončí bez záznamu.',
+                confirmText: 'Ano, čistý a uvolněný',
+                cancelText: 'Ne / netýká se',
+              });
+            }
             const diaryContent = [
               data.resolution,
               resultLabel ? `Výsledek: ${resultLabel}` : '',
               data.cleaningStatus === 'done' ? `Úklid po opravě: provedeno${data.cleaningNote ? ` (${data.cleaningNote})` : ''}` : '',
               data.cleaningStatus === 'not_applicable' ? `Úklid po opravě: netýká se${data.cleaningNote ? ` (${data.cleaningNote})` : ''}` : '',
+              hygieneReleased ? `Hygienické uvolnění: stroj čistý, uvolněn do provozu (${completedByName})` : '',
               data.auditNote ? `Audit: ${data.auditNote}` : '',
             ].filter(Boolean).join('\n');
             const batch = writeBatch(db);
@@ -1564,6 +1576,7 @@ export default function TasksPage() {
               workType: data.workType || null,
               result: data.result,
               auditNote: data.auditNote || null,
+              ...(hygieneReleased ? { hygieneRelease: { by: user?.id || 'unknown', byName: completedByName, at: Timestamp.now() } } : {}),
               completedAt: serverTimestamp(),
               completedBy: completedByName,
               completedByNames,
